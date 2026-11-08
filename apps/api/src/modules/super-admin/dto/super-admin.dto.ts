@@ -238,3 +238,4 @@ export class UpdatePlatformSettingRequestDto implements PlatformSettingDto {
   @IsString()
   description?: string;
 }
+

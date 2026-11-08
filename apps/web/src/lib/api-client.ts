@@ -12,6 +12,10 @@ import type {
   TenantDetail,
   TenantSummary,
   UpdateTenantStatusDto,
+  CheckSlugResult,
+  OnboardingPayload,
+  OnboardingResponseData,
+  PublicPlanDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -153,5 +157,19 @@ export const superAdminApi = {
     data: PlatformSettingDto,
   ): Promise<ApiResponse<PlatformSettingItemDto>> => {
     return apiClient.patch<PlatformSettingItemDto>('/super-admin/settings', data);
+  },
+};
+
+export const onboardingApi = {
+  getPlans: async (): Promise<ApiResponse<PublicPlanDto[]>> => {
+    return apiClient.get<PublicPlanDto[]>('/onboarding/plans');
+  },
+  checkSlug: async (slug: string): Promise<ApiResponse<CheckSlugResult>> => {
+    return apiClient.post<CheckSlugResult>('/onboarding/check-slug', { slug });
+  },
+  register: async (
+    payload: OnboardingPayload,
+  ): Promise<ApiResponse<OnboardingResponseData>> => {
+    return apiClient.post<OnboardingResponseData>('/onboarding/register', payload);
   },
 };

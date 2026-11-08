@@ -38,3 +38,4 @@ export type UpdateTenantStatusInput = z.infer<typeof updateTenantStatusSchema>;
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
 export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
 export type UpdatePlatformSettingInput = z.infer<typeof updatePlatformSettingSchema>;
+
