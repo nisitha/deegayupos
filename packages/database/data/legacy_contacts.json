@@ -1,0 +1,782 @@
+{
+  "suppliers": [
+    {
+      "id": "31",
+      "name": "Deegayu weda madura",
+      "phone": "077 26 34497",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "32",
+      "name": "Ayurna ceylon (pvt) Ltd",
+      "phone": "0776616339",
+      "email": "",
+      "address": "Dakunu Kaluthara, pannila road, 13 /c",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "34",
+      "name": "Sahansa Hela Osu",
+      "phone": "0771328056",
+      "email": "",
+      "address": "Rajanganaya",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "35",
+      "name": "MED CHEM",
+      "phone": "0774783730",
+      "email": "",
+      "address": "Kiribath kumbura, Candy",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "36",
+      "name": "Nuwanya Osu Suppiayers",
+      "phone": "0771328056",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "37",
+      "name": "Wanamandawe Ayurweda Drugs Manufactory",
+      "phone": "0779446000",
+      "email": "wanamandawe@gmai",
+      "address": "Puskoladeniya, Giriulla.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "38",
+      "name": "Dilma Capital Holdings [Pvt] ltd",
+      "phone": "",
+      "email": "",
+      "address": "546/2, Mihidu Mawatha, Athurugiriya Mawatha, Malabe.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "39",
+      "name": "Sanoda Ayurvedic Products",
+      "phone": "0757851782",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "40",
+      "name": "Siddaoshada {Pvt} Ltd",
+      "phone": "0332051335 / 0333136451",
+      "email": "info@siddhaushadha.lk",
+      "address": "18/1/B , Halgampitiya ; Kalagedihena",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "42",
+      "name": "Jeewantha Osu Sala",
+      "phone": "0372223496",
+      "email": "",
+      "address": "Main Street , Kurunagala",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "43",
+      "name": "Gurusinha mati pahan",
+      "phone": "0768044978",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "44",
+      "name": "Kadahapola Dharmarathna Aushadalaya [Pvt] Ltd",
+      "phone": "0372249276 / 0773018158",
+      "email": "ayu.kadahapola@gmail.com",
+      "address": "Kuliyapitiya Road, Kadahapola, Narammala",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "45",
+      "name": "Suwa Shakthi Nishpadana",
+      "phone": "0776963203",
+      "email": "",
+      "address": "No25, Makulgahamula Waththa, Kadahapola., Ampara Road, 7kanuwa, Kanda Uda Panguwa, Monaradala,",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "46",
+      "name": "Baddegama Stores",
+      "phone": "0112645344",
+      "email": "",
+      "address": "Mo 07 Keselwatta, Panadura",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "47",
+      "name": "Gampaha Siddayurweda Rasayana Oshada Samagama",
+      "phone": "0332222308 / 0332225582",
+      "email": "",
+      "address": "171 Candy Road, Yakkala.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "48",
+      "name": "Hettigoda Industries (Pvt) Ltd",
+      "phone": "0112736910",
+      "email": "siddalepa@stl.lk",
+      "address": "33/3, Darmarama Road, Rathmalana.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "49",
+      "name": "Bio Beauty Lanka",
+      "phone": "0752625818",
+      "email": "isuru@biobeautylanka.lk",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "50",
+      "name": "Dayana Enterprises (Pvt) Ltd",
+      "phone": "0784354413 / 0786213607",
+      "email": "",
+      "address": "No 134/1, Pelawaththa",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "51",
+      "name": "Suwada Industries (Pvt) Ltd",
+      "phone": "0761059386",
+      "email": "castamercare@suwada.lk",
+      "address": "692, Rice Mill Road , Katunayaka. 0112254680",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "52",
+      "name": "G K Enteraprisce",
+      "phone": "0718900996",
+      "email": "",
+      "address": "Matikumbura, Polgahawela.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "53",
+      "name": "W K A S Nishpadakayo",
+      "phone": "0774410866",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "54",
+      "name": "Isiraj - Horivila",
+      "phone": "0711515164 / 0332249191",
+      "email": "",
+      "address": "No 412/D/1, Maligawaththa, Maddegama, Kiridiwala.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "55",
+      "name": "M D Liweris Amarathunga & Sons",
+      "phone": "01127538989",
+      "email": "krimiraja@sltnet.lk",
+      "address": "Balushadagaraya, Kiriwanthuduwa.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "56",
+      "name": "Pathima Weda Madura",
+      "phone": "0768659555",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "57",
+      "name": "AL HAMA Distributors",
+      "phone": "0772399112",
+      "email": "",
+      "address": "82, Dunuwula Road, Akurana",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "58",
+      "name": "Niro Products",
+      "phone": "0720600247",
+      "email": "",
+      "address": "No91C, Ellangala Minuwangoda",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "62",
+      "name": "Vendol Lanka (Pvt) ltd",
+      "phone": "0772638319",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "63",
+      "name": "Jeewaka Herbal Products (Pvi) Ltd",
+      "phone": "0744105555",
+      "email": "jeewakaherbalsproducts@gmail.com",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "64",
+      "name": "T R Distributors",
+      "phone": "0773697273",
+      "email": "",
+      "address": "Bulugaha waththa, Malkaduwawa",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "65",
+      "name": "s b m distributor",
+      "phone": "0372223380",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "66",
+      "name": "Dammika Rupa",
+      "phone": "0775278980",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "67",
+      "name": "Sarasavi",
+      "phone": "0701572000",
+      "email": "",
+      "address": "Narammala Road, Alawwa",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "68",
+      "name": "Deegayu Main Store",
+      "phone": "0332241241",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "69",
+      "name": "Star Ayurweda Oshada Nishpadanagaraya",
+      "phone": "0312246313",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "70",
+      "name": "Sathya Products",
+      "phone": "0775836044",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "71",
+      "name": "Bakthi Hearbal Lanka (pvi) Ltd",
+      "phone": "0767001000",
+      "email": "",
+      "address": "no 70A Mahalwarawa Pannipitiya",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "73",
+      "name": "Elephant House (Pvt) Ltd",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "74",
+      "name": "Ambewela Products (pvt)ltd",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "75",
+      "name": "Kumara Kashapa Nishpadana",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "76",
+      "name": "Pelewatte Dairy",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "77",
+      "name": "Smak food",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "78",
+      "name": "Leoan Milk Foods",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "79",
+      "name": "Vinter Food",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "80",
+      "name": "Ceylon Beverage (pvt)ltd",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "81",
+      "name": "Sunquick Lanka",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "82",
+      "name": "Tea Product",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "83",
+      "name": "Sapumal Industries",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "84",
+      "name": "Link Natural",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "85",
+      "name": "Beam Hela Osu Lanka",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "86",
+      "name": "Unilever Srilanka",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "87",
+      "name": "ICL Brands",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "88",
+      "name": "Deegayu ICE Company",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "89",
+      "name": "Dinithi Pahan Thira",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "90",
+      "name": "Pasyale Ayurveda Osu",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "91",
+      "name": "Nature Beauty",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "92",
+      "name": "Himalaya Wellness",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "93",
+      "name": "D M T Distributor",
+      "phone": "0776949143",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "94",
+      "name": "Nahalle Aushadalaya",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "95",
+      "name": "Star Ayurvedic",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "96",
+      "name": "Rajapura Herbal Drugs",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "97",
+      "name": "The Kandy Ayurvedic",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "98",
+      "name": "Chandana Product-Madahapola.",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "100",
+      "name": "Godrej Household",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "101",
+      "name": "Dream Life",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "102",
+      "name": "Diamond Lanka",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "103",
+      "name": "Reckitt and Colman",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "104",
+      "name": "Parakrama Product",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "105",
+      "name": "Darley Butler",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "106",
+      "name": "Hemas",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "107",
+      "name": "Winuga Product",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "108",
+      "name": "Alawwa Mati Banda Nishpadakayo",
+      "phone": "0716485752",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "109",
+      "name": "Danara Distributors",
+      "phone": "0712373532",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "110",
+      "name": "Vinuga Hela Osu",
+      "phone": "0718531191",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "111",
+      "name": "Wickramaarachchi Bros (PVT) Ltd",
+      "phone": "0332256108",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "112",
+      "name": "Godakanda Harbals (Pvt) Ltd",
+      "phone": "",
+      "email": "godakandag@gmail.com",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "113",
+      "name": "Rawana Ayurweda Nishpadanagaraya",
+      "phone": "0771689474/0713238676",
+      "email": "",
+      "address": "No 627 1/2 Kiri Ibban Wewa, Sewanagala.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "114",
+      "name": "Sathpiyum Herbal",
+      "phone": "0712306373 / 0776863500 - jagath",
+      "email": "",
+      "address": "D94, Malavita, Hettimulla, Kegalla.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "115",
+      "name": "Chello Dairy Product (Pvt) Ltd",
+      "phone": "0452240385",
+      "email": "info@chellodairy.com",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "116",
+      "name": "Gobreg Household Products Lanka (Pvt) Ltd",
+      "phone": "0769701652",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "117",
+      "name": "A N M Distributors",
+      "phone": "07722051177",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "118",
+      "name": "Horana Parackrama Nishpadana",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "119",
+      "name": "Morawaka And Sons (Pvt) Ltd",
+      "phone": "0778916090",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "120",
+      "name": "Sensic Food Trading",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "121",
+      "name": "Geethani Product",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "122",
+      "name": "Herbi Product",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "123",
+      "name": "Pannala Puja Banda Nishpadakayo",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "124",
+      "name": "Wana Pawana Nishpadana",
+      "phone": "0713625785",
+      "email": "",
+      "address": "385/1/A, Jaya mawatha, polpithi mukalana, Jadana",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "125",
+      "name": "Green Harwast Lanka Product",
+      "phone": "0760605716",
+      "email": "",
+      "address": "Aluthwaththa, Weeragala, Narammala.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "126",
+      "name": "Uni Lanka traders",
+      "phone": "0112391348",
+      "email": "unilankat@yahoo.com",
+      "address": "No,284, sea street, colombo-11, Colombo",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "127",
+      "name": "Madushan Product",
+      "phone": "0773357650 / 0766019315",
+      "email": "",
+      "address": "No 366/4, Walikatiya, Hamangalla, Narangoda.",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "128",
+      "name": "Tasty (PVT) Ltd",
+      "phone": "0117297900",
+      "email": "info@tastyy.com",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "129",
+      "name": "Sugatha Rasayanagaraya",
+      "phone": "0342261306",
+      "email": "suensuherbals@gmail.com",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "130",
+      "name": "Swararasa Nispadana",
+      "phone": "0728926002",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "131",
+      "name": "Hertbele Elementts (pvt) Ltd",
+      "phone": "0777778026",
+      "email": "pilapitiyaayurwedaya@gmail.com",
+      "address": "Pilapitiya Weda Madura Kasbewa, Piliyandala.",
+      "opening_balance": "0.00"
+    }
+  ],
+  "customers": [
+    {
+      "id": "13",
+      "name": "Edd Dede",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "27",
+      "name": "Sm Sm",
+      "phone": "0771135595",
+      "email": "susantha.mama@gmail.com",
+      "address": "Susantha.mama@gmail.com, Gampaha, Katunayaka, 19345",
+      "opening_balance": "0.00"
+    },
+    {
+      "id": "28",
+      "name": "Su Su",
+      "phone": "0771135595",
+      "email": "",
+      "address": "Next service 7500KM",
+      "opening_balance": "0.00"
+    }
+  ]
+}

@@ -392,3 +392,4 @@ model IdempotencyKey {
   @@index([tenantId, expiresAt])
   @@map("idempotency_keys")
 }
+

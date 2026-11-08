@@ -304,6 +304,96 @@ export async function main() {
     },
   });
 
+  // Assign full system permissions to Tenant Alpha Owner
+  const allPermissions = await prisma.permission.findMany();
+  for (const perm of allPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: roleOwnerAlpha.id,
+          permissionId: perm.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: roleOwnerAlpha.id,
+        permissionId: perm.id,
+      },
+    });
+  }
+
+  // Create Cashier Role & User for RBAC testing
+  const roleCashierAlpha = await prisma.role.upsert({
+    where: {
+      tenantId_code: {
+        tenantId: tenantAlpha.id,
+        code: 'CASHIER',
+      },
+    },
+    update: { name: 'Cashier Staff' },
+    create: {
+      tenantId: tenantAlpha.id,
+      code: 'CASHIER',
+      name: 'Cashier Staff',
+      isSystem: false,
+    },
+  });
+
+  const cashierPerms = allPermissions.filter((p) =>
+    ['pos:access', 'pos:checkout'].includes(p.code),
+  );
+  for (const perm of cashierPerms) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: roleCashierAlpha.id,
+          permissionId: perm.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: roleCashierAlpha.id,
+        permissionId: perm.id,
+      },
+    });
+  }
+
+  const userCashierAlpha = await prisma.user.upsert({
+    where: { email: 'cashier.alpha@pixelcraftlk.com' },
+    update: {
+      fullName: 'Kamal Gunaratne',
+      isActive: true,
+    },
+    create: {
+      email: 'cashier.alpha@pixelcraftlk.com',
+      passwordHash,
+      fullName: 'Kamal Gunaratne',
+      phone: '+94 77 987 6543',
+      isActive: true,
+    },
+  });
+
+  await prisma.businessMembership.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenantAlpha.id,
+        userId: userCashierAlpha.id,
+      },
+    },
+    update: {
+      status: 'ACTIVE',
+      defaultBranchId: branchAlpha.id,
+      roleId: roleCashierAlpha.id,
+    },
+    create: {
+      tenantId: tenantAlpha.id,
+      userId: userCashierAlpha.id,
+      roleId: roleCashierAlpha.id,
+      defaultBranchId: branchAlpha.id,
+      status: 'ACTIVE',
+    },
+  });
+
   // --- TENANT BETA ---
   const tenantBeta = await prisma.business.upsert({
     where: { slug: 'beta' },
@@ -468,6 +558,23 @@ export async function main() {
       status: 'ACTIVE',
     },
   });
+
+  // Assign full system permissions to Tenant Beta Owner
+  for (const perm of allPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: roleOwnerBeta.id,
+          permissionId: perm.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: roleOwnerBeta.id,
+        permissionId: perm.id,
+      },
+    });
+  }
 
   console.log('✅ PixelCraft POS Database Seeding Completed Successfully!');
   console.log(`   - Super Admin: admin@pixelcraftlk.com`);
