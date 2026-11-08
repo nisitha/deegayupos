@@ -161,3 +161,4 @@ export class AuthMeDataDto implements AuthMeData {
   })
   permissions!: string[];
 }
+

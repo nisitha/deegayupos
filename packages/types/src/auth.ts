@@ -8,6 +8,8 @@ export interface UserTokenPayload {
   email: string;
   activeTenantId?: string;
   role?: string;
+  isSuperAdmin?: boolean;
+  isPlatformUser?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -22,6 +24,9 @@ export interface AuthUser {
   fullName: string;
   phone?: string | null;
   isActive: boolean;
+  isSuperAdmin?: boolean;
+  isPlatformUser?: boolean;
+  role?: string;
 }
 
 /**
@@ -98,3 +103,4 @@ export interface RefreshTokenDto {
 export interface SwitchTenantDto {
   tenantId: string;
 }
+

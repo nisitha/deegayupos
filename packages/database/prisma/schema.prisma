@@ -356,7 +356,7 @@ model SubscriptionPayment {
 
 model AuditLog {
   id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
   userId    String?  @map("user_id") @db.Uuid
   action    String   @db.VarChar(128)
   entity    String   @db.VarChar(128)
@@ -367,8 +367,8 @@ model AuditLog {
   userAgent String?  @map("user_agent") @db.VarChar(512)
   createdAt DateTime @default(now()) @map("created_at")
 
-  business Business @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, id])
   @@index([tenantId, entity, entityId])

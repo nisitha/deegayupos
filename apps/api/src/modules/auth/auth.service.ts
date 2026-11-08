@@ -78,6 +78,69 @@ export class AuthService {
     });
 
     if (!user) {
+      // Check if this is a Platform Super Admin account
+      const platformUser = await this.prisma.platformUser.findUnique({
+        where: { email },
+      });
+
+      if (platformUser) {
+        const isPlatformPasswordValid = await bcrypt.compare(
+          dto.password,
+          platformUser.passwordHash,
+        );
+
+        if (!isPlatformPasswordValid) {
+          throw new UnauthorizedException('Invalid email or password.');
+        }
+
+        if (!platformUser.isActive || platformUser.deletedAt) {
+          throw new UnauthorizedException(
+            'Platform administrator account is disabled or deactivated.',
+          );
+        }
+
+        const accessPayload: UserTokenPayload = {
+          sub: platformUser.id,
+          email: platformUser.email,
+          isPlatformUser: true,
+          isSuperAdmin: platformUser.role === 'SUPER_ADMIN',
+          role: platformUser.role,
+        };
+
+        const [accessToken, refreshToken] = await Promise.all([
+          this.jwtService.signAsync(accessPayload, {
+            secret: this.jwtSecret,
+            expiresIn: '15m',
+          }),
+          this.jwtService.signAsync(
+            { sub: platformUser.id, email: platformUser.email },
+            {
+              secret: this.jwtRefreshSecret,
+              expiresIn: '7d',
+            },
+          ),
+        ]);
+
+        return {
+          accessToken,
+          refreshToken,
+          expiresIn: 900,
+          tokenType: 'Bearer',
+          user: {
+            id: platformUser.id,
+            email: platformUser.email,
+            fullName: 'PixelCraft Super Admin',
+            phone: null,
+            isActive: platformUser.isActive,
+            isSuperAdmin: platformUser.role === 'SUPER_ADMIN',
+            isPlatformUser: true,
+            role: platformUser.role,
+          },
+          activeTenant: null,
+          permissions: ['*'],
+        };
+      }
+
       // Avoid leaking user existence, but record audit if business slug exists
       if (dto.tenantSlug) {
         const business = await this.prisma.business.findUnique({

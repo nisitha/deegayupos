@@ -32,3 +32,4 @@ export const switchTenantSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type SwitchTenantInput = z.infer<typeof switchTenantSchema>;
+

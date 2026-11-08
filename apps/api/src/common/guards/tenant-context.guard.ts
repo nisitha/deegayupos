@@ -48,10 +48,6 @@ export class TenantContextGuard implements CanActivate {
         userId: user.id,
         status: 'ACTIVE',
         deletedAt: null,
-        business: {
-          status: { in: ['ACTIVE', 'TRIAL'] },
-          deletedAt: null,
-        },
       },
       include: {
         business: true,
@@ -84,6 +80,25 @@ export class TenantContextGuard implements CanActivate {
         );
       }
       activeMembership = matched;
+    }
+
+    // Enforce business status isolation & suspension check
+    if (activeMembership.business.status === 'SUSPENDED') {
+      throw new ForbiddenException(
+        'Tenant account is suspended. Please contact PixelCraft support.',
+      );
+    }
+
+    if (activeMembership.business.status === 'EXPIRED') {
+      throw new ForbiddenException(
+        'Tenant organization subscription has expired. Please renew your subscription.',
+      );
+    }
+
+    if (activeMembership.business.deletedAt) {
+      throw new ForbiddenException(
+        'Tenant organization has been deactivated or removed.',
+      );
     }
 
     const authTenant: AuthTenant = {
