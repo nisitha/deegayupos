@@ -8,6 +8,12 @@ export const healthCheckDataSchema = z.object({
   uptime: z.number().nonnegative(),
   timestamp: z.string().datetime(),
   nodeVersion: z.string(),
+  database: z
+    .object({
+      status: z.enum(['connected', 'disconnected']),
+      latencyMs: z.number().optional(),
+    })
+    .optional(),
   memoryUsage: z
     .object({
       rssMb: z.number(),

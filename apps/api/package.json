@@ -11,6 +11,8 @@
     "start:prod": "node dist/main",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "vitest run test/tenant-isolation.spec.ts",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
@@ -19,6 +21,7 @@
     "@nestjs/core": "^11.0.11",
     "@nestjs/platform-express": "^11.0.11",
     "@nestjs/swagger": "^11.0.6",
+    "@pixelcraft/database": "workspace:*",
     "@pixelcraft/types": "workspace:*",
     "@pixelcraft/validation": "workspace:*",
     "class-transformer": "^0.5.1",
@@ -44,6 +47,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0"
   }
 }

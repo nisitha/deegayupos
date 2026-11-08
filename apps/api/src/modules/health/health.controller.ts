@@ -20,7 +20,7 @@ export class HealthController {
     description: 'System is healthy and responsive.',
     type: HealthCheckResponseDto,
   })
-  getHealth(): HealthCheckData {
+  async getHealth(): Promise<HealthCheckData> {
     return this.healthService.getHealthStatus();
   }
 }

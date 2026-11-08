@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
+  Database,
   ExternalLink,
   Layers,
   RefreshCw,
@@ -121,7 +122,7 @@ export function HealthStatusCard() {
           </div>
         ) : isOnline && healthData ? (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="rounded-lg border border-obsidian-border bg-obsidian-muted/50 p-3.5">
                 <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
                   <Server className="h-3.5 w-3.5 text-cyan-400" />
@@ -132,6 +133,25 @@ export function HealthStatusCard() {
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
                   v{healthData.version} ({healthData.environment})
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-obsidian-border bg-obsidian-muted/50 p-3.5">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
+                  <Database className="h-3.5 w-3.5 text-indigo-400" />
+                  PostgreSQL
+                </div>
+                <div className="text-sm font-semibold text-white">
+                  {healthData.database?.status === 'connected' ? (
+                    <span className="text-emerald-400">Connected</span>
+                  ) : (
+                    <span className="text-amber-400">Standby</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {healthData.database?.latencyMs !== undefined
+                    ? `${healthData.database.latencyMs} ms ping`
+                    : 'Prisma RLS'}
                 </div>
               </div>
 

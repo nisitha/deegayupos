@@ -43,6 +43,10 @@ export interface HealthCheckData {
   uptime: number; // in seconds
   timestamp: string;
   nodeVersion: string;
+  database?: {
+    status: 'connected' | 'disconnected';
+    latencyMs?: number;
+  };
   memoryUsage?: {
     rssMb: number;
     heapTotalMb: number;

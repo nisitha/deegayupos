@@ -44,6 +44,14 @@ export class ApiResponseDto<T> implements ApiResponse<T> {
   path?: string;
 }
 
+export class DatabaseStatusDto {
+  @ApiProperty({ example: 'connected', enum: ['connected', 'disconnected'] })
+  status!: 'connected' | 'disconnected';
+
+  @ApiPropertyOptional({ example: 4.2, description: 'Query ping roundtrip in ms' })
+  latencyMs?: number;
+}
+
 export class MemoryUsageDto {
   @ApiProperty({ example: 64.5, description: 'Resident Set Size in MB' })
   rssMb!: number;
@@ -80,6 +88,12 @@ export class HealthCheckDataDto implements HealthCheckData {
 
   @ApiProperty({ example: 'v24.19.0', description: 'Node.js runtime version' })
   nodeVersion!: string;
+
+  @ApiPropertyOptional({
+    type: () => DatabaseStatusDto,
+    description: 'PostgreSQL database connectivity',
+  })
+  database?: DatabaseStatusDto;
 
   @ApiPropertyOptional({ type: () => MemoryUsageDto, description: 'Memory consumption telemetry' })
   memoryUsage?: MemoryUsageDto;
