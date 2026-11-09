@@ -38,8 +38,8 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const [tenant, setTenant] = useState<AuthTenant | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [posMode, setPosMode] = useState<'retail' | 'restaurant'>('restaurant');
-  const [orderType, setOrderType] = useState<string>('Dine-In');
+  const [posMode, setPosMode] = useState<'retail' | 'restaurant'>('retail');
+  const [orderType, setOrderType] = useState<string>('Walk-In');
 
   // Load user session details from localStorage
   useEffect(() => {
@@ -66,9 +66,9 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       if (res.data) {
         setBusiness(res.data);
         setBranches(res.data.branches || []);
-        // If user is restricted to a branch, default to their primary branch
-        if (res.data.primaryBranch && !selectedBranchId) {
-          // If the user's role is not owner/admin and has assigned branch, auto-select it
+        if (res.data.businessType === 'RESTAURANT' || res.data.businessType === 'CAFE') {
+          setPosMode('restaurant');
+          setOrderType('Dine-In');
         }
       }
     } catch (err) {
@@ -76,7 +76,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranchId]);
+  }, []);
 
   useEffect(() => {
     fetchProfile();

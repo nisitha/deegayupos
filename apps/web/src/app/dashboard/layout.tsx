@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Search,
   Calendar,
   Building2,
   Bell,
-  UtensilsCrossed,
-  ShoppingBag,
+  Store,
 } from 'lucide-react';
 import { PosSidebar } from '../../components/layout/pos-sidebar';
 import {
@@ -16,16 +16,15 @@ import {
 } from '../../context/tenant-branch-context';
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isPosPage = pathname === '/dashboard/pos';
+
   const {
     selectedBranchId,
     setSelectedBranchId,
     business,
     branches,
     user,
-    posMode,
-    setPosMode,
-    orderType,
-    setOrderType,
     isOwnerOrAdmin,
   } = useTenantBranch();
 
@@ -39,10 +38,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     year: 'numeric',
   }).format(new Date());
 
-  const orderTypeOptions =
-    posMode === 'restaurant'
-      ? ['Dine-In', 'Takeaway', 'Delivery']
-      : ['Walk-In', 'Delivery', 'Wholesale'];
+  const currentBranchName =
+    branches.find((b) => b.id === selectedBranchId)?.name || 'All Branches';
 
   return (
     <div className="h-screen w-screen bg-[#F4F6F9] text-slate-900 flex overflow-hidden antialiased selection:bg-[#2F65F6] selection:text-white">
@@ -51,79 +48,43 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Top Header Bar */}
+        {/* Modern Clean Top Header Bar */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-5 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]">
-          {/* Left: Universal Search & Order Type Toggle */}
-          <div className="flex items-center gap-4 flex-1 max-w-2xl">
-            {/* Search Input */}
-            <div className="relative w-72 lg:w-80">
-              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search products or scan barcode..."
-                className="w-full bg-[#F8FAFC] border border-slate-200/80 rounded-xl pl-10 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2F65F6] focus:bg-white transition-all shadow-inner"
-              />
+          {/* Left: Store Monogram & Active Status */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2F65F6] shadow-sm">
+              <Store className="w-4 h-4" />
             </div>
-
-            {/* Order Type Toggle Pills */}
-            <div className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/60">
-              {orderTypeOptions.map((type) => {
-                const isSelected = orderType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setOrderType(type)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                      isSelected
-                        ? 'bg-white text-[#2F65F6] shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                );
-              })}
+            <div>
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span>{business?.name || 'PixelCraft POS'}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Online
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium">
+                {currentBranchName}
+              </p>
             </div>
           </div>
 
-          {/* Right: Branch Switcher, POS Mode Toggle, Date & Cashier Pill */}
-          <div className="flex items-center gap-3">
-            {/* Multi-Industry Mode Switcher */}
-            <div className="hidden md:flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs">
-              <button
-                onClick={() => {
-                  setPosMode('restaurant');
-                  setOrderType('Dine-In');
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
-                  posMode === 'restaurant'
-                    ? 'bg-white text-[#2F65F6] shadow-sm font-semibold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                title="Switch to Restaurant & Dining Mode"
-              >
-                <UtensilsCrossed className="w-3.5 h-3.5" />
-                <span>Dining</span>
-              </button>
-              <button
-                onClick={() => {
-                  setPosMode('retail');
-                  setOrderType('Walk-In');
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
-                  posMode === 'retail'
-                    ? 'bg-white text-[#2F65F6] shadow-sm font-semibold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                title="Switch to Retail POS Mode"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Retail</span>
-              </button>
+          {/* Center: Global Search Bar (Non-POS pages) */}
+          <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search products, orders, receipts..."
+                className="w-full bg-[#F8FAFC] border border-slate-200/80 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2F65F6] focus:bg-white transition-all shadow-inner"
+              />
             </div>
+          </div>
 
+          {/* Right: Branch Switcher, Live Date, Cashier Avatar */}
+          <div className="flex items-center gap-3">
             {/* Branch Switcher Dropdown */}
-            <div className="relative hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700">
+            <div className="relative hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium text-slate-700">
               <Building2 className="w-3.5 h-3.5 text-[#2F65F6]" />
               <select
                 value={selectedBranchId || 'ALL'}
@@ -132,7 +93,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                   setSelectedBranchId(val === 'ALL' ? null : val);
                 }}
                 disabled={!isOwnerOrAdmin && branches.length <= 1}
-                className="bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1 font-semibold text-xs"
               >
                 {isOwnerOrAdmin && (
                   <option value="ALL">All Branches</option>
@@ -146,7 +107,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Current Date Badge */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600">
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-600">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <span>{todayFormatted}</span>
             </div>
@@ -155,13 +116,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
               className="relative w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
+              title="Notifications"
             >
               <Bell className="w-4 h-4" />
               <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#2F65F6]" />
             </button>
 
             {/* Cashier / User Profile Badge */}
-            <div className="flex items-center gap-2.5 pl-2">
+            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80">
               <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2F65F6] to-[#4F46E5] text-white flex items-center justify-center font-bold text-xs shadow-sm">
                 {user?.fullName?.charAt(0) || 'C'}
               </div>
@@ -169,9 +131,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 <div className="text-xs font-bold text-slate-800 leading-tight">
                   {user?.fullName || 'Cashier Station'}
                 </div>
-                <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {business?.name || 'Online'}
+                <div className="text-[10px] text-slate-400 capitalize">
+                  {user?.role ? user.role.toLowerCase() : 'Staff'}
                 </div>
               </div>
             </div>
@@ -179,7 +140,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content Viewport */}
-        <main className="flex-1 overflow-y-auto bg-[#F4F6F9] p-4 lg:p-6">
+        <main
+          className={`flex-1 ${
+            isPosPage
+              ? 'overflow-hidden p-3 lg:p-4 bg-[#F4F6F9]'
+              : 'overflow-y-auto p-5 lg:p-6 bg-[#F4F6F9]'
+          }`}
+        >
           {children}
         </main>
       </div>

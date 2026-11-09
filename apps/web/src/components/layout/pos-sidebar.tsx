@@ -39,7 +39,7 @@ export function PosSidebar() {
       show: true,
     },
     {
-      name: 'POS Menu',
+      name: 'POS Terminal',
       href: '/dashboard/pos',
       icon: Store,
       show: hasPermission('pos:access'),
@@ -48,7 +48,7 @@ export function PosSidebar() {
       name: 'Tables',
       href: '/dashboard/tables',
       icon: UtensilsCrossed,
-      show: hasPermission('pos:access') || posMode === 'restaurant',
+      show: posMode === 'restaurant' && hasPermission('pos:access'),
     },
     {
       name: 'Catalogue',
