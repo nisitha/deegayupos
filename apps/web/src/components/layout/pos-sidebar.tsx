@@ -80,7 +80,7 @@ export function PosSidebar() {
   ];
 
   return (
-    <aside className="w-20 md:w-24 bg-white border-r border-slate-200/90 flex flex-col items-center justify-between py-4 shrink-0 z-40 select-none shadow-[1px_0_3px_0_rgba(0,0,0,0.02)]">
+    <aside className="hidden lg:flex w-20 xl:w-24 bg-white border-r border-slate-200/90 flex-col items-center justify-between py-4 shrink-0 z-40 select-none shadow-[1px_0_3px_0_rgba(0,0,0,0.02)]">
       {/* Brand Logo Header */}
       <div className="flex flex-col items-center gap-1">
         <Link

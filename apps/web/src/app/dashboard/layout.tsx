@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { PosSidebar } from '../../components/layout/pos-sidebar';
 import { Header } from '../../components/layout/header';
+import { BottomNavBar } from '../../components/layout/bottom-nav-bar';
 import { TenantBranchProvider } from '../../context/tenant-branch-context';
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -33,15 +34,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (!authChecked) {
     return (
-      <div className="h-screen w-screen bg-[#F4F6F9] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[#005BD3] border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen w-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-[#5C6AC4] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-[#F4F6F9] text-slate-900 flex overflow-hidden antialiased selection:bg-[#005BD3] selection:text-white">
-      {/* Left Slim Navigation Rail */}
+    <div className="h-screen w-screen bg-[#F8FAFC] text-slate-900 flex overflow-hidden antialiased selection:bg-[#5C6AC4] selection:text-white">
+      {/* Left Slim Navigation Rail (Hidden on mobile/tablet < lg) */}
       <PosSidebar />
 
       {/* Main Content Viewport */}
@@ -53,12 +54,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <main
           className={`flex-1 ${
             isPosPage
-              ? 'overflow-hidden p-3 lg:p-4 bg-[#F4F6F9]'
-              : 'overflow-y-auto p-5 lg:p-6 bg-[#F4F6F9]'
+              ? 'overflow-hidden p-0 bg-[#F8FAFC]'
+              : 'overflow-y-auto p-4 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-[#F8FAFC]'
           }`}
         >
           {children}
         </main>
+
+        {/* Bottom Thumb Navigation Dock (< lg screens) */}
+        <div className="lg:hidden shrink-0">
+          <BottomNavBar />
+        </div>
       </div>
     </div>
   );
