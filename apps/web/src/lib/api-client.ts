@@ -39,6 +39,15 @@ import type {
   HoldCartPayload,
   SaleDto,
   ReceiptDocumentDto,
+  StockLevelDto,
+  StockMovementDto,
+  StockAdjustmentDto,
+  CreateStockAdjustmentDto,
+  StockTransferDto,
+  CreateStockTransferDto,
+  InventoryTelemetryDto,
+  StockFilterParams,
+  MovementFilterParams,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -340,5 +349,30 @@ export const posApi = {
     return apiClient.get<PaginatedResult<SaleDto>>('/pos/sales', { params });
   },
 };
+
+export const inventoryApi = {
+  getTelemetry: async (): Promise<ApiResponse<InventoryTelemetryDto>> => {
+    return apiClient.get<InventoryTelemetryDto>('/inventory/telemetry');
+  },
+  getStockLevels: async (params?: StockFilterParams): Promise<ApiResponse<PaginatedResult<StockLevelDto>>> => {
+    return apiClient.get<PaginatedResult<StockLevelDto>>('/inventory/stock-levels', { params });
+  },
+  createAdjustment: async (payload: CreateStockAdjustmentDto): Promise<ApiResponse<StockAdjustmentDto>> => {
+    return apiClient.post<StockAdjustmentDto>('/inventory/adjustments', payload);
+  },
+  createTransfer: async (payload: CreateStockTransferDto): Promise<ApiResponse<StockTransferDto>> => {
+    return apiClient.post<StockTransferDto>('/inventory/transfers', payload);
+  },
+  dispatchTransfer: async (id: string): Promise<ApiResponse<StockTransferDto>> => {
+    return apiClient.patch<StockTransferDto>(`/inventory/transfers/${id}/dispatch`);
+  },
+  receiveTransfer: async (id: string): Promise<ApiResponse<StockTransferDto>> => {
+    return apiClient.patch<StockTransferDto>(`/inventory/transfers/${id}/receive`);
+  },
+  getMovements: async (params?: MovementFilterParams): Promise<ApiResponse<PaginatedResult<StockMovementDto>>> => {
+    return apiClient.get<PaginatedResult<StockMovementDto>>('/inventory/movements', { params });
+  },
+};
+
 
 

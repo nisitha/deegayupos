@@ -7,5 +7,6 @@ export * from './dashboard';
 export * from './business';
 export * from './products';
 export * from './pos';
+export * from './inventory';
 
 

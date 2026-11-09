@@ -8,6 +8,7 @@ import {
   Store,
   Grid,
   Package,
+  Boxes,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -47,6 +48,12 @@ export function PosSidebar() {
       name: 'Catalogue',
       href: '/dashboard/products',
       icon: Package,
+      show: hasPermission('inventory:view'),
+    },
+    {
+      name: 'Inventory',
+      href: '/dashboard/inventory',
+      icon: Boxes,
       show: hasPermission('inventory:view'),
     },
     {

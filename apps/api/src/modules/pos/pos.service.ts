@@ -154,6 +154,96 @@ export class PosService {
         });
       }
 
+      // Deduct Multi-Branch Inventory & Record Stock Movements
+      if (tx.warehouse && typeof tx.warehouse.findFirst === 'function') {
+        const warehouse = await tx.warehouse.findFirst({
+          where: {
+            tenantId,
+            branchId: payload.branchId,
+            isActive: true,
+          },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        });
+
+        if (warehouse) {
+          for (const item of payload.items) {
+            if (!item.productId) continue;
+
+            const product =
+              tx.product && typeof tx.product.findUnique === 'function'
+                ? await tx.product.findUnique({
+                    where: { id: item.productId },
+                    select: { id: true, isTrackStock: true, name: true, sku: true },
+                  })
+                : null;
+
+            if (!product || product.isTrackStock !== false) {
+              const stockLevel =
+                tx.stockLevel && typeof tx.stockLevel.findFirst === 'function'
+                  ? await tx.stockLevel.findFirst({
+                      where: {
+                        tenantId,
+                        warehouseId: warehouse.id,
+                        productId: item.productId,
+                        variantId: item.variantId || null,
+                      },
+                    })
+                  : null;
+
+              const currentBalance = stockLevel ? Number(stockLevel.quantityOnHand) : 0;
+              const requestedQty = Number(item.quantity);
+              const newBalance = currentBalance - requestedQty;
+
+              const isNegativeStockDisallowed =
+                settings?.allowNegativeStock === false ||
+                settings?.negativeStockPolicy === 'DISALLOW';
+
+              if (newBalance < 0 && isNegativeStockDisallowed) {
+                throw new BadRequestException(
+                  `Insufficient stock for item "${item.productName || product?.name || item.sku}". Available: ${currentBalance}, requested: ${requestedQty}`,
+                );
+              }
+
+              if (stockLevel && tx.stockLevel?.update) {
+                await tx.stockLevel.update({
+                  where: { id: stockLevel.id },
+                  data: { quantityOnHand: newBalance },
+                });
+              } else if (tx.stockLevel?.create) {
+                await tx.stockLevel.create({
+                  data: {
+                    tenantId,
+                    warehouseId: warehouse.id,
+                    productId: item.productId,
+                    variantId: item.variantId || null,
+                    quantityOnHand: newBalance,
+                    quantityReserved: 0,
+                    reorderPoint: 5,
+                  },
+                });
+              }
+
+              if (tx.stockMovement?.create) {
+                await tx.stockMovement.create({
+                  data: {
+                    tenantId,
+                    warehouseId: warehouse.id,
+                    productId: item.productId,
+                    variantId: item.variantId || null,
+                    movementType: 'SALE',
+                    quantity: -requestedQty,
+                    balanceBefore: currentBalance,
+                    balanceAfter: newBalance,
+                    referenceId: sale.id,
+                    notes: `POS Sale #${sale.invoiceNumber}`,
+                  },
+                });
+              }
+            }
+          }
+        }
+      }
+
       // Insert Payments
       for (const p of payload.payments) {
         await tx.salePayment.create({

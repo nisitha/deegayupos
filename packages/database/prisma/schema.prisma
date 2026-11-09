@@ -90,6 +90,37 @@ enum ReceiptPaperSize {
   A4
 }
 
+enum StockMovementType {
+  SALE
+  PURCHASE_RECEIPT
+  TRANSFER_DISPATCH
+  TRANSFER_RECEIPT
+  ADJUSTMENT_ADD
+  ADJUSTMENT_SUB
+  RETURN_RESTOCK
+  DAMAGE_LOSS
+}
+
+enum StockAdjustmentReason {
+  PHYSICAL_COUNT
+  DAMAGED
+  EXPIRED
+  LOST_STOLEN
+  CORRECTION
+}
+
+enum StockAdjustmentStatus {
+  APPLIED
+  REVERSED
+}
+
+enum StockTransferStatus {
+  PENDING
+  DISPATCHED
+  RECEIVED
+  CANCELLED
+}
+
 // ==========================================
 // 1. PLATFORM LAYER
 // ==========================================
@@ -155,6 +186,12 @@ model Business {
   saleItems       SaleItem[]
   salePayments    SalePayment[]
   heldCarts       HeldCart[]
+  stockLevels     StockLevel[]
+  stockMovements  StockMovement[]
+  stockAdjustments StockAdjustment[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  stockTransfers  StockTransfer[]
+  stockTransferItems StockTransferItem[]
 
   @@index([slug])
   @@index([status])
@@ -178,6 +215,7 @@ model BusinessSetting {
   receiptFooter       String?          @map("receipt_footer") @db.Text
   returnPolicyText    String?          @map("return_policy_text") @db.Text
   negativeStockPolicy String           @default("DISALLOW") @map("negative_stock_policy") @db.VarChar(32)
+  allowNegativeStock  Boolean          @default(false) @map("allow_negative_stock")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -228,6 +266,12 @@ model Warehouse {
   business Business @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
+  stockLevels      StockLevel[]
+  stockMovements   StockMovement[]
+  stockAdjustments StockAdjustment[]
+  sourceTransfers  StockTransfer[]   @relation("TransferSourceWarehouse")
+  targetTransfers  StockTransfer[]   @relation("TransferTargetWarehouse")
+
   @@index([tenantId, id])
   @@index([tenantId, branchId])
   @@index([tenantId, createdAt])
@@ -275,6 +319,8 @@ model User {
   auditLogs   AuditLog[]
   sales       Sale[]
   heldCarts   HeldCart[]
+  stockAdjustments StockAdjustment[]
+  stockTransfers   StockTransfer[]
 
   @@index([email])
   @@map("users")
@@ -544,6 +590,10 @@ model Product {
   unit     Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
   variants ProductVariant[]
   saleItems SaleItem[]
+  stockLevels          StockLevel[]
+  stockMovements       StockMovement[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  stockTransferItems   StockTransferItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -575,6 +625,10 @@ model ProductVariant {
   business  Business   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   saleItems SaleItem[]
+  stockLevels          StockLevel[]
+  stockMovements       StockMovement[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  stockTransferItems   StockTransferItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -698,4 +752,150 @@ model HeldCart {
   @@index([tenantId, cashierId])
   @@map("held_carts")
 }
+
+// ==========================================
+// 7. MULTI-BRANCH INVENTORY & STOCK MOVEMENT LAYER
+// ==========================================
+
+model StockLevel {
+  id               String          @id @default(uuid()) @db.Uuid
+  tenantId         String          @map("tenant_id") @db.Uuid
+  warehouseId      String          @map("warehouse_id") @db.Uuid
+  productId        String          @map("product_id") @db.Uuid
+  variantId        String?         @map("variant_id") @db.Uuid
+  quantityOnHand   Decimal         @default(0.000) @map("quantity_on_hand") @db.Decimal(10, 3)
+  quantityReserved Decimal         @default(0.000) @map("quantity_reserved") @db.Decimal(10, 3)
+  reorderPoint     Decimal         @default(5.000) @map("reorder_point") @db.Decimal(10, 3)
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  business  Business        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, warehouseId, productId, variantId])
+  @@index([tenantId, id])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, warehouseId, productId])
+  @@map("stock_levels")
+}
+
+model StockMovement {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @map("tenant_id") @db.Uuid
+  warehouseId   String            @map("warehouse_id") @db.Uuid
+  productId     String            @map("product_id") @db.Uuid
+  variantId     String?           @map("variant_id") @db.Uuid
+  movementType  StockMovementType @map("movement_type")
+  quantity      Decimal           @db.Decimal(10, 3)
+  balanceBefore Decimal           @map("balance_before") @db.Decimal(10, 3)
+  balanceAfter  Decimal           @map("balance_after") @db.Decimal(10, 3)
+  referenceId   String?           @map("reference_id") @db.VarChar(128)
+  notes         String?           @db.Text
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  business  Business        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, id])
+  @@index([tenantId, warehouseId, productId])
+  @@index([tenantId, referenceId])
+  @@index([tenantId, createdAt])
+  @@map("stock_movements")
+}
+
+model StockAdjustment {
+  id           String                @id @default(uuid()) @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  warehouseId  String                @map("warehouse_id") @db.Uuid
+  adjustedById String                @map("adjusted_by_id") @db.Uuid
+  reason       StockAdjustmentReason
+  status       StockAdjustmentStatus @default(APPLIED)
+  notes        String?               @db.Text
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  business   Business              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse  Warehouse             @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  adjustedBy User                  @relation(fields: [adjustedById], references: [id], onDelete: Restrict)
+  items      StockAdjustmentItem[]
+
+  @@index([tenantId, id])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, createdAt])
+  @@map("stock_adjustments")
+}
+
+model StockAdjustmentItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  adjustmentId        String   @map("adjustment_id") @db.Uuid
+  productId           String   @map("product_id") @db.Uuid
+  variantId           String?  @map("variant_id") @db.Uuid
+  countedQuantity     Decimal  @map("counted_quantity") @db.Decimal(10, 3)
+  discrepancyQuantity Decimal  @map("discrepancy_quantity") @db.Decimal(10, 3)
+
+  business   Business        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  adjustment StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, id])
+  @@index([tenantId, adjustmentId])
+  @@index([tenantId, productId])
+  @@map("stock_adjustment_items")
+}
+
+model StockTransfer {
+  id                 String              @id @default(uuid()) @db.Uuid
+  tenantId           String              @map("tenant_id") @db.Uuid
+  sourceWarehouseId  String              @map("source_warehouse_id") @db.Uuid
+  targetWarehouseId  String              @map("target_warehouse_id") @db.Uuid
+  requestedById      String              @map("requested_by_id") @db.Uuid
+  status             StockTransferStatus @default(PENDING)
+  trackingNumber     String              @map("tracking_number") @db.VarChar(64)
+  notes              String?             @db.Text
+  dispatchedAt       DateTime?           @map("dispatched_at")
+  receivedAt         DateTime?           @map("received_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  business        Business            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceWarehouse Warehouse           @relation("TransferSourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: Restrict)
+  targetWarehouse Warehouse           @relation("TransferTargetWarehouse", fields: [targetWarehouseId], references: [id], onDelete: Restrict)
+  requestedBy     User                @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  items           StockTransferItem[]
+
+  @@unique([tenantId, trackingNumber])
+  @@index([tenantId, id])
+  @@index([tenantId, sourceWarehouseId])
+  @@index([tenantId, targetWarehouseId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenantId           String          @map("tenant_id") @db.Uuid
+  transferId         String          @map("transfer_id") @db.Uuid
+  productId          String          @map("product_id") @db.Uuid
+  variantId          String?         @map("variant_id") @db.Uuid
+  quantityRequested  Decimal         @map("quantity_requested") @db.Decimal(10, 3)
+  quantityDispatched Decimal         @default(0.000) @map("quantity_dispatched") @db.Decimal(10, 3)
+  quantityReceived   Decimal         @default(0.000) @map("quantity_received") @db.Decimal(10, 3)
+
+  business Business        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transfer StockTransfer   @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, id])
+  @@index([tenantId, transferId])
+  @@index([tenantId, productId])
+  @@map("stock_transfer_items")
+}
+
 
