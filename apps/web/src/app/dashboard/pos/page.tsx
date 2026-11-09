@@ -11,13 +11,15 @@ import {
   Layers,
   ShoppingBag,
   Sparkles,
-  Pill,
-  FlaskConical,
-  Leaf,
-  Droplets,
   Package,
   Loader2,
   ArrowRight,
+  Percent,
+  User,
+  PauseCircle,
+  Tag,
+  Clock,
+  Barcode,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -27,11 +29,21 @@ import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { posApi } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
+import { DiscountPickerModal } from '../../../components/pos/discount-picker-modal';
+import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
+import { CustomerModal, type CustomerData } from '../../../components/pos/customer-modal';
+import { HeldTicketsModal, type HeldTicket } from '../../../components/pos/held-tickets-modal';
+import { Product3dBadge } from '../../../components/pos/product-3d-badge';
+import {
+  AYURVEDIC_MASTER_DEPARTMENTS,
+  AYURVEDIC_DEPARTMENT_LIST,
+  classifyAyurvedicDepartment,
+} from '../../../lib/ayurvedic-departments';
 import { getCachedCatalog, saveCachedCatalog } from '../../../lib/pos-catalog-db';
 
 // =========================================================================
 // "CONFIDENCY OS" DESIGN SYSTEM SPECIFICATION
-// Ultra-Premium Minimalist SaaS Catalog & Checkout Rail
+// Ayurvedic Pharmacy Catalog, Hero Search Station, 3D Badges & Tactile Actions
 // =========================================================================
 interface RetailProductItem {
   id: string;
@@ -48,70 +60,6 @@ interface RetailProductItem {
   alertQuantity?: number | null;
 }
 
-// Minimalist 3D Squircle visual helper for pharmaceutical herbal catalog cards
-function getProductSquircleVisual(categoryName?: string) {
-  const lower = (categoryName || '').toLowerCase();
-  if (
-    lower.includes('arishta') ||
-    lower.includes('asawa') ||
-    lower.includes('oil') ||
-    lower.includes('taila') ||
-    lower.includes('liquid')
-  ) {
-    return {
-      icon: Droplets,
-      bg: 'bg-amber-50/80 text-amber-600 border border-amber-200/60',
-    };
-  }
-  if (
-    lower.includes('wati') ||
-    lower.includes('guli') ||
-    lower.includes('pill') ||
-    lower.includes('tablet') ||
-    lower.includes('capsule')
-  ) {
-    return {
-      icon: Pill,
-      bg: 'bg-indigo-50/80 text-indigo-600 border border-indigo-200/60',
-    };
-  }
-  if (
-    lower.includes('powder') ||
-    lower.includes('churna') ||
-    lower.includes('dry') ||
-    lower.includes('ala') ||
-    lower.includes('herbal') ||
-    lower.includes('leaf') ||
-    lower.includes('tea')
-  ) {
-    return {
-      icon: Leaf,
-      bg: 'bg-emerald-50/80 text-emerald-600 border border-emerald-200/60',
-    };
-  }
-  if (
-    lower.includes('face') ||
-    lower.includes('cream') ||
-    lower.includes('soap') ||
-    lower.includes('balm')
-  ) {
-    return {
-      icon: Sparkles,
-      bg: 'bg-rose-50/80 text-rose-600 border border-rose-200/60',
-    };
-  }
-  if (lower.includes('rasayana') || lower.includes('kalka')) {
-    return {
-      icon: FlaskConical,
-      bg: 'bg-purple-50/80 text-purple-600 border border-purple-200/60',
-    };
-  }
-  return {
-    icon: Package,
-    bg: 'bg-blue-50/80 text-[#7052FF] border border-blue-200/60',
-  };
-}
-
 interface CartItem {
   id: string;
   productId: string;
@@ -123,37 +71,53 @@ interface CartItem {
   stockOnHand: number;
   unit: string;
   imageUrl?: string;
+  departmentId?: string;
 }
 
 export default function ConfidencyPosPage() {
   const { selectedBranchId, user } = useTenantBranch();
 
-  // Catalogue & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategorySlug, setSelectedCategorySlug] = useState('all');
+  // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string; slug: string; count: number }[]>([]);
-  const [totalProductsCount, setTotalProductsCount] = useState<number>(0);
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  // Department Filter & Search Station
+  const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH' | 'SPLIT'>('CARD');
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Completed Receipt Modal
+  // Customer Management
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerData | null>(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+
+  // Discounts
+  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'FLAT'>('NONE');
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [discountFlat, setDiscountFlat] = useState<number>(0);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+
+  // Held Tickets Queue
+  const [heldTickets, setHeldTickets] = useState<HeldTicket[]>([]);
+  const [isHeldTicketsModalOpen, setIsHeldTicketsModalOpen] = useState(false);
+
+  // Custom Item Modal
+  const [isCustomSaleModalOpen, setIsCustomSaleModalOpen] = useState(false);
+
+  // Completed Receipt Modal & Shift End
   const [completedSale, setCompletedSale] = useState<SaleDto | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-
-  // End Shift Modal
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
 
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
-  // Scanner & Search feedback
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Scanner & Notification feedback
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
 
   // Cashier Session Details
@@ -170,8 +134,6 @@ export default function ConfidencyPosPage() {
         const cached = await getCachedCatalog<RetailProductItem>('deegayu');
         if (cached && cached.products && cached.products.length > 0 && isMounted) {
           setProducts(cached.products);
-          setCategories(cached.categories || []);
-          setTotalProductsCount(cached.total || cached.products.length);
           setIsLoadingProducts(false);
         }
       } catch (cacheErr) {
@@ -188,8 +150,6 @@ export default function ConfidencyPosPage() {
           const freshTotal = json.data.total || freshProducts.length;
 
           setProducts(freshProducts);
-          setCategories(freshCategories);
-          setTotalProductsCount(freshTotal);
           setCatalogError(null);
 
           await saveCachedCatalog('deegayu', {
@@ -217,47 +177,37 @@ export default function ConfidencyPosPage() {
     };
   }, []);
 
-  // Category Tabs Filter
-  const categoryTabs = useMemo(() => {
-    if (categories.length > 0) {
-      const activeTabs = categories
-        .filter((c) => c.count > 0)
-        .map((c) => ({
-          name: c.name,
-          slug: c.slug,
-          count: c.count,
-        }));
-      return [
-        { name: 'All Products', slug: 'all', count: totalProductsCount || products.length },
-        ...activeTabs,
-      ];
+  // Classify each product into the 10 Ayurvedic Departments
+  const productsWithDept = useMemo(() => {
+    return products.map((p) => {
+      const deptId = classifyAyurvedicDepartment(p.name, p.category?.name, p.category?.slug);
+      return {
+        ...p,
+        departmentId: deptId,
+      };
+    });
+  }, [products]);
+
+  // Dynamic count of products per department
+  const departmentCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: productsWithDept.length };
+    for (const dept of AYURVEDIC_DEPARTMENT_LIST) {
+      counts[dept.id] = 0;
     }
+    for (const p of productsWithDept) {
+      const d = p.departmentId || 'fmcg';
+      counts[d] = (counts[d] || 0) + 1;
+    }
+    return counts;
+  }, [productsWithDept]);
 
-    const catMap = new Map<string, { slug: string; count: number }>();
-    products.forEach((p) => {
-      const catName = p.category?.name || 'General';
-      const slug = p.category?.slug || catName.toLowerCase();
-      const current = catMap.get(catName) || { slug, count: 0 };
-      catMap.set(catName, { slug, count: current.count + 1 });
-    });
-
-    const tabs = [{ name: 'All Products', slug: 'all', count: products.length }];
-    catMap.forEach((info, name) => {
-      tabs.push({ name, slug: info.slug, count: info.count });
-    });
-    return tabs;
-  }, [categories, products, totalProductsCount]);
-
-  // Fast Client-Side Search Filter across name, SKU, and barcode
+  // Fast Client-Side Search Filter across name, SKU, barcode, and selected department
   const filteredProducts = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
 
-    return products.filter((p) => {
-      if (selectedCategorySlug !== 'all') {
-        const catSlug = p.category?.slug?.toLowerCase();
-        const catName = p.category?.name?.toLowerCase();
-        const target = selectedCategorySlug.toLowerCase();
-        if (catSlug !== target && catName !== target) {
+    return productsWithDept.filter((p) => {
+      if (selectedDeptId !== 'all') {
+        if (p.departmentId !== selectedDeptId) {
           return false;
         }
       }
@@ -270,10 +220,10 @@ export default function ConfidencyPosPage() {
 
       return matchesName || matchesSku || matchesBarcode;
     });
-  }, [products, searchQuery, selectedCategorySlug]);
+  }, [productsWithDept, searchQuery, selectedDeptId]);
 
   // Add Item to Cart
-  const addToCart = useCallback((product: RetailProductItem) => {
+  const addToCart = useCallback((product: RetailProductItem & { departmentId?: string }) => {
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.productId === product.id);
       if (existing) {
@@ -294,6 +244,7 @@ export default function ConfidencyPosPage() {
           stockOnHand: product.stockOnHand,
           unit: product.unit,
           imageUrl: product.imageUrl,
+          departmentId: product.departmentId,
         },
       ];
     });
@@ -301,6 +252,32 @@ export default function ConfidencyPosPage() {
     setScanFeedback(`Added: ${product.name}`);
     setTimeout(() => setScanFeedback(null), 1500);
   }, []);
+
+  // Add Custom Sale Item
+  const handleAddCustomItem = (customItem: {
+    name: string;
+    price: number;
+    quantity: number;
+    note?: string;
+  }) => {
+    const customTitle = customItem.name + (customItem.note ? ` (${customItem.note})` : '');
+    setCart((prev) => [
+      ...prev,
+      {
+        id: `custom-${Date.now()}`,
+        productId: `custom-${Date.now()}`,
+        name: customTitle,
+        sku: 'CUSTOM-SALE',
+        price: customItem.price,
+        quantity: customItem.quantity,
+        stockOnHand: 999,
+        unit: 'pcs',
+        departmentId: 'fmcg',
+      },
+    ]);
+    setScanFeedback(`Custom Item Added: ${customTitle}`);
+    setTimeout(() => setScanFeedback(null), 2000);
+  };
 
   // Stepper Quantity Editor
   const handleQuantityChange = (itemId: string, newQty: number) => {
@@ -322,15 +299,66 @@ export default function ConfidencyPosPage() {
     setIsMobileCartOpen(false);
   };
 
+  const resetDiscount = () => {
+    setDiscountType('NONE');
+    setDiscountPercent(0);
+    setDiscountFlat(0);
+  };
+
   // Financial Calculations
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   }, [cart]);
 
+  const discountAmount = useMemo(() => {
+    if (discountType === 'PERCENT' && discountPercent > 0) {
+      return (subtotal * discountPercent) / 100;
+    }
+    if (discountType === 'FLAT' && discountFlat > 0) {
+      return Math.min(subtotal, discountFlat);
+    }
+    return 0.0;
+  }, [subtotal, discountType, discountPercent, discountFlat]);
+
   const taxAmount = 0.0;
-  const discountAmount = 0.0;
-  const totalAmount = subtotal + taxAmount - discountAmount;
+  const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount);
   const totalItemCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart]);
+
+  // Hold Active Cart
+  const handleHoldTicket = () => {
+    if (cart.length === 0) return;
+    const newHeld: HeldTicket = {
+      id: `held-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer',
+      items: [...cart],
+      discountType,
+      discountPercent,
+      discountFlat,
+      totalAmount,
+    };
+    setHeldTickets((prev) => [newHeld, ...prev]);
+    clearCart();
+    resetDiscount();
+    setScanFeedback(`Ticket held for ${newHeld.customerName}`);
+    setTimeout(() => setScanFeedback(null), 2500);
+  };
+
+  // Restore Held Ticket
+  const handleRestoreHeldTicket = (held: HeldTicket) => {
+    setCart(held.items);
+    setDiscountType(held.discountType);
+    setDiscountPercent(held.discountPercent);
+    setDiscountFlat(held.discountFlat);
+    setHeldTickets((prev) => prev.filter((t) => t.id !== held.id));
+    setScanFeedback(`Restored ticket (${held.items.length} items)`);
+    setTimeout(() => setScanFeedback(null), 2000);
+  };
+
+  // Discard Held Ticket
+  const handleDiscardHeldTicket = (ticketId: string) => {
+    setHeldTickets((prev) => prev.filter((t) => t.id !== ticketId));
+  };
 
   // Execute Checkout Transaction
   const handleCharge = useCallback(async () => {
@@ -338,6 +366,12 @@ export default function ConfidencyPosPage() {
     setIsProcessingCheckout(true);
 
     try {
+      const formattedCustomer = selectedCustomer
+        ? selectedCustomer.phone
+          ? `${selectedCustomer.name} (${selectedCustomer.phone})`
+          : selectedCustomer.name
+        : 'Walk-in Customer';
+
       const payload: CheckoutPayload = {
         branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
         orderType: 'RETAIL_WALKIN',
@@ -347,6 +381,7 @@ export default function ConfidencyPosPage() {
         totalAmount,
         paidAmount: totalAmount,
         changeDue: 0,
+        customerName: formattedCustomer,
         items: cart.map((item) => ({
           productId: item.productId,
           productName: item.name,
@@ -381,12 +416,12 @@ export default function ConfidencyPosPage() {
         orderType: 'RETAIL_WALKIN',
         status: 'COMPLETED',
         subtotal,
-        discountAmount: 0,
-        taxAmount: 0,
+        discountAmount,
+        taxAmount,
         totalAmount,
         paidAmount: totalAmount,
         changeDue: 0,
-        customerName: 'Walk-in Customer',
+        customerName: formattedCustomer,
         items: cart.map((i) => ({
           id: `si-${Math.random()}`,
           saleId: 'sale-1',
@@ -415,7 +450,14 @@ export default function ConfidencyPosPage() {
       setCompletedSale(finalizedSale);
       setShowReceiptModal(true);
       clearCart();
+      resetDiscount();
     } catch {
+      const formattedCustomer = selectedCustomer
+        ? selectedCustomer.phone
+          ? `${selectedCustomer.name} (${selectedCustomer.phone})`
+          : selectedCustomer.name
+        : 'Walk-in Customer';
+
       // Offline fallback
       const fallbackSale: SaleDto = {
         id: `sale-${Date.now()}`,
@@ -431,12 +473,12 @@ export default function ConfidencyPosPage() {
         orderType: 'RETAIL_WALKIN',
         status: 'COMPLETED',
         subtotal,
-        discountAmount: 0,
-        taxAmount: 0,
+        discountAmount,
+        taxAmount,
         totalAmount,
         paidAmount: totalAmount,
         changeDue: 0,
-        customerName: 'Walk-in Customer',
+        customerName: formattedCustomer,
         items: cart.map((i) => ({
           id: `si-${Math.random()}`,
           saleId: 'sale-1',
@@ -465,12 +507,23 @@ export default function ConfidencyPosPage() {
       setCompletedSale(fallbackSale);
       setShowReceiptModal(true);
       clearCart();
+      resetDiscount();
     } finally {
       setIsProcessingCheckout(false);
     }
-  }, [cart, selectedBranchId, subtotal, discountAmount, taxAmount, totalAmount, paymentMethod, cashierName]);
+  }, [
+    cart,
+    selectedBranchId,
+    subtotal,
+    discountAmount,
+    taxAmount,
+    totalAmount,
+    paymentMethod,
+    cashierName,
+    selectedCustomer,
+  ]);
 
-  // Keyboard shortcut listener (F2: Search, F4: Charge, Esc: Dismiss)
+  // Keyboard shortcut listener (F2: Search Barcode, F4: Charge, Esc: Dismiss)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
@@ -482,6 +535,10 @@ export default function ConfidencyPosPage() {
       } else if (e.key === 'Escape') {
         setIsEndShiftModalOpen(false);
         setIsMobileCartOpen(false);
+        setIsDiscountModalOpen(false);
+        setIsCustomerModalOpen(false);
+        setIsCustomSaleModalOpen(false);
+        setIsHeldTicketsModalOpen(false);
       }
     };
 
@@ -493,14 +550,14 @@ export default function ConfidencyPosPage() {
     <div className="h-full w-full flex overflow-hidden bg-white select-none">
       {/* Toast Feedback */}
       {scanFeedback && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
           <Sparkles className="w-3.5 h-3.5 text-[#7052FF]" />
           <span>{scanFeedback}</span>
         </div>
       )}
 
       {/* =====================================================================
-          CENTER COLUMN: TERMINAL HEADER, CATEGORY PILLS & MINIMALIST CATALOG
+          CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-100 bg-white min-w-0">
         {/* 1. Top Terminal Status Bar */}
@@ -511,7 +568,7 @@ export default function ConfidencyPosPage() {
               <Layers className="w-4 h-4" />
             </div>
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-              <span>POS</span>
+              <span>POS Terminal</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <span className="text-slate-300">|</span>
@@ -519,7 +576,10 @@ export default function ConfidencyPosPage() {
               <span>• {cashierName}</span>
               <span className="hidden sm:inline"> | Cashier: {registerCode}</span>
               <span className="hidden md:inline"> | Shift Started: 8:30 AM</span>
-              <span className="hidden lg:inline"> | Drawer: LKR {openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="hidden lg:inline">
+                {' '}
+                | Drawer: LKR {openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
 
@@ -527,7 +587,7 @@ export default function ConfidencyPosPage() {
           <div className="flex items-center gap-3 shrink-0 ml-2">
             <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Auto-refreshing 2s</span>
+              <span>Catalog Ready</span>
             </div>
             <button
               type="button"
@@ -539,59 +599,218 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Category Filter Carousel & Subtle Search */}
-        <div className="px-5 py-2.5 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-white">
-          {/* Horizontal Category Carousel */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth flex-1 min-w-0 py-0.5">
-            {categoryTabs.map((tab) => {
-              const isActive = selectedCategorySlug === tab.slug;
-              return (
-                <button
-                  key={tab.slug}
-                  type="button"
-                  onClick={() => setSelectedCategorySlug(tab.slug)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 active:scale-95 ${
-                    isActive
-                      ? 'bg-[#7052FF] text-white shadow-sm font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
+        {/* 2. Tactile Cashier Action Tabs */}
+        <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex items-center gap-2">
+            {/* Apply Discount Button */}
+            <button
+              type="button"
+              onClick={() => setIsDiscountModalOpen(true)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
+                discountType !== 'NONE'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                  : 'bg-white hover:bg-emerald-50/80 text-emerald-700 border-emerald-200/90 shadow-2xs'
+              }`}
+            >
+              <Percent className="w-3.5 h-3.5" />
+              <span>
+                {discountType === 'PERCENT'
+                  ? `${discountPercent}% Applied`
+                  : discountType === 'FLAT'
+                  ? `LKR ${discountFlat} Applied`
+                  : '% Add Discount'}
+              </span>
+              {discountType !== 'NONE' && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetDiscount();
+                  }}
+                  className="ml-1 hover:text-white/80 p-0.5 rounded-full hover:bg-emerald-700"
+                  title="Remove discount"
                 >
-                  <span>{tab.name}</span>
-                </button>
-              );
-            })}
+                  <X className="w-3 h-3" />
+                </span>
+              )}
+            </button>
+
+            {/* Add Customer Button */}
+            <button
+              type="button"
+              onClick={() => setIsCustomerModalOpen(true)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
+                selectedCustomer
+                  ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                  : 'bg-white hover:bg-sky-50/80 text-sky-700 border-sky-200/90 shadow-2xs'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span className="max-w-[130px] truncate">
+                {selectedCustomer ? selectedCustomer.name : '+ Add Customer'}
+              </span>
+              {selectedCustomer && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCustomer(null);
+                  }}
+                  className="ml-1 hover:text-white/80 p-0.5 rounded-full hover:bg-sky-700"
+                  title="Remove customer"
+                >
+                  <X className="w-3 h-3" />
+                </span>
+              )}
+            </button>
+
+            {/* Hold Ticket Button */}
+            <button
+              type="button"
+              onClick={handleHoldTicket}
+              disabled={cart.length === 0}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border bg-white hover:bg-amber-50/80 text-amber-700 border-amber-200/90 shadow-2xs disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              <span>⏸ Hold Ticket</span>
+            </button>
+
+            {/* Custom Sale Button */}
+            <button
+              type="button"
+              onClick={() => setIsCustomSaleModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border bg-white hover:bg-purple-50/80 text-[#7052FF] border-purple-200/90 shadow-2xs cursor-pointer"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span>+ Custom Item</span>
+            </button>
           </div>
 
-          {/* Far-Right Subtle Search Input */}
-          <div className="relative shrink-0 w-44 sm:w-56">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Held Tickets Queue Link */}
+          {heldTickets.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsHeldTicketsModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-amber-300 bg-amber-100/90 text-amber-900 hover:bg-amber-200 transition-all active:scale-95 shrink-0 shadow-2xs"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Held Tickets ({heldTickets.length})</span>
+            </button>
+          )}
+        </div>
+
+        {/* 3. Hero Search Station (52px Expansive Bar with Barcode [F2] Tag) */}
+        <div className="px-5 py-3 border-b border-slate-100 bg-white shrink-0">
+          <div className="relative flex items-center">
+            {/* Search Icon Accent */}
+            <div className="absolute left-4 flex items-center gap-2 pointer-events-none">
+              <div className="w-6 h-6 rounded-lg bg-purple-50 text-[#7052FF] flex items-center justify-center">
+                <Search className="w-3.5 h-3.5" />
+              </div>
+            </div>
+
+            {/* Expansive 52px Input */}
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search products [F2]..."
+              placeholder="Search 3,120 Ayurvedic medicines, oils, churnas, or scan barcode [F2]..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200/80 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#7052FF] transition-all"
+              className="w-full h-13 pl-14 pr-48 text-xs sm:text-sm font-medium rounded-2xl bg-slate-50/80 border border-slate-200/90 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all shadow-xs"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
+
+            {/* Right Action Icons & Badges */}
+            <div className="absolute right-3.5 flex items-center gap-2">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="w-6 h-6 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Barcode F2 Badge */}
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 shadow-2xs text-[11px] font-mono text-slate-500">
+                <Barcode className="w-3.5 h-3.5 text-[#7052FF]" />
+                <span className="font-semibold text-slate-700">F2</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+
+              {/* Live Count Badge */}
+              <div className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
+                {filteredProducts.length.toLocaleString()} items
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 3. High-End Minimalist Product Cards Grid */}
+        {/* 4. Ayurvedic Master Department Tabs (10 Sri Lankan Departments + Sinhala/English Labels) */}
+        <div className="px-5 py-2.5 border-b border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white">
+          {/* All Departments Tab */}
+          <button
+            type="button"
+            onClick={() => setSelectedDeptId('all')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+              selectedDeptId === 'all'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/80'
+            }`}
+          >
+            <span>All Products (සියලු වර්ග)</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                selectedDeptId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              {departmentCounts.all || 0}
+            </span>
+          </button>
+
+          {/* 10 Standardized Ayurvedic Departments */}
+          {AYURVEDIC_DEPARTMENT_LIST.map((dept) => {
+            const isActive = selectedDeptId === dept.id;
+            const count = departmentCounts[dept.id] || 0;
+
+            return (
+              <button
+                key={dept.id}
+                type="button"
+                onClick={() => setSelectedDeptId(dept.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+                  isActive
+                    ? `${dept.bgTint} ${dept.textColor} ${dept.borderTint} font-bold ring-2 ring-[#7052FF]/30 shadow-xs`
+                    : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/70'
+                }`}
+              >
+                {/* 3D Mini Dot */}
+                <span
+                  className={`w-2.5 h-2.5 rounded-full bg-gradient-to-br ${dept.gradient} shadow-2xs shrink-0`}
+                />
+                <span className="whitespace-nowrap">
+                  {dept.en} <span className="opacity-75 font-normal text-[11px]">({dept.si})</span>
+                </span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                    isActive ? 'bg-white/80 font-bold' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 5. Product Cards Grid with 3D Category Emblems */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-white">
           {isLoadingProducts && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <Loader2 className="w-8 h-8 animate-spin text-[#7052FF] mb-3" />
-              <h3 className="text-sm font-bold text-slate-800">Loading Deegayu Catalog...</h3>
-              <p className="text-xs text-slate-400 mt-1">Connecting to live Supabase repository...</p>
+              <h3 className="text-sm font-bold text-slate-800">Loading Deegayu Ayurvedic Catalog...</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Connecting to live Supabase repository (3,120 products)...
+              </p>
             </div>
           ) : catalogError && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
@@ -604,22 +823,51 @@ export default function ConfidencyPosPage() {
               <Package className="w-10 h-10 text-slate-300 mb-2" />
               <h3 className="text-sm font-bold text-slate-700">No Products Found</h3>
               <p className="text-xs text-slate-400 max-w-sm mt-1">
-                No items matched &quot;{searchQuery}&quot;
+                No items matched &quot;{searchQuery}&quot; in the selected department
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedDeptId('all');
+                }}
+                className="mt-3 text-xs font-semibold text-[#7052FF] hover:underline"
+              >
+                Clear Filters & Show All
+              </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
               {filteredProducts.map((product) => {
-                const visual = getProductSquircleVisual(product.category?.name);
-                const VisualIcon = visual.icon;
+                const dept =
+                  (product.departmentId && AYURVEDIC_MASTER_DEPARTMENTS[product.departmentId]) ||
+                  AYURVEDIC_MASTER_DEPARTMENTS['fmcg']!;
 
                 return (
                   <div
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    className="bg-white hover:shadow-lg transition-all duration-150 rounded-2xl p-4 flex flex-col justify-between border border-transparent hover:border-slate-100 cursor-pointer group active:scale-[0.98] select-none"
+                    className="bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-200 rounded-2xl p-3.5 flex flex-col justify-between border border-slate-100 hover:border-[#7052FF]/30 cursor-pointer group active:scale-[0.98] select-none relative"
                   >
-                    {/* Centered Floating Product Visual */}
+                    {/* Top Row: Department Sinhala Pill + Stock Indicator */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
+                      >
+                        {dept.si}
+                      </span>
+                      {product.stockOnHand <= 5 ? (
+                        <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          {product.stockOnHand} left
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Qty: {product.stockOnHand}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Centered Floating 3D Product Visual */}
                     <div className="h-28 w-full bg-slate-50/70 rounded-xl flex items-center justify-center relative overflow-hidden group-hover:bg-slate-100/60 transition-colors">
                       {product.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -630,21 +878,27 @@ export default function ConfidencyPosPage() {
                           className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
                         />
                       ) : (
-                        <div
-                          className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform ${visual.bg}`}
-                        >
-                          <VisualIcon className="w-6 h-6" />
-                        </div>
+                        <Product3dBadge departmentId={product.departmentId} size="md" />
                       )}
                     </div>
 
-                    {/* Product Title & Mono Price */}
+                    {/* Product Title, Department Subtitle & Price */}
                     <div className="mt-3">
-                      <h4 className="text-xs font-medium text-slate-800 line-clamp-1 group-hover:text-slate-950 transition-colors">
+                      <h4
+                        className="text-xs font-semibold text-slate-800 line-clamp-2 min-h-[32px] group-hover:text-slate-950 transition-colors leading-snug"
+                        title={product.name}
+                      >
                         {product.name}
                       </h4>
-                      <div className="text-xs font-bold text-slate-900 mt-1 font-mono">
-                        LKR {product.retailPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {dept.en}
+                      </div>
+                      <div className="text-xs font-black text-slate-900 mt-1.5 font-mono">
+                        LKR{' '}
+                        {product.retailPrice.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </div>
                     </div>
                   </div>
@@ -656,7 +910,7 @@ export default function ConfidencyPosPage() {
       </div>
 
       {/* =====================================================================
-          RIGHT COLUMN: DEDICATED CART & PAYMENT DOCK (340px-380px)
+          RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (340px-380px)
       ===================================================================== */}
       <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-white flex-col h-full shrink-0 select-none border-l border-slate-100">
         {/* 1. Cart Header */}
@@ -680,7 +934,36 @@ export default function ConfidencyPosPage() {
           )}
         </div>
 
-        {/* 2. Scrollable Cart Items List */}
+        {/* 2. Customer Pill in Cart (if attached) */}
+        {selectedCustomer && (
+          <div className="px-5 py-2.5 bg-sky-50/60 border-b border-sky-100 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-md bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                <User className="w-3.5 h-3.5" />
+              </div>
+              <div className="truncate">
+                <div className="text-xs font-bold text-sky-950 truncate">
+                  {selectedCustomer.name}
+                </div>
+                {selectedCustomer.loyaltyPoints ? (
+                  <div className="text-[10px] text-sky-700 font-mono">
+                    Loyalty: {selectedCustomer.loyaltyPoints} pts
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedCustomer(null)}
+              className="text-sky-500 hover:text-sky-800 text-xs p-1"
+              title="Remove customer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* 3. Scrollable Cart Items List */}
         <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
@@ -691,13 +974,13 @@ export default function ConfidencyPosPage() {
           ) : (
             cart.map((item) => (
               <div key={item.id} className="py-3 flex items-center justify-between gap-3 group">
-                {/* 36x36px rounded squircle image preview */}
-                <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center shrink-0">
+                {/* 36x36px rounded squircle image / 3D badge preview */}
+                <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt="" className="w-full h-full object-contain rounded-lg" />
+                    <img src={item.imageUrl} alt="" className="w-full h-full object-contain p-0.5" />
                   ) : (
-                    <Package className="w-4 h-4 text-slate-400" />
+                    <Product3dBadge departmentId={item.departmentId} size="sm" />
                   )}
                 </div>
 
@@ -748,7 +1031,7 @@ export default function ConfidencyPosPage() {
           )}
         </div>
 
-        {/* 3. Financial Breakdown Summary */}
+        {/* 4. Financial Breakdown Summary */}
         <div className="p-5 border-t border-slate-100 bg-white space-y-3">
           <div className="space-y-1.5 text-xs font-mono">
             <div className="flex justify-between text-slate-500">
@@ -759,10 +1042,42 @@ export default function ConfidencyPosPage() {
               <span>Tax (0% / Ex)</span>
               <span>LKR 0.00</span>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Discount</span>
-              <span>LKR 0.00</span>
-            </div>
+
+            {/* Discount Line */}
+            {discountType !== 'NONE' && (
+              <div className="flex justify-between items-center text-emerald-600 font-semibold">
+                <span className="flex items-center gap-1 font-sans">
+                  <Percent className="w-3 h-3" />
+                  <span>
+                    Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})
+                  </span>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span>- LKR {discountAmount.toFixed(2)}</span>
+                  <button
+                    type="button"
+                    onClick={resetDiscount}
+                    className="text-rose-400 hover:text-rose-600 p-0.5"
+                    title="Remove discount"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Add Discount Pill (if no discount active) */}
+            {discountType === 'NONE' && cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsDiscountModalOpen(true)}
+                className="w-full py-1.5 rounded-lg border border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50/50 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Percent className="w-3.5 h-3.5" />
+                <span>% Add Order Discount</span>
+              </button>
+            )}
+
             <div className="pt-2 border-t border-slate-100 flex justify-between text-sm font-bold text-slate-900">
               <span>Total</span>
               <span className="text-base text-slate-900 font-black">
@@ -771,7 +1086,7 @@ export default function ConfidencyPosPage() {
             </div>
           </div>
 
-          {/* 4. Payment Method Segmented Control */}
+          {/* 5. Payment Method Segmented Control */}
           <div className="pt-1">
             <label className="text-xs font-semibold text-slate-800 block mb-2">
               Payment Method
@@ -789,7 +1104,7 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    className={`py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isSelected
                         ? 'bg-white text-slate-900 font-bold shadow-xs'
                         : 'text-slate-500 hover:text-slate-800'
@@ -803,7 +1118,7 @@ export default function ConfidencyPosPage() {
             </div>
           </div>
 
-          {/* 5. Primary Charge Button */}
+          {/* 6. Primary Charge Button */}
           <div className="pt-1">
             <button
               type="button"
@@ -876,7 +1191,9 @@ export default function ConfidencyPosPage() {
 
             {/* Header */}
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-800">Order Summary ({totalItemCount})</h3>
+              <h3 className="text-sm font-semibold text-slate-800">
+                Order Summary ({totalItemCount})
+              </h3>
               <div className="flex items-center gap-2">
                 {cart.length > 0 && (
                   <button
@@ -916,7 +1233,9 @@ export default function ConfidencyPosPage() {
                     >
                       -
                     </button>
-                    <span className="font-bold text-slate-900 w-4 text-center">{item.quantity}</span>
+                    <span className="font-bold text-slate-900 w-4 text-center">
+                      {item.quantity}
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
@@ -979,8 +1298,9 @@ export default function ConfidencyPosPage() {
       )}
 
       {/* =====================================================================
-          SUPPORTING MODALS (Receipt & End Shift)
+          SUPPORTING MODALS
       ===================================================================== */}
+      {/* 1. Receipt Modal */}
       {showReceiptModal && completedSale && (
         <ReceiptModal
           isOpen={showReceiptModal}
@@ -993,6 +1313,7 @@ export default function ConfidencyPosPage() {
         />
       )}
 
+      {/* 2. End Shift Modal */}
       <ShiftEndModal
         isOpen={isEndShiftModalOpen}
         onClose={() => setIsEndShiftModalOpen(false)}
@@ -1004,6 +1325,60 @@ export default function ConfidencyPosPage() {
           setScanFeedback('Z-Report generated & Shift Ended.');
           setTimeout(() => setScanFeedback(null), 3000);
         }}
+      />
+
+      {/* 3. Discount Picker Modal */}
+      <DiscountPickerModal
+        isOpen={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        currentPercent={discountPercent}
+        currentFlatAmount={discountFlat}
+        onApplyDiscount={(type, value) => {
+          if (type === 'PERCENT') {
+            setDiscountType('PERCENT');
+            setDiscountPercent(value);
+            setDiscountFlat(0);
+            setScanFeedback(`${value}% Discount Applied`);
+          } else {
+            setDiscountType('FLAT');
+            setDiscountFlat(value);
+            setDiscountPercent(0);
+            setScanFeedback(`LKR ${value.toFixed(2)} Discount Applied`);
+          }
+          setTimeout(() => setScanFeedback(null), 2000);
+        }}
+      />
+
+      {/* 4. Customer Selection & Registration Modal */}
+      <CustomerModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
+        selectedCustomer={selectedCustomer}
+        onSelectCustomer={(cust) => {
+          setSelectedCustomer(cust);
+          if (cust) {
+            setScanFeedback(`Customer Attached: ${cust.name}`);
+          } else {
+            setScanFeedback('Customer reset to Walk-in');
+          }
+          setTimeout(() => setScanFeedback(null), 2000);
+        }}
+      />
+
+      {/* 5. Custom Item Modal */}
+      <CustomSaleModal
+        isOpen={isCustomSaleModalOpen}
+        onClose={() => setIsCustomSaleModalOpen(false)}
+        onAddCustomItem={handleAddCustomItem}
+      />
+
+      {/* 6. Held Tickets Queue Modal */}
+      <HeldTicketsModal
+        isOpen={isHeldTicketsModalOpen}
+        onClose={() => setIsHeldTicketsModalOpen(false)}
+        heldTickets={heldTickets}
+        onRestoreTicket={handleRestoreHeldTicket}
+        onDiscardTicket={handleDiscardHeldTicket}
       />
     </div>
   );
