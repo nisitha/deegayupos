@@ -81,3 +81,4 @@ export class OnboardingController {
     return this.onboardingService.register(dto, ip, userAgent);
   }
 }
+

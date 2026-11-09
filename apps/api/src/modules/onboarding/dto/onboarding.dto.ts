@@ -115,3 +115,4 @@ export class OnboardingRegisterRequestDto implements OnboardingPayload {
   @IsNotEmpty({ message: 'Must select a SaaS subscription plan' })
   planCode!: string;
 }
+

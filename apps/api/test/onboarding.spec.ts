@@ -478,3 +478,4 @@ describe('PixelCraft POS - Phase 05: SaaS Plans & Business Onboarding Suite', ()
     });
   });
 });
+

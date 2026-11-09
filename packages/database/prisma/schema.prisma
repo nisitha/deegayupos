@@ -120,8 +120,9 @@ model BusinessSetting {
   taxRate        Decimal   @default(0.00) @map("tax_rate") @db.Decimal(5, 2)
   isTaxInclusive Boolean   @default(false) @map("is_tax_inclusive")
   enableLoyalty  Boolean   @default(false) @map("enable_loyalty")
-  receiptFooter  String?   @map("receipt_footer") @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at")
+  receiptFooter       String?   @map("receipt_footer") @db.Text
+  negativeStockPolicy String    @default("DISALLOW") @map("negative_stock_policy") @db.VarChar(32)
+  createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 

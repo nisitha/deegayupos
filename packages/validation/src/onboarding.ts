@@ -67,3 +67,4 @@ export const onboardingSchema = z.object({
 
 export type CheckSlugInput = z.infer<typeof checkSlugSchema>;
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
+

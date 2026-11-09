@@ -16,6 +16,12 @@ import type {
   OnboardingPayload,
   OnboardingResponseData,
   PublicPlanDto,
+  DashboardMetrics,
+  DashboardChartsData,
+  DashboardActivityItem,
+  BusinessProfileData,
+  BusinessSettingsData,
+  UpdateBusinessSettingsPayload,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -37,13 +43,17 @@ class ApiClient {
   }
 
   private setupInterceptors(): void {
-    // Request Interceptor (Inject Auth / Tenant headers in subsequent phases)
+    // Request Interceptor (Inject Auth / Tenant headers)
     this.instance.interceptors.request.use(
       (config) => {
         if (typeof window !== 'undefined') {
           const token = localStorage.getItem('pixelcraft_access_token');
           if (token && !config.headers.Authorization) {
             config.headers.Authorization = `Bearer ${token}`;
+          }
+          const tenantId = localStorage.getItem('pixelcraft_tenant_id');
+          if (tenantId && !config.headers['x-tenant-id']) {
+            config.headers['x-tenant-id'] = tenantId;
           }
         }
         return config;
@@ -173,3 +183,39 @@ export const onboardingApi = {
     return apiClient.post<OnboardingResponseData>('/onboarding/register', payload);
   },
 };
+
+export const dashboardApi = {
+  getMetrics: async (branchId?: string): Promise<ApiResponse<DashboardMetrics>> => {
+    return apiClient.get<DashboardMetrics>('/dashboard/metrics', {
+      params: branchId ? { branchId } : undefined,
+    });
+  },
+  getCharts: async (
+    days = 7,
+    branchId?: string,
+  ): Promise<ApiResponse<DashboardChartsData>> => {
+    return apiClient.get<DashboardChartsData>('/dashboard/charts', {
+      params: { days, ...(branchId ? { branchId } : {}) },
+    });
+  },
+  getActivity: async (
+    limit = 10,
+    branchId?: string,
+  ): Promise<ApiResponse<DashboardActivityItem[]>> => {
+    return apiClient.get<DashboardActivityItem[]>('/dashboard/activity', {
+      params: { limit, ...(branchId ? { branchId } : {}) },
+    });
+  },
+};
+
+export const businessApi = {
+  getProfile: async (): Promise<ApiResponse<BusinessProfileData>> => {
+    return apiClient.get<BusinessProfileData>('/business/profile');
+  },
+  updateSettings: async (
+    data: UpdateBusinessSettingsPayload,
+  ): Promise<ApiResponse<BusinessSettingsData>> => {
+    return apiClient.patch<BusinessSettingsData>('/business/settings', data);
+  },
+};
+
