@@ -48,6 +48,13 @@ import type {
   InventoryTelemetryDto,
   StockFilterParams,
   MovementFilterParams,
+  SupplierDto,
+  CreateSupplierDto,
+  UpdateSupplierDto,
+  PurchaseOrderDto,
+  CreatePurchaseOrderDto,
+  GoodsReceivedNoteDto,
+  CreateGrnDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -371,6 +378,45 @@ export const inventoryApi = {
   },
   getMovements: async (params?: MovementFilterParams): Promise<ApiResponse<PaginatedResult<StockMovementDto>>> => {
     return apiClient.get<PaginatedResult<StockMovementDto>>('/inventory/movements', { params });
+  },
+};
+
+export const suppliersApi = {
+  getSuppliers: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<SupplierDto>>> => {
+    return apiClient.get<PaginatedResult<SupplierDto>>('/suppliers', { params });
+  },
+  getSupplierById: async (id: string): Promise<ApiResponse<SupplierDto>> => {
+    return apiClient.get<SupplierDto>(`/suppliers/${id}`);
+  },
+  createSupplier: async (payload: CreateSupplierDto): Promise<ApiResponse<SupplierDto>> => {
+    return apiClient.post<SupplierDto>('/suppliers', payload);
+  },
+  updateSupplier: async (id: string, payload: UpdateSupplierDto): Promise<ApiResponse<SupplierDto>> => {
+    return apiClient.patch<SupplierDto>(`/suppliers/${id}`, payload);
+  },
+  deleteSupplier: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
+    return apiClient.delete<{ success: boolean }>(`/suppliers/${id}`);
+  },
+};
+
+export const procurementApi = {
+  getPurchaseOrders: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<PurchaseOrderDto>>> => {
+    return apiClient.get<PaginatedResult<PurchaseOrderDto>>('/procurement/purchase-orders', { params });
+  },
+  getPurchaseOrderById: async (id: string): Promise<ApiResponse<PurchaseOrderDto>> => {
+    return apiClient.get<PurchaseOrderDto>(`/procurement/purchase-orders/${id}`);
+  },
+  createPurchaseOrder: async (payload: CreatePurchaseOrderDto): Promise<ApiResponse<PurchaseOrderDto>> => {
+    return apiClient.post<PurchaseOrderDto>('/procurement/purchase-orders', payload);
+  },
+  getGoodsReceivedNotes: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<GoodsReceivedNoteDto>>> => {
+    return apiClient.get<PaginatedResult<GoodsReceivedNoteDto>>('/procurement/grn', { params });
+  },
+  getGrnById: async (id: string): Promise<ApiResponse<GoodsReceivedNoteDto>> => {
+    return apiClient.get<GoodsReceivedNoteDto>(`/procurement/grn/${id}`);
+  },
+  createGrn: async (payload: CreateGrnDto): Promise<ApiResponse<GoodsReceivedNoteDto>> => {
+    return apiClient.post<GoodsReceivedNoteDto>('/procurement/grn', payload);
   },
 };
 

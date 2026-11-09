@@ -8,6 +8,7 @@ import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { PosModule } from './modules/pos/pos.module';
+import { ProcurementModule } from './modules/procurement/procurement.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 
@@ -27,6 +28,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
     ProductsModule,
     PosModule,
     InventoryModule,
+    ProcurementModule,
   ],
 })
 export class AppModule {}

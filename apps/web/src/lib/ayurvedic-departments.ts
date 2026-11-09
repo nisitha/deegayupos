@@ -251,3 +251,4 @@ export function classifyAyurvedicDepartment(
   // 10. General Healthcare & FMCG (Default)
   return 'fmcg';
 }
+

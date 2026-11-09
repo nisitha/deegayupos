@@ -11,7 +11,6 @@ import {
   Package,
   Tag,
   Users,
-  Star,
   Receipt,
   CreditCard,
   FileText,
@@ -20,6 +19,8 @@ import {
   Settings,
   Search,
   LogOut,
+  Truck,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
@@ -73,9 +74,10 @@ export function PosSidebar() {
       items: [
         { name: 'Order Queue', href: '/dashboard/sales', icon: ShoppingBag },
         { name: 'Catalog', href: '/dashboard/products', icon: Package },
+        { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
+        { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
         { name: 'Pricing Engine', href: '/dashboard/products', icon: Tag },
         { name: 'Customers', href: '/dashboard/customers', icon: Users },
-        { name: 'Reviews', href: '/dashboard/customers', icon: Star },
       ],
     },
     {
