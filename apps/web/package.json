@@ -12,10 +12,12 @@
     "clean": "rimraf .next dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
+    "@pixelcraft/database": "workspace:*",
     "@pixelcraft/types": "workspace:*",
     "@pixelcraft/validation": "workspace:*",
     "@tanstack/react-query": "^5.66.0",
     "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^0.475.0",
@@ -29,6 +31,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
     "@pixelcraft/config": "workspace:*",
+    "@types/bcryptjs": "^2.4.6",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^22.13.4",
     "@types/qrcode": "^1.5.6",

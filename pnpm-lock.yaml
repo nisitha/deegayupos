@@ -320,6 +320,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@pixelcraft/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@pixelcraft/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -332,6 +335,9 @@ importers:
       axios:
         specifier: ^1.7.9
         version: 1.21.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -366,6 +372,9 @@ importers:
       '@pixelcraft/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@types/bcryptjs':
+        specifier: ^2.4.6
+        version: 2.4.6
       '@types/jsbarcode':
         specifier: ^3.11.4
         version: 3.11.4

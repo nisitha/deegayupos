@@ -22,20 +22,26 @@ import {
   UserCheck,
   RotateCcw,
   Sparkles,
+  Pill,
+  FlaskConical,
+  Leaf,
+  Droplets,
+  Package,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
   HeldCartDto,
-  ProductDto,
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi, productsApi } from '../../../lib/api-client';
+import { posApi } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
 // =========================================================================
 // REALISTIC HIGH-END E-COMMERCE RETAIL CATALOGUE
-// Standard: Shopify Polaris & Stripe Dashboard (Crisp commercial imagery)
+// Standard: Shopify Polaris & Stripe Dashboard (Deegayu Weda Madura Catalog)
 // =========================================================================
 interface RetailProductItem {
   id: string;
@@ -45,231 +51,84 @@ interface RetailProductItem {
   retailPrice: number;
   wholesalePrice: number;
   costPrice: number;
-  category: { name: string; slug: string };
+  category: { id?: string; name: string; slug: string };
   stockOnHand: number;
   unit: string;
-  imageUrl: string;
+  imageUrl?: string;
+  alertQuantity?: number | null;
 }
 
-const SAMPLE_RETAIL_ITEMS: RetailProductItem[] = [
-  // 1. Groceries & Pantry
-  {
-    id: 'prod-001',
-    name: 'Organic Ceylon Cinnamon Quills (100g Pack)',
-    sku: 'GRO-CIN-01',
-    barcode: '479200000001',
-    retailPrice: 950.0,
-    wholesalePrice: 820.0,
-    costPrice: 500.0,
-    category: { name: 'Groceries', slug: 'groceries' },
-    stockOnHand: 45,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-002',
-    name: 'Super Kernel Aged Basmati Rice (5kg Bag)',
-    sku: 'GRO-RIC-02',
-    barcode: '479200000002',
-    retailPrice: 2450.0,
-    wholesalePrice: 2150.0,
-    costPrice: 1600.0,
-    category: { name: 'Groceries', slug: 'groceries' },
-    stockOnHand: 80,
-    unit: 'bags',
-    imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-003',
-    name: 'Single Estate Pure Ceylon BOPF Tea (500g Tin)',
-    sku: 'GRO-TEA-03',
-    barcode: '479200000003',
-    retailPrice: 1200.0,
-    wholesalePrice: 1050.0,
-    costPrice: 750.0,
-    category: { name: 'Groceries', slug: 'groceries' },
-    stockOnHand: 60,
-    unit: 'tins',
-    imageUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-004',
-    name: 'Cold Pressed Extra Virgin Olive Oil (750ml)',
-    sku: 'GRO-OIL-04',
-    barcode: '479200000004',
-    retailPrice: 3400.0,
-    wholesalePrice: 2950.0,
-    costPrice: 2200.0,
-    category: { name: 'Groceries', slug: 'groceries' },
-    stockOnHand: 18,
-    unit: 'btls',
-    imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80',
-  },
-
-  // 2. Electronics & Mobile
-  {
-    id: 'prod-005',
-    name: 'Pro Active ANC Wireless Bluetooth Earbuds',
-    sku: 'ELE-EAR-01',
-    barcode: '479200000005',
-    retailPrice: 12500.0,
-    wholesalePrice: 10200.0,
-    costPrice: 7800.0,
-    category: { name: 'Electronics', slug: 'electronics' },
-    stockOnHand: 24,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-006',
-    name: '65W GaN Fast Charger USB-C Dual Port',
-    sku: 'ELE-CHG-02',
-    barcode: '479200000006',
-    retailPrice: 4800.0,
-    wholesalePrice: 3900.0,
-    costPrice: 2600.0,
-    category: { name: 'Electronics', slug: 'electronics' },
-    stockOnHand: 35,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-007',
-    name: 'Ultra-Slim Mechanical Wireless Keyboard RGB',
-    sku: 'ELE-KBD-03',
-    barcode: '479200000007',
-    retailPrice: 16800.0,
-    wholesalePrice: 14200.0,
-    costPrice: 11000.0,
-    category: { name: 'Electronics', slug: 'electronics' },
-    stockOnHand: 12,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-008',
-    name: 'Precision Multisport GPS Smartwatch OLED',
-    sku: 'ELE-WAT-04',
-    barcode: '479200000008',
-    retailPrice: 28500.0,
-    wholesalePrice: 24000.0,
-    costPrice: 18500.0,
-    category: { name: 'Electronics', slug: 'electronics' },
-    stockOnHand: 8,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80',
-  },
-
-  // 3. Apparel & Fashion
-  {
-    id: 'prod-009',
-    name: 'Premium Pima Cotton Oxford Casual Shirt (Navy)',
-    sku: 'APP-SHT-01',
-    barcode: '479200000009',
-    retailPrice: 4200.0,
-    wholesalePrice: 3500.0,
-    costPrice: 2400.0,
-    category: { name: 'Apparel', slug: 'apparel' },
-    stockOnHand: 28,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-010',
-    name: 'Classic Indigo Selvedge Denim Trucker Jacket',
-    sku: 'APP-JKT-02',
-    barcode: '479200000010',
-    retailPrice: 8900.0,
-    wholesalePrice: 7200.0,
-    costPrice: 5100.0,
-    category: { name: 'Apparel', slug: 'apparel' },
-    stockOnHand: 14,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-011',
-    name: 'Italian Full-Grain Leather Dress Belt 35mm',
-    sku: 'APP-BLT-03',
-    barcode: '479200000011',
-    retailPrice: 3200.0,
-    wholesalePrice: 2600.0,
-    costPrice: 1800.0,
-    category: { name: 'Apparel', slug: 'apparel' },
-    stockOnHand: 40,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1624222247344-550fb60583dc?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-012',
-    name: 'Tailored Breathable Linen Chino Trousers',
-    sku: 'APP-TRZ-04',
-    barcode: '479200000012',
-    retailPrice: 5400.0,
-    wholesalePrice: 4400.0,
-    costPrice: 3100.0,
-    category: { name: 'Apparel', slug: 'apparel' },
-    stockOnHand: 22,
-    unit: 'pcs',
-    imageUrl: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=400&q=80',
-  },
-
-  // 4. Hardware & Tools
-  {
-    id: 'prod-013',
-    name: '20V Cordless Brushless Heavy-Duty Impact Drill Kit',
-    sku: 'HDW-DRL-01',
-    barcode: '479200000013',
-    retailPrice: 18500.0,
-    wholesalePrice: 15800.0,
-    costPrice: 12000.0,
-    category: { name: 'Hardware', slug: 'hardware' },
-    stockOnHand: 16,
-    unit: 'kits',
-    imageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-014',
-    name: 'Magnetic Precision Screwdriver Tool Set (48-in-1)',
-    sku: 'HDW-SCW-02',
-    barcode: '479200000014',
-    retailPrice: 2900.0,
-    wholesalePrice: 2300.0,
-    costPrice: 1500.0,
-    category: { name: 'Hardware', slug: 'hardware' },
-    stockOnHand: 32,
-    unit: 'sets',
-    imageUrl: 'https://images.unsplash.com/photo-1581147036324-c17ac41dfa6c?auto=format&fit=crop&w=400&q=80',
-  },
-
-  // 5. Pharmacy & Health
-  {
-    id: 'prod-015',
-    name: 'Daily Comprehensive Multivitamins Plus Zinc (90s)',
-    sku: 'PHM-VIT-01',
-    barcode: '479200000015',
-    retailPrice: 3800.0,
-    wholesalePrice: 3100.0,
-    costPrice: 2100.0,
-    category: { name: 'Pharmacy', slug: 'pharmacy' },
-    stockOnHand: 50,
-    unit: 'btls',
-    imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'prod-016',
-    name: 'Hospital-Grade 70% Isopropyl Hand Sanitizer (500ml)',
-    sku: 'PHM-SAN-02',
-    barcode: '479200000016',
-    retailPrice: 850.0,
-    wholesalePrice: 680.0,
-    costPrice: 420.0,
-    category: { name: 'Pharmacy', slug: 'pharmacy' },
-    stockOnHand: 75,
-    unit: 'btls',
-    imageUrl: 'https://images.unsplash.com/photo-1584744982491-665216d95f8b?auto=format&fit=crop&w=400&q=80',
-  },
-];
+// Category visual helper for authentic herbal/pharmacy catalog cards
+function getCategoryVisual(categoryName?: string) {
+  const lower = (categoryName || '').toLowerCase();
+  if (
+    lower.includes('arishta') ||
+    lower.includes('asawa') ||
+    lower.includes('oil') ||
+    lower.includes('syrup') ||
+    lower.includes('liquid')
+  ) {
+    return {
+      icon: Droplets,
+      bg: 'bg-amber-50 text-amber-600 border-amber-200/70',
+      badge: 'bg-amber-100/70 text-amber-800',
+    };
+  }
+  if (
+    lower.includes('wati') ||
+    lower.includes('guli') ||
+    lower.includes('pill') ||
+    lower.includes('tablet') ||
+    lower.includes('capsule')
+  ) {
+    return {
+      icon: Pill,
+      bg: 'bg-indigo-50 text-indigo-600 border-indigo-200/70',
+      badge: 'bg-indigo-100/70 text-indigo-800',
+    };
+  }
+  if (
+    lower.includes('powder') ||
+    lower.includes('churna') ||
+    lower.includes('dry') ||
+    lower.includes('ala') ||
+    lower.includes('herbal') ||
+    lower.includes('leaf') ||
+    lower.includes('tea')
+  ) {
+    return {
+      icon: Leaf,
+      bg: 'bg-emerald-50 text-emerald-600 border-emerald-200/70',
+      badge: 'bg-emerald-100/70 text-emerald-800',
+    };
+  }
+  if (
+    lower.includes('face') ||
+    lower.includes('cream') ||
+    lower.includes('soap') ||
+    lower.includes('cosmetic') ||
+    lower.includes('wash') ||
+    lower.includes('balm')
+  ) {
+    return {
+      icon: Sparkles,
+      bg: 'bg-rose-50 text-rose-600 border-rose-200/70',
+      badge: 'bg-rose-100/70 text-rose-800',
+    };
+  }
+  if (lower.includes('rasayana') || lower.includes('kalka')) {
+    return {
+      icon: FlaskConical,
+      bg: 'bg-purple-50 text-purple-600 border-purple-200/70',
+      badge: 'bg-purple-100/70 text-purple-800',
+    };
+  }
+  return {
+    icon: Package,
+    bg: 'bg-blue-50 text-[#005BD3] border-blue-200/70',
+    badge: 'bg-blue-100/70 text-blue-800',
+  };
+}
 
 interface CartItem {
   id: string;
@@ -334,7 +193,9 @@ const SAMPLE_CUSTOMERS: CustomerProfile[] = [
 ];
 
 export default function PosCheckoutPage() {
-  const { selectedBranchId } = useTenantBranch();
+  const { selectedBranchId, business, branches, tenant } = useTenantBranch();
+  const activeBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const activeBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
 
   // Mode View: 'grid' vs 'table'
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -345,7 +206,12 @@ export default function PosCheckoutPage() {
   // Catalogue & Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategorySlug, setSelectedCategorySlug] = useState('all');
-  const [dbProducts, setDbProducts] = useState<ProductDto[]>([]);
+  const [products, setProducts] = useState<RetailProductItem[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; slug: string; count: number }[]>([]);
+  const [totalProductsCount, setTotalProductsCount] = useState<number>(0);
+  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(60);
 
   // Cart & Active Sale Ticket
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -389,46 +255,32 @@ export default function PosCheckoutPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch real inventory products if available from backend
-  useEffect(() => {
-    productsApi
-      .getAll({ limit: 100 })
-      .then((res: { data?: { items?: ProductDto[] } }) => {
-        if (res.data?.items && res.data.items.length > 0) {
-          setDbProducts(res.data.items);
-        }
-      })
-      .catch(() => {
-        // Fallback to high-res sample items
-      });
+  // Fetch real catalog from Supabase via /api/pos/catalog
+  const loadCatalog = useCallback(async () => {
+    try {
+      setIsLoadingProducts(true);
+      setCatalogError(null);
+      // Fetch up to 1500 products for high-speed client-side filtering & scanner matching
+      const res = await fetch('/api/pos/catalog?slug=deegayu&limit=1500');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setProducts(json.data.products || []);
+        setCategories(json.data.categories || []);
+        setTotalProductsCount(json.data.total || 0);
+      } else {
+        setCatalogError(json.error || 'Failed to load catalog');
+      }
+    } catch (err: unknown) {
+      console.error('Failed to load Deegayu POS catalog:', err);
+      setCatalogError('Could not connect to catalog service.');
+    } finally {
+      setIsLoadingProducts(false);
+    }
   }, []);
 
-  // Combined product catalog
-  const allProducts: RetailProductItem[] = useMemo(() => {
-    if (dbProducts.length > 0) {
-      return dbProducts.map((p, index) => {
-        const fallback = SAMPLE_RETAIL_ITEMS[index % SAMPLE_RETAIL_ITEMS.length]!;
-        const raw = p as unknown as { stockOnHand?: number; imageUrl?: string };
-        return {
-          id: p.id,
-          name: p.name,
-          sku: p.sku,
-          barcode: p.barcode || fallback.barcode,
-          retailPrice: Number(p.retailPrice),
-          wholesalePrice: p.wholesalePrice ? Number(p.wholesalePrice) : Number(p.retailPrice) * 0.85,
-          costPrice: Number(p.costPrice),
-          category: {
-            name: p.category?.name || 'General Retail',
-            slug: p.category?.slug || 'general',
-          },
-          stockOnHand: raw.stockOnHand !== undefined ? raw.stockOnHand : 25,
-          unit: p.unit?.shortCode || 'pcs',
-          imageUrl: raw.imageUrl || fallback.imageUrl,
-        };
-      });
-    }
-    return SAMPLE_RETAIL_ITEMS;
-  }, [dbProducts]);
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
 
   // Recalculate cart item unit prices when pricingTier changes
   useEffect(() => {
@@ -440,34 +292,70 @@ export default function PosCheckoutPage() {
     );
   }, [pricingTier]);
 
-  // Dynamic Category Pills with counts
+  // Dynamic Category Pills with counts from Supabase
   const categoryTabs = useMemo(() => {
-    const catMap = new Map<string, number>();
-    allProducts.forEach((p) => {
+    if (categories.length > 0) {
+      const activeTabs = categories
+        .filter((c) => c.count > 0)
+        .map((c) => ({
+          name: c.name,
+          slug: c.slug,
+          count: c.count,
+        }));
+      return [
+        { name: 'All Products', slug: 'all', count: totalProductsCount || products.length },
+        ...activeTabs,
+      ];
+    }
+
+    // Fallback: derive from loaded products
+    const catMap = new Map<string, { slug: string; count: number }>();
+    products.forEach((p) => {
       const catName = p.category?.name || 'General';
-      catMap.set(catName, (catMap.get(catName) || 0) + 1);
+      const slug = p.category?.slug || catName.toLowerCase();
+      const current = catMap.get(catName) || { slug, count: 0 };
+      catMap.set(catName, { slug, count: current.count + 1 });
     });
 
-    const tabs = [{ name: 'All Products', slug: 'all', count: allProducts.length }];
-    catMap.forEach((count, name) => {
-      tabs.push({ name, slug: name.toLowerCase(), count });
+    const tabs = [{ name: 'All Products', slug: 'all', count: products.length }];
+    catMap.forEach((info, name) => {
+      tabs.push({ name, slug: info.slug, count: info.count });
     });
     return tabs;
-  }, [allProducts]);
+  }, [categories, products, totalProductsCount]);
 
-  // Filtered Products
+  // Reset display limit when category or search changes
+  useEffect(() => {
+    setDisplayLimit(60);
+  }, [selectedCategorySlug, searchQuery]);
+
+  // Filtered Products (Fast client-side search across name, SKU, and barcode)
   const filteredProducts = useMemo(() => {
-    return allProducts.filter((p) => {
-      const matchesSearch =
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.barcode && p.barcode.includes(searchQuery));
+    const term = searchQuery.trim().toLowerCase();
 
-      if (!matchesSearch) return false;
-      if (selectedCategorySlug === 'all') return true;
-      return p.category.name.toLowerCase() === selectedCategorySlug.toLowerCase();
+    return products.filter((p) => {
+      if (selectedCategorySlug !== 'all') {
+        const catSlug = p.category?.slug?.toLowerCase();
+        const catName = p.category?.name?.toLowerCase();
+        const target = selectedCategorySlug.toLowerCase();
+        if (catSlug !== target && catName !== target) {
+          return false;
+        }
+      }
+
+      if (!term) return true;
+
+      const matchesName = p.name.toLowerCase().includes(term);
+      const matchesSku = p.sku.toLowerCase().includes(term);
+      const matchesBarcode = p.barcode ? p.barcode.toLowerCase().includes(term) : false;
+
+      return matchesName || matchesSku || matchesBarcode;
     });
-  }, [allProducts, searchQuery, selectedCategorySlug]);
+  }, [products, searchQuery, selectedCategorySlug]);
+
+  const displayedProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayLimit);
+  }, [filteredProducts, displayLimit]);
 
   // Add Item to Cart
   const addToCart = useCallback((product: RetailProductItem) => {
@@ -506,18 +394,21 @@ export default function PosCheckoutPage() {
   // Barcode / SKU Scan Submitter
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const term = searchQuery.trim();
+    const term = searchQuery.trim().toLowerCase();
     if (!term) return;
 
-    const matched = allProducts.find(
-      (p) => p.barcode === term || p.sku.toUpperCase() === term.toUpperCase(),
+    const matched = products.find(
+      (p) =>
+        (p.barcode && p.barcode.toLowerCase() === term) ||
+        p.sku.toLowerCase() === term ||
+        p.name.toLowerCase() === term,
     );
 
     if (matched) {
       addToCart(matched);
       setSearchQuery('');
     } else {
-      setScanFeedback(`No match for SKU / Barcode: "${term}"`);
+      setScanFeedback(`No match for SKU / Barcode: "${searchQuery.trim()}"`);
       setTimeout(() => setScanFeedback(null), 2500);
     }
   };
@@ -900,7 +791,25 @@ export default function PosCheckoutPage() {
 
         {/* Catalog Body (Grid or Table) */}
         <div className="flex-1 overflow-y-auto p-3.5">
-          {filteredProducts.length === 0 ? (
+          {isLoadingProducts ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-12 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-[#005BD3] mb-3" />
+              <p className="text-sm font-semibold text-slate-700">Connecting to Deegayu Supabase Catalog...</p>
+              <p className="text-xs text-slate-400 mt-1">Loading 3,120 Ayurvedic & Pharmacy products</p>
+            </div>
+          ) : catalogError ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-rose-500">
+              <p className="text-sm font-semibold">{catalogError}</p>
+              <button
+                type="button"
+                onClick={() => loadCatalog()}
+                className="mt-3 px-4 py-2 bg-[#005BD3] text-white text-xs font-semibold rounded-xl hover:bg-[#004CB5] transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Retry Connection
+              </button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
               <ShoppingBag className="w-10 h-10 mb-2 opacity-30" />
               <p className="text-sm font-semibold text-slate-600">No items match your query</p>
@@ -910,166 +819,227 @@ export default function PosCheckoutPage() {
             /* ===============================================================
                A. COMPACT PRODUCT BENTO GRID (Shopify Polaris Card Standard)
             =============================================================== */
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-              {filteredProducts.map((product) => {
-                const activePrice =
-                  pricingTier === 'WHOLESALE' ? product.wholesalePrice : product.retailPrice;
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                {displayedProducts.map((product) => {
+                  const activePrice =
+                    pricingTier === 'WHOLESALE' ? product.wholesalePrice : product.retailPrice;
+                  const visual = getCategoryVisual(product.category?.name);
+                  const VisualIcon = visual.icon;
 
-                return (
-                  <div
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="bg-white rounded-xl border border-slate-200/80 shadow-card hover:shadow-card-hover hover:border-slate-300 transition-all duration-150 cursor-pointer flex flex-col justify-between overflow-hidden group"
-                  >
-                    {/* Top Image Container with Realistic E-Commerce Photo */}
-                    <div className="h-32 w-full bg-slate-50/50 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-
-                      {/* Floating Stock Pill */}
-                      <div className="absolute top-2 right-2">
-                        {product.stockOnHand <= 0 ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200 shadow-sm backdrop-blur-sm">
-                            Out of stock
-                          </span>
-                        ) : product.stockOnHand <= 10 ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200/70 shadow-sm backdrop-blur-sm">
-                            Only {product.stockOnHand} left
-                          </span>
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => addToCart(product)}
+                      className="bg-white rounded-xl border border-slate-200/80 shadow-card hover:shadow-card-hover hover:border-slate-300 transition-all duration-150 cursor-pointer flex flex-col justify-between overflow-hidden group select-none"
+                    >
+                      {/* Top Graphic Container (Image or Medical Squircle Badge) */}
+                      <div className="h-28 w-full bg-slate-50 flex items-center justify-center relative overflow-hidden border-b border-slate-100 group-hover:bg-slate-100/60 transition-colors">
+                        {product.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70 shadow-sm backdrop-blur-sm">
-                            {product.stockOnHand} in stock
-                          </span>
+                          <div className="flex flex-col items-center justify-center p-3 text-center">
+                            <div
+                              className={`w-11 h-11 rounded-2xl flex items-center justify-center border shadow-xs group-hover:scale-110 transition-transform duration-200 ${visual.bg}`}
+                            >
+                              <VisualIcon className="w-5 h-5" />
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-slate-400 mt-1 uppercase tracking-wider">
+                              {product.sku}
+                            </span>
+                          </div>
                         )}
-                      </div>
-                    </div>
 
-                    {/* Card Content */}
-                    <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                      <div>
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                          {product.category.name}
+                        {/* Floating Stock Pill */}
+                        <div className="absolute top-2 right-2">
+                          {product.stockOnHand <= 0 ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200 shadow-sm backdrop-blur-sm">
+                              Out of stock
+                            </span>
+                          ) : product.stockOnHand <= 10 ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200/70 shadow-sm backdrop-blur-sm">
+                              Only {product.stockOnHand} left
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70 shadow-sm backdrop-blur-sm">
+                              {product.stockOnHand > 999
+                                ? `${(product.stockOnHand / 1000).toFixed(1)}k in stock`
+                                : `${product.stockOnHand} in stock`}
+                            </span>
+                          )}
                         </div>
-                        <h4 className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug mt-0.5 group-hover:text-[#005BD3] transition-colors">
-                          {product.name}
-                        </h4>
                       </div>
 
-                      {/* Bottom Price & Quick Add Button */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-50">
+                      {/* Card Content */}
+                      <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
                         <div>
-                          <div className="text-sm font-bold font-mono text-slate-900 tracking-tight">
-                            LKR {activePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+                            {product.category?.name || 'Ayurvedic Pharmacy'}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            SKU: {product.sku}
-                          </div>
+                          <h4 className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug mt-0.5 group-hover:text-[#005BD3] transition-colors">
+                            {product.name}
+                          </h4>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                          }}
-                          className="w-7 h-7 rounded-lg bg-blue-50 text-[#005BD3] group-hover:bg-[#005BD3] group-hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                          title="Add to Ticket"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
+                        {/* Bottom Price & Quick Add Button */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-50">
+                          <div>
+                            <div className="text-sm font-bold font-mono text-slate-900 tracking-tight">
+                              LKR {activePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono truncate max-w-[120px]">
+                              {product.barcode || product.sku}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(product);
+                            }}
+                            className="w-7 h-7 rounded-lg bg-blue-50 text-[#005BD3] group-hover:bg-[#005BD3] group-hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                            title="Add to Ticket"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              {/* Load More Button when list exceeds display limit */}
+              {filteredProducts.length > displayLimit && (
+                <div className="flex justify-center py-4">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayLimit((prev) => prev + 60)}
+                    className="px-4 py-2 bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition-all flex items-center gap-1.5"
+                  >
+                    <span>Load more products ({displayLimit} of {filteredProducts.length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             /* ===============================================================
                B. HIGH-DENSITY TABLE LIST VIEW (For Supermarkets / Wholesale)
             =============================================================== */
-            <div className="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">Item Details</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3 text-right">Stock</th>
-                    <th className="py-2.5 px-3 text-right">Wholesale</th>
-                    <th className="py-2.5 px-3 text-right">Retail</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredProducts.map((product) => (
-                    <tr
-                      key={product.id}
-                      onClick={() => addToCart(product)}
-                      className="hover:bg-slate-50/80 cursor-pointer transition-colors"
-                    >
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2.5">
-                          {/* Small 32x32 Thumbnail */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={product.imageUrl}
-                            alt=""
-                            className="w-8 h-8 rounded-lg object-cover border border-slate-200/80 shrink-0"
-                          />
-                          <div>
-                            <div className="font-semibold text-slate-900">{product.name}</div>
-                            <div className="text-[11px] text-slate-400 font-mono">
-                              {product.sku} • {product.barcode}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-2.5 px-3 text-slate-600 font-medium">
-                        {product.category.name}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right font-medium">
-                        <span
-                          className={`font-mono font-bold ${
-                            product.stockOnHand <= 5 ? 'text-amber-600' : 'text-slate-800'
-                          }`}
-                        >
-                          {product.stockOnHand}
-                        </span>{' '}
-                        <span className="text-[10px] text-slate-400">{product.unit}</span>
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                        LKR {product.wholesalePrice.toFixed(2)}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        LKR {product.retailPrice.toFixed(2)}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                          }}
-                          className="px-2.5 py-1 rounded-md bg-[#005BD3] hover:bg-[#004CB5] text-white text-[11px] font-semibold transition-all inline-flex items-center gap-1 shadow-sm"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add
-                        </button>
-                      </td>
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Item Details</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3 text-right">Stock</th>
+                      <th className="py-2.5 px-3 text-right">Wholesale</th>
+                      <th className="py-2.5 px-3 text-right">Retail</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {displayedProducts.map((product) => {
+                      const visual = getCategoryVisual(product.category?.name);
+                      const VisualIcon = visual.icon;
+
+                      return (
+                        <tr
+                          key={product.id}
+                          onClick={() => addToCart(product)}
+                          className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                        >
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-2.5">
+                              {product.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={product.imageUrl}
+                                  alt=""
+                                  className="w-8 h-8 rounded-lg object-cover border border-slate-200/80 shrink-0"
+                                />
+                              ) : (
+                                <div
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${visual.bg}`}
+                                >
+                                  <VisualIcon className="w-4 h-4" />
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-semibold text-slate-900">{product.name}</div>
+                                <div className="text-[11px] text-slate-400 font-mono">
+                                  {product.sku} {product.barcode && product.barcode !== product.sku ? `• ${product.barcode}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-2.5 px-3 text-slate-600 font-medium">
+                            {product.category?.name || 'General'}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-right font-medium">
+                            <span
+                              className={`font-mono font-bold ${
+                                product.stockOnHand <= 5 ? 'text-amber-600' : 'text-slate-800'
+                              }`}
+                            >
+                              {product.stockOnHand.toLocaleString()}
+                            </span>{' '}
+                            <span className="text-[10px] text-slate-400">{product.unit}</span>
+                          </td>
+
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                            LKR {product.wholesalePrice.toFixed(2)}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                            LKR {product.retailPrice.toFixed(2)}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(product);
+                              }}
+                              className="px-2.5 py-1 rounded-md bg-[#005BD3] hover:bg-[#004CB5] text-white text-[11px] font-semibold transition-all inline-flex items-center gap-1 shadow-sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Load More Button for Table View */}
+              {filteredProducts.length > displayLimit && (
+                <div className="flex justify-center py-4">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayLimit((prev) => prev + 60)}
+                    className="px-4 py-2 bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs transition-all flex items-center gap-1.5"
+                  >
+                    <span>Load more products ({displayLimit} of {filteredProducts.length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1084,7 +1054,7 @@ export default function PosCheckoutPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Sale Ticket #INV-0024
+                {activeBusinessName} • {activeBranchName}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-50 text-[#005BD3] border border-blue-100">
                 ACTIVE

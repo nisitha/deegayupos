@@ -30,7 +30,7 @@ export function PosSidebar() {
       localStorage.removeItem('pixelcraft_tenant_id');
       localStorage.removeItem('pixelcraft_permissions');
     }
-    router.push('/');
+    router.push('/login');
   };
 
   // Core commercial retail navigation suite (Always visible to ensure zero dead-ends)
