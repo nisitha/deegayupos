@@ -9,11 +9,14 @@ import type {
   HeldCartDto,
   HoldCartPayload,
   PaginatedResult,
+  ReceiptDocumentDto,
+  ReceiptTaxBreakdownItem,
   SaleDto,
   SaleItemDto,
   SalePaymentDto,
 } from '@pixelcraft/types';
 import type { Prisma } from '@pixelcraft/database';
+import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../common/database/prisma.service';
 
 @Injectable()
@@ -349,6 +352,248 @@ export class PosService {
     }
 
     return this.mapSaleToDto(sale);
+  }
+
+  /**
+   * Fetch complete receipt payload including tenant branding, branch address,
+   * cashier details, tax breakdown, barcode data, and customized receipt header/footer notes.
+   */
+  async getReceiptDocument(
+    tenantId: string,
+    saleId: string,
+  ): Promise<ReceiptDocumentDto> {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: saleId, tenantId },
+      include: {
+        items: true,
+        payments: true,
+        cashier: {
+          select: { id: true, fullName: true, email: true },
+        },
+        branch: true,
+        business: {
+          include: {
+            settings: true,
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException(`Sale with ID "${saleId}" not found for this tenant.`);
+    }
+
+    const s = sale.business.settings;
+    const paperSize = s?.receiptPaperSize || 'MM_80';
+    const showLogo = s?.showLogoOnReceipt ?? true;
+    const showTaxDetails = s?.showTaxDetails ?? true;
+    const showBarcode = s?.showBarcodeOnReceipt ?? true;
+
+    const saleDto = this.mapSaleToDto(sale);
+
+    // Compute tax breakdown
+    const taxBreakdown: ReceiptTaxBreakdownItem[] = [];
+    if (saleDto.taxAmount > 0) {
+      const rate = s ? Number(s.taxRate) : 0;
+      const taxableAmount = Math.max(0, saleDto.subtotal - saleDto.discountAmount);
+      taxBreakdown.push({
+        rate,
+        taxableAmount,
+        taxAmount: saleDto.taxAmount,
+      });
+    }
+
+    return {
+      sale: saleDto,
+      business: {
+        id: sale.business.id,
+        name: sale.business.name,
+        legalName: sale.business.legalName,
+        businessType: sale.business.businessType,
+        currency: sale.business.currency,
+        logoUrl: null,
+      },
+      branch: {
+        id: sale.branch.id,
+        name: sale.branch.name,
+        code: sale.branch.code,
+        address: sale.branch.address,
+        phone: sale.branch.phone,
+      },
+      cashier: sale.cashier || {
+        id: sale.cashierId,
+        fullName: 'Cashier Station',
+        email: 'cashier@pixelcraftlk.com',
+      },
+      settings: {
+        paperSize: paperSize as 'MM_58' | 'MM_80' | 'A4',
+        showLogo,
+        showTaxDetails,
+        showBarcode,
+        taxNumber: s?.taxNumber || null,
+        receiptHeader: s?.receiptHeader || null,
+        receiptFooter: s?.receiptFooter || null,
+        returnPolicyText: s?.returnPolicyText || null,
+      },
+      barcodeData: {
+        format: 'CODE128',
+        code: sale.invoiceNumber,
+        verificationUrl: `https://pos.pixelcraftlk.com/verify/${sale.invoiceNumber}`,
+      },
+      taxBreakdown,
+    };
+  }
+
+  /**
+   * Generates a vector-sharp A4 PDF tax invoice buffer for customer or accounting records.
+   */
+  async generateSalePdf(
+    tenantId: string,
+    saleId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const receipt = await this.getReceiptDocument(tenantId, saleId);
+    const { sale, business, branch, cashier, settings } = receipt;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 40,
+      info: {
+        Title: `Invoice ${sale.invoiceNumber}`,
+        Author: 'PixelCraft POS',
+        Subject: 'Commercial Tax Invoice',
+        Creator: 'PixelCraft POS Engine',
+      },
+    });
+
+    const buffers: Buffer[] = [];
+    doc.on('data', (chunk) => buffers.push(chunk));
+
+    const pdfPromise = new Promise<Buffer>((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+    });
+
+    // Primary brand bar
+    doc.rect(40, 40, 515, 6).fill('#2F65F6');
+
+    // Business Name & Title
+    doc.fontSize(20).fillColor('#0F172A').text(business.legalName || business.name, 40, 56);
+    doc.fontSize(10).fillColor('#64748B').text(branch.name, 40, 82);
+    if (branch.address) doc.text(branch.address, 40, 96);
+    if (branch.phone) doc.text(`Tel: ${branch.phone}`, 40, 110);
+    if (settings.taxNumber) doc.text(`Tax / VAT Reg: ${settings.taxNumber}`, 40, 124);
+
+    // Invoice Meta (right column)
+    doc.fontSize(16).fillColor('#2F65F6').text('TAX INVOICE', 350, 56, { align: 'right' });
+    doc.fontSize(10).fillColor('#0F172A').text(`Invoice #: ${sale.invoiceNumber}`, 350, 82, { align: 'right' });
+    doc.fillColor('#64748B').text(`Date: ${new Date(sale.createdAt).toLocaleDateString()}`, 350, 96, { align: 'right' });
+    doc.text(`Time: ${new Date(sale.createdAt).toLocaleTimeString()}`, 350, 110, { align: 'right' });
+    doc.text(`Cashier: ${cashier.fullName}`, 350, 124, { align: 'right' });
+    if (sale.customerName) {
+      doc.text(`Customer: ${sale.customerName}`, 350, 138, { align: 'right' });
+    }
+
+    // Header Note
+    let currentY = 165;
+    if (settings.receiptHeader) {
+      doc.fontSize(9).fillColor('#475569').text(settings.receiptHeader, 40, currentY, { width: 515 });
+      currentY += 22;
+    }
+
+    // Items Table Header
+    doc.rect(40, currentY, 515, 20).fill('#F1F5F9');
+    doc.fillColor('#1E293B').fontSize(9).font('Helvetica-Bold');
+    doc.text('#', 50, currentY + 5);
+    doc.text('Item Description', 80, currentY + 5);
+    doc.text('SKU', 260, currentY + 5);
+    doc.text('Unit Price', 330, currentY + 5, { width: 60, align: 'right' });
+    doc.text('Qty', 400, currentY + 5, { width: 40, align: 'right' });
+    doc.text('Total', 450, currentY + 5, { width: 95, align: 'right' });
+
+    currentY += 24;
+    doc.font('Helvetica').fontSize(9);
+
+    sale.items.forEach((item, index) => {
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 40;
+      }
+
+      doc.fillColor('#334155');
+      doc.text((index + 1).toString(), 50, currentY);
+      doc.text(item.productName, 80, currentY, { width: 175 });
+      doc.fillColor('#64748B').text(item.sku, 260, currentY);
+      doc.fillColor('#334155');
+      doc.text(item.unitPrice.toFixed(2), 330, currentY, { width: 60, align: 'right' });
+      doc.text(item.quantity.toString(), 400, currentY, { width: 40, align: 'right' });
+      doc.text(item.subtotal.toFixed(2), 450, currentY, { width: 95, align: 'right' });
+
+      currentY += 18;
+      doc.strokeColor('#E2E8F0').lineWidth(0.5).moveTo(40, currentY).lineTo(555, currentY).stroke();
+      currentY += 6;
+    });
+
+    // Totals Section
+    currentY += 10;
+    const totalsX = 350;
+    const totalsWidth = 195;
+
+    doc.fontSize(9).fillColor('#64748B').text('Subtotal:', totalsX, currentY);
+    doc.fillColor('#0F172A').text(`${business.currency} ${sale.subtotal.toFixed(2)}`, totalsX, currentY, { width: totalsWidth, align: 'right' });
+    currentY += 16;
+
+    if (sale.discountAmount > 0) {
+      doc.fillColor('#059669').text('Discount:', totalsX, currentY);
+      doc.text(`-${business.currency} ${sale.discountAmount.toFixed(2)}`, totalsX, currentY, { width: totalsWidth, align: 'right' });
+      currentY += 16;
+    }
+
+    if (sale.taxAmount > 0) {
+      doc.fillColor('#64748B').text('Tax:', totalsX, currentY);
+      doc.fillColor('#0F172A').text(`${business.currency} ${sale.taxAmount.toFixed(2)}`, totalsX, currentY, { width: totalsWidth, align: 'right' });
+      currentY += 16;
+    }
+
+    // Grand Total Box
+    doc.rect(totalsX - 10, currentY, totalsWidth + 20, 24).fill('#EFF6FF');
+    doc.fillColor('#1D4ED8').font('Helvetica-Bold').fontSize(11).text('Total Due:', totalsX, currentY + 6);
+    doc.text(`${business.currency} ${sale.totalAmount.toFixed(2)}`, totalsX, currentY + 6, { width: totalsWidth, align: 'right' });
+    currentY += 34;
+
+    // Payments Breakdown
+    doc.font('Helvetica').fontSize(9).fillColor('#64748B').text('Payment Method(s):', 40, currentY);
+    currentY += 14;
+    sale.payments.forEach((p) => {
+      doc.fillColor('#334155').text(`• ${p.paymentMethod}: ${business.currency} ${p.amount.toFixed(2)} ${p.reference ? `(Ref: ${p.reference})` : ''}`, 40, currentY);
+      currentY += 14;
+    });
+    if (sale.changeDue > 0) {
+      doc.fillColor('#059669').text(`Change Given: ${business.currency} ${sale.changeDue.toFixed(2)}`, 40, currentY);
+      currentY += 14;
+    }
+
+    // Footer & Policies
+    currentY = Math.max(currentY + 20, 720);
+    doc.strokeColor('#CBD5E1').lineWidth(0.5).moveTo(40, currentY).lineTo(555, currentY).stroke();
+    currentY += 10;
+
+    if (settings.receiptFooter) {
+      doc.font('Helvetica').fontSize(9).fillColor('#475569').text(settings.receiptFooter, 40, currentY, { align: 'center', width: 515 });
+      currentY += 14;
+    }
+    if (settings.returnPolicyText) {
+      doc.font('Helvetica-Oblique').fontSize(8).fillColor('#94A3B8').text(settings.returnPolicyText, 40, currentY, { align: 'center', width: 515 });
+      currentY += 12;
+    }
+
+    doc.font('Helvetica').fontSize(8).fillColor('#CBD5E1').text(`Verification URL: https://pos.pixelcraftlk.com/verify/${sale.invoiceNumber}`, 40, currentY, { align: 'center', width: 515 });
+
+    doc.end();
+
+    const buffer = await pdfPromise;
+    const filename = `invoice-${sale.invoiceNumber.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.pdf`;
+
+    return { buffer, filename };
   }
 
   /**

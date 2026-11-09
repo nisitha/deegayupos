@@ -127,3 +127,49 @@ export interface HoldCartPayload {
 export interface VoidSalePayload {
   reason: string;
 }
+
+export interface ReceiptTaxBreakdownItem {
+  rate: number;
+  taxableAmount: number;
+  taxAmount: number;
+}
+
+export interface ReceiptDocumentDto {
+  sale: SaleDto;
+  business: {
+    id: string;
+    name: string;
+    legalName?: string | null;
+    businessType: string;
+    currency: string;
+    logoUrl?: string | null;
+  };
+  branch: {
+    id: string;
+    name: string;
+    code: string;
+    address?: string | null;
+    phone?: string | null;
+  };
+  cashier: {
+    id: string;
+    fullName: string;
+    email: string;
+  };
+  settings: {
+    paperSize: 'MM_58' | 'MM_80' | 'A4';
+    showLogo: boolean;
+    showTaxDetails: boolean;
+    showBarcode: boolean;
+    taxNumber?: string | null;
+    receiptHeader?: string | null;
+    receiptFooter?: string | null;
+    returnPolicyText?: string | null;
+  };
+  barcodeData: {
+    format: 'CODE128';
+    code: string;
+    verificationUrl: string;
+  };
+  taxBreakdown: ReceiptTaxBreakdownItem[];
+}

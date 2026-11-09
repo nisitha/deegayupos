@@ -11,7 +11,6 @@ import {
   QrCode,
   Wallet,
   CheckCircle2,
-  Printer,
   X,
   Edit3,
   UtensilsCrossed,
@@ -35,6 +34,7 @@ import type {
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { posApi, productsApi } from '../../../lib/api-client';
+import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
 // Sample fallback items for instant POS interactive showcase
 const SAMPLE_POS_ITEMS = [
@@ -1415,128 +1415,63 @@ export default function PosCheckoutPage() {
       )}
 
       {/* ============================================================== */}
-      {/* MODAL 3: THERMAL RECEIPT SLIP & SALE CONFIRMATION */}
+      {/* MODAL 3: HARDWARE-AGNOSTIC THERMAL & A4 RECEIPT MODAL */}
       {/* ============================================================== */}
-      {isReceiptModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 flex flex-col items-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-
-            <div className="text-center">
-              <h3 className="text-base font-bold text-slate-900">Sale Finalized!</h3>
-              <p className="text-xs text-slate-400">
-                {completedSale?.invoiceNumber ? `Invoice #${completedSale.invoiceNumber}` : `Order #${orderNumber}`}
-              </p>
-            </div>
-
-            {/* Clean Thermal Receipt Slip */}
-            <div className="w-full bg-[#FAFAFA] border border-slate-200 rounded-2xl p-4 text-xs font-mono space-y-2 shadow-inner">
-              <div className="text-center font-bold text-slate-800 text-sm">
-                {business?.name || 'PixelCraft POS Store'}
-              </div>
-              <div className="text-center text-[10px] text-slate-400">
-                {completedSale
-                  ? new Date(completedSale.createdAt).toLocaleString()
-                  : new Date().toLocaleString()}
-              </div>
-              <div className="text-center text-[10px] text-slate-500">
-                Cashier: {completedSale?.cashier?.fullName || user?.fullName || 'Cashier Station'}
-              </div>
-              <div className="border-b border-dashed border-slate-300 my-2" />
-
-              <div className="space-y-1">
-                {(completedSale?.items || cart).map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-[11px]">
-                    <span className="truncate max-w-[170px]">
-                      {item.quantity}x {'productName' in item ? item.productName : item.name}
-                    </span>
-                    <span>
-                      {formatCurrency(
-                        'unitPrice' in item
-                          ? item.unitPrice * item.quantity
-                          : item.price * item.quantity,
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-b border-dashed border-slate-300 my-2" />
-
-              <div className="space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(completedSale ? completedSale.subtotal : subtotal)}</span>
-                </div>
-                {(completedSale ? completedSale.discountAmount : discountAmount) > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Discount</span>
-                    <span>
-                      -{formatCurrency(completedSale ? completedSale.discountAmount : discountAmount)}
-                    </span>
-                  </div>
-                )}
-                {(completedSale ? completedSale.taxAmount : taxAmount) > 0 && (
-                  <div className="flex justify-between text-slate-500">
-                    <span>Tax</span>
-                    <span>{formatCurrency(completedSale ? completedSale.taxAmount : taxAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-slate-900 text-xs pt-1 border-t border-slate-200">
-                  <span>Total Due</span>
-                  <span>{formatCurrency(completedSale ? completedSale.totalAmount : grandTotal)}</span>
-                </div>
-                <div className="flex justify-between text-slate-500 pt-1">
-                  <span>Paid ({selectedPaymentMethod})</span>
-                  <span>
-                    {formatCurrency(
-                      completedSale
-                        ? completedSale.paidAmount
-                        : selectedPaymentMethod === 'CASH'
-                          ? cashTendered
-                          : grandTotal,
-                    )}
-                  </span>
-                </div>
-                {(completedSale ? completedSale.changeDue : changeDue) > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-bold">
-                    <span>Change Given</span>
-                    <span>{formatCurrency(completedSale ? completedSale.changeDue : changeDue)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Barcode visual footer */}
-              <div className="pt-2 text-center">
-                <div className="tracking-widest font-mono text-[9px] text-slate-400">
-                  * {completedSale?.invoiceNumber || `ORD-${orderNumber}`} *
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">Thank you for your visit!</p>
-              </div>
-            </div>
-
-            {/* Receipt Modal Actions */}
-            <div className="w-full grid grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={() => window.print()}
-                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Printer className="w-4 h-4" />
-                Print Receipt
-              </button>
-              <button
-                onClick={handleNewSale}
-                className="py-2.5 px-3 rounded-xl bg-[#2F65F6] hover:bg-[#1E4ED8] text-white text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Sparkles className="w-4 h-4" />
-                New Sale
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        onNewSale={handleNewSale}
+        saleId={completedSale?.id}
+        initialSale={
+          completedSale || {
+            id: 'draft-id',
+            tenantId: '',
+            branchId: selectedBranchId || branches[0]?.id || '',
+            cashierId: user?.id || '',
+            invoiceNumber: `ORD-${orderNumber}`,
+            orderType: posMode === 'restaurant' ? 'DINE_IN' : 'RETAIL_WALKIN',
+            status: 'COMPLETED',
+            subtotal,
+            discountAmount,
+            taxAmount,
+            totalAmount: grandTotal,
+            paidAmount: selectedPaymentMethod === 'CASH' ? cashTendered : grandTotal,
+            changeDue,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            items: cart.map((i) => ({
+              id: i.id,
+              saleId: 'draft-id',
+              productName: i.name,
+              sku: i.sku,
+              unitPrice: i.price,
+              quantity: i.quantity,
+              discountAmount: 0,
+              taxAmount: 0,
+              subtotal: i.price * i.quantity,
+              notes: i.note,
+            })),
+            payments: [
+              {
+                id: 'pay-draft',
+                saleId: 'draft-id',
+                paymentMethod:
+                  selectedPaymentMethod === 'QR'
+                    ? 'QR_PAYMENT'
+                    : selectedPaymentMethod === 'WALLET'
+                      ? 'STORE_CREDIT'
+                      : selectedPaymentMethod,
+                amount: selectedPaymentMethod === 'CASH' ? cashTendered : grandTotal,
+                status: 'SUCCESS',
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            customerName,
+            tableNumber: posMode === 'restaurant' ? selectedTable : undefined,
+          }
+        }
+        currency={currency}
+      />
 
       {/* ============================================================== */}
       {/* MODAL 4: HELD ORDERS QUEUE DRAWER */}

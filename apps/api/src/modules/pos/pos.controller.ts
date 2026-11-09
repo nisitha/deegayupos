@@ -8,8 +8,10 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiHeader,
@@ -22,6 +24,7 @@ import type {
   AuthUser,
   HeldCartDto,
   PaginatedResult,
+  ReceiptDocumentDto,
   SaleDto,
 } from '@pixelcraft/types';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
@@ -144,6 +147,43 @@ export class PosController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<SaleDto> {
     return this.posService.getSaleById(tenant.id, id);
+  }
+
+  @Get('sales/:id/receipt')
+  @RequireAnyPermissions('pos:checkout', 'pos:access')
+  @ApiOperation({
+    summary: 'Get complete printable receipt payload',
+    description: 'Retrieves comprehensive receipt payload with business branding, address, tax breakdown, payments, and barcode data.',
+  })
+  @ApiOkResponse({ description: 'Printable receipt document data' })
+  async getReceiptDocument(
+    @CurrentTenant() tenant: AuthTenant,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ReceiptDocumentDto> {
+    return this.posService.getReceiptDocument(tenant.id, id);
+  }
+
+  @Get('sales/:id/pdf')
+  @RequireAnyPermissions('pos:checkout', 'pos:access')
+  @ApiOperation({
+    summary: 'Download / Stream A4 PDF Tax Invoice',
+    description: 'Generates and streams a vector-sharp A4 PDF tax invoice for customer and accounting records.',
+  })
+  async getSalePdf(
+    @CurrentTenant() tenant: AuthTenant,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, filename } = await this.posService.generateSalePdf(
+      tenant.id,
+      id,
+    );
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Get('sales')

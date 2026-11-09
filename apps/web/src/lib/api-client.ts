@@ -22,6 +22,7 @@ import type {
   BusinessProfileData,
   BusinessSettingsData,
   UpdateBusinessSettingsPayload,
+  UpdateReceiptSettingsPayload,
   ProductDto,
   CreateProductPayload,
   UpdateProductPayload,
@@ -37,6 +38,7 @@ import type {
   HeldCartDto,
   HoldCartPayload,
   SaleDto,
+  ReceiptDocumentDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -232,6 +234,11 @@ export const businessApi = {
   ): Promise<ApiResponse<BusinessSettingsData>> => {
     return apiClient.patch<BusinessSettingsData>('/business/settings', data);
   },
+  updateReceiptSettings: async (
+    data: UpdateReceiptSettingsPayload,
+  ): Promise<ApiResponse<BusinessSettingsData>> => {
+    return apiClient.patch<BusinessSettingsData>('/business/receipt-settings', data);
+  },
 };
 
 export const productsApi = {
@@ -300,6 +307,34 @@ export const posApi = {
   },
   getSaleById: async (id: string): Promise<ApiResponse<SaleDto>> => {
     return apiClient.get<SaleDto>(`/pos/sales/${id}`);
+  },
+  getReceiptDocument: async (id: string): Promise<ApiResponse<ReceiptDocumentDto>> => {
+    return apiClient.get<ReceiptDocumentDto>(`/pos/sales/${id}/receipt`);
+  },
+  downloadPdf: async (id: string, invoiceNumber: string): Promise<void> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_access_token') : null;
+    const tenantId = typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_tenant_id') : null;
+
+    const response = await fetch(`${API_BASE_URL}/pos/sales/${id}/pdf`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF document');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${invoiceNumber.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   },
   getSales: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<SaleDto>>> => {
     return apiClient.get<PaginatedResult<SaleDto>>('/pos/sales', { params });

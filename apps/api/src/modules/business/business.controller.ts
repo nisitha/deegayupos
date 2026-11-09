@@ -34,6 +34,7 @@ import {
   BusinessProfileDto,
   BusinessSettingsDto,
   UpdateBusinessSettingsDto,
+  UpdateReceiptSettingsDto,
 } from './dto/business.dto';
 
 @ApiTags('Business Profile & Settings')
@@ -86,6 +87,36 @@ export class BusinessController {
   ): Promise<BusinessSettingsData> {
     const userAgent = req.headers['user-agent'] as string | undefined;
     return this.businessService.updateSettings(
+      tenant.id,
+      user.id,
+      dto,
+      ip,
+      userAgent,
+    );
+  }
+
+  @Patch('receipt-settings')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('settings:manage')
+  @ApiOperation({
+    summary: 'Update Tenant Receipt & Document Customization Settings',
+    description:
+      'Updates thermal paper size, header, footer, return policy, and document display preferences. Requires settings:manage permission.',
+  })
+  @ApiOkResponse({
+    description: 'Receipt settings updated successfully.',
+    type: BusinessSettingsDto,
+  })
+  async updateReceiptSettings(
+    @CurrentTenant() tenant: AuthTenant,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateReceiptSettingsDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+  ): Promise<BusinessSettingsData> {
+    const userAgent = req.headers['user-agent'] as string | undefined;
+    return this.businessService.updateReceiptSettings(
       tenant.id,
       user.id,
       dto,

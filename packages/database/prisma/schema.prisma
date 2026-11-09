@@ -84,6 +84,12 @@ enum SalePaymentStatus {
   FAILED
 }
 
+enum ReceiptPaperSize {
+  MM_58
+  MM_80
+  A4
+}
+
 // ==========================================
 // 1. PLATFORM LAYER
 // ==========================================
@@ -163,9 +169,15 @@ model BusinessSetting {
   taxNumber      String?   @map("tax_number") @db.VarChar(64)
   taxRate        Decimal   @default(0.00) @map("tax_rate") @db.Decimal(5, 2)
   isTaxInclusive Boolean   @default(false) @map("is_tax_inclusive")
-  enableLoyalty  Boolean   @default(false) @map("enable_loyalty")
-  receiptFooter       String?   @map("receipt_footer") @db.Text
-  negativeStockPolicy String    @default("DISALLOW") @map("negative_stock_policy") @db.VarChar(32)
+  enableLoyalty       Boolean          @default(false) @map("enable_loyalty")
+  receiptPaperSize    ReceiptPaperSize @default(MM_80) @map("receipt_paper_size")
+  showLogoOnReceipt   Boolean          @default(true) @map("show_logo_on_receipt")
+  showTaxDetails      Boolean          @default(true) @map("show_tax_details")
+  showBarcodeOnReceipt Boolean         @default(true) @map("show_barcode_on_receipt")
+  receiptHeader       String?          @map("receipt_header") @db.Text
+  receiptFooter       String?          @map("receipt_footer") @db.Text
+  returnPolicyText    String?          @map("return_policy_text") @db.Text
+  negativeStockPolicy String           @default("DISALLOW") @map("negative_stock_policy") @db.VarChar(32)
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")

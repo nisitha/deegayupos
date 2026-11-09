@@ -67,6 +67,57 @@ export class UpdateBusinessSettingsDto {
   receiptFooter?: string | null;
 
   @ApiPropertyOptional({
+    description: 'Preferred thermal receipt paper size',
+    enum: ['MM_58', 'MM_80', 'A4'],
+    example: 'MM_80',
+  })
+  @IsOptional()
+  @IsEnum(['MM_58', 'MM_80', 'A4'])
+  receiptPaperSize?: 'MM_58' | 'MM_80' | 'A4';
+
+  @ApiPropertyOptional({
+    description: 'Whether business logo is rendered on thermal receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showLogoOnReceipt?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether tax / VAT details are rendered on receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showTaxDetails?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether Code128 barcode is rendered on receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showBarcodeOnReceipt?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Custom message/address header rendered atop receipts',
+    example: 'Welcome to Colombo Flagship Store',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  receiptHeader?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Detailed return and exchange policy note',
+    example: 'Goods once sold can be exchanged within 7 days in original condition.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  returnPolicyText?: string | null;
+
+  @ApiPropertyOptional({
     description: 'Policy when attempting to sell out-of-stock items (DISALLOW, ALLOW, WARN)',
     enum: ['DISALLOW', 'ALLOW', 'WARN'],
     example: 'DISALLOW',
@@ -74,6 +125,68 @@ export class UpdateBusinessSettingsDto {
   @IsOptional()
   @IsEnum(['DISALLOW', 'ALLOW', 'WARN'])
   negativeStockPolicy?: string;
+}
+
+export class UpdateReceiptSettingsDto {
+  @ApiPropertyOptional({
+    description: 'Preferred thermal receipt paper size',
+    enum: ['MM_58', 'MM_80', 'A4'],
+    example: 'MM_80',
+  })
+  @IsOptional()
+  @IsEnum(['MM_58', 'MM_80', 'A4'])
+  receiptPaperSize?: 'MM_58' | 'MM_80' | 'A4';
+
+  @ApiPropertyOptional({
+    description: 'Whether business logo is rendered on thermal receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showLogoOnReceipt?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether tax / VAT details are rendered on receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showTaxDetails?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether Code128 barcode is rendered on receipts',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  showBarcodeOnReceipt?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Custom message/address header rendered atop receipts',
+    example: 'Welcome to Colombo Flagship Store',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  receiptHeader?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Custom greeting/terms printed at the footer of receipts',
+    example: 'Thank you for shopping with us! Exchange within 7 days with bill.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  receiptFooter?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Detailed return and exchange policy note',
+    example: 'Goods once sold can be exchanged within 7 days in original condition.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  returnPolicyText?: string | null;
 }
 
 export class BusinessProfileBranchDto {
@@ -121,8 +234,26 @@ export class BusinessSettingsDto {
   @ApiProperty({ example: false })
   enableLoyalty!: boolean;
 
+  @ApiProperty({ example: 'MM_80', enum: ['MM_58', 'MM_80', 'A4'] })
+  receiptPaperSize!: 'MM_58' | 'MM_80' | 'A4';
+
+  @ApiProperty({ example: true })
+  showLogoOnReceipt!: boolean;
+
+  @ApiProperty({ example: true })
+  showTaxDetails!: boolean;
+
+  @ApiProperty({ example: true })
+  showBarcodeOnReceipt!: boolean;
+
+  @ApiPropertyOptional({ example: 'Welcome to Colombo Flagship Store' })
+  receiptHeader?: string | null;
+
   @ApiPropertyOptional({ example: 'Thank you for shopping with us!' })
   receiptFooter?: string | null;
+
+  @ApiPropertyOptional({ example: 'Goods once sold can be exchanged within 7 days.' })
+  returnPolicyText?: string | null;
 
   @ApiProperty({ example: 'DISALLOW' })
   negativeStockPolicy!: string;

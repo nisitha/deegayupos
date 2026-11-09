@@ -3,6 +3,7 @@ import type {
   BusinessProfileData,
   BusinessSettingsData,
   UpdateBusinessSettingsPayload,
+  UpdateReceiptSettingsPayload,
 } from '@pixelcraft/types';
 import { PrismaService } from '../../common/database/prisma.service';
 
@@ -48,7 +49,13 @@ export class BusinessService {
         taxRate: Number(s.taxRate),
         isTaxInclusive: s.isTaxInclusive,
         enableLoyalty: s.enableLoyalty,
+        receiptPaperSize: (s.receiptPaperSize as any) || 'MM_80',
+        showLogoOnReceipt: s.showLogoOnReceipt !== false,
+        showTaxDetails: s.showTaxDetails !== false,
+        showBarcodeOnReceipt: s.showBarcodeOnReceipt !== false,
+        receiptHeader: s.receiptHeader,
         receiptFooter: s.receiptFooter,
+        returnPolicyText: s.returnPolicyText,
         negativeStockPolicy: s.negativeStockPolicy || 'DISALLOW',
         createdAt: s.createdAt.toISOString(),
         updatedAt: s.updatedAt.toISOString(),
@@ -110,7 +117,13 @@ export class BusinessService {
     if (dto.taxRate !== undefined) updateData.taxRate = dto.taxRate;
     if (dto.isTaxInclusive !== undefined) updateData.isTaxInclusive = dto.isTaxInclusive;
     if (dto.enableLoyalty !== undefined) updateData.enableLoyalty = dto.enableLoyalty;
+    if (dto.receiptPaperSize !== undefined) updateData.receiptPaperSize = dto.receiptPaperSize;
+    if (dto.showLogoOnReceipt !== undefined) updateData.showLogoOnReceipt = dto.showLogoOnReceipt;
+    if (dto.showTaxDetails !== undefined) updateData.showTaxDetails = dto.showTaxDetails;
+    if (dto.showBarcodeOnReceipt !== undefined) updateData.showBarcodeOnReceipt = dto.showBarcodeOnReceipt;
+    if (dto.receiptHeader !== undefined) updateData.receiptHeader = dto.receiptHeader;
     if (dto.receiptFooter !== undefined) updateData.receiptFooter = dto.receiptFooter;
+    if (dto.returnPolicyText !== undefined) updateData.returnPolicyText = dto.returnPolicyText;
     if (dto.negativeStockPolicy !== undefined) updateData.negativeStockPolicy = dto.negativeStockPolicy;
 
     const updated = await this.prisma.businessSetting.upsert({
@@ -125,7 +138,13 @@ export class BusinessService {
         taxRate: dto.taxRate !== undefined ? dto.taxRate : 0.0,
         isTaxInclusive: dto.isTaxInclusive || false,
         enableLoyalty: dto.enableLoyalty || false,
+        receiptPaperSize: dto.receiptPaperSize || 'MM_80',
+        showLogoOnReceipt: dto.showLogoOnReceipt !== undefined ? dto.showLogoOnReceipt : true,
+        showTaxDetails: dto.showTaxDetails !== undefined ? dto.showTaxDetails : true,
+        showBarcodeOnReceipt: dto.showBarcodeOnReceipt !== undefined ? dto.showBarcodeOnReceipt : true,
+        receiptHeader: dto.receiptHeader || null,
         receiptFooter: dto.receiptFooter || null,
+        returnPolicyText: dto.returnPolicyText || null,
         negativeStockPolicy: dto.negativeStockPolicy || 'DISALLOW',
       },
     });
@@ -153,7 +172,87 @@ export class BusinessService {
       taxRate: Number(updated.taxRate),
       isTaxInclusive: updated.isTaxInclusive,
       enableLoyalty: updated.enableLoyalty,
+      receiptPaperSize: (updated.receiptPaperSize as any) || 'MM_80',
+      showLogoOnReceipt: updated.showLogoOnReceipt !== false,
+      showTaxDetails: updated.showTaxDetails !== false,
+      showBarcodeOnReceipt: updated.showBarcodeOnReceipt !== false,
+      receiptHeader: updated.receiptHeader,
       receiptFooter: updated.receiptFooter,
+      returnPolicyText: updated.returnPolicyText,
+      negativeStockPolicy: updated.negativeStockPolicy || 'DISALLOW',
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Updates tenant receipt & document customization preferences.
+   */
+  async updateReceiptSettings(
+    tenantId: string,
+    userId: string,
+    dto: UpdateReceiptSettingsPayload,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<BusinessSettingsData> {
+    const existing = await this.prisma.businessSetting.findUnique({
+      where: { tenantId },
+    });
+
+    const updateData: Record<string, unknown> = {};
+    if (dto.receiptPaperSize !== undefined) updateData.receiptPaperSize = dto.receiptPaperSize;
+    if (dto.showLogoOnReceipt !== undefined) updateData.showLogoOnReceipt = dto.showLogoOnReceipt;
+    if (dto.showTaxDetails !== undefined) updateData.showTaxDetails = dto.showTaxDetails;
+    if (dto.showBarcodeOnReceipt !== undefined) updateData.showBarcodeOnReceipt = dto.showBarcodeOnReceipt;
+    if (dto.receiptHeader !== undefined) updateData.receiptHeader = dto.receiptHeader;
+    if (dto.receiptFooter !== undefined) updateData.receiptFooter = dto.receiptFooter;
+    if (dto.returnPolicyText !== undefined) updateData.returnPolicyText = dto.returnPolicyText;
+
+    const updated = await this.prisma.businessSetting.upsert({
+      where: { tenantId },
+      update: updateData,
+      create: {
+        tenantId,
+        invoicePrefix: 'INV-',
+        receiptPaperSize: dto.receiptPaperSize || 'MM_80',
+        showLogoOnReceipt: dto.showLogoOnReceipt !== undefined ? dto.showLogoOnReceipt : true,
+        showTaxDetails: dto.showTaxDetails !== undefined ? dto.showTaxDetails : true,
+        showBarcodeOnReceipt: dto.showBarcodeOnReceipt !== undefined ? dto.showBarcodeOnReceipt : true,
+        receiptHeader: dto.receiptHeader || null,
+        receiptFooter: dto.receiptFooter || null,
+        returnPolicyText: dto.returnPolicyText || null,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'RECEIPT_SETTINGS_UPDATED',
+        entity: 'BusinessSetting',
+        entityId: updated.id,
+        oldValues: existing ? JSON.parse(JSON.stringify(existing)) : null,
+        newValues: JSON.parse(JSON.stringify(updated)),
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+      },
+    });
+
+    return {
+      id: updated.id,
+      tenantId: updated.tenantId,
+      invoicePrefix: updated.invoicePrefix,
+      taxNumber: updated.taxNumber,
+      taxRate: Number(updated.taxRate),
+      isTaxInclusive: updated.isTaxInclusive,
+      enableLoyalty: updated.enableLoyalty,
+      receiptPaperSize: (updated.receiptPaperSize as any) || 'MM_80',
+      showLogoOnReceipt: updated.showLogoOnReceipt !== false,
+      showTaxDetails: updated.showTaxDetails !== false,
+      showBarcodeOnReceipt: updated.showBarcodeOnReceipt !== false,
+      receiptHeader: updated.receiptHeader,
+      receiptFooter: updated.receiptFooter,
+      returnPolicyText: updated.returnPolicyText,
       negativeStockPolicy: updated.negativeStockPolicy || 'DISALLOW',
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),

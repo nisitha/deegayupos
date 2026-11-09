@@ -10,6 +10,8 @@ export interface BusinessProfileBranch {
   isActive: boolean;
 }
 
+export type ReceiptPaperSize = 'MM_58' | 'MM_80' | 'A4';
+
 export interface BusinessSettingsData {
   id: string;
   tenantId: string;
@@ -18,7 +20,13 @@ export interface BusinessSettingsData {
   taxRate: number;
   isTaxInclusive: boolean;
   enableLoyalty: boolean;
+  receiptPaperSize: ReceiptPaperSize;
+  showLogoOnReceipt: boolean;
+  showTaxDetails: boolean;
+  showBarcodeOnReceipt: boolean;
+  receiptHeader?: string | null;
   receiptFooter?: string | null;
+  returnPolicyText?: string | null;
   negativeStockPolicy: string;
   createdAt: string;
   updatedAt: string;
@@ -46,8 +54,24 @@ export interface UpdateBusinessSettingsPayload {
   taxRate?: number;
   isTaxInclusive?: boolean;
   enableLoyalty?: boolean;
+  receiptPaperSize?: ReceiptPaperSize;
+  showLogoOnReceipt?: boolean;
+  showTaxDetails?: boolean;
+  showBarcodeOnReceipt?: boolean;
+  receiptHeader?: string | null;
   receiptFooter?: string | null;
+  returnPolicyText?: string | null;
   negativeStockPolicy?: string;
+}
+
+export interface UpdateReceiptSettingsPayload {
+  receiptPaperSize?: ReceiptPaperSize;
+  showLogoOnReceipt?: boolean;
+  showTaxDetails?: boolean;
+  showBarcodeOnReceipt?: boolean;
+  receiptHeader?: string | null;
+  receiptFooter?: string | null;
+  returnPolicyText?: string | null;
 }
 
 export type BusinessSettingsResponse = ApiResponse<BusinessSettingsData>;
