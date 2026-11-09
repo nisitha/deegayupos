@@ -10,14 +10,13 @@ import {
   Package,
   Settings,
   LogOut,
-  UtensilsCrossed,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
 export function PosSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, hasPermission, posMode } = useTenantBranch();
+  const { user, hasPermission } = useTenantBranch();
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
@@ -43,12 +42,6 @@ export function PosSidebar() {
       href: '/dashboard/pos',
       icon: Store,
       show: hasPermission('pos:access'),
-    },
-    {
-      name: 'Tables',
-      href: '/dashboard/tables',
-      icon: UtensilsCrossed,
-      show: posMode === 'restaurant' && hasPermission('pos:access'),
     },
     {
       name: 'Catalogue',

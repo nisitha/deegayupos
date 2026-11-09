@@ -66,10 +66,6 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       if (res.data) {
         setBusiness(res.data);
         setBranches(res.data.branches || []);
-        if (res.data.businessType === 'RESTAURANT' || res.data.businessType === 'CAFE') {
-          setPosMode('restaurant');
-          setOrderType('Dine-In');
-        }
       }
     } catch (err) {
       console.warn('Could not fetch tenant business profile:', err);

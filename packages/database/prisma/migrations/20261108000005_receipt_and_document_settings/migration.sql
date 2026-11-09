@@ -9,3 +9,4 @@ ALTER TABLE "business_settings"
     ADD COLUMN "show_barcode_on_receipt" BOOLEAN NOT NULL DEFAULT true,
     ADD COLUMN "receipt_header" TEXT,
     ADD COLUMN "return_policy_text" TEXT;
+
