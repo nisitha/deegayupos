@@ -108,8 +108,8 @@ export default function DashboardPage() {
             href="/dashboard/pos"
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-pos-btn transition-all group"
           >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            <span>Launch POS</span>
+            <Store className="w-3.5 h-3.5" />
+            <span>Open POS Terminal</span>
             <kbd className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono font-semibold text-white/90">
               F1
             </kbd>

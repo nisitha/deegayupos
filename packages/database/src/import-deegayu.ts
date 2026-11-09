@@ -299,6 +299,29 @@ export async function importDeegayuData() {
   });
 
   // Map all system permissions
+  const defaultPermissions = [
+    { code: 'pos:access', name: 'Access POS Terminal', module: 'pos' },
+    { code: 'pos:checkout', name: 'Process Checkout Orders', module: 'pos' },
+    { code: 'pos:discount', name: 'Apply Discounts', module: 'pos' },
+    { code: 'pos:refund', name: 'Process Customer Refunds', module: 'pos' },
+    { code: 'inventory:view', name: 'View Stock Balances', module: 'inventory' },
+    { code: 'inventory:manage', name: 'Manage Products & Stock Adjustments', module: 'inventory' },
+    { code: 'inventory:transfer', name: 'Initiate Stock Transfers', module: 'inventory' },
+    { code: 'reports:view', name: 'View Analytics & Reports', module: 'reports' },
+    { code: 'reports:export', name: 'Export Financial & Sales Reports', module: 'reports' },
+    { code: 'settings:view', name: 'View Tenant Configuration', module: 'settings' },
+    { code: 'settings:manage', name: 'Modify Tenant Preferences & Taxes', module: 'settings' },
+    { code: 'users:manage', name: 'Manage Staff Accounts & Memberships', module: 'access' },
+  ];
+
+  for (const perm of defaultPermissions) {
+    await prisma.permission.upsert({
+      where: { code: perm.code },
+      update: perm,
+      create: perm,
+    });
+  }
+
   const allPermissions = await prisma.permission.findMany();
   for (const perm of allPermissions) {
     await prisma.rolePermission.upsert({
@@ -630,3 +653,4 @@ if (require.main === module) {
       await prisma.$disconnect();
     });
 }
+
