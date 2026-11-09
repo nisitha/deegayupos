@@ -1,25 +1,46 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard,
-  Store,
-  Grid,
+  LayoutGrid,
+  Activity,
+  Bell,
+  ShoppingBag,
   Package,
-  Boxes,
-  Receipt,
+  Tag,
   Users,
+  Star,
+  Receipt,
+  CreditCard,
+  FileText,
+  Store,
+  Layers,
   Settings,
+  Search,
   LogOut,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
+interface SidebarMenuItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
+  isPos?: boolean;
+}
+
+interface SidebarMenuSection {
+  title: string;
+  items: SidebarMenuItem[];
+}
+
 export function PosSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useTenantBranch();
+  const { user, tenant, business } = useTenantBranch();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
@@ -33,146 +54,168 @@ export function PosSidebar() {
     router.push('/login');
   };
 
-  // Core commercial retail navigation suite (Always visible to ensure zero dead-ends)
-  const navItems = [
+  const businessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const initial = businessName.charAt(0) || 'D';
+  const displayName = user?.fullName || 'Dr. Deegayu';
+  const userEmail = user?.email || 'owner@deegayu.pixelcraftlk.com';
+
+  const menuSections: SidebarMenuSection[] = [
     {
-      name: 'Dashboard',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      isPos: false,
+      title: 'COMMAND',
+      items: [
+        { name: 'Overview', href: '/dashboard', icon: LayoutGrid, exact: true },
+        { name: 'Live Monitor', href: '/dashboard/inventory', icon: Activity },
+        { name: 'Alerts', href: '/dashboard/settings', icon: Bell },
+      ],
     },
     {
-      name: 'POS Terminal',
-      href: '/dashboard/pos',
-      icon: Store,
-      isPos: true, // Special high-contrast highlight
+      title: 'COMMERCE',
+      items: [
+        { name: 'Order Queue', href: '/dashboard/sales', icon: ShoppingBag },
+        { name: 'Catalog', href: '/dashboard/products', icon: Package },
+        { name: 'Pricing Engine', href: '/dashboard/products', icon: Tag },
+        { name: 'Customers', href: '/dashboard/customers', icon: Users },
+        { name: 'Reviews', href: '/dashboard/customers', icon: Star },
+      ],
     },
     {
-      name: 'Products',
-      href: '/dashboard/products',
-      icon: Package,
-      isPos: false,
+      title: 'FINANCE',
+      items: [
+        { name: 'Revenue Desk', href: '/dashboard/sales', icon: Receipt },
+        { name: 'Payouts', href: '/dashboard/sales', icon: CreditCard },
+        { name: 'Tax Engine', href: '/dashboard/settings', icon: FileText },
+      ],
     },
     {
-      name: 'Inventory',
-      href: '/dashboard/inventory',
-      icon: Boxes,
-      isPos: false,
-    },
-    {
-      name: 'Sales & Orders',
-      href: '/dashboard/sales',
-      icon: Receipt,
-      isPos: false,
-    },
-    {
-      name: 'Customers',
-      href: '/dashboard/customers',
-      icon: Users,
-      isPos: false,
-    },
-    {
-      name: 'Settings',
-      href: '/dashboard/settings',
-      icon: Settings,
-      isPos: false,
+      title: 'PLATFORM',
+      items: [
+        { name: 'Marketplace', href: '/dashboard/inventory', icon: Store },
+        { name: 'POS', href: '/dashboard/pos', icon: Layers, isPos: true },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+      ],
     },
   ];
 
   return (
-    <aside className="hidden lg:flex w-20 xl:w-24 bg-white border-r border-slate-200/90 flex-col items-center justify-between py-4 shrink-0 z-40 select-none shadow-[1px_0_3px_0_rgba(0,0,0,0.02)]">
-      {/* Brand Logo Header */}
-      <div className="flex flex-col items-center gap-1">
-        <Link
-          href="/dashboard"
-          className="w-11 h-11 rounded-2xl bg-[#005BD3] flex items-center justify-center text-white shadow-md shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
-          title="PixelCraft POS Command Center"
-        >
-          <Grid className="w-5 h-5" />
+    <aside className="hidden md:flex w-[220px] lg:w-[240px] bg-white border-r border-slate-100 flex-col justify-between h-full shrink-0 select-none z-30">
+      {/* 1. Brand Header */}
+      <div className="p-4 pb-3 border-b border-slate-50">
+        <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <div className="bg-[#7052FF] text-white font-bold rounded-xl w-9 h-9 flex items-center justify-center shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+            <span>{initial}</span>
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-[#7052FF] transition-colors">
+              {businessName}
+            </h2>
+            <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+              Ayurvedic Pharmacy OS
+            </p>
+          </div>
         </Link>
-        <span className="text-[10px] font-bold text-slate-900 tracking-tight mt-0.5 font-mono">
-          PixelPOS
-        </span>
+
+        {/* 2. Sleek Command Search Input */}
+        <div className="mt-3 relative">
+          <div className="w-full bg-slate-50 border border-slate-200/80 text-xs px-2.5 py-1.5 rounded-xl text-slate-400 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+              />
+            </div>
+            <kbd className="text-[9px] font-mono bg-white border border-slate-200/80 px-1 py-0.2 rounded text-slate-400 shadow-2xs shrink-0">
+              ⌘K
+            </kbd>
+          </div>
+        </div>
       </div>
 
-      {/* Primary Navigation Rail */}
-      <nav className="flex flex-col items-center gap-2.5 w-full px-2 my-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href);
+      {/* 3. Categorized Menu Navigation */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 no-scrollbar">
+        {menuSections.map((section) => (
+          <div key={section.title}>
+            <div className="text-[10px] font-bold text-slate-400 tracking-wider mb-1.5 px-2.5">
+              {section.title}
+            </div>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.exact
+                  ? pathname === item.href
+                  : item.isPos
+                    ? pathname === '/dashboard/pos'
+                    : pathname.startsWith(item.href) && pathname !== '/dashboard/pos';
 
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className="group relative flex flex-col items-center justify-center w-full"
-              title={item.name}
-            >
-              {/* Active Indicator Pill (Shopify Cobalt #005BD3) on left edge */}
-              {isActive && (
-                <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-7 bg-[#005BD3] rounded-r-full shadow-sm animate-in fade-in duration-200" />
-              )}
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors group ${
+                      isActive
+                        ? 'bg-slate-100 text-slate-900 font-bold'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          isActive
+                            ? 'text-[#7052FF]'
+                            : 'text-slate-400 group-hover:text-slate-700'
+                        }`}
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </div>
 
-              {/* 48x48px Touch Target Button */}
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150 relative ${
-                  isActive
-                    ? item.isPos
-                      ? 'bg-[#005BD3] text-white shadow-md shadow-blue-500/25 scale-105 font-bold'
-                      : 'bg-slate-900 text-white shadow-sm scale-105'
-                    : item.isPos
-                      ? 'bg-blue-50/80 text-[#005BD3] border border-blue-200/60 hover:bg-[#005BD3] hover:text-white shadow-sm hover:scale-105'
-                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
+                    {item.isPos && (
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                          isActive
+                            ? 'bg-[#7052FF] text-white'
+                            : 'bg-slate-200/70 text-slate-600'
+                        }`}
+                      >
+                        POS
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
 
-                {/* Instant Tooltip Flyout */}
-                <span className="group-hover:opacity-100 opacity-0 pointer-events-none absolute left-16 z-50 bg-slate-900 text-white text-xs font-semibold px-2.5 py-1 rounded-lg shadow-xl whitespace-nowrap transition-opacity duration-150 border border-slate-700/60 flex items-center gap-1.5">
-                  <span>{item.name}</span>
-                  {item.isPos && (
-                    <kbd className="px-1 py-0.2 text-[9px] font-mono bg-blue-600 rounded text-white">
-                      F1
-                    </kbd>
-                  )}
-                </span>
+      {/* 4. Bottom User Profile & Sign Out */}
+      <div className="p-3 border-t border-slate-100 bg-white">
+        <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7052FF] to-[#9B82FF] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+              {displayName.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-900 truncate">
+                {displayName}
               </div>
+              <div className="text-[10px] text-slate-400 font-mono truncate">
+                {userEmail}
+              </div>
+            </div>
+          </div>
 
-              {/* Label */}
-              <span
-                className={`text-[10px] font-medium mt-0.5 tracking-tight line-clamp-1 text-center ${
-                  isActive
-                    ? 'text-[#005BD3] font-bold'
-                    : item.isPos
-                      ? 'text-[#005BD3] font-semibold'
-                      : 'text-slate-500 group-hover:text-slate-800'
-                }`}
-              >
-                {item.name}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Bottom Profile Avatar & Logout */}
-      <div className="flex flex-col items-center gap-2 pt-2 border-t border-slate-100 w-full">
-        <div
-          className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200/80 flex items-center justify-center text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-200 transition-colors"
-          title={user?.fullName || 'Active Session'}
-        >
-          {user?.fullName?.charAt(0) || 'U'}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="p-1 text-slate-400 hover:text-rose-600 transition-colors rounded-lg"
+            title="Sign out of POS session"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-          title="Sign Out of Session"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
       </div>
     </aside>
   );

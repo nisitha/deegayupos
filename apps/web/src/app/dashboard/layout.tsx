@@ -21,7 +21,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         localStorage.getItem('pixelcraft_user');
 
       if (!token) {
-        // If testing directly in local dev without login, seed Deegayu session or redirect
         const hasSession = localStorage.getItem('pixelcraft_tenant_id');
         if (!hasSession) {
           router.push('/login');
@@ -34,36 +33,40 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (!authChecked) {
     return (
-      <div className="h-screen w-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[#5C6AC4] border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen w-screen bg-[#EDE9FE] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-[#7052FF] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-[#F8FAFC] text-slate-900 flex overflow-hidden antialiased selection:bg-[#5C6AC4] selection:text-white">
-      {/* Left Slim Navigation Rail (Hidden on mobile/tablet < lg) */}
-      <PosSidebar />
+    /* Outer Viewport Canvas (Soft Modern Canvas Tint) */
+    <div className="h-screen w-screen bg-[#EDE9FE] p-2 sm:p-3 md:p-4 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
+      {/* Inner Floating App Surface (Confidency OS Design System) */}
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative">
+        {/* Left Column: Categorized Navigation Sidebar (220px-240px) */}
+        <PosSidebar />
 
-      {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Modern Clean Top Header Bar with Interactive Profile & Sign Out */}
-        <Header />
+        {/* Main Content Viewport */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Non-POS pages render standard Header; POS page renders its integrated Top Terminal Status Bar */}
+          {!isPosPage && <Header />}
 
-        {/* Page Content Viewport */}
-        <main
-          className={`flex-1 ${
-            isPosPage
-              ? 'overflow-hidden p-0 bg-[#F8FAFC]'
-              : 'overflow-y-auto p-4 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-[#F8FAFC]'
-          }`}
-        >
-          {children}
-        </main>
+          {/* Page Content Viewport */}
+          <main
+            className={`flex-1 ${
+              isPosPage
+                ? 'overflow-hidden p-0 h-full'
+                : 'overflow-y-auto p-4 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'
+            }`}
+          >
+            {children}
+          </main>
 
-        {/* Bottom Thumb Navigation Dock (< lg screens) */}
-        <div className="lg:hidden shrink-0">
-          <BottomNavBar />
+          {/* Mobile Bottom Thumb Navigation (< md) */}
+          <div className="md:hidden shrink-0">
+            <BottomNavBar />
+          </div>
         </div>
       </div>
     </div>

@@ -103,3 +103,4 @@ export function BottomNavBar({ onOpenMoreActions }: BottomNavBarProps) {
     </nav>
   );
 }
+
