@@ -20,6 +20,10 @@ interface TenantBranchContextType {
   currency: string;
   isLoading: boolean;
   isOwnerOrAdmin: boolean;
+  posMode: 'retail' | 'restaurant';
+  setPosMode: (mode: 'retail' | 'restaurant') => void;
+  orderType: string;
+  setOrderType: (type: string) => void;
   refreshProfile: () => Promise<void>;
   hasPermission: (permissionCode: string) => boolean;
 }
@@ -34,6 +38,8 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const [tenant, setTenant] = useState<AuthTenant | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [posMode, setPosMode] = useState<'retail' | 'restaurant'>('restaurant');
+  const [orderType, setOrderType] = useState<string>('Dine-In');
 
   // Load user session details from localStorage
   useEffect(() => {
@@ -106,6 +112,10 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         currency: business?.currency || 'LKR',
         isLoading,
         isOwnerOrAdmin,
+        posMode,
+        setPosMode,
+        orderType,
+        setOrderType,
         refreshProfile: fetchProfile,
         hasPermission,
       }}

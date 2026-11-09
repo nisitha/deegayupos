@@ -1,347 +1,185 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  Package,
-  Boxes,
-  Truck,
-  Users,
+  Search,
+  Calendar,
   Building2,
-  Store,
-  BarChart3,
-  Settings,
-  ChevronDown,
-  LogOut,
-  Menu,
-  X,
-  GitBranch,
+  Bell,
+  UtensilsCrossed,
+  ShoppingBag,
 } from 'lucide-react';
+import { PosSidebar } from '../../components/layout/pos-sidebar';
 import {
   TenantBranchProvider,
   useTenantBranch,
 } from '../../context/tenant-branch-context';
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-  requiredPermission?: string;
-  badge?: string;
-}
-
-const ALL_NAV_ITEMS: NavItem[] = [
-  {
-    name: 'Overview',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'POS Checkout',
-    href: '/dashboard/pos',
-    icon: ShoppingCart,
-    requiredPermission: 'pos:access',
-    badge: 'Terminal',
-  },
-  {
-    name: 'Products & Catalog',
-    href: '/dashboard/products',
-    icon: Package,
-    requiredPermission: 'inventory:view',
-  },
-  {
-    name: 'Inventory',
-    href: '/dashboard/inventory',
-    icon: Boxes,
-    requiredPermission: 'inventory:view',
-  },
-  {
-    name: 'Purchases',
-    href: '/dashboard/purchases',
-    icon: Truck,
-    requiredPermission: 'inventory:manage',
-  },
-  {
-    name: 'Customers',
-    href: '/dashboard/customers',
-    icon: Users,
-    requiredPermission: 'pos:access',
-  },
-  {
-    name: 'Suppliers',
-    href: '/dashboard/suppliers',
-    icon: Store,
-    requiredPermission: 'inventory:manage',
-  },
-  {
-    name: 'Registers & Shifts',
-    href: '/dashboard/registers',
-    icon: Store,
-    requiredPermission: 'pos:access',
-  },
-  {
-    name: 'Reports',
-    href: '/dashboard/reports',
-    icon: BarChart3,
-    requiredPermission: 'reports:view',
-  },
-  {
-    name: 'Settings',
-    href: '/dashboard/settings',
-    icon: Settings,
-    requiredPermission: 'settings:view',
-  },
-];
-
 function DashboardShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-
   const {
     selectedBranchId,
     setSelectedBranchId,
     business,
     branches,
     user,
-    tenant,
+    posMode,
+    setPosMode,
+    orderType,
+    setOrderType,
     isOwnerOrAdmin,
-    hasPermission,
   } = useTenantBranch();
 
-  // Dynamic permission-aware filtering: omit modules user cannot access
-  const visibleNavItems = ALL_NAV_ITEMS.filter((item) => {
-    if (!item.requiredPermission) return true;
-    return hasPermission(item.requiredPermission);
-  });
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pixelcraft_access_token');
-      localStorage.removeItem('pixelcraft_refresh_token');
-      localStorage.removeItem('pixelcraft_user');
-      localStorage.removeItem('pixelcraft_tenant');
-      localStorage.removeItem('pixelcraft_tenant_id');
-      localStorage.removeItem('pixelcraft_permissions');
-    }
-    router.push('/');
-  };
+  // Today's date formatted nicely
+  const todayFormatted = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date());
+
+  const orderTypeOptions =
+    posMode === 'restaurant'
+      ? ['Dine-In', 'Takeaway', 'Delivery']
+      : ['Walk-In', 'Delivery', 'Wholesale'];
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-zinc-100 flex flex-col md:flex-row antialiased selection:bg-cyan-500 selection:text-black">
-      {/* Mobile Backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+    <div className="h-screen w-screen bg-[#F4F6F9] text-slate-900 flex overflow-hidden antialiased selection:bg-[#2F65F6] selection:text-white">
+      {/* Left Slim Navigation Rail */}
+      <PosSidebar />
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-[#0E1422]/95 border-r border-[#1F2C44] backdrop-blur-xl flex flex-col shrink-0 transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        {/* Brand Header */}
-        <div className="p-4 border-b border-[#1F2C44]/80 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-emerald-400 p-[1px] shadow-lg shadow-cyan-950/40">
-              <div className="w-full h-full bg-[#0E1422] rounded-[7px] flex items-center justify-center">
-                <Store className="w-4 h-4 text-cyan-400" />
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-white tracking-wide truncate max-w-[130px]">
-                {business?.name || tenant?.name || 'PixelCraft POS'}
-              </div>
-              <div className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase">
-                {tenant?.slug || 'tenant'}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-zinc-400 hover:text-white"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Navigation Section */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-            Menu Navigation
-          </div>
-          {visibleNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-cyan-500/15 to-emerald-500/5 text-cyan-400 border border-cyan-500/20 shadow-sm shadow-cyan-950/20'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#161F33]/60'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon
-                    className={`w-4 h-4 ${
-                      isActive ? 'text-cyan-400' : 'text-zinc-400'
-                    }`}
-                  />
-                  <span>{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 font-mono">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Bottom Platform Indicator */}
-        <div className="p-3 border-t border-[#1F2C44]/80 bg-[#0A0E18]/60">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-[#0E1422] border border-[#1F2C44]/60">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] text-zinc-300 font-medium">Cloud POS Engine</span>
-            </div>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-              v1.0
-            </span>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Content Viewport */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Header Bar */}
-        <header className="h-16 bg-[#0E1422]/80 border-b border-[#1F2C44] backdrop-blur-md px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
+        <header className="h-16 bg-white border-b border-slate-200/90 px-5 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]">
+          {/* Left: Universal Search & Order Type Toggle */}
+          <div className="flex items-center gap-4 flex-1 max-w-2xl">
+            {/* Search Input */}
+            <div className="relative w-72 lg:w-80">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search products or scan barcode..."
+                className="w-full bg-[#F8FAFC] border border-slate-200/80 rounded-xl pl-10 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2F65F6] focus:bg-white transition-all shadow-inner"
+              />
+            </div>
+
+            {/* Order Type Toggle Pills */}
+            <div className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/60">
+              {orderTypeOptions.map((type) => {
+                const isSelected = orderType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setOrderType(type)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                      isSelected
+                        ? 'bg-white text-[#2F65F6] shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Branch Switcher, POS Mode Toggle, Date & Cashier Pill */}
           <div className="flex items-center gap-3">
+            {/* Multi-Industry Mode Switcher */}
+            <div className="hidden md:flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl text-xs">
+              <button
+                onClick={() => {
+                  setPosMode('restaurant');
+                  setOrderType('Dine-In');
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
+                  posMode === 'restaurant'
+                    ? 'bg-white text-[#2F65F6] shadow-sm font-semibold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Switch to Restaurant & Dining Mode"
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                <span>Dining</span>
+              </button>
+              <button
+                onClick={() => {
+                  setPosMode('retail');
+                  setOrderType('Walk-In');
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
+                  posMode === 'retail'
+                    ? 'bg-white text-[#2F65F6] shadow-sm font-semibold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Switch to Retail POS Mode"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Retail</span>
+              </button>
+            </div>
+
+            {/* Branch Switcher Dropdown */}
+            <div className="relative hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700">
+              <Building2 className="w-3.5 h-3.5 text-[#2F65F6]" />
+              <select
+                value={selectedBranchId || 'ALL'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedBranchId(val === 'ALL' ? null : val);
+                }}
+                disabled={!isOwnerOrAdmin && branches.length <= 1}
+                className="bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1"
+              >
+                {isOwnerOrAdmin && (
+                  <option value="ALL">All Branches</option>
+                )}
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Current Date Badge */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>{todayFormatted}</span>
+            </div>
+
+            {/* Notification Bell */}
             <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="relative w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
             >
-              <Menu className="w-5 h-5" />
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#2F65F6]" />
             </button>
 
-            {/* Tenant Business Badge */}
-            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/20 text-xs">
-              <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-medium text-cyan-300 truncate max-w-[150px]">
-                {business?.name || tenant?.name || 'PixelCraft Store'}
-              </span>
-            </div>
-
-            {/* Branch Selector Dropdown */}
-            <div className="relative">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141C2E] border border-[#1F2C44] text-xs">
-                <GitBranch className="w-3.5 h-3.5 text-emerald-400" />
-                <select
-                  value={selectedBranchId || 'ALL'}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedBranchId(val === 'ALL' ? null : val);
-                  }}
-                  disabled={!isOwnerOrAdmin && branches.length <= 1}
-                  className="bg-transparent text-zinc-200 focus:outline-none cursor-pointer text-xs pr-2"
-                >
-                  {isOwnerOrAdmin && (
-                    <option value="ALL" className="bg-[#0E1422] text-zinc-200">
-                      All Branches
-                    </option>
-                  )}
-                  {branches.map((b) => (
-                    <option
-                      key={b.id}
-                      value={b.id}
-                      className="bg-[#0E1422] text-zinc-200"
-                    >
-                      {b.name} ({b.code})
-                    </option>
-                  ))}
-                </select>
+            {/* Cashier / User Profile Badge */}
+            <div className="flex items-center gap-2.5 pl-2">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2F65F6] to-[#4F46E5] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                {user?.fullName?.charAt(0) || 'C'}
               </div>
-            </div>
-          </div>
-
-          {/* User Profile & Actions */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-full hover:bg-zinc-800/60 border border-transparent hover:border-[#1F2C44] transition-all"
-              >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 text-black flex items-center justify-center font-bold text-xs shadow-sm">
-                  {user?.fullName?.charAt(0) || 'U'}
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-bold text-slate-800 leading-tight">
+                  {user?.fullName || 'Cashier Station'}
                 </div>
-                <div className="text-left hidden md:block">
-                  <div className="text-xs font-medium text-zinc-200 leading-tight">
-                    {user?.fullName || 'Business Staff'}
-                  </div>
-                  <div className="text-[10px] text-zinc-400 leading-tight">
-                    {tenant?.role || user?.role || 'Staff'}
-                  </div>
+                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {business?.name || 'Online'}
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-              </button>
-
-              {/* Profile Dropdown */}
-              {profileMenuOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-52 bg-[#0E1422] border border-[#1F2C44] rounded-xl shadow-xl shadow-black/60 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-                  onClick={() => setProfileMenuOpen(false)}
-                >
-                  <div className="px-3 py-2 border-b border-[#1F2C44]/60 mb-1">
-                    <p className="text-xs font-semibold text-white truncate">
-                      {user?.fullName || 'User'}
-                    </p>
-                    <p className="text-[11px] text-zinc-400 truncate">
-                      {user?.email || ''}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 font-mono">
-                        {tenant?.role || user?.role || 'MEMBER'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Link
-                    href="/dashboard/settings"
-                    className="flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-[#161F33] rounded-lg transition-colors"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-zinc-400" />
-                    Business Settings
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors text-left"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign Out
-                  </button>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </header>
 
         {/* Page Content Viewport */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 overflow-y-auto bg-[#F4F6F9] p-4 lg:p-6">
           {children}
         </main>
       </div>

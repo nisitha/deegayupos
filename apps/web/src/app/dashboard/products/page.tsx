@@ -371,13 +371,13 @@ export default function ProductsPage() {
       {/* 1. Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             Products & Catalogue
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-normal bg-cyan-950/60 text-cyan-400 border border-cyan-500/20">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
               {totalCount} Items
             </span>
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Manage your retail inventory, multi-variant options, barcode scanning tags, and pricing.
           </p>
         </div>
@@ -385,9 +385,9 @@ export default function ProductsPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0E1422] border border-[#1F2C44] text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
           >
-            <Download className="w-3.5 h-3.5 text-zinc-400" />
+            <Download className="w-3.5 h-3.5 text-slate-500" />
             <span>Export</span>
           </button>
 
@@ -399,15 +399,15 @@ export default function ProductsPage() {
                   setImportResult(null);
                   setIsImportModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0E1422] border border-[#1F2C44] text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
               >
-                <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
                 <span>Bulk Import</span>
               </button>
 
               <button
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-black font-semibold text-xs transition-all shadow-md shadow-cyan-950/30"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Product</span>
@@ -418,15 +418,15 @@ export default function ProductsPage() {
       </div>
 
       {/* 2. Filters & Search Bar */}
-      <div className="p-4 rounded-xl bg-[#0E1422] border border-[#1F2C44] flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search by name, SKU, or barcode..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
           />
         </div>
 
@@ -435,7 +435,7 @@ export default function ProductsPage() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-[#141C2E] border border-[#1F2C44] rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
           >
             <option value="">All Categories</option>
             {categories.map((c) => (
@@ -449,7 +449,7 @@ export default function ProductsPage() {
           <select
             value={selectedBrand}
             onChange={(e) => setSelectedBrand(e.target.value)}
-            className="bg-[#141C2E] border border-[#1F2C44] rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
           >
             <option value="">All Brands</option>
             {brands.map((b) => (
@@ -463,7 +463,7 @@ export default function ProductsPage() {
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="bg-[#141C2E] border border-[#1F2C44] rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
           >
             <option value="">All Product Types</option>
             <option value="STANDARD">Standard</option>
@@ -474,19 +474,19 @@ export default function ProductsPage() {
 
           <button
             onClick={loadProducts}
-            className="p-2 rounded-lg bg-[#141C2E] border border-[#1F2C44] text-zinc-400 hover:text-white"
+            className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Refresh list"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* 3. Products Data Table */}
-      <div className="rounded-xl bg-[#0E1422] border border-[#1F2C44] overflow-hidden">
+      <div className="rounded-2xl bg-white border border-slate-200/80 shadow-pos-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#141C2E]/80 text-zinc-400 uppercase tracking-wider text-[10px] border-b border-[#1F2C44]">
+            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3">Product Name & SKU</th>
                 <th className="px-4 py-3">Barcode</th>
@@ -498,61 +498,61 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1F2C44]/60">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-cyan-500 mb-2" />
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                     Loading product catalogue...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-500">
-                    <Package className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <Package className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                     No products found matching the criteria.
                   </td>
                 </tr>
               ) : (
                 products.map((p) => (
-                  <tr key={p.id} className="hover:bg-[#141C2E]/50 transition-colors">
+                  <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-white">{p.name}</div>
-                      <div className="text-[11px] font-mono text-zinc-400">{p.sku}</div>
+                      <div className="font-bold text-slate-900">{p.name}</div>
+                      <div className="text-[11px] font-mono text-slate-500">{p.sku}</div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-zinc-300">
+                    <td className="px-4 py-3 font-mono text-slate-700">
                       {p.barcode ? (
-                        <span className="flex items-center gap-1.5 text-zinc-300">
-                          <Barcode className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-slate-700">
+                          <Barcode className="w-3.5 h-3.5 text-slate-400" />
                           {p.barcode}
                         </span>
                       ) : (
-                        <span className="text-zinc-600">-</span>
+                        <span className="text-slate-400">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-zinc-200">{p.category?.name || 'Uncategorized'}</div>
-                      <div className="text-[11px] text-zinc-400">{p.brand?.name || '-'}</div>
+                      <div className="text-slate-800 font-medium">{p.category?.name || 'Uncategorized'}</div>
+                      <div className="text-[11px] text-slate-500">{p.brand?.name || '-'}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-[10px] px-2 py-0.5 rounded font-mono bg-[#161F33] text-cyan-400 border border-cyan-500/20">
+                      <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
                         {p.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-zinc-400">
+                    <td className="px-4 py-3 text-right font-mono text-slate-500">
                       {currency} {p.costPrice.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium text-emerald-400">
+                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
                       {currency} {p.retailPrice.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {p.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="w-2.5 h-2.5" />
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                           <XCircle className="w-2.5 h-2.5" />
                           Inactive
                         </span>
@@ -564,14 +564,14 @@ export default function ProductsPage() {
                           <>
                             <button
                               onClick={() => handleOpenEditModal(p)}
-                              className="p-1.5 rounded hover:bg-[#1F2C44] text-zinc-400 hover:text-cyan-400 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors"
                               title="Edit product"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteProduct(p.id)}
-                              className="p-1.5 rounded hover:bg-rose-950/50 text-zinc-400 hover:text-rose-400 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
                               title="Delete product"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -588,7 +588,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 border-t border-[#1F2C44] bg-[#141C2E]/40 flex items-center justify-between text-xs text-zinc-400">
+        <div className="px-4 py-3 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
           <span>
             Page {page} of {totalPages} ({totalCount} total items)
           </span>
@@ -596,14 +596,14 @@ export default function ProductsPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-2.5 py-1 rounded bg-[#0E1422] border border-[#1F2C44] hover:text-white disabled:opacity-40"
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-2.5 py-1 rounded bg-[#0E1422] border border-[#1F2C44] hover:text-white disabled:opacity-40"
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40"
             >
               Next
             </button>
@@ -613,49 +613,49 @@ export default function ProductsPage() {
 
       {/* 4. Product Create / Edit Modal */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-3xl bg-[#0E1422] border border-[#1F2C44] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-4 border-b border-[#1F2C44] flex items-center justify-between bg-[#141C2E]/60">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
                   <Package className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-white">
+                  <h2 className="text-base font-bold text-slate-900">
                     {editingProduct ? 'Edit Product Definition' : 'Create New Product'}
                   </h2>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-xs text-slate-500">
                     SKU, barcode scanners, pricing and variant options
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsProductModalOpen(false)}
-                className="text-zinc-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Tab Navigation */}
-            <div className="flex border-b border-[#1F2C44] px-4 bg-[#0A0E18]">
+            <div className="flex border-b border-slate-200 px-4 bg-slate-50/40">
               <button
                 onClick={() => setActiveTab('general')}
-                className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-all ${
+                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
                   activeTab === 'general'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
                 General Details
               </button>
               <button
                 onClick={() => setActiveTab('pricing')}
-                className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-all ${
+                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
                   activeTab === 'pricing'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
                 Pricing & Inventory
@@ -663,10 +663,10 @@ export default function ProductsPage() {
               {formData.type === 'VARIABLE' && (
                 <button
                   onClick={() => setActiveTab('variants')}
-                  className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-all ${
+                  className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
                     activeTab === 'variants'
-                      ? 'border-cyan-400 text-cyan-400'
-                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   Variants ({formData.variants?.length || 0})
@@ -675,9 +675,9 @@ export default function ProductsPage() {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSubmitProduct} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <form onSubmit={handleSubmitProduct} className="flex-1 overflow-y-auto p-6 space-y-4">
               {formError && (
-                <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{formError}</span>
                 </div>
@@ -688,7 +688,7 @@ export default function ProductsPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Product Name *
                       </label>
                       <input
@@ -697,19 +697,19 @@ export default function ProductsPage() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="e.g. Ceylon Earl Grey Tea 100g"
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-zinc-300">SKU Code</label>
+                        <label className="text-xs font-semibold text-slate-700">SKU Code</label>
                         <button
                           type="button"
                           onClick={handleAutoSku}
-                          className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"
+                          className="text-[11px] text-blue-600 font-semibold hover:underline flex items-center gap-1"
                         >
-                          <Sparkles className="w-2.5 h-2.5" /> Auto
+                          <Sparkles className="w-3 h-3" /> Auto
                         </button>
                       </div>
                       <input
@@ -717,12 +717,12 @@ export default function ProductsPage() {
                         value={formData.sku}
                         onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                         placeholder="e.g. TEA-EG-100"
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono uppercase focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Barcode (EAN/UPC/Code128)
                       </label>
                       <input
@@ -730,25 +730,25 @@ export default function ProductsPage() {
                         value={formData.barcode || ''}
                         onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                         placeholder="Scanned barcode string..."
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-zinc-300">Category</label>
+                        <label className="text-xs font-semibold text-slate-700">Category</label>
                         <button
                           type="button"
                           onClick={() => setQuickAddType('category')}
-                          className="text-[10px] text-cyan-400 hover:underline flex items-center gap-0.5"
+                          className="text-[11px] text-blue-600 font-semibold hover:underline flex items-center gap-0.5"
                         >
-                          <PlusCircle className="w-2.5 h-2.5" /> New
+                          <PlusCircle className="w-3 h-3" /> New
                         </button>
                       </div>
                       <select
                         value={formData.categoryId || ''}
                         onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       >
                         <option value="">Select Category</option>
                         {categories.map((c) => (
@@ -761,19 +761,19 @@ export default function ProductsPage() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-zinc-300">Brand</label>
+                        <label className="text-xs font-semibold text-slate-700">Brand</label>
                         <button
                           type="button"
                           onClick={() => setQuickAddType('brand')}
-                          className="text-[10px] text-cyan-400 hover:underline flex items-center gap-0.5"
+                          className="text-[11px] text-blue-600 font-semibold hover:underline flex items-center gap-0.5"
                         >
-                          <PlusCircle className="w-2.5 h-2.5" /> New
+                          <PlusCircle className="w-3 h-3" /> New
                         </button>
                       </div>
                       <select
                         value={formData.brandId || ''}
                         onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       >
                         <option value="">Select Brand</option>
                         {brands.map((b) => (
@@ -786,19 +786,19 @@ export default function ProductsPage() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-zinc-300">Unit of Measure</label>
+                        <label className="text-xs font-semibold text-slate-700">Unit of Measure</label>
                         <button
                           type="button"
                           onClick={() => setQuickAddType('unit')}
-                          className="text-[10px] text-cyan-400 hover:underline flex items-center gap-0.5"
+                          className="text-[11px] text-blue-600 font-semibold hover:underline flex items-center gap-0.5"
                         >
-                          <PlusCircle className="w-2.5 h-2.5" /> New
+                          <PlusCircle className="w-3 h-3" /> New
                         </button>
                       </div>
                       <select
                         value={formData.unitId || ''}
                         onChange={(e) => setFormData({ ...formData, unitId: e.target.value })}
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       >
                         <option value="">Select Unit</option>
                         {units.map((u) => (
@@ -810,7 +810,7 @@ export default function ProductsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Catalogue Type
                       </label>
                       <select
@@ -818,7 +818,7 @@ export default function ProductsPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, type: e.target.value as ProductType })
                         }
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       >
                         <option value="STANDARD">Standard (Single Item)</option>
                         <option value="VARIABLE">Variable (Sizes / Colors)</option>
@@ -828,7 +828,7 @@ export default function ProductsPage() {
                     </div>
 
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Product Description
                       </label>
                       <textarea
@@ -836,7 +836,7 @@ export default function ProductsPage() {
                         value={formData.description || ''}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Detailed product specifications..."
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
                   </div>
@@ -848,7 +848,7 @@ export default function ProductsPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Cost Price ({currency})
                       </label>
                       <input
@@ -859,12 +859,12 @@ export default function ProductsPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })
                         }
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Retail Price ({currency}) *
                       </label>
                       <input
@@ -876,12 +876,12 @@ export default function ProductsPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, retailPrice: parseFloat(e.target.value) || 0 })
                         }
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Wholesale Price ({currency})
                       </label>
                       <input
@@ -896,12 +896,12 @@ export default function ProductsPage() {
                           })
                         }
                         placeholder="Optional"
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Safety Stock Alert Qty
                       </label>
                       <input
@@ -914,7 +914,7 @@ export default function ProductsPage() {
                             alertQuantity: parseInt(e.target.value, 10) || 0,
                           })
                         }
-                        className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                       />
                     </div>
 
@@ -924,9 +924,9 @@ export default function ProductsPage() {
                         id="isTrackStock"
                         checked={formData.isTrackStock}
                         onChange={(e) => setFormData({ ...formData, isTrackStock: e.target.checked })}
-                        className="rounded bg-[#141C2E] border-[#1F2C44] text-cyan-500"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                       />
-                      <label htmlFor="isTrackStock" className="text-xs text-zinc-300 cursor-pointer">
+                      <label htmlFor="isTrackStock" className="text-xs font-medium text-slate-700 cursor-pointer">
                         Track Inventory Stock
                       </label>
                     </div>
@@ -937,9 +937,9 @@ export default function ProductsPage() {
                         id="isActive"
                         checked={formData.isActive}
                         onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                        className="rounded bg-[#141C2E] border-[#1F2C44] text-cyan-500"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                       />
-                      <label htmlFor="isActive" className="text-xs text-zinc-300 cursor-pointer">
+                      <label htmlFor="isActive" className="text-xs font-medium text-slate-700 cursor-pointer">
                         Active for Checkout
                       </label>
                     </div>
@@ -951,13 +951,13 @@ export default function ProductsPage() {
               {activeTab === 'variants' && formData.type === 'VARIABLE' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-400">
+                    <span className="text-xs text-slate-500">
                       Configure sizes, colors, and variant pricing overrides
                     </span>
                     <button
                       type="button"
                       onClick={handleAddVariantRow}
-                      className="px-2.5 py-1 rounded bg-[#161F33] text-cyan-400 border border-cyan-500/30 text-xs flex items-center gap-1 hover:bg-[#1f2c44]"
+                      className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 font-semibold text-xs flex items-center gap-1 hover:bg-blue-100 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add Variant
@@ -969,10 +969,10 @@ export default function ProductsPage() {
                       formData.variants.map((v, idx) => (
                         <div
                           key={idx}
-                          className="p-3 rounded-lg bg-[#141C2E] border border-[#1F2C44] grid grid-cols-1 sm:grid-cols-4 gap-2 items-center"
+                          className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-center"
                         >
                           <div>
-                            <label className="text-[10px] text-zinc-400">Variant Name</label>
+                            <label className="text-[10px] font-semibold text-slate-500">Variant Name</label>
                             <input
                               type="text"
                               value={v.name}
@@ -981,12 +981,12 @@ export default function ProductsPage() {
                                 copy[idx] = { ...copy[idx]!, name: e.target.value };
                                 setFormData({ ...formData, variants: copy });
                               }}
-                              className="w-full bg-[#0E1422] border border-[#1F2C44] rounded px-2 py-1 text-xs text-white"
+                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
                             />
                           </div>
 
                           <div>
-                            <label className="text-[10px] text-zinc-400">Variant SKU</label>
+                            <label className="text-[10px] font-semibold text-slate-500">Variant SKU</label>
                             <input
                               type="text"
                               value={v.sku || ''}
@@ -995,12 +995,12 @@ export default function ProductsPage() {
                                 copy[idx] = { ...copy[idx]!, sku: e.target.value };
                                 setFormData({ ...formData, variants: copy });
                               }}
-                              className="w-full bg-[#0E1422] border border-[#1F2C44] rounded px-2 py-1 text-xs text-white font-mono uppercase"
+                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono uppercase focus:outline-none focus:border-blue-500"
                             />
                           </div>
 
                           <div>
-                            <label className="text-[10px] text-zinc-400">Retail Price ({currency})</label>
+                            <label className="text-[10px] font-semibold text-slate-500">Retail Price ({currency})</label>
                             <input
                               type="number"
                               step="0.01"
@@ -1013,7 +1013,7 @@ export default function ProductsPage() {
                                 };
                                 setFormData({ ...formData, variants: copy });
                               }}
-                              className="w-full bg-[#0E1422] border border-[#1F2C44] rounded px-2 py-1 text-xs text-white font-mono"
+                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500"
                             />
                           </div>
 
@@ -1021,7 +1021,7 @@ export default function ProductsPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveVariantRow(idx)}
-                              className="text-rose-400 hover:text-rose-300 p-1 rounded hover:bg-rose-950/40 text-xs flex items-center gap-1"
+                              className="text-rose-600 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 text-xs flex items-center gap-1 transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               Remove
@@ -1030,7 +1030,7 @@ export default function ProductsPage() {
                         </div>
                       ))
                     ) : (
-                      <div className="py-6 text-center text-zinc-500 text-xs">
+                      <div className="py-6 text-center text-slate-400 text-xs">
                         No variant options configured. Click &quot;Add Variant&quot; to begin.
                       </div>
                     )}
@@ -1039,18 +1039,18 @@ export default function ProductsPage() {
               )}
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-[#1F2C44] flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-[#141C2E] border border-[#1F2C44] text-xs font-medium text-zinc-300 hover:text-white"
+                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-black font-semibold text-xs transition-all disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all disabled:opacity-50"
                 >
                   {isSubmitting
                     ? 'Saving...'
@@ -1066,18 +1066,18 @@ export default function ProductsPage() {
 
       {/* 5. Quick Add Taxonomy Modal */}
       {quickAddType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#0E1422] border border-[#1F2C44] rounded-xl shadow-2xl p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white capitalize flex items-center gap-2">
-                {quickAddType === 'category' && <FolderPlus className="w-4 h-4 text-cyan-400" />}
-                {quickAddType === 'brand' && <Tag className="w-4 h-4 text-emerald-400" />}
-                {quickAddType === 'unit' && <Ruler className="w-4 h-4 text-cyan-400" />}
+              <h3 className="text-sm font-bold text-slate-900 capitalize flex items-center gap-2">
+                {quickAddType === 'category' && <FolderPlus className="w-4 h-4 text-blue-600" />}
+                {quickAddType === 'brand' && <Tag className="w-4 h-4 text-emerald-600" />}
+                {quickAddType === 'unit' && <Ruler className="w-4 h-4 text-indigo-600" />}
                 Add New {quickAddType}
               </h3>
               <button
                 onClick={() => setQuickAddType(null)}
-                className="text-zinc-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1085,20 +1085,20 @@ export default function ProductsPage() {
 
             <form onSubmit={handleQuickAddSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">Name *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Name *</label>
                 <input
                   type="text"
                   required
                   value={quickAddName}
                   onChange={(e) => setQuickAddName(e.target.value)}
                   placeholder={`Enter ${quickAddType} name...`}
-                  className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                 />
               </div>
 
               {quickAddType === 'unit' && (
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Short Code (e.g. pcs, kg, ltr) *
                   </label>
                   <input
@@ -1107,14 +1107,14 @@ export default function ProductsPage() {
                     value={quickAddExtra}
                     onChange={(e) => setQuickAddExtra(e.target.value)}
                     placeholder="Short code..."
-                    className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                   />
                 </div>
               )}
 
               {quickAddType === 'category' && (
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Description
                   </label>
                   <input
@@ -1122,7 +1122,7 @@ export default function ProductsPage() {
                     value={quickAddExtra}
                     onChange={(e) => setQuickAddExtra(e.target.value)}
                     placeholder="Optional category description..."
-                    className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                   />
                 </div>
               )}
@@ -1131,13 +1131,13 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setQuickAddType(null)}
-                  className="px-3 py-1.5 rounded-lg bg-[#141C2E] text-zinc-400 hover:text-white text-xs"
+                  className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-cyan-500 text-black font-semibold text-xs hover:bg-cyan-400"
+                  className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all"
                 >
                   Save & Select
                 </button>
@@ -1149,22 +1149,22 @@ export default function ProductsPage() {
 
       {/* 6. Bulk Import Modal */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-xl bg-[#0E1422] border border-[#1F2C44] rounded-xl shadow-2xl p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                 Bulk Ingest Product Catalog
               </h3>
               <button
                 onClick={() => setIsImportModalOpen(false)}
-                className="text-zinc-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-slate-500">
               Paste a JSON array of products. Each object can contain <code>name</code>,{' '}
               <code>sku</code>, <code>barcode</code>, <code>costPrice</code>, <code>retailPrice</code>, and <code>type</code>.
             </p>
@@ -1181,27 +1181,27 @@ export default function ProductsPage() {
     "retailPrice": 150
   }
 ]'
-              className="w-full bg-[#141C2E] border border-[#1F2C44] rounded-lg p-3 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
             />
 
             {importResult && (
-              <div className="p-3 rounded-lg bg-[#141C2E] border border-[#1F2C44] text-xs">
-                <div className="text-emerald-400 font-medium">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="text-emerald-700 font-semibold">
                   Successfully imported: {importResult.inserted} item(s)
                 </div>
                 {importResult.errors.length > 0 && (
-                  <div className="text-rose-400 mt-1">
+                  <div className="text-rose-600 mt-1 font-medium">
                     Failed rows: {importResult.errors.length}
                   </div>
                 )}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2C44]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(false)}
-                className="px-3 py-1.5 rounded-lg bg-[#141C2E] text-zinc-400 hover:text-white text-xs"
+                className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold"
               >
                 Close
               </button>
@@ -1209,7 +1209,7 @@ export default function ProductsPage() {
                 type="button"
                 disabled={isImporting || !importJson.trim()}
                 onClick={handleBulkImportSubmit}
-                className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black font-semibold text-xs hover:bg-emerald-400 disabled:opacity-50"
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all disabled:opacity-50"
               >
                 {isImporting ? 'Ingesting...' : 'Import Products'}
               </button>
