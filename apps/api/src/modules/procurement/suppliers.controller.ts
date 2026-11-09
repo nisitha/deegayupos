@@ -96,3 +96,4 @@ export class SuppliersController {
     return this.suppliersService.deleteSupplier(tenant.id, id);
   }
 }
+

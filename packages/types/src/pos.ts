@@ -7,7 +7,8 @@ export type SalePaymentMethod =
   | 'CARD'
   | 'QR_PAYMENT'
   | 'BANK_TRANSFER'
-  | 'STORE_CREDIT';
+  | 'STORE_CREDIT'
+  | 'CUSTOMER_CREDIT';
 
 export type SalePaymentStatus = 'SUCCESS' | 'PENDING' | 'FAILED';
 

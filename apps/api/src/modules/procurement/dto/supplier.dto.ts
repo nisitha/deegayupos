@@ -136,3 +136,4 @@ export class UpdateSupplierDto {
   @MaxLength(32)
   status?: string;
 }
+

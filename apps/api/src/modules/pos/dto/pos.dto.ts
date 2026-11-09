@@ -69,10 +69,10 @@ export class CheckoutItemDto {
 
 export class CheckoutPaymentDto {
   @ApiProperty({
-    enum: ['CASH', 'CARD', 'QR_PAYMENT', 'BANK_TRANSFER', 'STORE_CREDIT'],
+    enum: ['CASH', 'CARD', 'QR_PAYMENT', 'BANK_TRANSFER', 'STORE_CREDIT', 'CUSTOMER_CREDIT'],
     example: 'CASH',
   })
-  @IsEnum(['CASH', 'CARD', 'QR_PAYMENT', 'BANK_TRANSFER', 'STORE_CREDIT'])
+  @IsEnum(['CASH', 'CARD', 'QR_PAYMENT', 'BANK_TRANSFER', 'STORE_CREDIT', 'CUSTOMER_CREDIT'])
   paymentMethod!: SalePaymentMethod;
 
   @ApiProperty({ example: 1000.0 })

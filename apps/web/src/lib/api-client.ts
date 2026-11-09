@@ -55,6 +55,13 @@ import type {
   CreatePurchaseOrderDto,
   GoodsReceivedNoteDto,
   CreateGrnDto,
+  CustomerDto,
+  CreateCustomerDto,
+  UpdateCustomerDto,
+  CustomerLedgerDto,
+  RecordCustomerPaymentDto,
+  CustomerPaymentDto,
+  CustomerTelemetryDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -419,6 +426,31 @@ export const procurementApi = {
     return apiClient.post<GoodsReceivedNoteDto>('/procurement/grn', payload);
   },
 };
+
+export const customersApi = {
+  getCustomers: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<CustomerDto>>> => {
+    return apiClient.get<PaginatedResult<CustomerDto>>('/customers', { params });
+  },
+  getTelemetry: async (): Promise<ApiResponse<CustomerTelemetryDto>> => {
+    return apiClient.get<CustomerTelemetryDto>('/customers/telemetry');
+  },
+  getCustomerById: async (id: string): Promise<ApiResponse<CustomerDto>> => {
+    return apiClient.get<CustomerDto>(`/customers/${id}`);
+  },
+  getCustomerLedger: async (id: string): Promise<ApiResponse<{ customer: CustomerDto; ledger: CustomerLedgerDto[] }>> => {
+    return apiClient.get<{ customer: CustomerDto; ledger: CustomerLedgerDto[] }>(`/customers/${id}/ledger`);
+  },
+  createCustomer: async (payload: CreateCustomerDto): Promise<ApiResponse<CustomerDto>> => {
+    return apiClient.post<CustomerDto>('/customers', payload);
+  },
+  updateCustomer: async (id: string, payload: UpdateCustomerDto): Promise<ApiResponse<CustomerDto>> => {
+    return apiClient.patch<CustomerDto>(`/customers/${id}`, payload);
+  },
+  recordDebtSettlement: async (id: string, payload: RecordCustomerPaymentDto): Promise<ApiResponse<{ customer: CustomerDto; payment: CustomerPaymentDto; ledgerEntry: CustomerLedgerDto }>> => {
+    return apiClient.post<{ customer: CustomerDto; payment: CustomerPaymentDto; ledgerEntry: CustomerLedgerDto }>(`/customers/${id}/payments`, payload);
+  },
+};
+
 
 
 

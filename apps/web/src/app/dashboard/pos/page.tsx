@@ -20,6 +20,7 @@ import {
   Tag,
   Clock,
   Barcode,
+  BookOpen,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -89,7 +90,7 @@ export default function ConfidencyPosPage() {
 
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH' | 'SPLIT'>('CARD');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH' | 'STORE_CREDIT' | 'SPLIT'>('CARD');
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   // Customer Management
@@ -363,6 +364,34 @@ export default function ConfidencyPosPage() {
   // Execute Checkout Transaction
   const handleCharge = useCallback(async () => {
     if (cart.length === 0) return;
+
+    // Credit limit and customer validation for STORE_CREDIT
+    if (paymentMethod === 'STORE_CREDIT') {
+      if (!selectedCustomer) {
+        setIsCustomerModalOpen(true);
+        setScanFeedback('⚠️ Please select a customer for Store Credit purchase');
+        setTimeout(() => setScanFeedback(null), 3000);
+        return;
+      }
+
+      if (selectedCustomer.status === 'SUSPENDED') {
+        setScanFeedback('❌ Customer account is suspended. Cannot issue credit.');
+        setTimeout(() => setScanFeedback(null), 3000);
+        return;
+      }
+
+      const debt = Number(selectedCustomer.currentBalance || 0);
+      const limit = Number(selectedCustomer.creditLimit || 0);
+      const avail = Math.max(0, limit - debt);
+
+      if (totalAmount > avail) {
+        const excess = (totalAmount - avail).toFixed(2);
+        setScanFeedback(`❌ Credit limit exceeded by LKR ${excess}. Available: LKR ${avail.toLocaleString()}`);
+        setTimeout(() => setScanFeedback(null), 4000);
+        return;
+      }
+    }
+
     setIsProcessingCheckout(true);
 
     try {
@@ -374,6 +403,8 @@ export default function ConfidencyPosPage() {
 
       const payload: CheckoutPayload = {
         branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+        customerId: selectedCustomer?.id || undefined,
+        customerName: formattedCustomer,
         orderType: 'RETAIL_WALKIN',
         subtotal,
         discountAmount,
@@ -381,7 +412,6 @@ export default function ConfidencyPosPage() {
         totalAmount,
         paidAmount: totalAmount,
         changeDue: 0,
-        customerName: formattedCustomer,
         items: cart.map((item) => ({
           productId: item.productId,
           productName: item.name,
@@ -394,7 +424,12 @@ export default function ConfidencyPosPage() {
         })),
         payments: [
           {
-            paymentMethod: paymentMethod === 'CARD' ? 'CARD' : paymentMethod === 'CASH' ? 'CASH' : 'CARD',
+            paymentMethod:
+              paymentMethod === 'STORE_CREDIT'
+                ? 'CUSTOMER_CREDIT'
+                : paymentMethod === 'CASH'
+                ? 'CASH'
+                : 'CARD',
             amount: totalAmount,
           },
         ],
@@ -449,6 +484,20 @@ export default function ConfidencyPosPage() {
 
       setCompletedSale(finalizedSale);
       setShowReceiptModal(true);
+      if (paymentMethod === 'STORE_CREDIT' && selectedCustomer) {
+        setSelectedCustomer((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentBalance: (prev.currentBalance || 0) + totalAmount,
+                availableCredit: Math.max(
+                  0,
+                  (prev.creditLimit || 0) - ((prev.currentBalance || 0) + totalAmount),
+                ),
+              }
+            : null,
+        );
+      }
       clearCart();
       resetDiscount();
     } catch {
@@ -1091,10 +1140,11 @@ export default function ConfidencyPosPage() {
             <label className="text-xs font-semibold text-slate-800 block mb-2">
               Payment Method
             </label>
-            <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-3 gap-1 text-xs">
+            <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
               {[
                 { id: 'CARD', label: 'Card', icon: CreditCard },
                 { id: 'CASH', label: 'Cash', icon: Banknote },
+                { id: 'STORE_CREDIT', label: 'Credit', icon: BookOpen },
                 { id: 'SPLIT', label: 'Split', icon: Split },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -1104,18 +1154,62 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    className={`py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 cursor-pointer ${
                       isSelected
                         ? 'bg-white text-slate-900 font-bold shadow-xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{tab.label}</span>
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 );
               })}
             </div>
+
+            {/* Credit Account Telemetry & Warning */}
+            {paymentMethod === 'STORE_CREDIT' && (
+              <div className="mt-2 text-[11px] transition-all animate-in fade-in duration-150">
+                {!selectedCustomer ? (
+                  <div className="flex items-center justify-between text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                    <span className="font-semibold">⚠️ Select customer for Credit sale</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomerModalOpen(true)}
+                      className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200 hover:bg-indigo-50 cursor-pointer"
+                    >
+                      Attach
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-50/70 border border-indigo-100 p-2.5 rounded-xl space-y-1">
+                    <div className="flex justify-between font-bold text-slate-800">
+                      <span className="truncate">{selectedCustomer.name}</span>
+                      <span className="font-mono text-indigo-700 shrink-0">
+                        Limit: LKR {Number(selectedCustomer.creditLimit || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-600">
+                      <span>Current Debt (ණය):</span>
+                      <span className="font-mono font-bold text-rose-600">
+                        LKR {Number(selectedCustomer.currentBalance || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-600">
+                      <span>Available Credit:</span>
+                      <span className="font-mono font-bold text-emerald-600">
+                        LKR {Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                    {totalAmount > Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0)) && (
+                      <div className="text-[10px] font-bold text-red-600 bg-red-50 p-1.5 rounded-md border border-red-200 mt-1">
+                        ⚠️ Order exceeds credit limit by LKR {(totalAmount - Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0))).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 6. Primary Charge Button */}
@@ -1260,17 +1354,18 @@ export default function ConfidencyPosPage() {
               </div>
 
               {/* Payment selector */}
-              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-3 gap-1 text-xs">
+              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
                 {[
                   { id: 'CARD', label: 'Card' },
                   { id: 'CASH', label: 'Cash' },
+                  { id: 'STORE_CREDIT', label: 'Credit' },
                   { id: 'SPLIT', label: 'Split' },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-1.5 rounded-lg font-medium transition-all ${
+                    className={`py-1.5 rounded-lg font-medium transition-all text-center ${
                       paymentMethod === tab.id
                         ? 'bg-white text-slate-900 font-bold shadow-xs'
                         : 'text-slate-500'

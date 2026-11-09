@@ -10,3 +10,4 @@ import { SuppliersService } from './suppliers.service';
   exports: [SuppliersService, ProcurementService],
 })
 export class ProcurementModule {}
+

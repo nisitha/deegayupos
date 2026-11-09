@@ -129,3 +129,4 @@ export class ProcurementController {
     return this.procurementService.createGrn(tenant.id, user.id, dto);
   }
 }
+

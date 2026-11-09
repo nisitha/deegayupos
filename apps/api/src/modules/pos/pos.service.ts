@@ -97,6 +97,57 @@ export class PosService {
 
     // 4. Atomic Transaction Execution
     return this.prisma.withTenantContext(tenantId, async (tx) => {
+      // Validate customer credit if paying with CUSTOMER_CREDIT or STORE_CREDIT
+      const totalCreditAmount = payload.payments
+        .filter(
+          (p) =>
+            p.paymentMethod === 'CUSTOMER_CREDIT' ||
+            p.paymentMethod === 'STORE_CREDIT',
+        )
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      let customerRecord: any = null;
+      let newCreditDebt = 0;
+
+      if (totalCreditAmount > 0) {
+        if (!payload.customerId) {
+          throw new BadRequestException(
+            'Customer must be selected for Credit / Store Credit sales.',
+          );
+        }
+
+        customerRecord = await tx.customer.findFirst({
+          where: {
+            id: payload.customerId,
+            tenantId,
+            deletedAt: null,
+          },
+        });
+
+        if (!customerRecord) {
+          throw new NotFoundException(
+            `Customer "${payload.customerId}" not found.`,
+          );
+        }
+
+        if (customerRecord.status === 'SUSPENDED') {
+          throw new BadRequestException(
+            `Customer account is suspended and cannot make credit purchases.`,
+          );
+        }
+
+        const currentDebt = Number(customerRecord.currentBalance || 0);
+        const creditLimit = Number(customerRecord.creditLimit || 0);
+        newCreditDebt = currentDebt + totalCreditAmount;
+
+        if (newCreditDebt > creditLimit) {
+          const excess = (newCreditDebt - creditLimit).toFixed(2);
+          throw new BadRequestException(
+            `Credit limit exceeded by LKR ${excess}. (Limit: LKR ${creditLimit.toLocaleString()}, Current Balance: LKR ${currentDebt.toLocaleString()}, Requested: LKR ${totalCreditAmount.toLocaleString()})`,
+          );
+        }
+      }
+
       // Generate sequential invoice number
       const settings = await tx.businessSetting.findUnique({
         where: { tenantId },
@@ -254,6 +305,30 @@ export class PosService {
             amount: p.amount,
             reference: p.reference || null,
             status: 'SUCCESS',
+          },
+        });
+      }
+
+      // Update Customer Debt & append Customer Ledger entry if Credit Sale
+      if (totalCreditAmount > 0 && customerRecord) {
+        await tx.customer.update({
+          where: { id: customerRecord.id },
+          data: {
+            currentBalance: newCreditDebt,
+          },
+        });
+
+        await tx.customerLedger.create({
+          data: {
+            tenantId,
+            customerId: customerRecord.id,
+            entryType: 'CREDIT_SALE',
+            referenceId: sale.invoiceNumber,
+            debitAmount: totalCreditAmount,
+            creditAmount: 0,
+            runningBalance: newCreditDebt,
+            notes: `POS Credit Sale #${sale.invoiceNumber}`,
+            createdById: cashierId,
           },
         });
       }
@@ -851,7 +926,11 @@ export class PosService {
       amount: Number(p.amount),
       reference: p.reference || undefined,
       status: p.status as SalePaymentDto['status'],
-      createdAt: p.createdAt.toISOString(),
+      createdAt: p.createdAt
+        ? p.createdAt instanceof Date
+          ? p.createdAt.toISOString()
+          : new Date(p.createdAt).toISOString()
+        : new Date().toISOString(),
     };
   }
 
