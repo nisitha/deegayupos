@@ -25,13 +25,14 @@ interface TenantBranchContextType {
   orderType: string;
   setOrderType: (type: string) => void;
   refreshProfile: () => Promise<void>;
+  refreshBranches: () => Promise<void>;
   hasPermission: (permissionCode: string) => boolean;
 }
 
 const TenantBranchContext = createContext<TenantBranchContextType | undefined>(undefined);
 
 export function TenantBranchProvider({ children }: { children: React.ReactNode }) {
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchIdState] = useState<string | null>(null);
   const [business, setBusiness] = useState<BusinessProfileData | null>(null);
   const [branches, setBranches] = useState<BusinessProfileBranch[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -41,7 +42,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const [posMode, setPosMode] = useState<'retail' | 'restaurant'>('retail');
   const [orderType, setOrderType] = useState<string>('Walk-In');
 
-  // Load user session details from localStorage
+  // Load user session & saved branch selection details from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -53,9 +54,46 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
 
         const storedPerms = localStorage.getItem('pixelcraft_permissions');
         if (storedPerms) setPermissions(JSON.parse(storedPerms));
+
+        const storedBranch = localStorage.getItem('pixelcraft_selected_branch');
+        if (storedBranch) setSelectedBranchIdState(storedBranch);
       } catch (err) {
         console.error('Failed to parse local authentication cache:', err);
       }
+    }
+  }, []);
+
+  const setSelectedBranchId = useCallback((id: string | null) => {
+    setSelectedBranchIdState(id);
+    if (typeof window !== 'undefined') {
+      if (id) {
+        localStorage.setItem('pixelcraft_selected_branch', id);
+      } else {
+        localStorage.removeItem('pixelcraft_selected_branch');
+      }
+    }
+  }, []);
+
+  const fetchBranches = useCallback(async () => {
+    try {
+      const res = await fetch('/api/branches?slug=deegayu');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setBranches(json.data);
+        // If no selected branch, pick the primary or first one
+        setSelectedBranchIdState((prev) => {
+          if (prev && json.data.some((b: BusinessProfileBranch) => b.id === prev)) {
+            return prev;
+          }
+          const primary = json.data.find((b: BusinessProfileBranch) => b.isPrimary) || json.data[0];
+          if (primary && typeof window !== 'undefined') {
+            localStorage.setItem('pixelcraft_selected_branch', primary.id);
+          }
+          return primary ? primary.id : null;
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch branches from API:', err);
     }
   }, []);
 
@@ -65,14 +103,19 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       const res = await businessApi.getProfile();
       if (res.data) {
         setBusiness(res.data);
-        setBranches(res.data.branches || []);
+        if (res.data.branches && res.data.branches.length > 0) {
+          setBranches(res.data.branches);
+        }
       }
+      await fetchBranches();
     } catch (err) {
       console.warn('Could not fetch tenant business profile:', err);
+      // Fallback to fetch branches directly
+      await fetchBranches();
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchBranches]);
 
   useEffect(() => {
     fetchProfile();
@@ -113,6 +156,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         orderType,
         setOrderType,
         refreshProfile: fetchProfile,
+        refreshBranches: fetchBranches,
         hasPermission,
       }}
     >
@@ -128,4 +172,3 @@ export function useTenantBranch() {
   }
   return context;
 }
-
