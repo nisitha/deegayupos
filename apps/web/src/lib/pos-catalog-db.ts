@@ -157,3 +157,4 @@ export async function saveCachedCatalog<T>(
     // LocalStorage quota may be reached; IndexedDB holds the primary full dataset
   }
 }
+

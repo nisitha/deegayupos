@@ -21,6 +21,7 @@ import {
   FolderPlus,
   Tag,
   Ruler,
+  Eye,
 } from 'lucide-react';
 import type {
   BrandDto,
@@ -34,11 +35,37 @@ import type {
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { productsApi } from '../../../lib/api-client';
 
+export interface ManagedProductItem {
+  id: string;
+  name: string;
+  sku: string;
+  barcode?: string | null;
+  costPrice: number;
+  retailPrice: number;
+  wholesalePrice?: number | null;
+  type?: string;
+  productType?: string;
+  status?: string;
+  isActive: boolean;
+  category?: { id: string; name: string; slug?: string } | null;
+  categoryId?: string | null;
+  stockOnHand?: number;
+  stock?: number;
+  brand?: BrandDto | null;
+  brandId?: string | null;
+  unit?: UnitDto | null;
+  unitId?: string | null;
+  description?: string | null;
+  alertQuantity?: number;
+  isTrackStock?: boolean;
+  variants?: unknown[];
+}
+
 export default function ProductsPage() {
   const { currency, hasPermission } = useTenantBranch();
 
   // Data states
-  const [products, setProducts] = useState<ProductDto[]>([]);
+  const [products, setProducts] = useState<ManagedProductItem[]>([]);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [brands, setBrands] = useState<BrandDto[]>([]);
   const [units, setUnits] = useState<UnitDto[]>([]);
@@ -47,14 +74,15 @@ export default function ProductsPage() {
   // Filters & Pagination
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedBrand, setSelectedBrand] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   // Modals & Drawers
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<ManagedProductItem | null>(null);
   const [editingProduct, setEditingProduct] = useState<ProductDto | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'pricing' | 'variants'>('general');
 
@@ -95,51 +123,64 @@ export default function ProductsPage() {
   const loadTaxonomy = useCallback(async () => {
     try {
       const [catsRes, brandsRes, unitsRes] = await Promise.all([
-        productsApi.getCategories(),
-        productsApi.getBrands(),
-        productsApi.getUnits(),
+        productsApi.getCategories().catch(() => ({ data: [] })),
+        productsApi.getBrands().catch(() => ({ data: [] })),
+        productsApi.getUnits().catch(() => ({ data: [] })),
       ]);
-      if (catsRes.data) setCategories(catsRes.data);
+      if (catsRes.data && catsRes.data.length > 0) setCategories(catsRes.data);
       if (brandsRes.data) setBrands(brandsRes.data);
       if (unitsRes.data) setUnits(unitsRes.data);
     } catch (err) {
-      console.error('Failed to load catalog taxonomy:', err);
+      console.warn('Catalog taxonomy background load note:', err);
     }
   }, []);
 
-  // Load Products list
+  // Load Products list from internal Next.js Supabase API
   const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await productsApi.getAll({
-        page,
-        limit: 15,
-        search: search.trim() || undefined,
-        categoryId: selectedCategory || undefined,
-        brandId: selectedBrand || undefined,
-        type: selectedType ? (selectedType as ProductType) : undefined,
+      const params = new URLSearchParams({
+        slug: 'deegayu',
+        page: String(page),
+        limit: String(limit),
       });
 
-      if (res.data) {
-        setProducts(res.data.items);
-        setTotalPages(res.data.totalPages);
-        setTotalCount(res.data.total);
+      if (search.trim()) params.set('search', search.trim());
+      if (selectedCategory && selectedCategory !== 'all') params.set('categoryId', selectedCategory);
+      if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
+
+      const res = await fetch(`/api/products?${params.toString()}`);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        setProducts(json.data.products || []);
+        setTotalPages(json.data.totalPages || 1);
+        setTotalCount(json.data.total || 0);
+        if (json.data.categories && json.data.categories.length > 0) {
+          setCategories(json.data.categories);
+        }
       }
-    } catch (err) {
-      console.error('Failed to load products:', err);
+    } catch (err: unknown) {
+      console.error('Failed to load products from /api/products:', err);
     } finally {
       setLoading(false);
     }
-  }, [page, search, selectedCategory, selectedBrand, selectedType]);
+  }, [page, limit, search, selectedCategory, selectedStatus]);
 
   useEffect(() => {
     loadTaxonomy();
   }, [loadTaxonomy]);
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedCategory, selectedStatus, limit]);
+
+  // Debounced search / query effect (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
       loadProducts();
-    }, 250);
+    }, 300);
     return () => clearTimeout(timer);
   }, [loadProducts]);
 
@@ -169,32 +210,35 @@ export default function ProductsPage() {
   };
 
   // Open Edit Product Modal
-  const handleOpenEditModal = (p: ProductDto) => {
-    setEditingProduct(p);
+  const handleOpenEditModal = (p: ManagedProductItem) => {
+    setEditingProduct(p as unknown as ProductDto);
     setFormData({
       name: p.name,
       sku: p.sku,
       barcode: p.barcode || '',
       description: p.description || '',
-      type: p.type,
-      categoryId: p.categoryId || '',
+      type: (p.type as ProductType) || 'STANDARD',
+      categoryId: p.categoryId || p.category?.id || '',
       brandId: p.brandId || '',
       unitId: p.unitId || '',
-      costPrice: p.costPrice,
-      retailPrice: p.retailPrice,
+      costPrice: p.costPrice || 0,
+      retailPrice: p.retailPrice || 0,
       wholesalePrice: p.wholesalePrice || undefined,
-      alertQuantity: p.alertQuantity,
-      isTrackStock: p.isTrackStock,
-      isActive: p.isActive,
-      variants: (p.variants || []).map((v) => ({
-        id: v.id,
-        name: v.name,
-        sku: v.sku,
-        barcode: v.barcode || '',
-        costPrice: v.costPrice || 0,
-        retailPrice: v.retailPrice || 0,
-        attributes: v.attributes || {},
-      })),
+      alertQuantity: p.alertQuantity || 5,
+      isTrackStock: p.isTrackStock !== undefined ? p.isTrackStock : true,
+      isActive: p.isActive !== undefined ? p.isActive : true,
+      variants: ((p.variants as unknown[]) || []).map((v) => {
+        const item = v as { id?: string; name?: string; sku?: string; barcode?: string; costPrice?: number; retailPrice?: number; attributes?: Record<string, string> };
+        return {
+          id: item.id,
+          name: item.name || '',
+          sku: item.sku || '',
+          barcode: item.barcode || '',
+          costPrice: item.costPrice || 0,
+          retailPrice: item.retailPrice || 0,
+          attributes: item.attributes || {},
+        };
+      }),
     });
     setActiveTab('general');
     setFormError(null);
@@ -373,12 +417,12 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             Products & Catalogue
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
-              {totalCount} Items
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-[#005BD3] border border-blue-200/60 font-mono">
+              {totalCount.toLocaleString()} Items
             </span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Manage your retail inventory, multi-variant options, barcode scanning tags, and pricing.
+            Browse and manage Ayurvedic pharmacy catalog, barcode scanning tags, pricing, and live stock balances.
           </p>
         </div>
 
@@ -407,7 +451,7 @@ export default function ProductsPage() {
 
               <button
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004CB5] text-white font-semibold text-xs shadow-sm transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Product</span>
@@ -426,7 +470,7 @@ export default function ProductsPage() {
             placeholder="Search by name, SKU, or barcode..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#005BD3] focus:bg-white transition-colors"
           />
         </div>
 
@@ -435,9 +479,9 @@ export default function ProductsPage() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-[#005BD3] focus:bg-white max-w-[200px]"
           >
-            <option value="">All Categories</option>
+            <option value="">All Categories ({categories.length})</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -445,31 +489,27 @@ export default function ProductsPage() {
             ))}
           </select>
 
-          {/* Brand Filter */}
+          {/* Status Filter */}
           <select
-            value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-[#005BD3] focus:bg-white"
           >
-            <option value="">All Brands</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ARCHIVED">Archived</option>
           </select>
 
-          {/* Type Filter */}
+          {/* Page Limit Selector */}
           <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white"
+            value={limit}
+            onChange={(e) => setLimit(parseInt(e.target.value, 10))}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-[#005BD3] focus:bg-white"
           >
-            <option value="">All Product Types</option>
-            <option value="STANDARD">Standard</option>
-            <option value="VARIABLE">Variable</option>
-            <option value="SERVICE">Service</option>
-            <option value="BUNDLE">Bundle</option>
+            <option value={25}>25 per page</option>
+            <option value={50}>50 per page</option>
+            <option value={100}>100 per page</option>
           </select>
 
           <button
@@ -477,7 +517,7 @@ export default function ProductsPage() {
             className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Refresh list"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#005BD3]' : ''}`} />
           </button>
         </div>
       </div>
@@ -490,120 +530,153 @@ export default function ProductsPage() {
               <tr>
                 <th className="px-4 py-3">Product Name & SKU</th>
                 <th className="px-4 py-3">Barcode</th>
-                <th className="px-4 py-3">Category / Brand</th>
+                <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3 text-right">Cost Price</th>
                 <th className="px-4 py-3 text-right">Retail Price</th>
                 <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Stock</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
-                    Loading product catalogue...
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#005BD3] mb-2" />
+                    Loading Deegayu product catalogue...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <Package className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                     No products found matching the criteria.
                   </td>
                 </tr>
               ) : (
-                products.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{p.name}</div>
-                      <div className="text-[11px] font-mono text-slate-500">{p.sku}</div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-700">
-                      {p.barcode ? (
-                        <span className="flex items-center gap-1.5 text-slate-700">
-                          <Barcode className="w-3.5 h-3.5 text-slate-400" />
-                          {p.barcode}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-slate-800 font-medium">{p.category?.name || 'Uncategorized'}</div>
-                      <div className="text-[11px] text-slate-500">{p.brand?.name || '-'}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
-                        {p.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-500">
-                      {currency} {p.costPrice.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
-                      {currency} {p.retailPrice.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {p.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                          <XCircle className="w-2.5 h-2.5" />
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {hasPermission('inventory:manage') && (
-                          <>
-                            <button
-                              onClick={() => handleOpenEditModal(p)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors"
-                              title="Edit product"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(p.id)}
-                              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
-                              title="Delete product"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
+                products.map((p) => {
+                  const stock = p.stockOnHand !== undefined ? p.stockOnHand : p.stock !== undefined ? p.stock : 0;
+                  const typeLabel = p.productType === 'STANDARD' ? 'PHARMACY' : p.productType || p.type || 'RETAIL';
+
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-semibold text-slate-900 leading-snug">{p.name}</div>
+                        <div className="font-mono text-xs text-slate-500 mt-0.5">{p.sku}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-700">
+                        {p.barcode ? (
+                          <span className="inline-flex items-center gap-1.5 text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded text-[11px]">
+                            <Barcode className="w-3.5 h-3.5 text-slate-400" />
+                            {p.barcode}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-[#005BD3] border border-blue-200/60">
+                          {p.category?.name || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          {typeLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-500">
+                        {currency} {Number(p.costPrice || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                        {currency} {Number(p.retailPrice || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {p.status === 'ACTIVE' || p.isActive ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            <XCircle className="w-2.5 h-2.5 text-slate-400" />
+                            {p.status || 'Inactive'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {stock <= 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
+                            0
+                          </span>
+                        ) : stock <= 10 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                            {stock}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            {stock.toLocaleString()}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewingProduct(p)}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+                            title="View product details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          {hasPermission('inventory:manage') && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(p)}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-[#005BD3] transition-colors"
+                                title="Edit product"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(p.id)}
+                                className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                                title="Delete product"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-4 py-3 border-t border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <span>
-            Page {page} of {totalPages} ({totalCount} total items)
+            Showing page <span className="font-bold text-slate-800">{page}</span> of{' '}
+            <span className="font-bold text-slate-800">{totalPages}</span> ({totalCount.toLocaleString()} total items)
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40"
+              disabled={page <= 1 || loading}
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40 transition-colors"
             >
               Previous
             </button>
+            <span className="px-2 py-1 font-mono text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-md">
+              {page} / {totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40"
+              disabled={page >= totalPages || loading}
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 shadow-sm disabled:opacity-40 transition-colors"
             >
               Next
             </button>
@@ -1213,6 +1286,87 @@ export default function ProductsPage() {
               >
                 {isImporting ? 'Ingesting...' : 'Import Products'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. View Product Details Modal */}
+      {viewingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3]">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{viewingProduct.name}</h3>
+                  <p className="text-xs text-slate-400 font-mono">SKU: {viewingProduct.sku}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingProduct(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Category</span>
+                <div className="font-semibold text-slate-800 mt-1">{viewingProduct.category?.name || 'Uncategorized'}</div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Barcode</span>
+                <div className="font-mono font-semibold text-slate-800 mt-1">{viewingProduct.barcode || 'N/A'}</div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Retail Price</span>
+                <div className="font-mono font-bold text-slate-900 mt-1 text-sm">{currency} {Number(viewingProduct.retailPrice || 0).toFixed(2)}</div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Cost Price</span>
+                <div className="font-mono font-semibold text-slate-600 mt-1 text-sm">{currency} {Number(viewingProduct.costPrice || 0).toFixed(2)}</div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">On-Hand Stock</span>
+                <div className="font-mono font-bold text-emerald-700 mt-1 text-sm">{Number(viewingProduct.stockOnHand ?? viewingProduct.stock ?? 0).toLocaleString()} units</div>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Status</span>
+                <div className="mt-1">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                    {viewingProduct.status || 'Active'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setViewingProduct(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Close
+              </button>
+              {hasPermission('inventory:manage') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toEdit = viewingProduct;
+                    setViewingProduct(null);
+                    handleOpenEditModal(toEdit);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004CB5] text-xs font-semibold text-white shadow-sm transition-colors flex items-center gap-1.5"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Edit Product
+                </button>
+              )}
             </div>
           </div>
         </div>
