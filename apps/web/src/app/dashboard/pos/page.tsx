@@ -38,6 +38,7 @@ import type {
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { posApi } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
+import { getCachedCatalog, saveCachedCatalog } from '../../../lib/pos-catalog-db';
 
 // =========================================================================
 // REALISTIC HIGH-END E-COMMERCE RETAIL CATALOGUE
@@ -210,6 +211,7 @@ export default function PosCheckoutPage() {
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string; count: number }[]>([]);
   const [totalProductsCount, setTotalProductsCount] = useState<number>(0);
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
+  const [isBackgroundSyncing, setIsBackgroundSyncing] = useState<boolean>(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [displayLimit, setDisplayLimit] = useState(60);
 
@@ -255,18 +257,100 @@ export default function PosCheckoutPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch real catalog from Supabase via /api/pos/catalog
+  // Instant 0ms Hydration via IndexedDB / LocalStorage + Background Sync
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initCatalog() {
+      // 1. Immediately hydrate from browser IndexedDB / LocalStorage cache (0ms instant startup)
+      try {
+        const cached = await getCachedCatalog<RetailProductItem>('deegayu');
+        if (cached && cached.products && cached.products.length > 0 && isMounted) {
+          setProducts(cached.products);
+          setCategories(cached.categories || []);
+          setTotalProductsCount(cached.total || cached.products.length);
+          setIsLoadingProducts(false); // Immediate 0ms local paint
+        }
+      } catch (cacheErr) {
+        console.warn('Local cache read error:', cacheErr);
+      }
+
+      // 2. Concurrently fetch fresh catalog from API (revalidating in background)
+      try {
+        setIsBackgroundSyncing(true);
+        const res = await fetch('/api/pos/catalog?slug=deegayu&limit=3500');
+        const json = await res.json();
+
+        if (json.success && json.data && isMounted) {
+          const freshProducts = json.data.products || [];
+          const freshCategories = json.data.categories || [];
+          const freshTotal = json.data.total || freshProducts.length;
+
+          setProducts(freshProducts);
+          setCategories(freshCategories);
+          setTotalProductsCount(freshTotal);
+          setCatalogError(null);
+
+          // Persist to local IndexedDB & LocalStorage
+          await saveCachedCatalog('deegayu', {
+            products: freshProducts,
+            categories: freshCategories,
+            total: freshTotal,
+          });
+        } else if (isMounted) {
+          setProducts((prev) => {
+            if (prev.length === 0) {
+              setCatalogError(json.error || 'Failed to load catalog');
+            }
+            return prev;
+          });
+        }
+      } catch (netErr: unknown) {
+        console.warn('Background sync error (operating offline):', netErr);
+        if (isMounted) {
+          setProducts((prev) => {
+            if (prev.length === 0) {
+              setCatalogError('Could not connect to catalog service.');
+            }
+            return prev;
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingProducts(false);
+          setIsBackgroundSyncing(false);
+        }
+      }
+    }
+
+    initCatalog();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Force Manual Refresh (Bypasses server & client cache)
   const loadCatalog = useCallback(async () => {
     try {
       setIsLoadingProducts(true);
       setCatalogError(null);
-      // Fetch up to 1500 products for high-speed client-side filtering & scanner matching
-      const res = await fetch('/api/pos/catalog?slug=deegayu&limit=1500');
+      const res = await fetch('/api/pos/catalog?slug=deegayu&limit=3500&refresh=true');
       const json = await res.json();
       if (json.success && json.data) {
-        setProducts(json.data.products || []);
-        setCategories(json.data.categories || []);
-        setTotalProductsCount(json.data.total || 0);
+        const freshProducts = json.data.products || [];
+        const freshCategories = json.data.categories || [];
+        const freshTotal = json.data.total || freshProducts.length;
+
+        setProducts(freshProducts);
+        setCategories(freshCategories);
+        setTotalProductsCount(freshTotal);
+
+        await saveCachedCatalog('deegayu', {
+          products: freshProducts,
+          categories: freshCategories,
+          total: freshTotal,
+        });
       } else {
         setCatalogError(json.error || 'Failed to load catalog');
       }
@@ -277,10 +361,6 @@ export default function PosCheckoutPage() {
       setIsLoadingProducts(false);
     }
   }, []);
-
-  useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
 
   // Recalculate cart item unit prices when pricingTier changes
   useEffect(() => {
@@ -732,8 +812,30 @@ export default function PosCheckoutPage() {
               </div>
             </form>
 
+            {/* Sync & Offline Status Indicator */}
+            {isBackgroundSyncing ? (
+              <div
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-[11px] font-semibold text-[#005BD3] shrink-0"
+                title="Synchronizing catalog with server in background..."
+              >
+                <Loader2 className="w-3 h-3 animate-spin text-[#005BD3]" />
+                <span className="hidden md:inline">Syncing...</span>
+              </div>
+            ) : totalProductsCount > 0 ? (
+              <div
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-[11px] font-semibold text-emerald-700 shrink-0"
+                title="Instant Offline-Ready IndexedDB Cache Active"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="hidden md:inline">Offline Ready</span>
+                <span className="font-mono text-[10px] text-emerald-800 bg-emerald-100/60 px-1 py-0.2 rounded">
+                  {totalProductsCount.toLocaleString()}
+                </span>
+              </div>
+            ) : null}
+
             {/* View Mode Switcher (Grid vs Table List) */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
@@ -763,41 +865,122 @@ export default function PosCheckoutPage() {
 
           {/* Minimalist Category Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            {categoryTabs.map((tab) => {
-              const isActive = selectedCategorySlug === tab.slug;
-              return (
-                <button
-                  key={tab.slug}
-                  onClick={() => setSelectedCategorySlug(tab.slug)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{tab.name}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+            {isLoadingProducts && categoryTabs.length <= 1 ? (
+              Array.from({ length: 7 }).map((_, i) => (
+                <div
+                  key={`cat-skel-${i}`}
+                  className="w-20 h-7 rounded-lg bg-slate-100 animate-pulse shrink-0 border border-slate-200/60"
+                />
+              ))
+            ) : (
+              categoryTabs.map((tab) => {
+                const isActive = selectedCategorySlug === tab.slug;
+                return (
+                  <button
+                    key={tab.slug}
+                    onClick={() => setSelectedCategorySlug(tab.slug)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
                     }`}
                   >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span>{tab.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
         {/* Catalog Body (Grid or Table) */}
         <div className="flex-1 overflow-y-auto p-3.5">
-          {isLoadingProducts ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-12 text-slate-400">
-              <Loader2 className="w-8 h-8 animate-spin text-[#005BD3] mb-3" />
-              <p className="text-sm font-semibold text-slate-700">Connecting to Deegayu Supabase Catalog...</p>
-              <p className="text-xs text-slate-400 mt-1">Loading 3,120 Ayurvedic & Pharmacy products</p>
-            </div>
-          ) : catalogError ? (
+          {isLoadingProducts && products.length === 0 ? (
+            /* ===============================================================
+               SHOPIFY POLARIS BENTO SKELETON (Instant Smooth Placeholder)
+            =============================================================== */
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col justify-between h-[216px] animate-pulse"
+                  >
+                    <div className="h-28 w-full bg-slate-100/90 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
+                      <div className="w-11 h-11 rounded-2xl bg-slate-200/70" />
+                      <div className="absolute top-2 right-2 w-16 h-4 bg-slate-200/70 rounded" />
+                    </div>
+                    <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                      <div className="space-y-1.5">
+                        <div className="w-14 h-2.5 bg-slate-200/80 rounded" />
+                        <div className="w-full h-3 bg-slate-200/80 rounded" />
+                        <div className="w-3/4 h-3 bg-slate-200/80 rounded" />
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <div className="space-y-1">
+                          <div className="w-16 h-4 bg-slate-200/80 rounded" />
+                          <div className="w-10 h-2.5 bg-slate-200/80 rounded" />
+                        </div>
+                        <div className="w-7 h-7 rounded-lg bg-slate-200/80" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Item Details</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3 text-right">Stock</th>
+                      <th className="py-2.5 px-3 text-right">Wholesale</th>
+                      <th className="py-2.5 px-3 text-right">Retail</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={`table-skel-${i}`} className="animate-pulse">
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-slate-200/80 shrink-0" />
+                            <div className="space-y-1 flex-1">
+                              <div className="w-40 h-3 bg-slate-200/80 rounded" />
+                              <div className="w-20 h-2.5 bg-slate-200/80 rounded" />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="w-16 h-3 bg-slate-200/80 rounded" />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="w-10 h-3 bg-slate-200/80 rounded ml-auto" />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="w-14 h-3 bg-slate-200/80 rounded ml-auto" />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="w-14 h-3 bg-slate-200/80 rounded ml-auto" />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="w-12 h-6 bg-slate-200/80 rounded ml-auto" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : catalogError && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 text-rose-500">
               <p className="text-sm font-semibold">{catalogError}</p>
               <button
