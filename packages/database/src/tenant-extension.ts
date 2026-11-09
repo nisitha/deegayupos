@@ -14,6 +14,11 @@ const TENANT_SCOPED_MODELS = new Set([
   'businessmembership',
   'auditlog',
   'idempotencykey',
+  'category',
+  'brand',
+  'unit',
+  'product',
+  'productvariant',
 ]);
 
 /**

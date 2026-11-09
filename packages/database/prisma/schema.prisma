@@ -49,6 +49,13 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum ProductType {
+  STANDARD
+  VARIABLE
+  SERVICE
+  BUNDLE
+}
+
 // ==========================================
 // 1. PLATFORM LAYER
 // ==========================================
@@ -105,6 +112,11 @@ model Business {
   subscriptions   Subscription[]
   auditLogs       AuditLog[]
   idempotencyKeys IdempotencyKey[]
+  categories      Category[]
+  brands          Brand[]
+  units           Unit[]
+  products        Product[]
+  productVariants ProductVariant[]
 
   @@index([slug])
   @@index([status])
@@ -392,5 +404,132 @@ model IdempotencyKey {
   @@unique([tenantId, key])
   @@index([tenantId, expiresAt])
   @@map("idempotency_keys")
+}
+
+// ==========================================
+// 6. PRODUCT & CATALOGUE LAYER
+// ==========================================
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  slug        String    @db.VarChar(255)
+  description String?   @db.Text
+  parentId    String?   @map("parent_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  business Business   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, id])
+  @@index([tenantId, parentId])
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String    @db.VarChar(255)
+  slug      String    @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  business Business  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, id])
+  @@map("brands")
+}
+
+model Unit {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String    @db.VarChar(128)
+  shortCode String    @map("short_code") @db.VarChar(32)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  business Business  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, shortCode])
+  @@index([tenantId, id])
+  @@map("units")
+}
+
+model Product {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  categoryId     String?     @map("category_id") @db.Uuid
+  brandId        String?     @map("brand_id") @db.Uuid
+  unitId         String?     @map("unit_id") @db.Uuid
+  name           String      @db.VarChar(255)
+  slug           String      @db.VarChar(255)
+  sku            String      @db.VarChar(128)
+  barcode        String?     @db.VarChar(128)
+  description    String?     @db.Text
+  type           ProductType @default(STANDARD)
+  costPrice      Decimal     @default(0.00) @map("cost_price") @db.Decimal(12, 2)
+  retailPrice    Decimal     @map("retail_price") @db.Decimal(12, 2)
+  wholesalePrice Decimal?    @map("wholesale_price") @db.Decimal(12, 2)
+  alertQuantity  Int         @default(5) @map("alert_quantity")
+  isTrackStock   Boolean     @default(true) @map("is_track_stock")
+  isActive       Boolean     @default(true) @map("is_active")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  business Business         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand    Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  unit     Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  variants ProductVariant[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, id])
+  @@index([tenantId, barcode])
+  @@index([tenantId, sku])
+  @@index([tenantId, name])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, brandId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, createdAt])
+  @@map("products")
+}
+
+model ProductVariant {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  productId   String    @map("product_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  sku         String    @db.VarChar(128)
+  barcode     String?   @db.VarChar(128)
+  costPrice   Decimal?  @map("cost_price") @db.Decimal(12, 2)
+  retailPrice Decimal?  @map("retail_price") @db.Decimal(12, 2)
+  attributes  Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  business Business @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, id])
+  @@index([tenantId, productId])
+  @@index([tenantId, barcode])
+  @@index([tenantId, sku])
+  @@map("product_variants")
 }
 

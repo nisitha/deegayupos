@@ -1,4 +1,4 @@
-import type { ApiResponse } from './api';
+import type { ApiResponse, PaginatedResult } from './api';
 import type { TenantStatus } from './tenant';
 
 /**
@@ -38,14 +38,6 @@ export interface TenantSummary {
     name: string;
     monthlyPrice: number;
   } | null;
-}
-
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
 }
 
 export type PaginatedTenantsResponse = ApiResponse<PaginatedResult<TenantSummary>>;

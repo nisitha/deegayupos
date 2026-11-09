@@ -6,5 +6,6 @@ export * from './super-admin';
 export * from './onboarding';
 export * from './dashboard';
 export * from './business';
+export * from './products';
 
 

@@ -23,6 +23,17 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
+ * Generic paginated result wrapper.
+ */
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
  * Standard API Error Response Envelope.
  */
 export interface ApiErrorResponse {

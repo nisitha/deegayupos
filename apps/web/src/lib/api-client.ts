@@ -22,6 +22,17 @@ import type {
   BusinessProfileData,
   BusinessSettingsData,
   UpdateBusinessSettingsPayload,
+  ProductDto,
+  CreateProductPayload,
+  UpdateProductPayload,
+  ProductLookupResult,
+  CategoryDto,
+  CreateCategoryPayload,
+  BrandDto,
+  CreateBrandPayload,
+  UnitDto,
+  CreateUnitPayload,
+  BulkImportResult,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -216,6 +227,54 @@ export const businessApi = {
     data: UpdateBusinessSettingsPayload,
   ): Promise<ApiResponse<BusinessSettingsData>> => {
     return apiClient.patch<BusinessSettingsData>('/business/settings', data);
+  },
+};
+
+export const productsApi = {
+  getAll: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<ProductDto>>> => {
+    return apiClient.get<PaginatedResult<ProductDto>>('/products', { params });
+  },
+  getById: async (id: string): Promise<ApiResponse<ProductDto>> => {
+    return apiClient.get<ProductDto>(`/products/${id}`);
+  },
+  lookupBarcode: async (params: {
+    barcode?: string;
+    sku?: string;
+  }): Promise<ApiResponse<ProductLookupResult>> => {
+    return apiClient.get<ProductLookupResult>('/products/lookup', { params });
+  },
+  create: async (data: CreateProductPayload): Promise<ApiResponse<ProductDto>> => {
+    return apiClient.post<ProductDto>('/products', data);
+  },
+  update: async (id: string, data: UpdateProductPayload): Promise<ApiResponse<ProductDto>> => {
+    return apiClient.patch<ProductDto>(`/products/${id}`, data);
+  },
+  delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
+    return apiClient.delete<{ success: boolean }>(`/products/${id}`);
+  },
+  getCategories: async (): Promise<ApiResponse<CategoryDto[]>> => {
+    return apiClient.get<CategoryDto[]>('/products/categories');
+  },
+  createCategory: async (data: CreateCategoryPayload): Promise<ApiResponse<CategoryDto>> => {
+    return apiClient.post<CategoryDto>('/products/categories', data);
+  },
+  getBrands: async (): Promise<ApiResponse<BrandDto[]>> => {
+    return apiClient.get<BrandDto[]>('/products/brands');
+  },
+  createBrand: async (data: CreateBrandPayload): Promise<ApiResponse<BrandDto>> => {
+    return apiClient.post<BrandDto>('/products/brands', data);
+  },
+  getUnits: async (): Promise<ApiResponse<UnitDto[]>> => {
+    return apiClient.get<UnitDto[]>('/products/units');
+  },
+  createUnit: async (data: CreateUnitPayload): Promise<ApiResponse<UnitDto>> => {
+    return apiClient.post<UnitDto>('/products/units', data);
+  },
+  bulkImport: async (products: CreateProductPayload[]): Promise<ApiResponse<BulkImportResult>> => {
+    return apiClient.post<BulkImportResult>('/products/bulk-import', { products });
+  },
+  export: async (): Promise<ApiResponse<ProductDto[]>> => {
+    return apiClient.get<ProductDto[]>('/products/export');
   },
 };
 
