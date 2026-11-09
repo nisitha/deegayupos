@@ -19,6 +19,10 @@ const TENANT_SCOPED_MODELS = new Set([
   'unit',
   'product',
   'productvariant',
+  'sale',
+  'saleitem',
+  'salepayment',
+  'heldcart',
 ]);
 
 /**

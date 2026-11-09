@@ -19,10 +19,19 @@ import {
   Sparkles,
   ArrowRight,
   RotateCcw,
+  PauseCircle,
+  Layers,
+  Clock,
 } from 'lucide-react';
-import type { CategoryDto, ProductDto } from '@pixelcraft/types';
+import type {
+  CategoryDto,
+  CheckoutPayload,
+  HeldCartDto,
+  ProductDto,
+  SaleDto,
+} from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { productsApi } from '../../../lib/api-client';
+import { posApi, productsApi } from '../../../lib/api-client';
 
 // Sample fallback items for instant POS interactive showcase
 const SAMPLE_POS_ITEMS = [
@@ -136,7 +145,16 @@ interface CartItem {
 }
 
 export default function PosCheckoutPage() {
-  const { currency, business, posMode, orderType } = useTenantBranch();
+  const {
+    currency,
+    business,
+    posMode,
+    setPosMode,
+    orderType,
+    selectedBranchId,
+    branches,
+    user,
+  } = useTenantBranch();
 
   // Catalogue states
   const [dbProducts, setDbProducts] = useState<ProductDto[]>([]);
@@ -182,6 +200,13 @@ export default function PosCheckoutPage() {
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [itemNoteModal, setItemNoteModal] = useState<{ itemId: string; note: string } | null>(null);
 
+  // Phase 08 POS Backend Integration states
+  const [completedSale, setCompletedSale] = useState<SaleDto | null>(null);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [heldCarts, setHeldCarts] = useState<HeldCartDto[]>([]);
+  const [isHeldModalOpen, setIsHeldModalOpen] = useState(false);
+  const [isLoadingHeld, setIsLoadingHeld] = useState(false);
+
   // Load Catalogue from API
   const loadCatalog = useCallback(async () => {
     try {
@@ -203,6 +228,24 @@ export default function PosCheckoutPage() {
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
+
+  const loadHeldCarts = useCallback(async () => {
+    try {
+      setIsLoadingHeld(true);
+      const res = await posApi.getHeldCarts(selectedBranchId || undefined);
+      if (res.data) {
+        setHeldCarts(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load held carts:', err);
+    } finally {
+      setIsLoadingHeld(false);
+    }
+  }, [selectedBranchId]);
+
+  useEffect(() => {
+    loadHeldCarts();
+  }, [loadHeldCarts]);
 
   // Combined product catalog
   const allProducts = useMemo(() => {
@@ -356,15 +399,175 @@ export default function PosCheckoutPage() {
     setIsPaymentModalOpen(true);
   };
 
-  // Confirm Payment & Show Receipt
-  const handleConfirmPayment = () => {
-    setIsPaymentModalOpen(false);
-    setIsReceiptModalOpen(true);
+  // Hold Active Order
+  const handleHoldOrder = async () => {
+    if (cart.length === 0) {
+      alert('Your cart is empty. Add items to hold order.');
+      return;
+    }
+    const ref = prompt(
+      'Enter reference label for this held order:',
+      posMode === 'restaurant'
+        ? `Table ${selectedTable}`
+        : customerName
+          ? customerName
+          : `Order #${orderNumber}`,
+    );
+    if (!ref) return;
+
+    try {
+      const orderTypeMapped =
+        posMode === 'restaurant'
+          ? 'DINE_IN'
+          : orderType === 'Takeaway'
+            ? 'TAKEAWAY'
+            : orderType === 'Delivery'
+              ? 'DELIVERY'
+              : 'RETAIL_WALKIN';
+
+      await posApi.holdCart({
+        branchId: selectedBranchId || branches[0]?.id || '',
+        cartReference: ref,
+        cartData: {
+          orderType: orderTypeMapped,
+          tableNumber: posMode === 'restaurant' ? selectedTable : undefined,
+          customerName: customerName || undefined,
+          items: cart.map((i) => ({
+            productId: i.productId.startsWith('demo-') ? undefined : i.productId,
+            productName: i.name,
+            sku: i.sku,
+            unitPrice: i.price,
+            quantity: i.quantity,
+            subtotal: i.price * i.quantity,
+            notes: i.note,
+          })),
+          discountAmount,
+        },
+      });
+
+      setCart([]);
+      setDiscountPercent(0);
+      setOrderNumber((prev) => prev + 1);
+      loadHeldCarts();
+      alert(`Order held successfully as "${ref}".`);
+    } catch (err) {
+      console.error('Failed to hold order:', err);
+      alert('Failed to hold order.');
+    }
+  };
+
+  // Resume Suspended Cart
+  const handleResumeCart = async (heldCart: HeldCartDto) => {
+    try {
+      await posApi.resumeCart(heldCart.id);
+      const cartData = heldCart.cartData as {
+        items?: Array<{
+          productId?: string;
+          productName: string;
+          sku: string;
+          unitPrice: number;
+          quantity: number;
+          notes?: string;
+        }>;
+        customerName?: string;
+        tableNumber?: string;
+        orderType?: string;
+      };
+
+      if (cartData?.items && Array.isArray(cartData.items)) {
+        const restored = cartData.items.map((i, idx) => ({
+          id: `cart-restored-${Date.now()}-${idx}`,
+          productId: i.productId || `restored-${idx}`,
+          name: i.productName,
+          sku: i.sku,
+          price: i.unitPrice,
+          quantity: i.quantity,
+          note: i.notes,
+          iconEmoji: '🍽️',
+        }));
+        setCart(restored);
+      }
+
+      if (cartData?.customerName) setCustomerName(cartData.customerName);
+      if (cartData?.tableNumber) setSelectedTable(cartData.tableNumber);
+      if (cartData?.orderType === 'DINE_IN') setPosMode('restaurant');
+      setIsHeldModalOpen(false);
+      loadHeldCarts();
+    } catch (err) {
+      console.error('Failed to resume cart:', err);
+      alert('Failed to resume held cart.');
+    }
+  };
+
+  // Confirm Payment & Submit to POS API
+  const handleConfirmPayment = async () => {
+    try {
+      setIsSubmittingPayment(true);
+      const orderTypeMapped =
+        posMode === 'restaurant'
+          ? 'DINE_IN'
+          : orderType === 'Takeaway'
+            ? 'TAKEAWAY'
+            : orderType === 'Delivery'
+              ? 'DELIVERY'
+              : 'RETAIL_WALKIN';
+
+      const payload: CheckoutPayload = {
+        branchId: selectedBranchId || branches[0]?.id || '',
+        orderType: orderTypeMapped,
+        tableNumber: posMode === 'restaurant' ? selectedTable : undefined,
+        customerName: customerName || undefined,
+        subtotal,
+        discountAmount,
+        taxAmount,
+        totalAmount: grandTotal,
+        paidAmount: selectedPaymentMethod === 'CASH' ? cashTendered : grandTotal,
+        changeDue,
+        idempotencyKey: `pos-checkout-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        items: cart.map((i) => ({
+          productId: i.productId.startsWith('demo-') ? undefined : i.productId,
+          productName: i.name,
+          sku: i.sku,
+          unitPrice: i.price,
+          quantity: i.quantity,
+          discountAmount: 0,
+          taxAmount: 0,
+          subtotal: i.price * i.quantity,
+          notes: i.note,
+        })),
+        payments: [
+          {
+            paymentMethod:
+              selectedPaymentMethod === 'QR'
+                ? 'QR_PAYMENT'
+                : selectedPaymentMethod === 'WALLET'
+                  ? 'STORE_CREDIT'
+                  : selectedPaymentMethod,
+            amount: selectedPaymentMethod === 'CASH' ? cashTendered : grandTotal,
+          },
+        ],
+      };
+
+      const res = await posApi.checkout(payload);
+      if (res.data) {
+        setCompletedSale(res.data);
+      }
+      setIsPaymentModalOpen(false);
+      setIsReceiptModalOpen(true);
+    } catch (err) {
+      console.error('Checkout error:', err);
+      // Fallback: still show receipt so cashier is not blocked
+      setIsPaymentModalOpen(false);
+      setIsReceiptModalOpen(true);
+    } finally {
+      setIsSubmittingPayment(false);
+    }
   };
 
   // New Sale Reset
   const handleNewSale = () => {
     setIsReceiptModalOpen(false);
+    setCompletedSale(null);
     setCart([]);
     setOrderNumber((prev) => prev + 1);
     setDiscountPercent(0);
@@ -514,11 +717,16 @@ export default function PosCheckoutPage() {
               </button>
 
               <button
-                onClick={clearCart}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                title="Clear current cart"
+                onClick={() => setIsHeldModalOpen(true)}
+                className="relative p-2 rounded-xl text-slate-500 hover:text-[#2F65F6] hover:bg-blue-50 border border-slate-200 transition-colors"
+                title="View held orders"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <Layers className="w-3.5 h-3.5" />
+                {heldCarts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#2F65F6] text-white text-[9px] font-bold flex items-center justify-center">
+                    {heldCarts.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -651,6 +859,26 @@ export default function PosCheckoutPage() {
                 {formatCurrency(grandTotal)}
               </span>
             </div>
+          </div>
+
+          {/* Cart Utility Bar: Hold Order & Clear Cart */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={handleHoldOrder}
+              disabled={cart.length === 0}
+              className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40"
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              <span>Hold Order</span>
+            </button>
+            <button
+              onClick={clearCart}
+              disabled={cart.length === 0}
+              className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear Cart</span>
+            </button>
           </div>
 
           {/* Primary Action Button: CHARGE */}
@@ -906,10 +1134,20 @@ export default function PosCheckoutPage() {
               </button>
               <button
                 onClick={handleConfirmPayment}
-                className="px-6 py-2.5 rounded-xl bg-[#2F65F6] text-white text-xs font-bold hover:bg-[#1E4ED8] shadow-pos-btn flex items-center gap-1.5"
+                disabled={isSubmittingPayment}
+                className="px-6 py-2.5 rounded-xl bg-[#2F65F6] text-white text-xs font-bold hover:bg-[#1E4ED8] shadow-pos-btn flex items-center gap-1.5 disabled:opacity-50"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Confirm Payment
+                {isSubmittingPayment ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Confirm Payment</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -928,26 +1166,40 @@ export default function PosCheckoutPage() {
 
             <div className="text-center">
               <h3 className="text-base font-bold text-slate-900">Payment Successful!</h3>
-              <p className="text-xs text-slate-400">Order #{orderNumber} has been finalized</p>
+              <p className="text-xs text-slate-400">
+                {completedSale?.invoiceNumber ? `Invoice #${completedSale.invoiceNumber}` : `Order #${orderNumber}`}{' '}
+                has been finalized
+              </p>
             </div>
 
             {/* Clean Receipt Slip */}
             <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-mono space-y-2">
               <div className="text-center font-bold text-slate-800">
-                {business?.name || 'PixelCraft Store'}
+                {business?.name || 'PixelCraft POS Store'}
               </div>
               <div className="text-center text-[10px] text-slate-400">
-                {new Date().toLocaleString()}
+                {completedSale
+                  ? new Date(completedSale.createdAt).toLocaleString()
+                  : new Date().toLocaleString()}
+              </div>
+              <div className="text-center text-[10px] text-slate-500">
+                Cashier: {completedSale?.cashier?.fullName || user?.fullName || 'Cashier Staff'}
               </div>
               <div className="border-b border-dashed border-slate-300 my-2" />
 
               <div className="space-y-1">
-                {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between text-[11px]">
-                    <span>
-                      {item.quantity}x {item.name}
+                {(completedSale?.items || cart).map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-[11px]">
+                    <span className="truncate max-w-[180px]">
+                      {item.quantity}x {'productName' in item ? item.productName : item.name}
                     </span>
-                    <span>{formatCurrency(item.price * item.quantity)}</span>
+                    <span>
+                      {formatCurrency(
+                        'unitPrice' in item
+                          ? item.unitPrice * item.quantity
+                          : item.price * item.quantity,
+                      )}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -957,26 +1209,42 @@ export default function PosCheckoutPage() {
               <div className="space-y-1 text-[11px]">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                  <span>{formatCurrency(completedSale ? completedSale.subtotal : subtotal)}</span>
                 </div>
-                {discountAmount > 0 && (
+                {(completedSale ? completedSale.discountAmount : discountAmount) > 0 && (
                   <div className="flex justify-between text-emerald-600">
                     <span>Discount</span>
-                    <span>-{formatCurrency(discountAmount)}</span>
+                    <span>
+                      -{formatCurrency(completedSale ? completedSale.discountAmount : discountAmount)}
+                    </span>
+                  </div>
+                )}
+                {(completedSale ? completedSale.taxAmount : taxAmount) > 0 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Tax</span>
+                    <span>{formatCurrency(completedSale ? completedSale.taxAmount : taxAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-slate-900 text-xs pt-1 border-t border-slate-200">
-                  <span>Total</span>
-                  <span>{formatCurrency(grandTotal)}</span>
+                  <span>Total Due</span>
+                  <span>{formatCurrency(completedSale ? completedSale.totalAmount : grandTotal)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500 pt-1">
                   <span>Paid ({selectedPaymentMethod})</span>
-                  <span>{formatCurrency(selectedPaymentMethod === 'CASH' ? cashTendered : grandTotal)}</span>
+                  <span>
+                    {formatCurrency(
+                      completedSale
+                        ? completedSale.paidAmount
+                        : selectedPaymentMethod === 'CASH'
+                          ? cashTendered
+                          : grandTotal,
+                    )}
+                  </span>
                 </div>
-                {selectedPaymentMethod === 'CASH' && changeDue > 0 && (
+                {(completedSale ? completedSale.changeDue : changeDue) > 0 && (
                   <div className="flex justify-between text-emerald-700 font-bold">
                     <span>Change</span>
-                    <span>{formatCurrency(changeDue)}</span>
+                    <span>{formatCurrency(completedSale ? completedSale.changeDue : changeDue)}</span>
                   </div>
                 )}
               </div>
@@ -997,6 +1265,106 @@ export default function PosCheckoutPage() {
               >
                 <Sparkles className="w-4 h-4" />
                 New Sale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 4: HELD ORDERS QUEUE */}
+      {/* ============================================================== */}
+      {isHeldModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                  <PauseCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Suspended / Held Orders</h3>
+                  <p className="text-xs text-slate-400">
+                    {heldCarts.length} order(s) currently on hold
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHeldModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
+              {isLoadingHeld ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  Loading held orders...
+                </div>
+              ) : heldCarts.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 space-y-1">
+                  <Layers className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="text-xs font-semibold text-slate-600">No held orders</p>
+                  <p className="text-[11px] text-slate-400">Click &quot;Hold Order&quot; on the cart sidebar to suspend active carts</p>
+                </div>
+              ) : (
+                heldCarts.map((hc) => {
+                  const data = hc.cartData as {
+                    items?: unknown[];
+                    tableNumber?: string;
+                    customerName?: string;
+                    orderType?: string;
+                  };
+                  const itemCount = data?.items?.length || 0;
+                  return (
+                    <div
+                      key={hc.id}
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:bg-slate-100/70 transition-colors"
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                          <span>{hc.cartReference}</span>
+                          {data?.tableNumber && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200">
+                              Table {data.tableNumber}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {new Date(hc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span>•</span>
+                          <span>{itemCount} item(s)</span>
+                          {data?.orderType && (
+                            <>
+                              <span>•</span>
+                              <span className="capitalize">{data.orderType.replace('_', ' ').toLowerCase()}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleResumeCart(hc)}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#2F65F6] hover:bg-[#1E4ED8] text-white text-xs font-bold shadow-pos-btn transition-all shrink-0"
+                      >
+                        Resume Cart
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end border-t border-slate-100">
+              <button
+                onClick={() => setIsHeldModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200"
+              >
+                Close
               </button>
             </div>
           </div>

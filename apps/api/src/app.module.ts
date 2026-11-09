@@ -6,6 +6,7 @@ import { BusinessModule } from './modules/business/business.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { PosModule } from './modules/pos/pos.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 
@@ -23,6 +24,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
     DashboardModule,
     BusinessModule,
     ProductsModule,
+    PosModule,
   ],
 })
 export class AppModule {}

@@ -33,6 +33,10 @@ import type {
   UnitDto,
   CreateUnitPayload,
   BulkImportResult,
+  CheckoutPayload,
+  HeldCartDto,
+  HoldCartPayload,
+  SaleDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -277,4 +281,29 @@ export const productsApi = {
     return apiClient.get<ProductDto[]>('/products/export');
   },
 };
+
+export const posApi = {
+  checkout: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
+    return apiClient.post<SaleDto>('/pos/checkout', data);
+  },
+  holdCart: async (data: HoldCartPayload): Promise<ApiResponse<HeldCartDto>> => {
+    return apiClient.post<HeldCartDto>('/pos/cart/hold', data);
+  },
+  getHeldCarts: async (branchId?: string): Promise<ApiResponse<HeldCartDto[]>> => {
+    return apiClient.get<HeldCartDto[]>('/pos/cart/held', { params: { branchId } });
+  },
+  resumeCart: async (id: string): Promise<ApiResponse<HeldCartDto>> => {
+    return apiClient.post<HeldCartDto>(`/pos/cart/resume/${id}`);
+  },
+  voidSale: async (id: string, reason: string): Promise<ApiResponse<SaleDto>> => {
+    return apiClient.post<SaleDto>(`/pos/void/${id}`, { reason });
+  },
+  getSaleById: async (id: string): Promise<ApiResponse<SaleDto>> => {
+    return apiClient.get<SaleDto>(`/pos/sales/${id}`);
+  },
+  getSales: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<SaleDto>>> => {
+    return apiClient.get<PaginatedResult<SaleDto>>('/pos/sales', { params });
+  },
+};
+
 
