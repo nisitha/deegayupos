@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Search,
   Calendar,
@@ -17,6 +18,7 @@ import {
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isPosPage = pathname === '/dashboard/pos';
 
   const {
@@ -29,14 +31,31 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   } = useTenantBranch();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [currentDateStr, setCurrentDateStr] = useState<string>('');
 
-  // Today's date formatted nicely
-  const todayFormatted = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date());
+  // Hydration-safe date formatting
+  useEffect(() => {
+    setCurrentDateStr(
+      new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date()),
+    );
+  }, []);
+
+  // Global F1 Shortcut to launch POS Terminal from anywhere
+  useEffect(() => {
+    const handleGlobalF1 = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        router.push('/dashboard/pos');
+      }
+    };
+    window.addEventListener('keydown', handleGlobalF1);
+    return () => window.removeEventListener('keydown', handleGlobalF1);
+  }, [router]);
 
   const currentBranchName =
     branches.find((b) => b.id === selectedBranchId)?.name || 'All Branches';
@@ -81,11 +100,27 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Right: Branch Switcher, Live Date, Cashier Avatar */}
-          <div className="flex items-center gap-3">
+          {/* Right: Launch POS CTA, Branch Switcher, Live Date, Cashier Avatar */}
+          <div className="flex items-center gap-2.5">
+            {/* High-Visibility "Launch POS" CTA Button */}
+            {!isPosPage && (
+              <Link
+                href="/dashboard/pos"
+                className="bg-[#005BD3] hover:bg-[#004CB5] text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-sm shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                title="Launch Retail POS Terminal (Shortcut: F1)"
+              >
+                <Store className="w-4 h-4" />
+                <span className="hidden sm:inline">Open POS Terminal</span>
+                <span className="sm:hidden">POS</span>
+                <kbd className="hidden sm:inline-block bg-blue-700/60 text-[10px] px-1.5 py-0.5 rounded text-blue-100 font-mono">
+                  F1
+                </kbd>
+              </Link>
+            )}
+
             {/* Branch Switcher Dropdown */}
             <div className="relative hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium text-slate-700">
-              <Building2 className="w-3.5 h-3.5 text-[#2F65F6]" />
+              <Building2 className="w-3.5 h-3.5 text-[#005BD3]" />
               <select
                 value={selectedBranchId || 'ALL'}
                 onChange={(e) => {
@@ -106,11 +141,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               </select>
             </div>
 
-            {/* Current Date Badge */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-600">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>{todayFormatted}</span>
-            </div>
+            {/* Current Date Badge (Hydration safe) */}
+            {currentDateStr && (
+              <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-600">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>{currentDateStr}</span>
+              </div>
+            )}
 
             {/* Notification Bell */}
             <button

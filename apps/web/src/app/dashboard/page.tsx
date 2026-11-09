@@ -11,10 +11,11 @@ import {
   PlusCircle,
   ArrowUpRight,
   Clock,
-  Layers,
   Sparkles,
   RefreshCw,
   Store,
+  FileText,
+  Boxes,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -34,8 +35,7 @@ import { useTenantBranch } from '../../context/tenant-branch-context';
 import { dashboardApi } from '../../lib/api-client';
 
 export default function DashboardPage() {
-  const { selectedBranchId, currency, hasPermission } =
-    useTenantBranch();
+  const { selectedBranchId, currency } = useTenantBranch();
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [charts, setCharts] = useState<DashboardChartsData | null>(null);
@@ -104,15 +104,16 @@ export default function DashboardPage() {
             <span>Refresh</span>
           </button>
 
-          {hasPermission('pos:access') && (
-            <Link
-              href="/dashboard/pos"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-pos-btn transition-all"
-            >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>Launch POS</span>
-            </Link>
-          )}
+          <Link
+            href="/dashboard/pos"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-pos-btn transition-all group"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>Launch POS</span>
+            <kbd className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono font-semibold text-white/90">
+              F1
+            </kbd>
+          </Link>
         </div>
       </div>
 
@@ -335,77 +336,95 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
-            {hasPermission('pos:access') && (
-              <Link
-                href="/dashboard/pos"
-                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300/60 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">
-                    <ShoppingCart className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600">Start New Sale</div>
-                    <div className="text-[11px] text-slate-500">Launch POS Checkout</div>
-                  </div>
+            {/* Action 1: Open POS Terminal */}
+            <Link
+              href="/dashboard/pos"
+              className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 hover:border-[#005BD3]/50 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#005BD3] text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Store className="w-4 h-4" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-              </Link>
-            )}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
+                    Open POS Terminal
+                  </div>
+                  <div className="text-[11px] text-slate-500">Fast Barcode Checkout</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold text-[#005BD3] bg-white border border-blue-200 rounded shadow-2xs">
+                  F1
+                </kbd>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-[#005BD3] transition-colors" />
+              </div>
+            </Link>
 
-            {hasPermission('inventory:view') && (
-              <Link
-                href="/dashboard/products"
-                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/60 border border-slate-200/80 hover:border-emerald-300/60 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
-                    <PlusCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-600">Manage Products</div>
-                    <div className="text-[11px] text-slate-500">Catalog & Barcodes</div>
-                  </div>
+            {/* Action 2: Add New Product */}
+            <Link
+              href="/dashboard/products"
+              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <PlusCircle className="w-4 h-4" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
-              </Link>
-            )}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    Add New Product
+                  </div>
+                  <div className="text-[11px] text-slate-500">SKUs, Barcodes & Variants</div>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+            </Link>
 
-            {hasPermission('pos:access') && (
-              <Link
-                href="/dashboard/tables"
-                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300/60 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">
-                    <Store className="w-4 h-4" />
+            {/* Action 3: View Stock Alerts */}
+            <Link
+              href="/dashboard/inventory"
+              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Boxes className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    View Stock Alerts
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600">Table & Floor View</div>
-                    <div className="text-[11px] text-slate-500">Dining & Room Layouts</div>
+                  <div className="text-[11px] text-slate-500">
+                    {metrics?.lowStockCount ?? 0} low-stock item(s)
                   </div>
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-              </Link>
-            )}
+              </div>
+              <div className="flex items-center gap-2">
+                {(metrics?.lowStockCount ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    {metrics?.lowStockCount} Low
+                  </span>
+                )}
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
+              </div>
+            </Link>
 
-            {hasPermission('settings:view') && (
-              <Link
-                href="/dashboard/settings"
-                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 hover:border-slate-300 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 group-hover:scale-105 transition-transform">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900">Business Settings</div>
-                    <div className="text-[11px] text-slate-500">Taxes, Invoices, Branches</div>
-                  </div>
+            {/* Action 4: Daily Sales Report */}
+            <Link
+              href="/dashboard/sales"
+              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <FileText className="w-4 h-4" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
-              </Link>
-            )}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                    Daily Sales Report
+                  </div>
+                  <div className="text-[11px] text-slate-500">Receipts & Invoices</div>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+            </Link>
           </div>
         </div>
 
@@ -440,10 +459,12 @@ export default function DashboardPage() {
                           )}
                           {' • '}
                           <span className="font-mono text-[10px] text-slate-400">
-                            {new Date(act.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {isMounted
+                              ? new Date(act.createdAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '--:--'}
                           </span>
                         </div>
                       </div>
