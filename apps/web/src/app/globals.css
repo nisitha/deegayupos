@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --background: #F4F6F9;
+  --background: #F8FAFC;
   --foreground: #0F172A;
   --color-pos-surface: #FFFFFF;
   --color-pos-border: #E2E8F0;
-  --color-pos-primary: #2F65F6;
+  --color-pos-primary: #005BD3;
   color-scheme: light;
 }
 
@@ -15,6 +15,19 @@ body {
   color: var(--foreground);
   background: var(--background);
   min-height: 100vh;
+}
+
+/* Layered Enterprise SaaS Shadows (Polaris & Stripe Dashboard standard) */
+.shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+}
+
+.shadow-card-hover {
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+}
+
+.shadow-rail {
+  box-shadow: -4px 0 24px 0 rgba(15, 23, 42, 0.03);
 }
 
 /* Custom smooth scrollbar for clean light theme */
