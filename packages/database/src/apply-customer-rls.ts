@@ -63,3 +63,4 @@ applyCustomerRls()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

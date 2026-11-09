@@ -41,6 +41,7 @@ import {
   classifyAyurvedicDepartment,
 } from '../../../lib/ayurvedic-departments';
 import { getCachedCatalog, saveCachedCatalog } from '../../../lib/pos-catalog-db';
+import { PrinterBridge } from '../../../lib/hardware/printer-bridge';
 
 // =========================================================================
 // "CONFIDENCY OS" DESIGN SYSTEM SPECIFICATION
@@ -484,6 +485,22 @@ export default function ConfidencyPosPage() {
 
       setCompletedSale(finalizedSale);
       setShowReceiptModal(true);
+
+      // Phase 13 Hardware Automation: Cash drawer kick & Auto thermal print
+      try {
+        const hw = PrinterBridge.getSettings();
+        if (
+          hw.autoOpenCashDrawer &&
+          finalizedSale.payments?.some((p) => p.paymentMethod === 'CASH')
+        ) {
+          PrinterBridge.kickCashDrawer().catch(() => {});
+        }
+        if (hw.autoPrintReceipt) {
+          PrinterBridge.printReceipt(finalizedSale).catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
       if (paymentMethod === 'STORE_CREDIT' && selectedCustomer) {
         setSelectedCustomer((prev) =>
           prev
@@ -555,6 +572,22 @@ export default function ConfidencyPosPage() {
 
       setCompletedSale(fallbackSale);
       setShowReceiptModal(true);
+
+      // Phase 13 Hardware Automation: Cash drawer kick & Auto thermal print
+      try {
+        const hw = PrinterBridge.getSettings();
+        if (
+          hw.autoOpenCashDrawer &&
+          fallbackSale.payments?.some((p) => p.paymentMethod === 'CASH')
+        ) {
+          PrinterBridge.kickCashDrawer().catch(() => {});
+        }
+        if (hw.autoPrintReceipt) {
+          PrinterBridge.printReceipt(fallbackSale).catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
       clearCart();
       resetDiscount();
     } finally {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Save,
   Printer,
@@ -60,7 +61,7 @@ export default function SettingsDocumentPage() {
       setIsSaving(true);
       setErrorMessage(null);
       await businessApi.updateReceiptSettings({
-        receiptPaperSize: paperSize,
+        receiptPaperSize: paperSize === 'A5' ? 'A4' : paperSize,
         showLogoOnReceipt: showLogo,
         showTaxDetails: showTax,
         showBarcodeOnReceipt: showBarcode,
@@ -158,7 +159,7 @@ export default function SettingsDocumentPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             Document & Receipt Settings
             <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-[#2F65F6] border border-blue-200">
-              Phase 09
+              ESC/POS & Invoicing
             </span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -166,30 +167,45 @@ export default function SettingsDocumentPage() {
           </p>
         </div>
 
-        {/* Quick Presets */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-medium">Quick Presets:</span>
-          <button
-            type="button"
-            onClick={() => applyPreset('retail')}
-            className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
-          >
-            Retail 80mm
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('cafe')}
-            className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
-          >
-            Dining 58mm
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('wholesale')}
-            className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
-          >
-            A4 Invoice
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Quick Presets */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-medium">Presets:</span>
+            <button
+              type="button"
+              onClick={() => applyPreset('retail')}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+            >
+              80mm
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset('cafe')}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+            >
+              58mm
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset('wholesale')}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+            >
+              A4
+            </button>
+          </div>
+
+          {/* Tab Navigation between Document Design and Hardware Bridge */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-semibold">
+            <div className="px-3.5 py-1.5 rounded-xl bg-white text-indigo-600 shadow-xs font-bold">
+              Receipt Template
+            </div>
+            <Link
+              href="/dashboard/settings/hardware"
+              className="px-3.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Hardware & ESC/POS
+            </Link>
+          </div>
         </div>
       </div>
 

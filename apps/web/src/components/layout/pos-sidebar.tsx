@@ -21,6 +21,7 @@ import {
   LogOut,
   Truck,
   ClipboardCheck,
+  Printer,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
@@ -93,6 +94,7 @@ export function PosSidebar() {
       items: [
         { name: 'Marketplace', href: '/dashboard/inventory', icon: Store },
         { name: 'POS', href: '/dashboard/pos', icon: Layers, isPos: true },
+        { name: 'Hardware & Printers', href: '/dashboard/settings/hardware', icon: Printer },
         { name: 'Settings', href: '/dashboard/settings', icon: Settings },
       ],
     },

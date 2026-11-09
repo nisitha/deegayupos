@@ -33,3 +33,8 @@ Thumbs.db
 !.vscode/settings.json
 .idea
 
+# External data imports
+xPOS/
+__pycache__/
+
+
