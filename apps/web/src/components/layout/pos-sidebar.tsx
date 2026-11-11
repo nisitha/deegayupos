@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -29,14 +29,54 @@ interface SidebarMenuItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-  isPos?: boolean;
+  badge?: string;
 }
 
 interface SidebarMenuSection {
   title: string;
   items: SidebarMenuItem[];
 }
+
+const MENU_SECTIONS: SidebarMenuSection[] = [
+  {
+    title: 'COMMAND',
+    items: [
+      { name: 'Overview', href: '/dashboard', icon: LayoutGrid },
+      { name: 'Live Monitor', href: '/dashboard/live', icon: Activity },
+      { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
+    ],
+  },
+  {
+    title: 'COMMERCE',
+    items: [
+      { name: 'Order Queue', href: '/dashboard/orders', icon: ShoppingBag },
+      { name: 'Catalog', href: '/dashboard/products', icon: Package },
+      { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
+      { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
+      { name: 'Pricing Engine', href: '/dashboard/pricing', icon: Tag },
+      { name: 'Customers', href: '/dashboard/customers', icon: Users },
+    ],
+  },
+  {
+    title: 'FINANCE',
+    items: [
+      { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },
+      { name: 'Payouts', href: '/dashboard/finance/payouts', icon: CreditCard },
+      { name: 'Tax Engine', href: '/dashboard/finance/tax', icon: FileText },
+    ],
+  },
+  {
+    title: 'PLATFORM',
+    items: [
+      { name: 'Marketplace', href: '/dashboard/marketplace', icon: Store },
+      { name: 'POS', href: '/dashboard/pos', icon: Layers, badge: 'POS' },
+      { name: 'Hardware & Printers', href: '/dashboard/settings/hardware', icon: Printer },
+      { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    ],
+  },
+];
+
+const ALL_HREFS = MENU_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
 
 export function PosSidebar() {
   const pathname = usePathname();
@@ -61,44 +101,26 @@ export function PosSidebar() {
   const displayName = user?.fullName || 'Dr. Deegayu';
   const userEmail = user?.email || 'owner@deegayu.pixelcraftlk.com';
 
-  const menuSections: SidebarMenuSection[] = [
-    {
-      title: 'COMMAND',
-      items: [
-        { name: 'Overview', href: '/dashboard', icon: LayoutGrid, exact: true },
-        { name: 'Live Monitor', href: '/dashboard/inventory', icon: Activity },
-        { name: 'Alerts', href: '/dashboard/settings', icon: Bell },
-      ],
+  const isItemActive = useCallback(
+    (href: string) => {
+      if (!href || href === '#') return false;
+      // Exact match for the dashboard root
+      if (href === '/dashboard') {
+        return pathname === '/dashboard';
+      }
+      // Exact match
+      if (pathname === href) {
+        return true;
+      }
+      // If another menu item matches pathname exactly, don't greedily match parent
+      if (ALL_HREFS.includes(pathname)) {
+        return false;
+      }
+      // Exact match or sub-route match with strict trailing slash boundary
+      return pathname.startsWith(`${href}/`);
     },
-    {
-      title: 'COMMERCE',
-      items: [
-        { name: 'Order Queue', href: '/dashboard/sales', icon: ShoppingBag },
-        { name: 'Catalog', href: '/dashboard/products', icon: Package },
-        { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
-        { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
-        { name: 'Pricing Engine', href: '/dashboard/products', icon: Tag },
-        { name: 'Customers', href: '/dashboard/customers', icon: Users },
-      ],
-    },
-    {
-      title: 'FINANCE',
-      items: [
-        { name: 'Revenue Desk', href: '/dashboard/sales', icon: Receipt },
-        { name: 'Payouts', href: '/dashboard/sales', icon: CreditCard },
-        { name: 'Tax Engine', href: '/dashboard/settings', icon: FileText },
-      ],
-    },
-    {
-      title: 'PLATFORM',
-      items: [
-        { name: 'Marketplace', href: '/dashboard/inventory', icon: Store },
-        { name: 'POS', href: '/dashboard/pos', icon: Layers, isPos: true },
-        { name: 'Hardware & Printers', href: '/dashboard/settings/hardware', icon: Printer },
-        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-      ],
-    },
-  ];
+    [pathname],
+  );
 
   return (
     <aside className="hidden md:flex w-[220px] lg:w-[240px] bg-white border-r border-slate-100 flex-col justify-between h-full shrink-0 select-none z-30">
@@ -140,7 +162,7 @@ export function PosSidebar() {
 
       {/* 3. Categorized Menu Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 no-scrollbar">
-        {menuSections.map((section) => (
+        {MENU_SECTIONS.map((section) => (
           <div key={section.title}>
             <div className="text-[10px] font-bold text-slate-400 tracking-wider mb-1.5 px-2.5">
               {section.title}
@@ -148,11 +170,7 @@ export function PosSidebar() {
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = item.exact
-                  ? pathname === item.href
-                  : item.isPos
-                    ? pathname === '/dashboard/pos'
-                    : pathname.startsWith(item.href) && pathname !== '/dashboard/pos';
+                const isActive = isItemActive(item.href);
 
                 return (
                   <Link
@@ -160,7 +178,7 @@ export function PosSidebar() {
                     href={item.href}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors group ${
                       isActive
-                        ? 'bg-slate-100 text-slate-900 font-bold'
+                        ? 'bg-slate-100 text-slate-900 font-semibold shadow-xs'
                         : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-medium'
                     }`}
                   >
@@ -175,7 +193,7 @@ export function PosSidebar() {
                       <span className="truncate">{item.name}</span>
                     </div>
 
-                    {item.isPos && (
+                    {item.badge && (
                       <span
                         className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
                           isActive
@@ -183,7 +201,7 @@ export function PosSidebar() {
                             : 'bg-slate-200/70 text-slate-600'
                         }`}
                       >
-                        POS
+                        {item.badge}
                       </span>
                     )}
                   </Link>

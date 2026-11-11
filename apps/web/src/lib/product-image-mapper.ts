@@ -39,3 +39,4 @@ export function getProductPhoto(product: ProductLike): string {
 
   return CATEGORY_STUDIO_PHOTOS[deptId] || CATEGORY_STUDIO_PHOTOS.general || 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80';
 }
+
