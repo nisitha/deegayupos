@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
@@ -16,6 +17,8 @@ import {
   ArrowRight,
   Percent,
   User,
+  UserPlus,
+  Plus,
   PauseCircle,
   Tag,
   Clock,
@@ -34,7 +37,7 @@ import { DiscountPickerModal } from '../../../components/pos/discount-picker-mod
 import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
 import { CustomerModal, type CustomerData } from '../../../components/pos/customer-modal';
 import { HeldTicketsModal, type HeldTicket } from '../../../components/pos/held-tickets-modal';
-import { Product3dBadge } from '../../../components/pos/product-3d-badge';
+import { getProductPhoto } from '../../../lib/product-image-mapper';
 import {
   AYURVEDIC_MASTER_DEPARTMENTS,
   AYURVEDIC_DEPARTMENT_LIST,
@@ -88,6 +91,9 @@ export default function ConfidencyPosPage() {
   const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
 
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -224,6 +230,42 @@ export default function ConfidencyPosPage() {
     });
   }, [productsWithDept, searchQuery, selectedDeptId]);
 
+  // Fast Live Autocomplete Results for Keystroke Dropdown (Top 15 Matches)
+  const liveSearchResults = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return [];
+
+    return productsWithDept
+      .filter((p) => {
+        const matchesName = p.name.toLowerCase().includes(term);
+        const matchesSku = p.sku.toLowerCase().includes(term);
+        const matchesBarcode = p.barcode ? p.barcode.toLowerCase().includes(term) : false;
+        return matchesName || matchesSku || matchesBarcode;
+      })
+      .slice(0, 15);
+  }, [productsWithDept, searchQuery]);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Update search dropdown state when query changes
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      setIsSearchDropdownOpen(true);
+      setSelectedSearchIndex(0);
+    } else {
+      setIsSearchDropdownOpen(false);
+    }
+  }, [searchQuery]);
+
   // Add Item to Cart
   const addToCart = useCallback((product: RetailProductItem & { departmentId?: string }) => {
     setCart((prevCart) => {
@@ -296,16 +338,16 @@ export default function ConfidencyPosPage() {
     setCart((prev) => prev.filter((item) => item.id !== itemId));
   };
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([]);
     setIsMobileCartOpen(false);
-  };
+  }, []);
 
-  const resetDiscount = () => {
+  const resetDiscount = useCallback(() => {
     setDiscountType('NONE');
     setDiscountPercent(0);
     setDiscountFlat(0);
-  };
+  }, []);
 
   // Financial Calculations
   const subtotal = useMemo(() => {
@@ -327,7 +369,7 @@ export default function ConfidencyPosPage() {
   const totalItemCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart]);
 
   // Hold Active Cart
-  const handleHoldTicket = () => {
+  const handleHoldTicket = useCallback(() => {
     if (cart.length === 0) return;
     const newHeld: HeldTicket = {
       id: `held-${Date.now()}`,
@@ -344,7 +386,16 @@ export default function ConfidencyPosPage() {
     resetDiscount();
     setScanFeedback(`Ticket held for ${newHeld.customerName}`);
     setTimeout(() => setScanFeedback(null), 2500);
-  };
+  }, [
+    cart,
+    selectedCustomer,
+    discountType,
+    discountPercent,
+    discountFlat,
+    totalAmount,
+    clearCart,
+    resetDiscount,
+  ]);
 
   // Restore Held Ticket
   const handleRestoreHeldTicket = (held: HeldTicket) => {
@@ -603,18 +654,24 @@ export default function ConfidencyPosPage() {
     paymentMethod,
     cashierName,
     selectedCustomer,
+    clearCart,
+    resetDiscount,
   ]);
 
-  // Keyboard shortcut listener (F2: Search Barcode, F4: Charge, Esc: Dismiss)
+  // Keyboard shortcut listener (F2: Search Barcode, F4: Hold Ticket, Esc: Dismiss)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
         searchInputRef.current?.focus();
+        if (searchQuery.trim().length > 0) {
+          setIsSearchDropdownOpen(true);
+        }
       } else if (e.key === 'F4') {
         e.preventDefault();
-        if (cart.length > 0) handleCharge();
+        if (cart.length > 0) handleHoldTicket();
       } else if (e.key === 'Escape') {
+        setIsSearchDropdownOpen(false);
         setIsEndShiftModalOpen(false);
         setIsMobileCartOpen(false);
         setIsDiscountModalOpen(false);
@@ -626,7 +683,7 @@ export default function ConfidencyPosPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, handleCharge]);
+  }, [cart, handleHoldTicket, searchQuery]);
 
   return (
     <div className="h-full w-full flex overflow-hidden bg-white select-none">
@@ -681,26 +738,22 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Tactile Cashier Action Tabs */}
-        <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar shrink-0">
-          <div className="flex items-center gap-2">
-            {/* Apply Discount Button */}
+        {/* 2. Large Tactile Cashier Action Tabs (h-14 md:h-16, 4-column responsive grid) */}
+        <div className="px-5 pt-3.5 pb-2 bg-slate-50/50 border-b border-slate-100 shrink-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+            {/* Tab 1: Apply Discount */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
-                discountType !== 'NONE'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                  : 'bg-white hover:bg-emerald-50/80 text-emerald-700 border-emerald-200/90 shadow-2xs'
-              }`}
+              className="h-14 md:h-16 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-emerald-400 cursor-pointer px-3 select-none"
             >
-              <Percent className="w-3.5 h-3.5" />
-              <span>
+              <Percent className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
+              <span className="truncate">
                 {discountType === 'PERCENT'
                   ? `${discountPercent}% Applied`
                   : discountType === 'FLAT'
-                  ? `LKR ${discountFlat} Applied`
-                  : '% Add Discount'}
+                  ? `LKR ${discountFlat} Off`
+                  : 'Apply Discount'}
               </span>
               {discountType !== 'NONE' && (
                 <span
@@ -708,27 +761,23 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     resetDiscount();
                   }}
-                  className="ml-1 hover:text-white/80 p-0.5 rounded-full hover:bg-emerald-700"
+                  className="ml-1 hover:bg-emerald-700/80 p-1 rounded-full transition-colors"
                   title="Remove discount"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5 text-white" />
                 </span>
               )}
             </button>
 
-            {/* Add Customer Button */}
+            {/* Tab 2: Add Customer */}
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border cursor-pointer ${
-                selectedCustomer
-                  ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
-                  : 'bg-white hover:bg-sky-50/80 text-sky-700 border-sky-200/90 shadow-2xs'
-              }`}
+              className="h-14 md:h-16 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-sky-500 cursor-pointer px-3 select-none"
             >
-              <User className="w-3.5 h-3.5" />
-              <span className="max-w-[130px] truncate">
-                {selectedCustomer ? selectedCustomer.name : '+ Add Customer'}
+              <UserPlus className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
+              <span className="truncate">
+                {selectedCustomer ? selectedCustomer.name : 'Customer (Walk-in)'}
               </span>
               {selectedCustomer && (
                 <span
@@ -736,94 +785,221 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     setSelectedCustomer(null);
                   }}
-                  className="ml-1 hover:text-white/80 p-0.5 rounded-full hover:bg-sky-700"
+                  className="ml-1 hover:bg-sky-800/80 p-1 rounded-full transition-colors"
                   title="Remove customer"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5 text-white" />
                 </span>
               )}
             </button>
 
-            {/* Hold Ticket Button */}
+            {/* Tab 3: Hold Ticket [F4] */}
             <button
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border bg-white hover:bg-amber-50/80 text-amber-700 border-amber-200/90 shadow-2xs disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              className="h-14 md:h-16 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-amber-400 disabled:opacity-50 disabled:pointer-events-none cursor-pointer px-3 select-none"
             >
-              <PauseCircle className="w-3.5 h-3.5" />
-              <span>⏸ Hold Ticket</span>
+              <PauseCircle className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
+              <span className="truncate">Hold Ticket [F4]</span>
             </button>
 
-            {/* Custom Sale Button */}
+            {/* Tab 4: Custom Sale Item */}
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 border bg-white hover:bg-purple-50/80 text-[#7052FF] border-purple-200/90 shadow-2xs cursor-pointer"
+              className="h-14 md:h-16 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-purple-500 cursor-pointer px-3 select-none"
             >
-              <Tag className="w-3.5 h-3.5" />
-              <span>+ Custom Item</span>
+              <Tag className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
+              <span className="truncate">+ Custom Item</span>
             </button>
           </div>
 
-          {/* Held Tickets Queue Link */}
+          {/* Held Tickets Banner (if tickets are held) */}
           {heldTickets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setIsHeldTicketsModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-amber-300 bg-amber-100/90 text-amber-900 hover:bg-amber-200 transition-all active:scale-95 shrink-0 shadow-2xs"
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>Held Tickets ({heldTickets.length})</span>
-            </button>
+            <div className="mb-1.5 flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-900 text-xs">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                <span className="font-semibold">
+                  {heldTickets.length} ticket{heldTickets.length > 1 ? 's' : ''} currently on hold
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHeldTicketsModalOpen(true)}
+                className="font-bold underline hover:text-amber-950 cursor-pointer"
+              >
+                View & Resume &rarr;
+              </button>
+            </div>
           )}
         </div>
 
-        {/* 3. Hero Search Station (52px Expansive Bar with Barcode [F2] Tag) */}
-        <div className="px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-          <div className="relative flex items-center">
-            {/* Search Icon Accent */}
-            <div className="absolute left-4 flex items-center gap-2 pointer-events-none">
-              <div className="w-6 h-6 rounded-lg bg-purple-50 text-[#7052FF] flex items-center justify-center">
-                <Search className="w-3.5 h-3.5" />
-              </div>
+        {/* 3. Hero Search Station with Live Keystroke Autocomplete Dropdown */}
+        <div className="px-5 py-3 border-b border-slate-100 bg-white shrink-0" ref={searchContainerRef}>
+          <div className="relative w-full mb-1">
+            {/* Left: Magnifying Glass Icon (w-6 h-6 text-slate-400) */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none z-10">
+              <Search className="w-6 h-6 text-slate-400" />
             </div>
 
-            {/* Expansive 52px Input */}
+            {/* Expansive Input (h-14 md:h-16 text-base md:text-lg font-medium px-14 rounded-2xl border-2 border-slate-200 bg-white shadow-sm focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all) */}
             <input
               ref={searchInputRef}
               type="text"
               placeholder="Search 3,120 Ayurvedic medicines, oils, churnas, or scan barcode [F2]..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-13 pl-14 pr-48 text-xs sm:text-sm font-medium rounded-2xl bg-slate-50/80 border border-slate-200/90 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all shadow-xs"
+              onFocus={() => {
+                if (searchQuery.trim().length > 0) setIsSearchDropdownOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  if (!isSearchDropdownOpen && liveSearchResults.length > 0) {
+                    setIsSearchDropdownOpen(true);
+                    setSelectedSearchIndex(0);
+                  } else {
+                    setSelectedSearchIndex((prev) => (prev < liveSearchResults.length - 1 ? prev + 1 : 0));
+                  }
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setSelectedSearchIndex((prev) => (prev > 0 ? prev - 1 : liveSearchResults.length - 1));
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (isSearchDropdownOpen && liveSearchResults.length > 0 && liveSearchResults[selectedSearchIndex]) {
+                    addToCart(liveSearchResults[selectedSearchIndex]);
+                    searchInputRef.current?.focus();
+                  }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setIsSearchDropdownOpen(false);
+                  searchInputRef.current?.blur();
+                }
+              }}
+              className="w-full h-14 md:h-16 text-base md:text-lg font-medium pl-14 pr-44 rounded-2xl border-2 border-slate-200 bg-white shadow-sm focus:outline-none focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all text-slate-900 placeholder:text-slate-400"
             />
 
-            {/* Right Action Icons & Badges */}
-            <div className="absolute right-3.5 flex items-center gap-2">
+            {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="w-6 h-6 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsSearchDropdownOpen(false);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="w-7 h-7 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
                   title="Clear search"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
 
-              {/* Barcode F2 Badge */}
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 shadow-2xs text-[11px] font-mono text-slate-500">
-                <Barcode className="w-3.5 h-3.5 text-[#7052FF]" />
-                <span className="font-semibold text-slate-700">F2</span>
+              {/* Barcode [F2] Tag */}
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs text-xs font-mono text-slate-500">
+                <Barcode className="w-4 h-4 text-[#7052FF]" />
+                <span className="font-semibold text-slate-700">[F2]</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
 
               {/* Live Count Badge */}
-              <div className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
+              <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl shrink-0">
                 {filteredProducts.length.toLocaleString()} items
               </div>
             </div>
+
+            {/* Floating Live Autocomplete Dropdown Popover */}
+            {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[380px] overflow-y-auto z-50 divide-y divide-slate-100">
+                {liveSearchResults.length > 0 ? (
+                  liveSearchResults.map((item, idx) => {
+                    const isSelected = idx === selectedSearchIndex;
+                    return (
+                      <div
+                        key={item.id}
+                        onMouseEnter={() => setSelectedSearchIndex(idx)}
+                        onClick={() => {
+                          addToCart(item);
+                          searchInputRef.current?.focus();
+                        }}
+                        className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-purple-50/80' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* Thumbnail & Product Meta */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-slate-50 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200/80 p-0.5">
+                            <img
+                              src={getProductPhoto(item)}
+                              alt={item.name}
+                              className="w-full h-full object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                                {item.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                {item.sku}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                              <span className="capitalize">{item.category?.name || 'Ayurvedic'}</span>
+                              <span>•</span>
+                              <span
+                                className={
+                                  item.stockOnHand <= 5
+                                    ? 'text-amber-600 font-semibold'
+                                    : 'text-emerald-600 font-semibold'
+                                }
+                              >
+                                In Stock: {item.stockOnHand}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Price Badge & Instant Add Button */}
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm">
+                            LKR{' '}
+                            {item.retailPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(item);
+                              searchInputRef.current?.focus();
+                            }}
+                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-[#7052FF] text-white text-xs font-semibold rounded-lg transition-colors active:scale-95 flex items-center gap-1 shadow-2xs cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-sm font-semibold text-slate-700">
+                      No products found matching &ldquo;{searchQuery}&rdquo;
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Try searching by generic name, brand, or SKU barcode.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -949,19 +1125,14 @@ export default function ConfidencyPosPage() {
                       )}
                     </div>
 
-                    {/* Centered Floating 3D Product Visual */}
-                    <div className="h-28 w-full bg-slate-50/70 rounded-xl flex items-center justify-center relative overflow-hidden group-hover:bg-slate-100/60 transition-colors">
-                      {product.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          loading="lazy"
-                          className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <Product3dBadge departmentId={product.departmentId} size="md" />
-                      )}
+                    {/* High-Contrast Realistic Product Photo Container */}
+                    <div className="w-full h-32 relative bg-slate-50/80 rounded-2xl overflow-hidden mb-3 flex items-center justify-center p-2 group-hover:bg-slate-100 transition-colors">
+                      <img
+                        src={getProductPhoto(product)}
+                        alt={product.name}
+                        className="w-full h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
+                        loading="lazy"
+                      />
                     </div>
 
                     {/* Product Title, Department Subtitle & Price */}
@@ -1056,14 +1227,14 @@ export default function ConfidencyPosPage() {
           ) : (
             cart.map((item) => (
               <div key={item.id} className="py-3 flex items-center justify-between gap-3 group">
-                {/* 36x36px rounded squircle image / 3D badge preview */}
-                <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                  {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt="" className="w-full h-full object-contain p-0.5" />
-                  ) : (
-                    <Product3dBadge departmentId={item.departmentId} size="sm" />
-                  )}
+                {/* Rounded squircle realistic product photo preview */}
+                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
+                  <img
+                    src={getProductPhoto(item)}
+                    alt={item.name}
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                  />
                 </div>
 
                 {/* Name & Unit Price */}
