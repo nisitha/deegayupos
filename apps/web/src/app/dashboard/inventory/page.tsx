@@ -651,71 +651,71 @@ export default function InventoryPage() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Product & SKU</th>
-                    <th className="py-3 px-4">Warehouse & Branch</th>
-                    <th className="py-3 px-4 text-right">Stock On Hand</th>
-                    <th className="py-3 px-4 text-right">Reserved</th>
-                    <th className="py-3 px-4 text-right">Reorder Pt</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3.5 px-4">Product & SKU</th>
+                    <th className="py-3.5 px-4">Warehouse & Branch</th>
+                    <th className="py-3.5 px-4 text-right">Stock On Hand</th>
+                    <th className="py-3.5 px-4 text-right">Reserved</th>
+                    <th className="py-3.5 px-4 text-right">Reorder Pt</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
+                <tbody className="divide-y divide-slate-100 text-sm">
                   {filteredLevels.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={7} className="py-12 text-center text-slate-500">
                         No inventory records matching your query criteria.
                       </td>
                     </tr>
                   ) : (
                     filteredLevels.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-slate-800">
-                          <div>{item.productName}</div>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 font-mono">
+                        <td className="py-3.5 px-4 font-semibold text-slate-900">
+                          <div className="text-sm font-semibold text-slate-900 leading-snug">{item.productName}</div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-mono">
                             <span>SKU: {item.sku}</span>
                             {item.barcode && <span>• {item.barcode}</span>}
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-600">
-                          <div className="font-medium text-slate-800 flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                        <td className="py-3.5 px-4 text-slate-700">
+                          <div className="font-medium text-slate-900 flex items-center gap-1.5 text-sm">
+                            <Building2 className="w-4 h-4 text-slate-400" />
                             {item.warehouseName || 'Main Storage'}
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
+                          <div className="text-xs text-slate-500 mt-0.5">
                             {item.branchName || 'Primary Branch'}
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-black text-slate-900 text-sm">
-                          {item.quantityOnHand} <span className="text-[11px] font-normal text-slate-500">{item.unit || 'pcs'}</span>
+                        <td className="py-3.5 px-4 text-right font-black text-slate-950 text-sm md:text-base font-mono">
+                          {item.quantityOnHand} <span className="text-xs font-normal text-slate-500 font-sans">{item.unit || 'pcs'}</span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-medium text-slate-500">
-                          {item.quantityReserved} {item.unit || 'pcs'}
+                        <td className="py-3.5 px-4 text-right font-medium text-slate-600 font-mono text-sm">
+                          {item.quantityReserved} <span className="text-xs font-normal text-slate-500 font-sans">{item.unit || 'pcs'}</span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono text-slate-500">
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-700 font-medium text-sm">
                           {item.reorderPoint}
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
                           {item.status === 'IN_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               In Stock
                             </span>
                           )}
                           {item.status === 'LOW_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               Low Stock
                             </span>
                           )}
                           {item.status === 'OUT_OF_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                               Out of Stock
                             </span>
                           )}
@@ -724,7 +724,7 @@ export default function InventoryPage() {
                         <td className="py-3.5 px-4 text-right space-x-2">
                           <button
                             onClick={() => setLedgerItem(item)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-all"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all"
                             title="View Stock Movement Audit History"
                           >
                             <History className="w-3.5 h-3.5 text-slate-500" />
@@ -734,7 +734,7 @@ export default function InventoryPage() {
                           {hasPermission('inventory:manage') && (
                             <button
                               onClick={() => handleOpenAdjustment(item)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-all"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-all border border-blue-200"
                               title="Apply physical count adjustment or damage deduction"
                             >
                               <Sliders className="w-3.5 h-3.5 text-blue-600" />
@@ -772,39 +772,39 @@ export default function InventoryPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Tracking #</th>
-                    <th className="py-3 px-4">Source Warehouse</th>
-                    <th className="py-3 px-4">Destination Warehouse</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4">Created</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3.5 px-4">Tracking #</th>
+                    <th className="py-3.5 px-4">Source Warehouse</th>
+                    <th className="py-3.5 px-4">Destination Warehouse</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4">Created</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
+                <tbody className="divide-y divide-slate-100 text-sm">
                   {transfers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <td colSpan={6} className="py-12 text-center text-slate-500">
                         No active branch transfers recorded. Click &quot;New Transfer&quot; to initiate stock movement.
                       </td>
                     </tr>
                   ) : (
                     transfers.map((trf) => (
                       <tr key={trf.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600 text-sm">
                           {trf.trackingNumber}
                         </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-800">
+                        <td className="py-3.5 px-4 font-medium text-slate-900 text-sm">
                           {trf.sourceWarehouseName || 'Source Storage'}
                         </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-800">
+                        <td className="py-3.5 px-4 font-medium text-slate-900 text-sm">
                           {trf.targetWarehouseName || 'Destination Storage'}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                               trf.status === 'PENDING'
                                 ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                 : trf.status === 'DISPATCHED'
@@ -817,14 +817,14 @@ export default function InventoryPage() {
                             {trf.status}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">
+                        <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
                           {new Date(trf.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-3.5 px-4 text-right space-x-2">
                           {trf.status === 'PENDING' && hasPermission('inventory:manage') && (
                             <button
                               onClick={() => handleDispatch(trf.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-all"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs"
                             >
                               <Send className="w-3.5 h-3.5" />
                               Dispatch
@@ -833,7 +833,7 @@ export default function InventoryPage() {
                           {trf.status === 'DISPATCHED' && hasPermission('inventory:manage') && (
                             <button
                               onClick={() => handleReceive(trf.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-all"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
                             >
                               <Download className="w-3.5 h-3.5" />
                               Receive

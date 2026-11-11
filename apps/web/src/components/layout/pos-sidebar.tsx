@@ -123,18 +123,18 @@ export function PosSidebar() {
   );
 
   return (
-    <aside className="hidden md:flex w-[220px] lg:w-[240px] bg-white border-r border-slate-100 flex-col justify-between h-full shrink-0 select-none z-30">
+    <aside className="hidden md:flex w-[240px] lg:w-[260px] bg-white border-r border-slate-100 flex-col justify-between h-full shrink-0 select-none z-30">
       {/* 1. Brand Header */}
       <div className="p-4 pb-3 border-b border-slate-50">
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="bg-[#7052FF] text-white font-bold rounded-xl w-9 h-9 flex items-center justify-center shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+          <div className="bg-[#7052FF] text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform">
             <span>{initial}</span>
           </div>
           <div className="min-w-0">
-            <h2 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-[#7052FF] transition-colors">
+            <h2 className="text-sm font-bold text-slate-900 truncate leading-tight group-hover:text-[#7052FF] transition-colors">
               {businessName}
             </h2>
-            <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+            <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
               Ayurvedic Pharmacy OS
             </p>
           </div>
@@ -142,18 +142,18 @@ export function PosSidebar() {
 
         {/* 2. Sleek Command Search Input */}
         <div className="mt-3 relative">
-          <div className="w-full bg-slate-50 border border-slate-200/80 text-xs px-2.5 py-1.5 rounded-xl text-slate-400 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <div className="w-full bg-slate-50 border border-slate-200/80 text-sm px-3 py-2 rounded-xl text-slate-400 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
               />
             </div>
-            <kbd className="text-[9px] font-mono bg-white border border-slate-200/80 px-1 py-0.2 rounded text-slate-400 shadow-2xs shrink-0">
+            <kbd className="text-[10px] font-mono bg-white border border-slate-200/80 px-1.5 py-0.5 rounded text-slate-500 shadow-2xs shrink-0 font-medium">
               ⌘K
             </kbd>
           </div>
@@ -164,7 +164,7 @@ export function PosSidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 no-scrollbar">
         {MENU_SECTIONS.map((section) => (
           <div key={section.title}>
-            <div className="text-[10px] font-bold text-slate-400 tracking-wider mb-1.5 px-2.5">
+            <div className="text-xs font-bold tracking-wider text-slate-500 mb-2 px-3 uppercase">
               {section.title}
             </div>
             <div className="space-y-0.5">
@@ -176,15 +176,15 @@ export function PosSidebar() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors group ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors group ${
                       isActive
-                        ? 'bg-slate-100 text-slate-900 font-semibold shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-medium'
+                        ? 'bg-slate-100 text-slate-900 font-bold shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon
-                        className={`w-4 h-4 shrink-0 transition-colors ${
+                        className={`w-[18px] h-[18px] shrink-0 transition-colors ${
                           isActive
                             ? 'text-[#7052FF]'
                             : 'text-slate-400 group-hover:text-slate-700'
@@ -195,7 +195,7 @@ export function PosSidebar() {
 
                     {item.badge && (
                       <span
-                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                           isActive
                             ? 'bg-[#7052FF] text-white'
                             : 'bg-slate-200/70 text-slate-600'
@@ -215,15 +215,15 @@ export function PosSidebar() {
       {/* 4. Bottom User Profile & Sign Out */}
       <div className="p-3 border-t border-slate-100 bg-white">
         <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7052FF] to-[#9B82FF] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#7052FF] to-[#9B82FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
               {displayName.charAt(0)}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">
+              <div className="text-sm font-bold text-slate-900 truncate">
                 {displayName}
               </div>
-              <div className="text-[10px] text-slate-400 font-mono truncate">
+              <div className="text-xs text-slate-500 font-mono truncate">
                 {userEmail}
               </div>
             </div>
@@ -232,10 +232,10 @@ export function PosSidebar() {
           <button
             type="button"
             onClick={handleLogout}
-            className="p-1 text-slate-400 hover:text-rose-600 transition-colors rounded-lg"
+            className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-lg"
             title="Sign out of POS session"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>

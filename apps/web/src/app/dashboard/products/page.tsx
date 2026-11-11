@@ -525,31 +525,31 @@ export default function ProductsPage() {
       {/* 3. Products Data Table */}
       <div className="rounded-2xl bg-white border border-slate-200/80 shadow-pos-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-semibold border-b border-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider text-xs font-bold border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3">Product Name & SKU</th>
-                <th className="px-4 py-3">Barcode</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3 text-right">Cost Price</th>
-                <th className="px-4 py-3 text-right">Retail Price</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center">Stock</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3.5">Product Name & SKU</th>
+                <th className="px-4 py-3.5">Barcode</th>
+                <th className="px-4 py-3.5">Category</th>
+                <th className="px-4 py-3.5">Type</th>
+                <th className="px-4 py-3.5 text-right">Cost Price</th>
+                <th className="px-4 py-3.5 text-right">Retail Price</th>
+                <th className="px-4 py-3.5 text-center">Status</th>
+                <th className="px-4 py-3.5 text-center">Stock</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#005BD3] mb-2" />
                     Loading Deegayu product catalogue...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-500">
                     <Package className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                     No products found matching the criteria.
                   </td>
@@ -561,13 +561,13 @@ export default function ProductsPage() {
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5">
                         <div className="text-sm font-semibold text-slate-900 leading-snug">{p.name}</div>
                         <div className="font-mono text-xs text-slate-500 mt-0.5">{p.sku}</div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-slate-700">
+                      <td className="px-4 py-3.5 font-mono text-slate-700">
                         {p.barcode ? (
-                          <span className="inline-flex items-center gap-1.5 text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-md text-xs">
                             <Barcode className="w-3.5 h-3.5 text-slate-400" />
                             {p.barcode}
                           </span>
@@ -575,58 +575,58 @@ export default function ProductsPage() {
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-[#005BD3] border border-blue-200/60">
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-[#005BD3] border border-blue-200/60">
                           {p.category?.name || 'Uncategorized'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                           {typeLabel}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-500">
+                      <td className="px-4 py-3.5 text-right font-mono text-sm text-slate-600">
                         {currency} {Number(p.costPrice || 0).toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                      <td className="px-4 py-3.5 text-right font-mono text-sm font-bold text-slate-950">
                         {currency} {Number(p.retailPrice || 0).toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         {p.status === 'ACTIVE' || p.isActive ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                            <XCircle className="w-2.5 h-2.5 text-slate-400" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            <XCircle className="w-3 h-3 text-slate-400" />
                             {p.status || 'Inactive'}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         {stock <= 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
                             0
                           </span>
                         ) : stock <= 10 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
                             {stock}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                             {stock.toLocaleString()}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingProduct(p)}
                             className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
                             title="View product details"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                           </button>
                           {hasPermission('inventory:manage') && (
                             <>
@@ -635,14 +635,14 @@ export default function ProductsPage() {
                                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-[#005BD3] transition-colors"
                                 title="Edit product"
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
+                                <Edit2 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(p.id)}
                                 className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
                                 title="Delete product"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </>
                           )}

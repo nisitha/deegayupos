@@ -1009,7 +1009,7 @@ export default function ConfidencyPosPage() {
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+            className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
               selectedDeptId === 'all'
                 ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                 : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/80'
@@ -1017,8 +1017,8 @@ export default function ConfidencyPosPage() {
           >
             <span>All Products (සියලු වර්ග)</span>
             <span
-              className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                selectedDeptId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                selectedDeptId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
               }`}
             >
               {departmentCounts.all || 0}
@@ -1035,7 +1035,7 @@ export default function ConfidencyPosPage() {
                 key={dept.id}
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+                className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
                   isActive
                     ? `${dept.bgTint} ${dept.textColor} ${dept.borderTint} font-bold ring-2 ring-[#7052FF]/30 shadow-xs`
                     : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/70'
@@ -1046,11 +1046,11 @@ export default function ConfidencyPosPage() {
                   className={`w-2.5 h-2.5 rounded-full bg-gradient-to-br ${dept.gradient} shadow-2xs shrink-0`}
                 />
                 <span className="whitespace-nowrap">
-                  {dept.en} <span className="opacity-75 font-normal text-[11px]">({dept.si})</span>
+                  {dept.en} <span className="opacity-80 font-normal text-xs">({dept.si})</span>
                 </span>
                 <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                    isActive ? 'bg-white/80 font-bold' : 'bg-slate-100 text-slate-500'
+                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
+                    isActive ? 'bg-white/90 font-bold' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {count}
@@ -1110,16 +1110,16 @@ export default function ConfidencyPosPage() {
                     {/* Top Row: Department Sinhala Pill + Stock Indicator */}
                     <div className="flex items-center justify-between mb-2">
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
+                        className={`text-xs font-semibold px-2.5 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
                       >
                         {dept.si}
                       </span>
                       {product.stockOnHand <= 5 ? (
-                        <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                           {product.stockOnHand} left
                         </span>
                       ) : (
-                        <span className="text-[10px] font-mono text-slate-400">
+                        <span className="text-xs font-mono font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60">
                           Qty: {product.stockOnHand}
                         </span>
                       )}
@@ -1138,15 +1138,15 @@ export default function ConfidencyPosPage() {
                     {/* Product Title, Department Subtitle & Price */}
                     <div className="mt-3">
                       <h4
-                        className="text-xs font-semibold text-slate-800 line-clamp-2 min-h-[32px] group-hover:text-slate-950 transition-colors leading-snug"
+                        className="text-sm md:text-base font-bold text-slate-900 line-clamp-2 min-h-[38px] group-hover:text-[#7052FF] transition-colors leading-snug"
                         title={product.name}
                       >
                         {product.name}
                       </h4>
-                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                      <div className="text-xs text-slate-600 font-medium truncate mt-0.5">
                         {dept.en}
                       </div>
-                      <div className="text-xs font-black text-slate-900 mt-1.5 font-mono">
+                      <div className="text-sm md:text-base font-black text-slate-950 mt-1.5 font-mono">
                         LKR{' '}
                         {product.retailPrice.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -1169,8 +1169,8 @@ export default function ConfidencyPosPage() {
         {/* 1. Cart Header */}
         <div className="h-14 px-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-800">Order Summary</h3>
-            <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            <h3 className="text-sm md:text-base font-bold text-slate-900">Order Summary</h3>
+            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
               {totalItemCount}
             </span>
           </div>
@@ -1179,7 +1179,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={clearCart}
-              className="text-rose-500 hover:text-rose-600 text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-rose-600 hover:text-rose-700 text-xs md:text-sm font-semibold flex items-center gap-1 cursor-pointer transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Reset Order</span>
@@ -1191,15 +1191,15 @@ export default function ConfidencyPosPage() {
         {selectedCustomer && (
           <div className="px-5 py-2.5 bg-sky-50/60 border-b border-sky-100 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-md bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
-                <User className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4" />
               </div>
               <div className="truncate">
-                <div className="text-xs font-bold text-sky-950 truncate">
+                <div className="text-xs md:text-sm font-bold text-sky-950 truncate">
                   {selectedCustomer.name}
                 </div>
                 {selectedCustomer.loyaltyPoints ? (
-                  <div className="text-[10px] text-sky-700 font-mono">
+                  <div className="text-xs text-sky-700 font-mono font-medium">
                     Loyalty: {selectedCustomer.loyaltyPoints} pts
                   </div>
                 ) : null}
@@ -1221,8 +1221,8 @@ export default function ConfidencyPosPage() {
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
               <ShoppingBag className="w-10 h-10 mb-2 opacity-20 text-slate-400" />
-              <p className="text-xs font-semibold text-slate-700">No items selected</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Click any product in the catalog</p>
+              <p className="text-sm font-semibold text-slate-700">No items selected</p>
+              <p className="text-xs text-slate-400 mt-0.5">Click any product in the catalog</p>
             </div>
           ) : (
             cart.map((item) => (
@@ -1239,16 +1239,16 @@ export default function ConfidencyPosPage() {
 
                 {/* Name & Unit Price */}
                 <div className="min-w-0 flex-1">
-                  <h5 className="text-xs font-medium text-slate-900 truncate max-w-[130px]">
+                  <h5 className="text-sm font-bold text-slate-900 truncate leading-snug max-w-[140px]">
                     {item.name}
                   </h5>
-                  <div className="text-[11px] text-slate-400 font-mono">
+                  <div className="text-xs text-slate-500 font-mono font-medium">
                     LKR {item.price.toFixed(2)}
                   </div>
                 </div>
 
                 {/* Stepper Quantity Controls: - [qty] + */}
-                <div className="text-xs text-slate-600 font-mono flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60 shrink-0">
+                <div className="text-sm text-slate-800 font-mono font-bold flex items-center gap-2.5 bg-slate-100/80 px-2.5 py-1 rounded-xl border border-slate-200/60 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
@@ -1268,7 +1268,7 @@ export default function ConfidencyPosPage() {
 
                 {/* Line Total & Delete */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-semibold text-slate-900 font-mono">
+                  <span className="text-sm font-semibold text-slate-900 font-mono">
                     LKR {(item.price * item.quantity).toFixed(2)}
                   </span>
                   <button
@@ -1286,21 +1286,21 @@ export default function ConfidencyPosPage() {
 
         {/* 4. Financial Breakdown Summary */}
         <div className="p-5 border-t border-slate-100 bg-white space-y-3">
-          <div className="space-y-1.5 text-xs font-mono">
-            <div className="flex justify-between text-slate-500">
-              <span>Subtotal</span>
-              <span>LKR {subtotal.toFixed(2)}</span>
+          <div className="space-y-1.5 font-mono">
+            <div className="flex justify-between text-sm text-slate-600">
+              <span className="font-sans font-medium">Subtotal</span>
+              <span className="font-bold">LKR {subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Tax (0% / Ex)</span>
+            <div className="flex justify-between text-sm text-slate-600">
+              <span className="font-sans font-medium">Tax (0% / Ex)</span>
               <span>LKR 0.00</span>
             </div>
 
             {/* Discount Line */}
             {discountType !== 'NONE' && (
-              <div className="flex justify-between items-center text-emerald-600 font-semibold">
+              <div className="flex justify-between items-center text-emerald-600 font-semibold text-sm">
                 <span className="flex items-center gap-1 font-sans">
-                  <Percent className="w-3 h-3" />
+                  <Percent className="w-3.5 h-3.5" />
                   <span>
                     Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})
                   </span>
@@ -1313,7 +1313,7 @@ export default function ConfidencyPosPage() {
                     className="text-rose-400 hover:text-rose-600 p-0.5"
                     title="Remove discount"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -1331,9 +1331,14 @@ export default function ConfidencyPosPage() {
               </button>
             )}
 
-            <div className="pt-2 border-t border-slate-100 flex justify-between text-sm font-bold text-slate-900">
-              <span>Total</span>
-              <span className="text-base text-slate-900 font-black">
+            <div className="pt-3 border-t border-slate-200/80 flex items-baseline justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500">
+                  Total Payable
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">Net Due (LKR)</span>
+              </div>
+              <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-slate-950">
                 LKR {totalAmount.toFixed(2)}
               </span>
             </div>
@@ -1341,10 +1346,10 @@ export default function ConfidencyPosPage() {
 
           {/* 5. Payment Method Segmented Control */}
           <div className="pt-1">
-            <label className="text-xs font-semibold text-slate-800 block mb-2">
+            <label className="text-xs md:text-sm font-bold text-slate-800 block mb-2">
               Payment Method
             </label>
-            <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
+            <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
               {[
                 { id: 'CARD', label: 'Card', icon: CreditCard },
                 { id: 'CASH', label: 'Cash', icon: Banknote },
@@ -1358,13 +1363,13 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                    className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isSelected
                         ? 'bg-white text-slate-900 font-bold shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <Icon className="w-4 h-4 shrink-0" />
                     <span className="truncate">{tab.label}</span>
                   </button>
                 );
@@ -1373,14 +1378,14 @@ export default function ConfidencyPosPage() {
 
             {/* Credit Account Telemetry & Warning */}
             {paymentMethod === 'STORE_CREDIT' && (
-              <div className="mt-2 text-[11px] transition-all animate-in fade-in duration-150">
+              <div className="mt-2 text-xs transition-all animate-in fade-in duration-150">
                 {!selectedCustomer ? (
                   <div className="flex items-center justify-between text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
                     <span className="font-semibold">⚠️ Select customer for Credit sale</span>
                     <button
                       type="button"
                       onClick={() => setIsCustomerModalOpen(true)}
-                      className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200 hover:bg-indigo-50 cursor-pointer"
+                      className="text-xs font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-md border border-indigo-200 hover:bg-indigo-50 cursor-pointer"
                     >
                       Attach
                     </button>
@@ -1393,20 +1398,20 @@ export default function ConfidencyPosPage() {
                         Limit: LKR {Number(selectedCustomer.creditLimit || 0).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between text-[10px] text-slate-600">
+                    <div className="flex justify-between text-xs text-slate-600">
                       <span>Current Debt (ණය):</span>
                       <span className="font-mono font-bold text-rose-600">
                         LKR {Number(selectedCustomer.currentBalance || 0).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between text-[10px] text-slate-600">
+                    <div className="flex justify-between text-xs text-slate-600">
                       <span>Available Credit:</span>
                       <span className="font-mono font-bold text-emerald-600">
                         LKR {Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0)).toLocaleString()}
                       </span>
                     </div>
                     {totalAmount > Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0)) && (
-                      <div className="text-[10px] font-bold text-red-600 bg-red-50 p-1.5 rounded-md border border-red-200 mt-1">
+                      <div className="text-xs font-bold text-red-600 bg-red-50 p-1.5 rounded-md border border-red-200 mt-1">
                         ⚠️ Order exceeds credit limit by LKR {(totalAmount - Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0))).toFixed(2)}
                       </div>
                     )}
@@ -1422,11 +1427,11 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleCharge}
               disabled={cart.length === 0 || isProcessingCheckout}
-              className="w-full bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-[0.99] disabled:opacity-40 text-white font-semibold text-xs py-3.5 rounded-xl shadow-lg shadow-[#7052FF]/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-[0.99] disabled:opacity-40 text-white font-bold text-base md:text-lg py-4 rounded-2xl shadow-lg shadow-[#7052FF]/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
             >
               {isProcessingCheckout ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Processing Checkout...</span>
                 </>
               ) : (
@@ -1452,19 +1457,19 @@ export default function ConfidencyPosPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">
+                <span className="font-bold text-sm md:text-base">
                   {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}
                 </span>
                 <span className="text-white/40">•</span>
-                <span className="font-mono font-bold text-white text-sm">
+                <span className="font-mono font-bold text-white text-sm md:text-base">
                   LKR {totalAmount.toFixed(2)}
                 </span>
               </div>
-              <p className="text-[11px] text-white/80">Tap to review & checkout</p>
+              <p className="text-xs text-white/90">Tap to review & checkout</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white text-[#7052FF] px-4 py-2 rounded-xl font-bold text-xs shadow-sm">
+          <div className="flex items-center gap-1.5 bg-white text-[#7052FF] px-4 py-2 rounded-xl font-bold text-xs md:text-sm shadow-sm">
             <span>Checkout</span>
             <ArrowRight className="w-4 h-4" />
           </div>
@@ -1489,7 +1494,7 @@ export default function ConfidencyPosPage() {
 
             {/* Header */}
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-800">
+              <h3 className="text-sm md:text-base font-bold text-slate-800">
                 Order Summary ({totalItemCount})
               </h3>
               <div className="flex items-center gap-2">
@@ -1497,7 +1502,7 @@ export default function ConfidencyPosPage() {
                   <button
                     type="button"
                     onClick={clearCart}
-                    className="text-xs text-rose-500 font-semibold px-2 py-1"
+                    className="text-xs md:text-sm text-rose-600 font-semibold px-2 py-1"
                   >
                     Reset
                   </button>
@@ -1517,13 +1522,13 @@ export default function ConfidencyPosPage() {
               {cart.map((item) => (
                 <div key={item.id} className="py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h5 className="text-xs font-medium text-slate-900 truncate">{item.name}</h5>
-                    <div className="text-[11px] text-slate-400 font-mono">
+                    <h5 className="text-sm font-bold text-slate-900 truncate">{item.name}</h5>
+                    <div className="text-xs text-slate-500 font-mono">
                       LKR {item.price.toFixed(2)}
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-600 font-mono flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60">
+                  <div className="text-xs text-slate-700 font-mono flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60">
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
@@ -1543,7 +1548,7 @@ export default function ConfidencyPosPage() {
                     </button>
                   </div>
 
-                  <span className="text-xs font-bold font-mono text-slate-900">
+                  <span className="text-sm font-bold font-mono text-slate-900">
                     LKR {(item.price * item.quantity).toFixed(2)}
                   </span>
                 </div>
@@ -1552,13 +1557,17 @@ export default function ConfidencyPosPage() {
 
             {/* Financial breakdown & Charge */}
             <div className="p-5 bg-white border-t border-slate-100 space-y-3">
-              <div className="flex justify-between text-sm font-bold text-slate-900 font-mono">
-                <span>Total Amount</span>
-                <span>LKR {totalAmount.toFixed(2)}</span>
+              <div className="flex justify-between items-baseline text-slate-900">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500">
+                  Total Payable
+                </span>
+                <span className="text-xl md:text-2xl font-black font-mono text-slate-950">
+                  LKR {totalAmount.toFixed(2)}
+                </span>
               </div>
 
               {/* Payment selector */}
-              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
+              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
                 {[
                   { id: 'CARD', label: 'Card' },
                   { id: 'CASH', label: 'Cash' },
@@ -1569,10 +1578,10 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-1.5 rounded-lg font-medium transition-all text-center ${
+                    className={`py-2 rounded-lg font-semibold transition-all text-center ${
                       paymentMethod === tab.id
                         ? 'bg-white text-slate-900 font-bold shadow-xs'
-                        : 'text-slate-500'
+                        : 'text-slate-600'
                     }`}
                   >
                     {tab.label}
@@ -1587,7 +1596,7 @@ export default function ConfidencyPosPage() {
                   handleCharge();
                 }}
                 disabled={cart.length === 0 || isProcessingCheckout}
-                className="w-full bg-[#7052FF] text-white font-semibold text-xs py-3.5 rounded-xl shadow-lg shadow-[#7052FF]/20 flex items-center justify-center gap-2"
+                className="w-full bg-[#7052FF] text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-[#7052FF]/20 flex items-center justify-center gap-2"
               >
                 <span>Charge LKR {totalAmount.toFixed(2)}</span>
               </button>
