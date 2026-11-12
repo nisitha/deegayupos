@@ -11,6 +11,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { ProductsModule } from './modules/products/products.module';
+import { StaffModule } from './modules/staff/staff.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
     BusinessModule,
     ProductsModule,
     PosModule,
+    StaffModule,
     InventoryModule,
     ProcurementModule,
     CustomersModule,

@@ -211,9 +211,29 @@ export async function GET(request: NextRequest) {
     const cached = memoryCache[cacheKey];
     const now = Date.now();
 
+    const ifNoneMatch = request.headers.get('if-none-match');
+    const ifModifiedSince = request.headers.get('if-modified-since');
+
     // 1. Check in-memory cache
     if (!forceRefresh && cached) {
       const age = now - cached.timestamp;
+      const etag = `W/"cat-${cached.timestamp}"`;
+
+      // 1a. Conditional 304 Not Modified validation
+      if (
+        ifNoneMatch === etag ||
+        (ifModifiedSince && new Date(ifModifiedSince).getTime() >= cached.timestamp)
+      ) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            ...CACHE_HEADERS,
+            ETag: etag,
+            'Last-Modified': new Date(cached.timestamp).toUTCString(),
+            'X-Cache-Status': 'NOT_MODIFIED',
+          },
+        });
+      }
 
       // Fresh cache hit (< 5 mins) -> Return in 0-2ms
       if (age < CACHE_TTL_MS) {
@@ -222,6 +242,8 @@ export async function GET(request: NextRequest) {
           {
             headers: {
               ...CACHE_HEADERS,
+              ETag: etag,
+              'Last-Modified': new Date(cached.timestamp).toUTCString(),
               'X-Cache-Status': 'HIT',
               'X-Cache-Age-Ms': String(age),
             },
@@ -247,6 +269,8 @@ export async function GET(request: NextRequest) {
           {
             headers: {
               ...CACHE_HEADERS,
+              ETag: etag,
+              'Last-Modified': new Date(cached.timestamp).toUTCString(),
               'X-Cache-Status': 'STALE-REVALIDATING',
               'X-Cache-Age-Ms': String(age),
             },
@@ -278,11 +302,15 @@ export async function GET(request: NextRequest) {
       data,
     };
 
+    const freshEtag = `W/"cat-${data ? Date.now() : 'empty'}"`;
+
     return NextResponse.json(
       { success: true, data },
       {
         headers: {
           ...CACHE_HEADERS,
+          ETag: freshEtag,
+          'Last-Modified': new Date().toUTCString(),
           'X-Cache-Status': 'MISS',
         },
       },

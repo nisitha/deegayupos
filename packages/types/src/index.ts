@@ -10,5 +10,7 @@ export * from './pos';
 export * from './inventory';
 export * from './procurement';
 export * from './customer';
+export * from './shift';
+export * from './staff';
 
 

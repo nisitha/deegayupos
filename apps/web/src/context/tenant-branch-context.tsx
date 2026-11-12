@@ -9,12 +9,21 @@ import type {
 } from '@pixelcraft/types';
 import { businessApi } from '../lib/api-client';
 
+export interface ActiveCashier {
+  id: string;
+  fullName: string;
+  role: string;
+  email?: string;
+}
+
 interface TenantBranchContextType {
   selectedBranchId: string | null;
   setSelectedBranchId: (id: string | null) => void;
   business: BusinessProfileData | null;
   branches: BusinessProfileBranch[];
   user: AuthUser | null;
+  activeCashier: ActiveCashier | null;
+  setActiveCashier: (cashier: ActiveCashier | null) => void;
   tenant: AuthTenant | null;
   permissions: string[];
   currency: string;
@@ -36,6 +45,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const [business, setBusiness] = useState<BusinessProfileData | null>(null);
   const [branches, setBranches] = useState<BusinessProfileBranch[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [activeCashier, setActiveCashierState] = useState<ActiveCashier | null>(null);
   const [tenant, setTenant] = useState<AuthTenant | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +57,15 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     if (typeof window !== 'undefined') {
       try {
         const storedUser = localStorage.getItem('pixelcraft_user');
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          setUser(parsed);
+        }
+
+        const storedCashier = localStorage.getItem('pixelcraft_active_cashier');
+        if (storedCashier) {
+          setActiveCashierState(JSON.parse(storedCashier));
+        }
 
         const storedTenant = localStorage.getItem('pixelcraft_tenant');
         if (storedTenant) setTenant(JSON.parse(storedTenant));
@@ -59,6 +77,17 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         if (storedBranch) setSelectedBranchIdState(storedBranch);
       } catch (err) {
         console.error('Failed to parse local authentication cache:', err);
+      }
+    }
+  }, []);
+
+  const setActiveCashier = useCallback((cashier: ActiveCashier | null) => {
+    setActiveCashierState(cashier);
+    if (typeof window !== 'undefined') {
+      if (cashier) {
+        localStorage.setItem('pixelcraft_active_cashier', JSON.stringify(cashier));
+      } else {
+        localStorage.removeItem('pixelcraft_active_cashier');
       }
     }
   }, []);
@@ -146,6 +175,8 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         business,
         branches,
         user,
+        activeCashier,
+        setActiveCashier,
         tenant,
         permissions,
         currency: business?.currency || 'LKR',

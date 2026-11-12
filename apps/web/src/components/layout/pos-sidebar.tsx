@@ -22,6 +22,7 @@ import {
   Truck,
   ClipboardCheck,
   Printer,
+  UserCheck,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
@@ -70,6 +71,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
     items: [
       { name: 'Marketplace', href: '/dashboard/marketplace', icon: Store },
       { name: 'POS', href: '/dashboard/pos', icon: Layers, badge: 'POS' },
+      { name: 'Staff & Roles', href: '/dashboard/staff', icon: UserCheck },
       { name: 'Hardware & Printers', href: '/dashboard/settings/hardware', icon: Printer },
       { name: 'Settings', href: '/dashboard/settings', icon: Settings },
     ],

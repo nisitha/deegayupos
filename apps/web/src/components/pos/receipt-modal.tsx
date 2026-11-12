@@ -13,11 +13,11 @@ import {
   Send,
   Radio,
 } from 'lucide-react';
-import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import type { ReceiptDocumentDto, SaleDto } from '@pixelcraft/types';
 import { posApi } from '../../lib/api-client';
 import { PrinterBridge } from '../../lib/hardware/printer-bridge';
+import { ReceiptBarcodeBlock } from './receipt-barcode-block';
 
 export type PaperSize = 'MM_80' | 'MM_58' | 'A4' | 'A5';
 
@@ -52,7 +52,6 @@ export function ReceiptModal({
   const [shareMode, setShareMode] = useState<'SMS' | 'EMAIL'>('SMS');
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
-  const barcodeRef = useRef<SVGSVGElement | null>(null);
   const printAreaRef = useRef<HTMLDivElement | null>(null);
 
   // Sync initial hardware setting for default paper width
@@ -101,26 +100,7 @@ export function ReceiptModal({
   const invoiceNumber = effectiveSale?.invoiceNumber || 'INV-DRAFT';
   const verificationUrl =
     receiptData?.barcodeData?.verificationUrl ||
-    `https://pos.pixelcraftlk.com/verify/${invoiceNumber}`;
-
-  // Generate Barcode SVG
-  useEffect(() => {
-    if (barcodeRef.current && invoiceNumber && isOpen) {
-      try {
-        JsBarcode(barcodeRef.current, invoiceNumber, {
-          format: 'CODE128',
-          width: paperSize === 'MM_58' ? 1.2 : 1.5,
-          height: paperSize === 'MM_58' ? 32 : 40,
-          displayValue: true,
-          fontSize: 9,
-          font: 'monospace',
-          margin: 2,
-        });
-      } catch (err) {
-        console.warn('Barcode rendering warning:', err);
-      }
-    }
-  }, [invoiceNumber, isOpen, paperSize, receiptData]);
+    `https://pos.pixelcraftlk.com/receipt/${invoiceNumber}`;
 
   // Generate QR Code URL
   useEffect(() => {
@@ -447,7 +427,7 @@ export function ReceiptModal({
                 </div>
                 <div className="text-right font-mono text-[11px] text-slate-600">
                   <div>Station: REG-01</div>
-                  <div>Dispensed By: {effectiveSale?.cashier?.fullName || 'Chief Pharmacist'}</div>
+                  <div>Dispensed By: {effectiveSale?.cashier?.fullName || effectiveSale?.cashierName || 'Chief Pharmacist'}</div>
                   <div className="text-indigo-700 font-bold">Original Customer Copy</div>
                 </div>
               </div>
@@ -619,7 +599,7 @@ export function ReceiptModal({
                 </div>
                 <div className="flex justify-between">
                   <span>Cashier:</span>
-                  <span>{effectiveSale?.cashier?.fullName || 'Cashier Station'}</span>
+                  <span>{effectiveSale?.cashier?.fullName || effectiveSale?.cashierName || 'Cashier Station'}</span>
                 </div>
                 {effectiveSale?.customerName && (
                   <div className="flex justify-between">
@@ -707,28 +687,15 @@ export function ReceiptModal({
                 </div>
               </div>
 
-              {/* Barcode & Verification QR Section */}
-              <div className="pt-3 border-t border-dashed border-slate-300 text-center space-y-2">
-                {showBarcode && (
-                  <div className="flex flex-col items-center justify-center">
-                    <svg ref={barcodeRef} className="max-w-full" />
-                  </div>
-                )}
-
-                {qrCodeUrl && (
-                  <div className="flex flex-col items-center justify-center pt-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={qrCodeUrl}
-                      alt="Verification QR"
-                      className="w-20 h-20 object-contain rounded-lg border border-slate-200 p-0.5"
-                    />
-                    <span className="text-[9px] text-slate-400 mt-0.5 font-sans">
-                      Scan to verify electronic receipt
-                    </span>
-                  </div>
-                )}
-              </div>
+              {/* Authentic Code128 Barcode & Scannable QR Code */}
+              <ReceiptBarcodeBlock
+                invoiceNumber={invoiceNumber}
+                verificationUrl={verificationUrl}
+                paperWidth={paperSize === 'MM_58' ? '58mm' : '80mm'}
+                showBarcode={showBarcode}
+                showQr={true}
+                captionText="Scan to verify receipt online"
+              />
 
               {/* Footer Note & Return Policy */}
               <div className="pt-2 text-center space-y-1 border-t border-dotted border-slate-200 mt-2 font-sans">

@@ -305,8 +305,9 @@ export function generateEscPosReceipt(
 
   builder.row('Date:', dateStr);
   builder.row('Station:', options.cashierStation || 'REG-01');
-  if (sale.cashier?.fullName) {
-    builder.row('Cashier:', sale.cashier.fullName);
+  const cashierDisplayName = sale.cashier?.fullName || sale.cashierName;
+  if (cashierDisplayName) {
+    builder.row('Cashier:', cashierDisplayName);
   }
   if (sale.customerName && sale.customerName !== 'Walk-in Customer') {
     builder.row('Customer:', sale.customerName);

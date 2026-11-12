@@ -300,3 +300,90 @@ export class BusinessProfileDto {
   settings?: BusinessSettingsDto | null;
 }
 
+export class UpdateTenantStoreSettingsDto {
+  @ApiPropertyOptional({ example: 'දීගායු වෙද මැදුර / Deegayu Weda Madura' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  legalName?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://pos.pixelcraftlk.com/images/deegayu-logo.png' })
+  @IsOptional()
+  @IsString()
+  logoUrl?: string | null;
+
+  @ApiPropertyOptional({ example: '+94 34 222 3456' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  phone?: string;
+
+  @ApiPropertyOptional({ example: 'info@deegayu.pixelcraftlk.com' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string | null;
+
+  @ApiPropertyOptional({ example: 'Main Street, Kalutara, Sri Lanka' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  address?: string;
+
+  @ApiPropertyOptional({ example: 'VAT-10928392-8000' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  vatNumber?: string | null;
+
+  @ApiPropertyOptional({ example: 'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  receiptHeaderNote?: string | null;
+
+  @ApiPropertyOptional({ example: 'නිරෝගී සුවය පතමු! Return within 7 days.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  receiptFooterNote?: string | null;
+
+  @ApiPropertyOptional({ example: 'Goods once sold can be exchanged within 7 days with original receipt.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  returnPolicy?: string | null;
+
+  @ApiPropertyOptional({ enum: ['80mm', '58mm'], example: '80mm' })
+  @IsOptional()
+  @IsEnum(['80mm', '58mm'])
+  receiptPaperWidth?: '80mm' | '58mm';
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  showLogo?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  showVat?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  showBarcode?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  showQr?: boolean;
+}
+
+

@@ -96,6 +96,11 @@ export class CheckoutRequestDto {
   @IsUUID()
   registerId?: string;
 
+  @ApiPropertyOptional({ example: 'b5113d74-c5a9-46e3-8260-22cba2b52b34', description: 'Attributed Cashier User ID' })
+  @IsOptional()
+  @IsUUID()
+  cashierId?: string;
+
   @ApiPropertyOptional({ example: 'a1113d74-c5a9-46e3-8260-22cba2b52b34' })
   @IsOptional()
   @IsUUID()
@@ -184,6 +189,11 @@ export class HoldCartRequestDto {
   @IsOptional()
   @IsUUID()
   registerId?: string;
+
+  @ApiPropertyOptional({ example: 'b5113d74-c5a9-46e3-8260-22cba2b52b34', description: 'Attributed Cashier User ID' })
+  @IsOptional()
+  @IsUUID()
+  cashierId?: string;
 
   @ApiProperty({ example: 'Table T-12 (Party of 4)' })
   @IsString()

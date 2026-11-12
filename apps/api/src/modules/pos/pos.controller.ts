@@ -65,7 +65,8 @@ export class PosController {
     @CurrentUser() user: AuthUser,
     @Body() body: CheckoutRequestDto,
   ): Promise<SaleDto> {
-    return this.posService.checkout(tenant.id, user.id, body);
+    const effectiveCashierId = body.cashierId || user.id;
+    return this.posService.checkout(tenant.id, effectiveCashierId, body);
   }
 
   @Post('cart/hold')

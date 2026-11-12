@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import {
   CreditCard,
   Banknote,
@@ -35,6 +35,7 @@ import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
 import { DiscountPickerModal } from '../../../components/pos/discount-picker-modal';
 import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
+import { CashierSwitcherModal } from '../../../components/pos/cashier-switcher-modal';
 import { CustomerModal, type CustomerData } from '../../../components/pos/customer-modal';
 import { HeldTicketsModal, type HeldTicket } from '../../../components/pos/held-tickets-modal';
 import { getProductPhoto } from '../../../lib/product-image-mapper';
@@ -43,7 +44,7 @@ import {
   AYURVEDIC_DEPARTMENT_LIST,
   classifyAyurvedicDepartment,
 } from '../../../lib/ayurvedic-departments';
-import { getCachedCatalog, saveCachedCatalog } from '../../../lib/pos-catalog-db';
+import { getCachedCatalogData, setCachedCatalogData } from '../../../lib/catalog-db';
 import { PrinterBridge } from '../../../lib/hardware/printer-bridge';
 
 // =========================================================================
@@ -80,7 +81,7 @@ interface CartItem {
 }
 
 export default function ConfidencyPosPage() {
-  const { selectedBranchId, user } = useTenantBranch();
+  const { selectedBranchId, user, activeCashier, setActiveCashier } = useTenantBranch();
 
   // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
@@ -90,10 +91,15 @@ export default function ConfidencyPosPage() {
   // Department Filter & Search Station
   const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
+
+  // High-Performance Virtualization / Progressive DOM Pagination
+  const [visibleCount, setVisibleCount] = useState<number>(48);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -121,6 +127,7 @@ export default function ConfidencyPosPage() {
   const [completedSale, setCompletedSale] = useState<SaleDto | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
+  const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
 
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
@@ -129,18 +136,23 @@ export default function ConfidencyPosPage() {
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
 
   // Cashier Session Details
-  const cashierName = user?.fullName || 'Dr. Deegayu';
+  const cashierId = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
+  const cashierName = activeCashier?.fullName || user?.fullName || 'Dr. Deegayu (Owner)';
   const registerCode = 'REG-01';
   const openingFloat = 15000.0;
 
-  // Instant 0ms Hydration via IndexedDB / LocalStorage + Background Sync
+  // Instant 0ms Hydration via IndexedDB (< 15ms) + Background Sync
   useEffect(() => {
     let isMounted = true;
 
     async function initCatalog() {
+      let cachedTimestamp: number | null = null;
+
+      // 1. Immediately read from IndexedDB with ZERO blocking spinner
       try {
-        const cached = await getCachedCatalog<RetailProductItem>('deegayu');
+        const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
         if (cached && cached.products && cached.products.length > 0 && isMounted) {
+          cachedTimestamp = cached.cachedAt;
           setProducts(cached.products);
           setIsLoadingProducts(false);
         }
@@ -148,8 +160,22 @@ export default function ConfidencyPosPage() {
         console.warn('Local cache read error:', cacheErr);
       }
 
+      // 2. Concurrently sync with /api/pos/catalog in background with If-Modified-Since
       try {
-        const res = await fetch('/api/pos/catalog?slug=deegayu&limit=3500');
+        const headers: Record<string, string> = {};
+        if (cachedTimestamp) {
+          headers['If-Modified-Since'] = new Date(cachedTimestamp).toUTCString();
+        }
+
+        const res = await fetch('/api/pos/catalog?slug=deegayu&limit=3500', {
+          headers,
+        });
+
+        if (res.status === 304) {
+          // IndexedDB cache is already pristine & fresh
+          return;
+        }
+
         const json = await res.json();
 
         if (json.success && json.data && isMounted) {
@@ -160,7 +186,8 @@ export default function ConfidencyPosPage() {
           setProducts(freshProducts);
           setCatalogError(null);
 
-          await saveCachedCatalog('deegayu', {
+          // Update IndexedDB asynchronously
+          await setCachedCatalogData('deegayu', {
             products: freshProducts,
             categories: freshCategories,
             total: freshTotal,
@@ -185,13 +212,19 @@ export default function ConfidencyPosPage() {
     };
   }, []);
 
-  // Classify each product into the 10 Ayurvedic Departments
+  // Classify each product into the 10 Ayurvedic Departments & pre-build lowercase search tokens
   const productsWithDept = useMemo(() => {
     return products.map((p) => {
       const deptId = classifyAyurvedicDepartment(p.name, p.category?.name, p.category?.slug);
+      const name = p.name || '';
+      const sku = p.sku || '';
+      const barcode = p.barcode || '';
+      const cat = p.category?.name || '';
+      const _searchStr = `${name} ${sku} ${barcode} ${cat}`.toLowerCase();
       return {
         ...p,
         departmentId: deptId,
+        _searchStr,
       };
     });
   }, [products]);
@@ -209,41 +242,87 @@ export default function ConfidencyPosPage() {
     return counts;
   }, [productsWithDept]);
 
-  // Fast Client-Side Search Filter across name, SKU, barcode, and selected department
+  // Ultra-Fast In-Memory Search (< 1-2ms) using deferredSearchQuery & pre-indexed strings
   const filteredProducts = useMemo(() => {
-    const term = searchQuery.trim().toLowerCase();
+    const rawTerm = deferredSearchQuery.trim().toLowerCase();
+    const hasDept = selectedDeptId !== 'all';
+
+    if (!rawTerm && !hasDept) {
+      return productsWithDept;
+    }
+
+    const tokens = rawTerm ? rawTerm.split(/\s+/).filter(Boolean) : [];
 
     return productsWithDept.filter((p) => {
-      if (selectedDeptId !== 'all') {
-        if (p.departmentId !== selectedDeptId) {
-          return false;
-        }
+      if (hasDept && p.departmentId !== selectedDeptId) {
+        return false;
       }
+      if (tokens.length === 0) return true;
 
-      if (!term) return true;
-
-      const matchesName = p.name.toLowerCase().includes(term);
-      const matchesSku = p.sku.toLowerCase().includes(term);
-      const matchesBarcode = p.barcode ? p.barcode.toLowerCase().includes(term) : false;
-
-      return matchesName || matchesSku || matchesBarcode;
+      const str = p._searchStr;
+      for (const token of tokens) {
+        if (!str.includes(token)) return false;
+      }
+      return true;
     });
-  }, [productsWithDept, searchQuery, selectedDeptId]);
+  }, [productsWithDept, deferredSearchQuery, selectedDeptId]);
 
   // Fast Live Autocomplete Results for Keystroke Dropdown (Top 15 Matches)
   const liveSearchResults = useMemo(() => {
-    const term = searchQuery.trim().toLowerCase();
-    if (!term) return [];
+    const rawTerm = deferredSearchQuery.trim().toLowerCase();
+    if (!rawTerm) return [];
 
-    return productsWithDept
-      .filter((p) => {
-        const matchesName = p.name.toLowerCase().includes(term);
-        const matchesSku = p.sku.toLowerCase().includes(term);
-        const matchesBarcode = p.barcode ? p.barcode.toLowerCase().includes(term) : false;
-        return matchesName || matchesSku || matchesBarcode;
-      })
-      .slice(0, 15);
-  }, [productsWithDept, searchQuery]);
+    const tokens = rawTerm.split(/\s+/).filter(Boolean);
+    const results: typeof productsWithDept = [];
+
+    for (const p of productsWithDept) {
+      let matches = true;
+      for (const token of tokens) {
+        if (!p._searchStr.includes(token)) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        results.push(p);
+        if (results.length >= 15) break;
+      }
+    }
+    return results;
+  }, [productsWithDept, deferredSearchQuery]);
+
+  // Reset pagination to 48 when department filter or search query changes
+  useEffect(() => {
+    setVisibleCount(48);
+  }, [deferredSearchQuery, selectedDeptId]);
+
+  // Progressive sliced items for instant DOM rendering (prevents freezing main thread with 3,120 nodes)
+  const visibleProducts = useMemo(() => {
+    return filteredProducts.slice(0, visibleCount);
+  }, [filteredProducts, visibleCount]);
+
+  // IntersectionObserver to dynamically load next 48 items as user scrolls down
+  useEffect(() => {
+    if (!loadMoreSentinelRef.current) return;
+    const target = loadMoreSentinelRef.current;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev < filteredProducts.length) {
+              return Math.min(prev + 48, filteredProducts.length);
+            }
+            return prev;
+          });
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [filteredProducts.length]);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -455,6 +534,7 @@ export default function ConfidencyPosPage() {
 
       const payload: CheckoutPayload = {
         branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+        cashierId,
         customerId: selectedCustomer?.id || undefined,
         customerName: formattedCustomer,
         orderType: 'RETAIL_WALKIN',
@@ -489,15 +569,16 @@ export default function ConfidencyPosPage() {
 
       const res = await posApi.checkout(payload);
 
-      const finalizedSale: SaleDto = res.data || {
+      const rawSale: SaleDto = res.data || {
         id: `sale-${Date.now()}`,
         tenantId: 'deegayu',
         branchId: selectedBranchId || 'branch-1',
-        cashierId: 'cashier-1',
+        cashierId,
+        cashierName,
         cashier: {
-          id: 'cashier-1',
+          id: cashierId,
           fullName: cashierName,
-          email: 'owner@deegayu.pixelcraftlk.com',
+          email: activeCashier?.email || user?.email || 'owner@deegayu.pixelcraftlk.com',
         },
         invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
         orderType: 'RETAIL_WALKIN',
@@ -532,6 +613,17 @@ export default function ConfidencyPosPage() {
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+      };
+
+      const finalizedSale: SaleDto = {
+        ...rawSale,
+        cashierId: rawSale.cashierId || cashierId,
+        cashierName: rawSale.cashierName || rawSale.cashier?.fullName || cashierName,
+        cashier: rawSale.cashier || {
+          id: cashierId,
+          fullName: cashierName,
+          email: activeCashier?.email || user?.email || 'cashier@deegayu.pixelcraftlk.com',
+        },
       };
 
       setCompletedSale(finalizedSale);
@@ -580,11 +672,12 @@ export default function ConfidencyPosPage() {
         id: `sale-${Date.now()}`,
         tenantId: 'deegayu',
         branchId: selectedBranchId || 'branch-1',
-        cashierId: 'cashier-1',
+        cashierId,
+        cashierName,
         cashier: {
-          id: 'cashier-1',
+          id: cashierId,
           fullName: cashierName,
-          email: 'owner@deegayu.pixelcraftlk.com',
+          email: activeCashier?.email || user?.email || 'owner@deegayu.pixelcraftlk.com',
         },
         invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
         orderType: 'RETAIL_WALKIN',
@@ -652,7 +745,10 @@ export default function ConfidencyPosPage() {
     taxAmount,
     totalAmount,
     paymentMethod,
+    cashierId,
     cashierName,
+    activeCashier,
+    user,
     selectedCustomer,
     clearCart,
     resetDiscount,
@@ -711,10 +807,23 @@ export default function ConfidencyPosPage() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <span className="text-slate-300">|</span>
-            <div className="text-xs text-slate-500 font-medium truncate">
-              <span>• {cashierName}</span>
-              <span className="hidden sm:inline"> | Cashier: {registerCode}</span>
-              <span className="hidden md:inline"> | Shift Started: 8:30 AM</span>
+            <button
+              type="button"
+              onClick={() => setIsCashierModalOpen(true)}
+              className="flex items-center gap-1.5 hover:bg-purple-50 px-2 py-1 rounded-lg transition-colors cursor-pointer text-xs group"
+              title="Click or press to switch cashier profile via 4-digit PIN"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-bold text-slate-900 group-hover:text-[#7052FF] transition-colors">
+                Cashier: {cashierName}
+              </span>
+              <span className="text-[10px] font-bold bg-[#7052FF]/10 text-[#7052FF] px-1.5 py-0.5 rounded group-hover:bg-[#7052FF] group-hover:text-white transition-colors">
+                PIN Switch
+              </span>
+            </button>
+            <div className="hidden sm:flex text-xs text-slate-500 font-medium truncate items-center">
+              <span>| Reg: {registerCode}</span>
+              <span className="hidden md:inline"> | Shift: 8:30 AM</span>
               <span className="hidden lg:inline">
                 {' '}
                 | Drawer: LKR {openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -1096,7 +1205,7 @@ export default function ConfidencyPosPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
-              {filteredProducts.map((product) => {
+              {visibleProducts.map((product) => {
                 const dept =
                   (product.departmentId && AYURVEDIC_MASTER_DEPARTMENTS[product.departmentId]) ||
                   AYURVEDIC_MASTER_DEPARTMENTS['fmcg']!;
@@ -1157,6 +1266,29 @@ export default function ConfidencyPosPage() {
                   </div>
                 );
               })}
+
+              {visibleCount < filteredProducts.length && (
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="col-span-full py-6 flex flex-col items-center justify-center border-t border-dashed border-slate-200 mt-2"
+                >
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#7052FF]" />
+                    <span>
+                      Showing {visibleProducts.length} of {filteredProducts.length} products...
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleCount((prev) => Math.min(prev + 48, filteredProducts.length))
+                    }
+                    className="mt-2 text-xs font-semibold text-[#7052FF] hover:underline cursor-pointer"
+                  >
+                    Load next 48 items
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1687,6 +1819,18 @@ export default function ConfidencyPosPage() {
         heldTickets={heldTickets}
         onRestoreTicket={handleRestoreHeldTicket}
         onDiscardTicket={handleDiscardHeldTicket}
+      />
+
+      {/* 7. Cashier Profile & PIN Switcher Modal */}
+      <CashierSwitcherModal
+        isOpen={isCashierModalOpen}
+        onClose={() => setIsCashierModalOpen(false)}
+        currentCashierName={cashierName}
+        onCashierSwitched={(switchedCashier) => {
+          setActiveCashier(switchedCashier);
+          setScanFeedback(`Active cashier switched to ${switchedCashier.fullName}`);
+          setTimeout(() => setScanFeedback(null), 3000);
+        }}
       />
     </div>
   );

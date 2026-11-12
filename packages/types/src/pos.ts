@@ -42,7 +42,9 @@ export interface SaleDto {
   tenantId: string;
   branchId: string;
   registerId?: string;
+  shiftId?: string;
   cashierId: string;
+  cashierName?: string;
   customerId?: string;
   customerName?: string;
   invoiceNumber: string;
@@ -90,6 +92,8 @@ export interface CreateSalePaymentPayload {
 export interface CheckoutPayload {
   branchId: string;
   registerId?: string;
+  cashierId?: string;
+  cashierName?: string;
   customerId?: string;
   customerName?: string;
   orderType?: OrderType;
@@ -111,6 +115,7 @@ export interface HeldCartDto {
   tenantId: string;
   branchId: string;
   registerId?: string;
+  shiftId?: string;
   cashierId: string;
   cartReference: string;
   cartData: Record<string, unknown>;

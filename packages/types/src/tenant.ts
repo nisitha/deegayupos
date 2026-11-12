@@ -24,3 +24,30 @@ export interface TenantContext {
   status: TenantStatus;
   customDomain?: string;
 }
+
+/**
+ * Store Profile & Receipt Branding Settings DTO
+ */
+export interface TenantStoreSettingsDto {
+  id?: string;
+  tenantId?: string;
+  name: string;
+  legalName?: string | null;
+  logoUrl?: string | null;
+  phone: string;
+  email?: string | null;
+  address: string;
+  vatNumber?: string | null;
+  receiptHeaderNote?: string | null;
+  receiptFooterNote?: string | null;
+  returnPolicy?: string | null;
+  receiptPaperWidth: '80mm' | '58mm';
+  showLogo: boolean;
+  showVat: boolean;
+  showBarcode: boolean;
+  showQr: boolean;
+  updatedAt?: string;
+}
+
+export type UpdateTenantStoreSettingsDto = Partial<TenantStoreSettingsDto>;
+

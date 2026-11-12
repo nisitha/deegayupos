@@ -30,4 +30,25 @@ export const updateReceiptSettingsSchema = z.object({
 
 export type UpdateReceiptSettingsInput = z.infer<typeof updateReceiptSettingsSchema>;
 
+export const updateTenantStoreSettingsSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  legalName: z.string().max(255).nullable().optional(),
+  logoUrl: z.string().max(2000).nullable().optional(),
+  phone: z.string().min(1).max(64).optional(),
+  email: z.string().email().nullable().optional().or(z.literal('')),
+  address: z.string().min(1).max(1000).optional(),
+  vatNumber: z.string().max(64).nullable().optional(),
+  receiptHeaderNote: z.string().max(2000).nullable().optional(),
+  receiptFooterNote: z.string().max(2000).nullable().optional(),
+  returnPolicy: z.string().max(2000).nullable().optional(),
+  receiptPaperWidth: z.enum(['80mm', '58mm']).optional(),
+  showLogo: z.boolean().optional(),
+  showVat: z.boolean().optional(),
+  showBarcode: z.boolean().optional(),
+  showQr: z.boolean().optional(),
+});
+
+export type UpdateTenantStoreSettingsInput = z.infer<typeof updateTenantStoreSettingsSchema>;
+
+
 

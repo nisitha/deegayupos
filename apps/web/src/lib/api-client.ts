@@ -23,6 +23,8 @@ import type {
   BusinessSettingsData,
   UpdateBusinessSettingsPayload,
   UpdateReceiptSettingsPayload,
+  TenantStoreSettingsDto,
+  UpdateTenantStoreSettingsDto,
   ProductDto,
   CreateProductPayload,
   UpdateProductPayload,
@@ -62,6 +64,9 @@ import type {
   RecordCustomerPaymentDto,
   CustomerPaymentDto,
   CustomerTelemetryDto,
+  StaffUserDto,
+  CreateStaffUserDto,
+  UpdateStaffUserDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -264,6 +269,22 @@ export const businessApi = {
   },
 };
 
+export const tenantSettingsApi = {
+  getSettings: async (slug?: string): Promise<ApiResponse<TenantStoreSettingsDto>> => {
+    return apiClient.get<TenantStoreSettingsDto>('/tenant/settings', {
+      params: slug ? { slug } : undefined,
+    });
+  },
+  updateSettings: async (
+    data: UpdateTenantStoreSettingsDto,
+    slug?: string,
+  ): Promise<ApiResponse<TenantStoreSettingsDto>> => {
+    return apiClient.patch<TenantStoreSettingsDto>('/tenant/settings', data, {
+      params: slug ? { slug } : undefined,
+    });
+  },
+};
+
 export const productsApi = {
   getAll: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<ProductDto>>> => {
     return apiClient.get<PaginatedResult<ProductDto>>('/products', { params });
@@ -450,6 +471,28 @@ export const customersApi = {
     return apiClient.post<{ customer: CustomerDto; payment: CustomerPaymentDto; ledgerEntry: CustomerLedgerDto }>(`/customers/${id}/payments`, payload);
   },
 };
+
+export const staffApi = {
+  list: async (): Promise<ApiResponse<StaffUserDto[]>> => {
+    return apiClient.get<StaffUserDto[]>('/staff');
+  },
+  getById: async (id: string): Promise<ApiResponse<StaffUserDto>> => {
+    return apiClient.get<StaffUserDto>(`/staff/${id}`);
+  },
+  create: async (payload: CreateStaffUserDto): Promise<ApiResponse<StaffUserDto>> => {
+    return apiClient.post<StaffUserDto>('/staff', payload);
+  },
+  update: async (id: string, payload: UpdateStaffUserDto): Promise<ApiResponse<StaffUserDto>> => {
+    return apiClient.patch<StaffUserDto>(`/staff/${id}`, payload);
+  },
+  delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
+    return apiClient.delete<{ success: boolean }>(`/staff/${id}`);
+  },
+  verifyPin: async (pinCode: string): Promise<ApiResponse<StaffUserDto | null>> => {
+    return apiClient.post<StaffUserDto | null>('/staff/verify-pin', { pinCode });
+  },
+};
+
 
 
 

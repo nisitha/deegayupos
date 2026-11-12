@@ -4,6 +4,8 @@ import type {
   BusinessSettingsData,
   UpdateBusinessSettingsPayload,
   UpdateReceiptSettingsPayload,
+  TenantStoreSettingsDto,
+  UpdateTenantStoreSettingsDto,
 } from '@pixelcraft/types';
 import { PrismaService } from '../../common/database/prisma.service';
 
@@ -256,6 +258,262 @@ export class BusinessService {
       negativeStockPolicy: updated.negativeStockPolicy || 'DISALLOW',
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Retrieves store identity, contact info, and receipt branding for active tenant.
+   */
+  async getTenantStoreSettings(tenantId: string): Promise<TenantStoreSettingsDto> {
+    const business = await this.prisma.business.findFirst({
+      where: { id: tenantId, deletedAt: null },
+      include: {
+        settings: true,
+        tenantSettings: true,
+        branches: {
+          where: { deletedAt: null },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Tenant organization not found.');
+    }
+
+    const primaryBranch = business.branches.find((b) => b.isPrimary) || business.branches[0] || null;
+    const ts = business.tenantSettings;
+    const bs = business.settings;
+
+    return {
+      id: ts?.id || bs?.id || business.id,
+      tenantId: business.id,
+      name: ts?.name || business.name || 'දීගායු වෙද මැදුර / Deegayu Weda Madura',
+      legalName: ts?.legalName ?? business.legalName ?? 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
+      logoUrl: ts?.logoUrl ?? business.logoUrl ?? 'https://pos.pixelcraftlk.com/images/deegayu-logo.png',
+      phone: ts?.phone || business.phone || primaryBranch?.phone || '+94 34 222 3456',
+      email: ts?.email ?? business.email ?? 'info@deegayu.pixelcraftlk.com',
+      address: ts?.address || business.address || primaryBranch?.address || 'Main Street, Kalutara, Sri Lanka',
+      vatNumber: ts?.vatNumber ?? bs?.vatNumber ?? bs?.taxNumber ?? 'VAT-10928392-8000',
+      receiptHeaderNote:
+        ts?.receiptHeaderNote ??
+        bs?.receiptHeaderNote ??
+        bs?.receiptHeader ??
+        'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary',
+      receiptFooterNote:
+        ts?.receiptFooterNote ??
+        bs?.receiptFooterNote ??
+        bs?.receiptFooter ??
+        'නිරෝගී සුවය පතමු! / Wishing you healthy living! Return within 7 days.',
+      returnPolicy:
+        ts?.returnPolicy ??
+        bs?.returnPolicy ??
+        bs?.returnPolicyText ??
+        'Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.',
+      receiptPaperWidth:
+        (ts?.receiptPaperWidth as '80mm' | '58mm') ||
+        (bs?.receiptPaperWidth as '80mm' | '58mm') ||
+        (bs?.receiptPaperSize === 'MM_58' ? '58mm' : '80mm'),
+      showLogo: ts?.showLogo ?? bs?.showLogo ?? bs?.showLogoOnReceipt ?? true,
+      showVat: ts?.showVat ?? bs?.showVat ?? bs?.showTaxDetails ?? true,
+      showBarcode: ts?.showBarcode ?? bs?.showBarcode ?? bs?.showBarcodeOnReceipt ?? true,
+      showQr: ts?.showQr ?? bs?.showQr ?? true,
+      updatedAt: ts?.updatedAt?.toISOString() || bs?.updatedAt?.toISOString() || business.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Persists updated store profile and receipt branding settings for tenant.
+   */
+  async updateTenantStoreSettings(
+    tenantId: string,
+    userId: string,
+    dto: UpdateTenantStoreSettingsDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<TenantStoreSettingsDto> {
+    const business = await this.prisma.business.findFirst({
+      where: { id: tenantId, deletedAt: null },
+      include: {
+        settings: true,
+        tenantSettings: true,
+        branches: {
+          where: { deletedAt: null },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Tenant organization not found.');
+    }
+
+    const {
+      name,
+      legalName,
+      logoUrl,
+      phone,
+      email,
+      address,
+      vatNumber,
+      receiptHeaderNote,
+      receiptFooterNote,
+      returnPolicy,
+      receiptPaperWidth,
+      showLogo,
+      showVat,
+      showBarcode,
+      showQr,
+    } = dto;
+
+    // 1. Update Business record
+    const updatedBusiness = await this.prisma.business.update({
+      where: { id: business.id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(legalName !== undefined && { legalName }),
+        ...(logoUrl !== undefined && { logoUrl }),
+        ...(phone !== undefined && { phone }),
+        ...(email !== undefined && { email }),
+        ...(address !== undefined && { address }),
+      },
+    });
+
+    // 2. Upsert BusinessSetting
+    const paperSizeEnum = receiptPaperWidth === '58mm' ? 'MM_58' : 'MM_80';
+    const updatedBs = await this.prisma.businessSetting.upsert({
+      where: { tenantId: business.id },
+      create: {
+        tenantId: business.id,
+        invoicePrefix: 'INV-',
+        taxNumber: vatNumber !== undefined ? vatNumber : null,
+        vatNumber: vatNumber !== undefined ? vatNumber : null,
+        receiptHeader: receiptHeaderNote !== undefined ? receiptHeaderNote : null,
+        receiptHeaderNote: receiptHeaderNote !== undefined ? receiptHeaderNote : null,
+        receiptFooter: receiptFooterNote !== undefined ? receiptFooterNote : null,
+        receiptFooterNote: receiptFooterNote !== undefined ? receiptFooterNote : null,
+        returnPolicyText: returnPolicy !== undefined ? returnPolicy : null,
+        returnPolicy: returnPolicy !== undefined ? returnPolicy : null,
+        receiptPaperSize: paperSizeEnum,
+        receiptPaperWidth: receiptPaperWidth || '80mm',
+        showLogoOnReceipt: showLogo !== undefined ? showLogo : true,
+        showLogo: showLogo !== undefined ? showLogo : true,
+        showTaxDetails: showVat !== undefined ? showVat : true,
+        showVat: showVat !== undefined ? showVat : true,
+        showBarcodeOnReceipt: showBarcode !== undefined ? showBarcode : true,
+        showBarcode: showBarcode !== undefined ? showBarcode : true,
+        showQr: showQr !== undefined ? showQr : true,
+      },
+      update: {
+        ...(vatNumber !== undefined && { taxNumber: vatNumber, vatNumber }),
+        ...(receiptHeaderNote !== undefined && {
+          receiptHeader: receiptHeaderNote,
+          receiptHeaderNote,
+        }),
+        ...(receiptFooterNote !== undefined && {
+          receiptFooter: receiptFooterNote,
+          receiptFooterNote,
+        }),
+        ...(returnPolicy !== undefined && {
+          returnPolicyText: returnPolicy,
+          returnPolicy,
+        }),
+        ...(receiptPaperWidth !== undefined && {
+          receiptPaperSize: paperSizeEnum,
+          receiptPaperWidth,
+        }),
+        ...(showLogo !== undefined && { showLogoOnReceipt: showLogo, showLogo }),
+        ...(showVat !== undefined && { showTaxDetails: showVat, showVat }),
+        ...(showBarcode !== undefined && { showBarcodeOnReceipt: showBarcode, showBarcode }),
+        ...(showQr !== undefined && { showQr }),
+      },
+    });
+
+    // 3. Upsert TenantSettings model
+    const updatedTs = await this.prisma.tenantSettings.upsert({
+      where: { tenantId: business.id },
+      create: {
+        tenantId: business.id,
+        name: name || updatedBusiness.name,
+        legalName: legalName !== undefined ? legalName : updatedBusiness.legalName,
+        logoUrl: logoUrl !== undefined ? logoUrl : updatedBusiness.logoUrl,
+        phone: phone || updatedBusiness.phone || '+94 34 222 3456',
+        email: email !== undefined ? email : updatedBusiness.email,
+        address: address || updatedBusiness.address || 'Main Street, Kalutara, Sri Lanka',
+        vatNumber: vatNumber !== undefined ? vatNumber : updatedBs.vatNumber,
+        receiptHeaderNote: receiptHeaderNote !== undefined ? receiptHeaderNote : updatedBs.receiptHeaderNote,
+        receiptFooterNote: receiptFooterNote !== undefined ? receiptFooterNote : updatedBs.receiptFooterNote,
+        returnPolicy: returnPolicy !== undefined ? returnPolicy : updatedBs.returnPolicy,
+        receiptPaperWidth: receiptPaperWidth || '80mm',
+        showLogo: showLogo !== undefined ? showLogo : true,
+        showVat: showVat !== undefined ? showVat : true,
+        showBarcode: showBarcode !== undefined ? showBarcode : true,
+        showQr: showQr !== undefined ? showQr : true,
+      },
+      update: {
+        ...(name !== undefined && { name }),
+        ...(legalName !== undefined && { legalName }),
+        ...(logoUrl !== undefined && { logoUrl }),
+        ...(phone !== undefined && { phone }),
+        ...(email !== undefined && { email }),
+        ...(address !== undefined && { address }),
+        ...(vatNumber !== undefined && { vatNumber }),
+        ...(receiptHeaderNote !== undefined && { receiptHeaderNote }),
+        ...(receiptFooterNote !== undefined && { receiptFooterNote }),
+        ...(returnPolicy !== undefined && { returnPolicy }),
+        ...(receiptPaperWidth !== undefined && { receiptPaperWidth }),
+        ...(showLogo !== undefined && { showLogo }),
+        ...(showVat !== undefined && { showVat }),
+        ...(showBarcode !== undefined && { showBarcode }),
+        ...(showQr !== undefined && { showQr }),
+      },
+    });
+
+    // 4. Update primary branch if contact info changed
+    const primaryBranch = business.branches.find((b) => b.isPrimary) || business.branches[0];
+    if (primaryBranch && (address !== undefined || phone !== undefined)) {
+      await this.prisma.branch.update({
+        where: { id: primaryBranch.id },
+        data: {
+          ...(address !== undefined && { address }),
+          ...(phone !== undefined && { phone }),
+        },
+      });
+    }
+
+    // 5. Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'TENANT_SETTINGS_UPDATED',
+        entity: 'TenantSettings',
+        entityId: updatedTs.id,
+        newValues: JSON.parse(JSON.stringify(updatedTs)),
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+      },
+    });
+
+    return {
+      id: updatedTs.id,
+      tenantId: business.id,
+      name: updatedTs.name,
+      legalName: updatedTs.legalName,
+      logoUrl: updatedTs.logoUrl,
+      phone: updatedTs.phone || '',
+      email: updatedTs.email,
+      address: updatedTs.address || '',
+      vatNumber: updatedTs.vatNumber,
+      receiptHeaderNote: updatedTs.receiptHeaderNote,
+      receiptFooterNote: updatedTs.receiptFooterNote,
+      returnPolicy: updatedTs.returnPolicy,
+      receiptPaperWidth: updatedTs.receiptPaperWidth as '80mm' | '58mm',
+      showLogo: updatedTs.showLogo,
+      showVat: updatedTs.showVat,
+      showBarcode: updatedTs.showBarcode,
+      showQr: updatedTs.showQr,
+      updatedAt: updatedTs.updatedAt.toISOString(),
     };
   }
 }

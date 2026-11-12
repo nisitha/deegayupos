@@ -11,6 +11,7 @@ import {
   type PrinterPaperWidth,
   type EscPosReceiptOptions,
 } from './escpos-generator';
+import { generateReceiptBarcodeHtml } from '../../components/pos/receipt-barcode-block';
 
 export type PrinterConnectionType =
   | 'BROWSER_PRINT'
@@ -137,7 +138,7 @@ export class PrinterBridge {
   /**
    * 1. Standard Web Print API Fallback (Hidden Iframe)
    */
-  static printViaBrowser(
+  static async printViaBrowser(
     sale: SaleDto,
     settings: HardwareSettings,
     storeDetails?: {
@@ -148,10 +149,24 @@ export class PrinterBridge {
       taxNumber?: string;
     },
   ): Promise<boolean> {
-    return new Promise((resolve) => {
-      const paperWidth = settings.paperWidth;
-      const iframeId = 'pixelcraft-silent-print-frame';
+    const paperWidth = settings.paperWidth;
+    const iframeId = 'pixelcraft-silent-print-frame';
 
+    // Generate authentic Code128 and QR code markup
+    let barcodeBlockHtml = '';
+    try {
+      barcodeBlockHtml = await generateReceiptBarcodeHtml({
+        invoiceNumber: sale.invoiceNumber,
+        verificationUrl: `https://pos.pixelcraftlk.com/receipt/${sale.invoiceNumber}`,
+        paperWidth: settings.paperWidth,
+        showBarcode: settings.printBarcode !== false,
+        showQr: settings.printQrCode !== false,
+      });
+    } catch (err) {
+      console.warn('Failed to generate print barcode/QR block:', err);
+    }
+
+    return new Promise((resolve) => {
       let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
       if (!iframe) {
         iframe = document.createElement('iframe');
@@ -234,6 +249,11 @@ export class PrinterBridge {
             .divider { border-bottom: 1px dashed #000; margin: 4px 0; }
             .divider-double { border-bottom: 2px solid #000; margin: 4px 0; }
             .row { display: flex; justify-content: space-between; }
+            svg {
+              shape-rendering: crispEdges !important;
+              image-rendering: pixelated !important;
+              max-width: 100%;
+            }
           </style>
         </head>
         <body>
@@ -251,7 +271,7 @@ export class PrinterBridge {
           <div class="row"><span>Invoice:</span><span class="bold">#${sale.invoiceNumber}</span></div>
           <div class="row"><span>Date:</span><span>${new Date(sale.createdAt || Date.now()).toLocaleString()}</span></div>
           ${sale.customerName ? `<div class="row"><span>Customer:</span><span>${sale.customerName}</span></div>` : ''}
-          ${sale.cashier?.fullName ? `<div class="row"><span>Cashier:</span><span>${sale.cashier.fullName}</span></div>` : ''}
+          ${(sale.cashier?.fullName || sale.cashierName) ? `<div class="row"><span>Cashier:</span><span>${sale.cashier?.fullName || sale.cashierName}</span></div>` : ''}
 
           <div class="divider"></div>
           <div class="row bold">
@@ -287,6 +307,8 @@ export class PrinterBridge {
               ? `<div class="row bold"><span>Change Due:</span><span>${currency} ${Number(sale.changeDue).toFixed(2)}</span></div>`
               : ''
           }
+
+          ${barcodeBlockHtml}
 
           <div class="divider"></div>
           <div class="center" style="margin-top: 6px; font-size: 10px;">

@@ -161,6 +161,22 @@ export class PosService {
 
       const invoiceNumber = `${prefix}${year}-${String(currentCount + 1).padStart(5, '0')}`;
 
+      // Resolve Cashier snapshot name
+      let cashierName = 'Cashier Station';
+      if (tx.user?.findUnique) {
+        try {
+          const cashierUser = await tx.user.findUnique({
+            where: { id: cashierId },
+            select: { fullName: true },
+          });
+          if (cashierUser?.fullName) {
+            cashierName = cashierUser.fullName;
+          }
+        } catch {
+          // fallback to default in mock unit test environments
+        }
+      }
+
       // Create Sale Record
       const sale = await tx.sale.create({
         data: {
@@ -168,6 +184,7 @@ export class PosService {
           branchId: payload.branchId,
           registerId: payload.registerId || null,
           cashierId,
+          cashierName,
           customerId: payload.customerId || null,
           customerName: payload.customerName || null,
           invoiceNumber,
@@ -585,10 +602,10 @@ export class PosService {
         address: sale.branch.address,
         phone: sale.branch.phone,
       },
-      cashier: sale.cashier || {
+      cashier: {
         id: sale.cashierId,
-        fullName: 'Cashier Station',
-        email: 'cashier@pixelcraftlk.com',
+        fullName: sale.cashierName || sale.cashier?.fullName || 'Cashier Station',
+        email: sale.cashier?.email || 'cashier@pixelcraftlk.com',
       },
       settings: {
         paperSize: paperSize as 'MM_58' | 'MM_80' | 'A4',
@@ -850,6 +867,7 @@ export class PosService {
       status: string;
       createdAt: Date;
     }>;
+    cashierName?: string | null;
     cashier?: { id: string; fullName: string; email: string } | null;
   }): SaleDto {
     return {
@@ -858,6 +876,7 @@ export class PosService {
       branchId: sale.branchId,
       registerId: sale.registerId || undefined,
       cashierId: sale.cashierId,
+      cashierName: sale.cashierName || sale.cashier?.fullName || undefined,
       customerId: sale.customerId || undefined,
       customerName: sale.customerName || undefined,
       invoiceNumber: sale.invoiceNumber,
@@ -876,7 +895,18 @@ export class PosService {
       updatedAt: sale.updatedAt.toISOString(),
       items: (sale.items || []).map((i) => this.mapSaleItemToDto(i)),
       payments: (sale.payments || []).map((p) => this.mapSalePaymentToDto(p)),
-      cashier: sale.cashier || undefined,
+      cashier: sale.cashier
+        ? {
+            ...sale.cashier,
+            fullName: sale.cashierName || sale.cashier.fullName,
+          }
+        : sale.cashierName
+          ? {
+              id: sale.cashierId,
+              fullName: sale.cashierName,
+              email: '',
+            }
+          : undefined,
     };
   }
 

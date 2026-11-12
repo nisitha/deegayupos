@@ -21,6 +21,7 @@ import type {
   AuthUser,
   BusinessProfileData,
   BusinessSettingsData,
+  TenantStoreSettingsDto,
 } from '@pixelcraft/types';
 import type { Request } from 'express';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
@@ -35,6 +36,7 @@ import {
   BusinessSettingsDto,
   UpdateBusinessSettingsDto,
   UpdateReceiptSettingsDto,
+  UpdateTenantStoreSettingsDto,
 } from './dto/business.dto';
 
 @ApiTags('Business Profile & Settings')
@@ -117,6 +119,42 @@ export class BusinessController {
   ): Promise<BusinessSettingsData> {
     const userAgent = req.headers['user-agent'] as string | undefined;
     return this.businessService.updateReceiptSettings(
+      tenant.id,
+      user.id,
+      dto,
+      ip,
+      userAgent,
+    );
+  }
+
+  @Get('tenant/settings')
+  @ApiOperation({
+    summary: 'Retrieve Tenant Store Profile & Receipt Branding Settings',
+    description: 'Fetches store details, contact numbers, address, VAT number, and receipt toggles.',
+  })
+  async getTenantSettings(
+    @CurrentTenant() tenant: AuthTenant,
+  ): Promise<TenantStoreSettingsDto> {
+    return this.businessService.getTenantStoreSettings(tenant.id);
+  }
+
+  @Patch('tenant/settings')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('settings:manage')
+  @ApiOperation({
+    summary: 'Update Tenant Store Profile & Receipt Branding Settings',
+    description: 'Persists store identity, address, phone, VAT registration, notes, and receipt format.',
+  })
+  async updateTenantSettings(
+    @CurrentTenant() tenant: AuthTenant,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateTenantStoreSettingsDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+  ): Promise<TenantStoreSettingsDto> {
+    const userAgent = req.headers['user-agent'] as string | undefined;
+    return this.businessService.updateTenantStoreSettings(
       tenant.id,
       user.id,
       dto,

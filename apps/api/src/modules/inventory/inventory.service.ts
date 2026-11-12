@@ -22,7 +22,7 @@ import {
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * 1. Query paginated stock levels with multi-branch / warehouse filtering
