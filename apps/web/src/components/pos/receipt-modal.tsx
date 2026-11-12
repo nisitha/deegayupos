@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Printer,
@@ -18,6 +20,7 @@ import type { ReceiptDocumentDto, SaleDto } from '@pixelcraft/types';
 import { posApi } from '../../lib/api-client';
 import { PrinterBridge } from '../../lib/hardware/printer-bridge';
 import { ReceiptBarcodeBlock } from './receipt-barcode-block';
+import { useTenantBranch } from '../../context/tenant-branch-context';
 
 export type PaperSize = 'MM_80' | 'MM_58' | 'A4' | 'A5';
 
@@ -38,6 +41,7 @@ export function ReceiptModal({
   initialSale,
   currency = 'LKR',
 }: ReceiptModalProps) {
+  const { business } = useTenantBranch();
   const [receiptData, setReceiptData] = useState<ReceiptDocumentDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [paperSize, setPaperSize] = useState<PaperSize>('MM_80');
@@ -143,10 +147,21 @@ export function ReceiptModal({
   const handlePrint = () => {
     if (!effectiveSale) return;
     const hw = PrinterBridge.getSettings();
-    PrinterBridge.printViaBrowser(effectiveSale, {
-      ...hw,
-      paperWidth: paperSize === 'MM_58' ? '58mm' : '80mm',
-    });
+    PrinterBridge.printViaBrowser(
+      effectiveSale,
+      {
+        ...hw,
+        paperWidth: paperSize === 'MM_58' ? '58mm' : '80mm',
+      },
+      {
+        storeName: businessName,
+        branchName: branchName,
+        address: branchAddress,
+        phone: branchPhone,
+        taxNumber: taxNumber,
+        logoUrl: logoUrl || undefined,
+      },
+    );
   };
 
   // Direct ESC/POS Thermal Print (Bluetooth / Network RAW / USB)
@@ -232,7 +247,11 @@ export function ReceiptModal({
   };
 
   const businessName =
-    receiptData?.business.legalName || receiptData?.business.name || 'DEEGAYU WEDA MADURA';
+    receiptData?.business.legalName || receiptData?.business.name || business?.name || 'DEEGAYU WEDA MADURA';
+  const logoUrl =
+    (receiptData?.settings as { logoUrl?: string | null } | undefined)?.logoUrl ||
+    (receiptData?.business as { logoUrl?: string | null } | undefined)?.logoUrl ||
+    business?.logoUrl;
   const branchName = receiptData?.branch.name || 'Flagship Clinic & Dispensary';
   const branchAddress = receiptData?.branch.address || 'Colombo Road, Kiribathgoda, Sri Lanka';
   const branchPhone = receiptData?.branch.phone || '+94 11 291 4500';
@@ -381,17 +400,31 @@ export function ReceiptModal({
             >
               {/* Official Letterhead */}
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
-                <div>
-                  <h1 className="text-xl font-black text-slate-950 uppercase tracking-tight">
-                    {businessName}
-                  </h1>
-                  <div className="text-xs font-bold text-indigo-700">දීගායු වෙද මැදුර සහ ආයුර්වේද ඖෂධාලය</div>
-                  <div className="text-[11px] text-slate-500 mt-1 max-w-xs leading-snug">
-                    {branchName} • {branchAddress}
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono">Tel: {branchPhone}</div>
-                  <div className="text-[11px] font-bold text-slate-800 mt-0.5">
-                    VAT / Tax Reg ID: {taxNumber}
+                <div className="flex items-start gap-3">
+                  {logoUrl && (
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-50 border border-slate-200/80 p-1 shrink-0">
+                      <img
+                        src={logoUrl}
+                        alt="Store Logo"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-xl font-black text-slate-950 uppercase tracking-tight">
+                      {businessName}
+                    </h1>
+                    <div className="text-xs font-bold text-indigo-700">දීගායු වෙද මැදුර සහ ආයුර්වේද ඖෂධාලය</div>
+                    <div className="text-[11px] text-slate-500 mt-1 max-w-xs leading-snug">
+                      {branchName} • {branchAddress}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">Tel: {branchPhone}</div>
+                    <div className="text-[11px] font-bold text-slate-800 mt-0.5">
+                      VAT / Tax Reg ID: {taxNumber}
+                    </div>
                   </div>
                 </div>
 
@@ -484,7 +517,6 @@ export function ReceiptModal({
 
                   {qrCodeUrl && (
                     <div className="flex items-center gap-3 pt-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={qrCodeUrl} alt="Verify QR" className="w-16 h-16 border rounded-lg p-0.5" />
                       <div className="text-[10px] text-slate-400 font-mono leading-tight">
                         Authentic Digital Receipt<br />
@@ -545,6 +577,20 @@ export function ReceiptModal({
             >
               {/* Header: Store Identity */}
               <div className="text-center space-y-1 pb-2">
+                {logoUrl && (
+                  <div className="flex justify-center mb-1.5">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-200/80 p-0.5">
+                      <img
+                        src={logoUrl}
+                        alt="Store Logo"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="text-base font-black tracking-tight text-slate-950 uppercase">
                   {businessName}
                 </div>

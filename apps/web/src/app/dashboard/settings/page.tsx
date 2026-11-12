@@ -18,11 +18,15 @@ import {
   Image as ImageIcon,
   RotateCcw,
   Check,
+  UploadCloud,
+  Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { tenantSettingsApi } from '../../../lib/api-client';
 import type { TenantStoreSettingsDto } from '@pixelcraft/types';
 import { ReceiptBarcodeBlock } from '@/components/pos/receipt-barcode-block';
+import { uploadStoreLogo } from '../../../lib/upload-store-logo';
 
 export default function SettingsDocumentPage() {
   const { business, refreshProfile, hasPermission } = useTenantBranch();
@@ -61,6 +65,73 @@ export default function SettingsDocumentPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Logo Upload States & Ref
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+  const logoFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo image must be under 5MB');
+      return;
+    }
+
+    const previousLogo = logoUrl;
+    setLogoUploadError(null);
+    setIsUploadingLogo(true);
+
+    // Optimistic local preview
+    const objectUrl = URL.createObjectURL(file);
+    setLogoUrl(objectUrl);
+
+    try {
+      const uploadedUrl = await uploadStoreLogo(file, 'deegayu');
+      setLogoUrl(uploadedUrl);
+      // Auto-persist immediately to tenant settings in DB
+      await tenantSettingsApi.updateSettings({ logoUrl: uploadedUrl }, 'deegayu');
+      await refreshProfile();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      console.error('Failed to upload store logo:', err);
+      const msg = err instanceof Error ? err.message : 'Logo upload failed';
+      setLogoUploadError(msg);
+      setLogoUrl(previousLogo);
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    const previousLogo = logoUrl;
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    setLogoUrl('');
+
+    try {
+      await tenantSettingsApi.updateSettings({ logoUrl: null }, 'deegayu');
+      await refreshProfile();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      console.error('Failed to remove store logo:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to remove logo';
+      setLogoUploadError(msg);
+      setLogoUrl(previousLogo);
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = '';
+      }
+    }
+  };
 
   // Fetch settings from API on load
   const loadSettings = useCallback(async () => {
@@ -359,36 +430,100 @@ export default function SettingsDocumentPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Store Logo URL / Image Address</span>
-                  <span className="text-[10px] font-normal text-slate-400">High-contrast monochrome/color</span>
+              {/* Brand Logo Management Widget (Button-Driven, No Raw URL Inputs) */}
+              <div className="pt-2">
+                <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-[#7052FF]" />
+                    <span>Store Brand Logo</span>
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Propagates to Sidebar, POS Header & 80mm Receipts
+                  </span>
                 </label>
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={logoFileInputRef}
+                  onChange={handleLogoUpload}
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                />
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/90">
+                  {/* 80x80 Squircle Preview Box */}
+                  <div className="w-20 h-20 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 overflow-hidden p-1 relative group">
                     {logoUrl ? (
                       <img
                         src={logoUrl}
-                        alt="Logo"
+                        alt="Store Logo"
                         className="w-full h-full object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=120&auto=format&fit=crop&q=80';
+                          (e.target as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=120&auto=format&fit=crop&q=80';
                         }}
                       />
                     ) : (
-                      <ImageIcon className="w-5 h-5 text-slate-400" />
+                      <div className="w-full h-full bg-gradient-to-br from-[#7052FF] to-[#5939e6] rounded-xl flex items-center justify-center text-white shadow-xs">
+                        <span className="text-2xl font-black tracking-tight">
+                          {storeName.trim().charAt(0) || 'D'}
+                        </span>
+                      </div>
+                    )}
+                    {isUploadingLogo && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-xs flex items-center justify-center rounded-2xl">
+                        <Loader2 className="w-6 h-6 text-[#7052FF] animate-spin" />
+                      </div>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    value={logoUrl}
-                    onChange={(e) => {
-                      setLogoUrl(e.target.value);
-                      setIsDirty(true);
-                    }}
-                    placeholder="https://pos.pixelcraftlk.com/images/deegayu-logo.png"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7052FF] focus:bg-white transition-colors"
-                  />
+
+                  {/* Actions & Instructions */}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => logoFileInputRef.current?.click()}
+                        disabled={isUploadingLogo}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#7052FF] hover:bg-[#5e3fed] text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {isUploadingLogo ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            <span>{logoUrl ? 'Change Logo' : 'Upload Store Logo'}</span>
+                          </>
+                        )}
+                      </button>
+
+                      {logoUrl && (
+                        <button
+                          type="button"
+                          onClick={handleLogoRemove}
+                          disabled={isUploadingLogo}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200/80 text-xs font-semibold rounded-xl shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Remove</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      PNG, SVG, or WebP up to 5MB • Transparent background recommended for 80mm thermal receipts.
+                    </p>
+
+                    {logoUploadError && (
+                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                        <span>{logoUploadError}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -763,7 +898,7 @@ export default function SettingsDocumentPage() {
                     </div>
                   ) : (
                     <div className="w-10 h-10 rounded-xl bg-[#7052FF] text-white flex items-center justify-center font-bold text-base shadow-xs">
-                      D
+                      {storeName.trim().charAt(0) || 'D'}
                     </div>
                   )}
                 </div>

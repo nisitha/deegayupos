@@ -28,6 +28,7 @@ export interface HardwareSettings {
   autoOpenCashDrawer: boolean;
   printBarcode: boolean;
   printQrCode: boolean;
+  printLogo?: boolean;
   footerMessage: string;
   bluetoothDeviceName?: string | null;
 }
@@ -41,6 +42,7 @@ export const DEFAULT_HARDWARE_SETTINGS: HardwareSettings = {
   autoOpenCashDrawer: true,
   printBarcode: true,
   printQrCode: true,
+  printLogo: true,
   footerMessage: 'නිරෝගී සුවය පතමු! / Thank You Come Again',
   bluetoothDeviceName: null,
 };
@@ -147,6 +149,7 @@ export class PrinterBridge {
       address?: string;
       phone?: string;
       taxNumber?: string;
+      logoUrl?: string;
     },
   ): Promise<boolean> {
     const paperWidth = settings.paperWidth;
@@ -257,6 +260,11 @@ export class PrinterBridge {
           </style>
         </head>
         <body>
+          ${settings.printLogo !== false && storeDetails?.logoUrl ? `
+            <div class="center" style="margin-bottom: 6px;">
+              <img src="${storeDetails.logoUrl}" style="max-height: 48px; max-width: 140px; object-fit: contain;" />
+            </div>
+          ` : ''}
           <div class="center bold" style="font-size: ${paperWidth === '58mm' ? '13px' : '15px'};">
             ${storeDetails?.storeName || 'DEEGAYU WEDA MADURA'}
           </div>

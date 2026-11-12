@@ -37,6 +37,7 @@ export interface BusinessProfileData {
   name: string;
   slug: string;
   legalName?: string | null;
+  logoUrl?: string | null;
   businessType: string;
   status: string;
   currency: string;

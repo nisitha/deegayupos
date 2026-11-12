@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -100,6 +102,13 @@ export function PosSidebar() {
 
   const businessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
   const initial = businessName.charAt(0) || 'D';
+  const logoUrl = business?.logoUrl || (tenant as { logoUrl?: string | null } | null)?.logoUrl;
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logoUrl]);
+
   const displayName = user?.fullName || 'Dr. Deegayu';
   const userEmail = user?.email || 'owner@deegayu.pixelcraftlk.com';
 
@@ -129,8 +138,17 @@ export function PosSidebar() {
       {/* 1. Brand Header */}
       <div className="p-4 pb-3 border-b border-slate-50">
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="bg-[#7052FF] text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-            <span>{initial}</span>
+          <div className="bg-[#7052FF] text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform overflow-hidden p-0.5">
+            {logoUrl && !logoError ? (
+              <img
+                src={logoUrl}
+                alt={businessName}
+                className="w-full h-full object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span>{initial}</span>
+            )}
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-slate-900 truncate leading-tight group-hover:text-[#7052FF] transition-colors">

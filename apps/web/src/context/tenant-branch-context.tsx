@@ -129,11 +129,65 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const fetchProfile = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await businessApi.getProfile();
-      if (res.data) {
-        setBusiness(res.data);
-        if (res.data.branches && res.data.branches.length > 0) {
-          setBranches(res.data.branches);
+
+      // 1. Fetch live tenant settings (including uploaded logoUrl) from Next.js API
+      let localSettingsData: {
+        id?: string;
+        name?: string;
+        legalName?: string | null;
+        logoUrl?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        address?: string | null;
+      } | null = null;
+
+      try {
+        const localRes = await fetch('/api/tenant/settings?slug=deegayu');
+        if (localRes.ok) {
+          const localJson = await localRes.json();
+          if (localJson.success && localJson.data) {
+            localSettingsData = localJson.data;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch local tenant settings:', err);
+      }
+
+      // 2. Fetch business profile from backend API if available
+      try {
+        const res = await businessApi.getProfile();
+        if (res.data) {
+          setBusiness({
+            ...res.data,
+            ...(localSettingsData?.logoUrl !== undefined ? { logoUrl: localSettingsData.logoUrl } : {}),
+            ...(localSettingsData?.name ? { name: localSettingsData.name } : {}),
+            ...(localSettingsData?.legalName ? { legalName: localSettingsData.legalName } : {}),
+          });
+          if (res.data.branches && res.data.branches.length > 0) {
+            setBranches(res.data.branches);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch tenant business profile from backend API:', err);
+        if (localSettingsData) {
+          setBusiness((prev) => ({
+            ...(prev || {
+              id: localSettingsData?.id || 'tenant-deegayu-id',
+              name: localSettingsData?.name || 'Deegayu Weda Madura',
+              slug: 'deegayu',
+              currency: 'LKR',
+              businessType: 'PHARMACY',
+              timezone: 'Asia/Colombo',
+              status: 'ACTIVE',
+              branches: [],
+            }),
+            name: localSettingsData.name || 'Deegayu Weda Madura',
+            legalName: localSettingsData.legalName,
+            logoUrl: localSettingsData.logoUrl,
+            phone: localSettingsData.phone || undefined,
+            email: localSettingsData.email || undefined,
+            address: localSettingsData.address || undefined,
+          }));
         }
       }
       await fetchBranches();
