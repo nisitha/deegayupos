@@ -105,11 +105,16 @@ export async function uploadStoreLogo(
     throw new Error(errorMsg);
   }
 
-  const data = (await response.json()) as { url: string };
-  if (!data?.url) {
+  const data = (await response.json()) as {
+    url?: string;
+    logoUrl?: string;
+    publicUrl?: string;
+  };
+  const returnedUrl = data.logoUrl || data.url || data.publicUrl;
+  if (!returnedUrl) {
     throw new Error('Upload endpoint did not return an image URL');
   }
 
-  return data.url;
+  return returnedUrl;
 }
 

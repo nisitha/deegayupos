@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
         const bucketName = 'store-assets';
 
-        // Auto-create public bucket if missing
+        // Auto-create public bucket if missing, or ensure it is explicitly public
         const { data: buckets, error: listError } = await supabase.storage.listBuckets();
         if (!listError) {
           const exists = buckets?.some((b) => b.name === bucketName);
@@ -69,14 +69,28 @@ export async function POST(req: NextRequest) {
               public: true,
               fileSizeLimit: 5 * 1024 * 1024,
             });
+          } else {
+            await supabase.storage.updateBucket(bucketName, {
+              public: true,
+            });
           }
         }
+
+        const contentType =
+          file.type ||
+          (ext === 'svg'
+            ? 'image/svg+xml'
+            : ext === 'webp'
+            ? 'image/webp'
+            : ext === 'png'
+            ? 'image/png'
+            : 'image/jpeg');
 
         // Upload file
         const { error: uploadError } = await supabase.storage
           .from(bucketName)
           .upload(storagePath, buffer, {
-            contentType: file.type || (ext === 'svg' ? 'image/svg+xml' : `image/${ext}`),
+            contentType,
             upsert: true,
           });
 
@@ -87,7 +101,10 @@ export async function POST(req: NextRequest) {
 
           if (publicUrlData?.publicUrl) {
             return NextResponse.json({
+              success: true,
               url: publicUrlData.publicUrl,
+              logoUrl: publicUrlData.publicUrl,
+              publicUrl: publicUrlData.publicUrl,
               storage: 'supabase',
               path: storagePath,
             });
@@ -111,7 +128,10 @@ export async function POST(req: NextRequest) {
     const localUrl = `/uploads/logos/${tenantSlug}/${fileName}`;
 
     return NextResponse.json({
+      success: true,
       url: localUrl,
+      logoUrl: localUrl,
+      publicUrl: localUrl,
       storage: 'local',
       path: storagePath,
     });

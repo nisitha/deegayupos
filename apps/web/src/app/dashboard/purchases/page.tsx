@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { GoodsReceivedNoteDto, PurchaseOrderDto, SupplierDto } from '@pixelcraft/types';
+import { getCachedCatalogData } from '../../../lib/catalog-db';
 
 interface CatalogProductItem {
   id: string;
@@ -65,20 +66,34 @@ export default function PurchasesPage() {
 
   // Load Data
   const fetchData = useCallback(async () => {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard/purchases') {
+      return;
+    }
     setIsLoading(true);
     try {
-      const [grnRes, poRes, supRes, catRes] = await Promise.all([
+      // 1. Try to load catalog from IndexedDB first for instant startup (<10ms)
+      let productsLoaded = false;
+      try {
+        const cached = await getCachedCatalogData<CatalogProductItem>('deegayu');
+        if (cached && cached.products && cached.products.length > 0) {
+          setCatalogProducts(cached.products);
+          productsLoaded = true;
+        }
+      } catch (cacheErr) {
+        console.warn('Purchases page cache read error:', cacheErr);
+      }
+
+      // 2. Fetch procurement records, and only query catalog over network if IndexedDB was empty
+      const [grnRes, poRes, supRes] = await Promise.all([
         fetch('/api/procurement/grn?slug=deegayu&limit=50'),
         fetch('/api/procurement/purchase-orders?slug=deegayu&limit=50'),
         fetch('/api/suppliers?slug=deegayu&limit=150'),
-        fetch('/api/pos/catalog?slug=deegayu&limit=3500'),
       ]);
 
-      const [grnJson, poJson, supJson, catJson] = await Promise.all([
+      const [grnJson, poJson, supJson] = await Promise.all([
         grnRes.json(),
         poRes.json(),
         supRes.json(),
-        catRes.json(),
       ]);
 
       if (grnJson.success && grnJson.data) setGrns(grnJson.data.items || []);
@@ -89,8 +104,15 @@ export default function PurchasesPage() {
           setGrnSupplierId((prev) => prev || supJson.data.items[0].id);
         }
       }
-      if (catJson.success && catJson.data) {
-        setCatalogProducts(catJson.data.products || []);
+
+      if (!productsLoaded) {
+        const catRes = await fetch('/api/pos/catalog?slug=deegayu&limit=3500');
+        if (catRes.ok) {
+          const catJson = await catRes.json();
+          if (catJson.success && catJson.data) {
+            setCatalogProducts(catJson.data.products || []);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load procurement data:', err);

@@ -271,6 +271,17 @@ export const businessApi = {
 
 export const tenantSettingsApi = {
   getSettings: async (slug?: string): Promise<ApiResponse<TenantStoreSettingsDto>> => {
+    try {
+      const q = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+      const localRes = await fetch(`/api/tenant/settings${q}`, {
+        cache: 'no-store',
+      });
+      if (localRes.ok) {
+        return (await localRes.json()) as ApiResponse<TenantStoreSettingsDto>;
+      }
+    } catch {
+      // Fallback to apiClient
+    }
     return apiClient.get<TenantStoreSettingsDto>('/tenant/settings', {
       params: slug ? { slug } : undefined,
     });
@@ -279,6 +290,19 @@ export const tenantSettingsApi = {
     data: UpdateTenantStoreSettingsDto,
     slug?: string,
   ): Promise<ApiResponse<TenantStoreSettingsDto>> => {
+    try {
+      const q = slug ? `?slug=${encodeURIComponent(slug)}` : '';
+      const localRes = await fetch(`/api/tenant/settings${q}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (localRes.ok) {
+        return (await localRes.json()) as ApiResponse<TenantStoreSettingsDto>;
+      }
+    } catch {
+      // Fallback to apiClient
+    }
     return apiClient.patch<TenantStoreSettingsDto>('/tenant/settings', data, {
       params: slug ? { slug } : undefined,
     });

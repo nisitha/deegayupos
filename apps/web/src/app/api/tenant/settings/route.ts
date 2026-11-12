@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       tenantId: business.id,
       name: ts?.name || business.name || 'දීගායු වෙද මැදුර / Deegayu Weda Madura',
       legalName: ts?.legalName ?? business.legalName ?? 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
-      logoUrl: ts?.logoUrl ?? business.logoUrl ?? 'https://pos.pixelcraftlk.com/images/deegayu-logo.png',
+      logoUrl: ts?.logoUrl ?? business.logoUrl ?? null,
       phone: ts?.phone || business.phone || primaryBranch?.phone || '+94 34 222 3456',
       email: ts?.email ?? business.email ?? 'info@deegayu.pixelcraftlk.com',
       address: ts?.address || business.address || primaryBranch?.address || 'Main Street, Kalutara, Sri Lanka',

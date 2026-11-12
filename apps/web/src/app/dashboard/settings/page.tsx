@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Save,
   Printer,
@@ -29,13 +30,14 @@ import { ReceiptBarcodeBlock } from '@/components/pos/receipt-barcode-block';
 import { uploadStoreLogo } from '../../../lib/upload-store-logo';
 
 export default function SettingsDocumentPage() {
+  const router = useRouter();
   const { business, refreshProfile, hasPermission } = useTenantBranch();
 
   // 1. Store Identity & Contact States
   const [storeName, setStoreName] = useState('දීගායු වෙද මැදුර / Deegayu Weda Madura');
   const [legalName, setLegalName] = useState('Deegayu Ayurvedic Products & Health Care (Pvt) Ltd');
   const [branchName, setBranchName] = useState('Kalutara Flagship Dispensary');
-  const [logoUrl, setLogoUrl] = useState('https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=120&auto=format&fit=crop&q=80');
+  const [logoUrl, setLogoUrl] = useState('');
   const [phone, setPhone] = useState('+94 34 222 3456');
   const [email, setEmail] = useState('dispensary@deegayu.pixelcraftlk.com');
   const [address, setAddress] = useState('Main Street, Kalutara, Western Province, Sri Lanka');
@@ -69,7 +71,14 @@ export default function SettingsDocumentPage() {
   // Logo Upload States & Ref
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
+  const [receiptLogoFailed, setReceiptLogoFailed] = useState(false);
   const logoFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLogoPreviewFailed(false);
+    setReceiptLogoFailed(false);
+  }, [logoUrl]);
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -83,6 +92,8 @@ export default function SettingsDocumentPage() {
     const previousLogo = logoUrl;
     setLogoUploadError(null);
     setIsUploadingLogo(true);
+    setLogoPreviewFailed(false);
+    setReceiptLogoFailed(false);
 
     // Optimistic local preview
     const objectUrl = URL.createObjectURL(file);
@@ -90,10 +101,28 @@ export default function SettingsDocumentPage() {
 
     try {
       const uploadedUrl = await uploadStoreLogo(file, 'deegayu');
-      setLogoUrl(uploadedUrl);
-      // Auto-persist immediately to tenant settings in DB
-      await tenantSettingsApi.updateSettings({ logoUrl: uploadedUrl }, 'deegayu');
+      if (!uploadedUrl) throw new Error('No logo URL returned from upload');
+
+      // Cache-busting preview URL for immediate display
+      const cacheBustedPreview = uploadedUrl.includes('?')
+        ? `${uploadedUrl}&t=${Date.now()}`
+        : `${uploadedUrl}?t=${Date.now()}`;
+      setLogoUrl(cacheBustedPreview);
+
+      // Auto-persist clean URL immediately to database
+      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoUrl: uploadedUrl }),
+      });
+
+      if (!persistRes.ok) {
+        await tenantSettingsApi.updateSettings({ logoUrl: uploadedUrl }, 'deegayu');
+      }
+
       await refreshProfile();
+      router.refresh();
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
@@ -116,8 +145,19 @@ export default function SettingsDocumentPage() {
     setLogoUrl('');
 
     try {
-      await tenantSettingsApi.updateSettings({ logoUrl: null }, 'deegayu');
+      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoUrl: null }),
+      });
+
+      if (!persistRes.ok) {
+        await tenantSettingsApi.updateSettings({ logoUrl: null }, 'deegayu');
+      }
+
       await refreshProfile();
+      router.refresh();
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
@@ -137,12 +177,34 @@ export default function SettingsDocumentPage() {
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await tenantSettingsApi.getSettings('deegayu');
-      if (res.success && res.data) {
-        const d = res.data;
+      let resData: TenantStoreSettingsDto | null = null;
+      try {
+        const fetchRes = await fetch(`/api/tenant/settings?slug=deegayu&t=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (fetchRes.ok) {
+          const json = await fetchRes.json();
+          if (json.success && json.data) {
+            resData = json.data;
+          }
+        }
+      } catch {
+        // Fallback
+      }
+
+      if (!resData) {
+        const res = await tenantSettingsApi.getSettings('deegayu');
+        if (res.success && res.data) {
+          resData = res.data;
+        }
+      }
+
+      if (resData) {
+        const d = resData;
         if (d.name) setStoreName(d.name);
         if (d.legalName) setLegalName(d.legalName);
         if (d.logoUrl) setLogoUrl(d.logoUrl);
+        else setLogoUrl('');
         if (d.phone) setPhone(d.phone);
         if (d.email) setEmail(d.email);
         if (d.address) setAddress(d.address);
@@ -162,6 +224,7 @@ export default function SettingsDocumentPage() {
       if (business) {
         if (business.name) setStoreName(business.name);
         if (business.legalName) setLegalName(business.legalName);
+        if (business.logoUrl) setLogoUrl(business.logoUrl);
         if (business.primaryBranch?.name) setBranchName(business.primaryBranch.name);
         if (business.primaryBranch?.address) setAddress(business.primaryBranch.address);
         if (business.primaryBranch?.phone) setPhone(business.primaryBranch.phone);
@@ -205,14 +268,26 @@ export default function SettingsDocumentPage() {
         showQr,
       };
 
-      const res = await tenantSettingsApi.updateSettings(payload, 'deegayu');
-      if (res.success) {
+      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      let saveOk = persistRes.ok;
+      if (!saveOk) {
+        const res = await tenantSettingsApi.updateSettings(payload, 'deegayu');
+        saveOk = res.success;
+      }
+
+      if (saveOk) {
         setSaveSuccess(true);
         setIsDirty(false);
         await refreshProfile();
+        router.refresh();
         setTimeout(() => setSaveSuccess(false), 3500);
       } else {
-        setErrorMessage(res.error?.message || 'Failed to save store settings.');
+        setErrorMessage('Failed to save store settings.');
       }
     } catch (err: unknown) {
       console.error('Failed to save store settings:', err);
@@ -454,15 +529,12 @@ export default function SettingsDocumentPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/90">
                   {/* 80x80 Squircle Preview Box */}
                   <div className="w-20 h-20 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 overflow-hidden p-1 relative group">
-                    {logoUrl ? (
+                    {logoUrl && !logoPreviewFailed ? (
                       <img
                         src={logoUrl}
                         alt="Store Logo"
                         className="w-full h-full object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=120&auto=format&fit=crop&q=80';
-                        }}
+                        onError={() => setLogoPreviewFailed(true)}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-[#7052FF] to-[#5939e6] rounded-xl flex items-center justify-center text-white shadow-xs">
@@ -885,15 +957,13 @@ export default function SettingsDocumentPage() {
             <div className="text-center space-y-1 pb-2">
               {showLogo && (
                 <div className="flex justify-center mb-1.5">
-                  {logoUrl ? (
+                  {logoUrl && !receiptLogoFailed ? (
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-200/80 p-0.5">
                       <img
                         src={logoUrl}
                         alt="Store Logo"
                         className="w-full h-full object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
+                        onError={() => setReceiptLogoFailed(true)}
                       />
                     </div>
                   ) : (

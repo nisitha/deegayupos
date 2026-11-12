@@ -143,6 +143,9 @@ export default function ConfidencyPosPage() {
 
   // Instant 0ms Hydration via IndexedDB (< 15ms) + Background Sync
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard/pos') {
+      return;
+    }
     let isMounted = true;
 
     async function initCatalog() {

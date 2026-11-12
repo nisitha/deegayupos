@@ -94,6 +94,7 @@ export function BottomNavBar({ onOpenMoreActions }: BottomNavBarProps) {
           <Link
             key={item.name}
             href={item.href}
+            prefetch={false}
             className="flex-1 flex justify-center focus:outline-none"
           >
             {content}

@@ -142,7 +142,9 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       } | null = null;
 
       try {
-        const localRes = await fetch('/api/tenant/settings?slug=deegayu');
+        const localRes = await fetch(`/api/tenant/settings?slug=deegayu&t=${Date.now()}`, {
+          cache: 'no-store',
+        });
         if (localRes.ok) {
           const localJson = await localRes.json();
           if (localJson.success && localJson.data) {
@@ -159,7 +161,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         if (res.data) {
           setBusiness({
             ...res.data,
-            ...(localSettingsData?.logoUrl !== undefined ? { logoUrl: localSettingsData.logoUrl } : {}),
+            logoUrl: localSettingsData ? localSettingsData.logoUrl : res.data.logoUrl,
             ...(localSettingsData?.name ? { name: localSettingsData.name } : {}),
             ...(localSettingsData?.legalName ? { legalName: localSettingsData.legalName } : {}),
           });
@@ -183,7 +185,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             }),
             name: localSettingsData.name || 'Deegayu Weda Madura',
             legalName: localSettingsData.legalName,
-            logoUrl: localSettingsData.logoUrl,
+            logoUrl: localSettingsData.logoUrl ?? null,
             phone: localSettingsData.phone || undefined,
             email: localSettingsData.email || undefined,
             address: localSettingsData.address || undefined,

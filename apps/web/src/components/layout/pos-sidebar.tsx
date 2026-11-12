@@ -137,7 +137,7 @@ export function PosSidebar() {
     <aside className="hidden md:flex w-[240px] lg:w-[260px] bg-white border-r border-slate-100 flex-col justify-between h-full shrink-0 select-none z-30">
       {/* 1. Brand Header */}
       <div className="p-4 pb-3 border-b border-slate-50">
-        <Link href="/dashboard" className="flex items-center gap-2.5 group">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2.5 group">
           <div className="bg-[#7052FF] text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform overflow-hidden p-0.5">
             {logoUrl && !logoError ? (
               <img
@@ -196,6 +196,7 @@ export function PosSidebar() {
                   <Link
                     key={item.name}
                     href={item.href}
+                    prefetch={false}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors group ${
                       isActive
                         ? 'bg-slate-100 text-slate-900 font-bold shadow-xs'
