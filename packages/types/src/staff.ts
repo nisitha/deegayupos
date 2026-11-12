@@ -36,3 +36,4 @@ export interface UpdateStaffUserDto {
   isActive?: boolean;
   phone?: string | null;
 }
+

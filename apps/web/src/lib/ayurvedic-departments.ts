@@ -148,7 +148,33 @@ export function classifyAyurvedicDepartment(
     return 'taila';
   }
 
-  // 3. Churna & Powders
+  // 3. Herbal Skincare, Hair Care & Personal Hygiene
+  if (
+    p.includes('hair') ||
+    p.includes('colour') ||
+    p.includes('color') ||
+    p.includes('dye') ||
+    p.includes('henna') ||
+    p.includes('mehendi') ||
+    p.includes('soap') ||
+    p.includes('face') ||
+    p.includes('wash') ||
+    p.includes('shampoo') ||
+    p.includes('conditioner') ||
+    p.includes('skin') ||
+    p.includes('lotion') ||
+    p.includes('scrub') ||
+    p.includes('cream') ||
+    c.includes('soap') ||
+    c.includes('cream') ||
+    c.includes('skin') ||
+    c.includes('hair') ||
+    c.includes('cosmetic')
+  ) {
+    return 'skincare';
+  }
+
+  // 4. Churna & Powders
   if (
     p.includes('churna') ||
     p.includes('churnaya') ||
@@ -210,23 +236,6 @@ export function classifyAyurvedicDepartment(
     c.includes('balm')
   ) {
     return 'balms';
-  }
-
-  // 8. Herbal Skincare & Soaps
-  if (
-    p.includes('soap') ||
-    p.includes('face') ||
-    p.includes('wash') ||
-    p.includes('shampoo') ||
-    p.includes('skin') ||
-    p.includes('lotion') ||
-    p.includes('scrub') ||
-    p.includes('cream') ||
-    c.includes('soap') ||
-    c.includes('cream') ||
-    c.includes('skin')
-  ) {
-    return 'skincare';
   }
 
   // 9. Raw & Dry Herbs

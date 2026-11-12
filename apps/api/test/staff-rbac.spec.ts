@@ -322,3 +322,4 @@ describe('PixelCraft POS - Step 5: Staff Accounts, RBAC & Cashier Attribution Su
     expect(updated.role).toBe('MANAGER');
   });
 });
+

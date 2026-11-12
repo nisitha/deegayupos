@@ -38,7 +38,7 @@ import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
 import { CashierSwitcherModal } from '../../../components/pos/cashier-switcher-modal';
 import { CustomerModal, type CustomerData } from '../../../components/pos/customer-modal';
 import { HeldTicketsModal, type HeldTicket } from '../../../components/pos/held-tickets-modal';
-import { getProductPhoto } from '../../../lib/product-image-mapper';
+import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
 import {
   AYURVEDIC_MASTER_DEPARTMENTS,
   AYURVEDIC_DEPARTMENT_LIST,
@@ -1045,6 +1045,9 @@ export default function ConfidencyPosPage() {
                               alt={item.name}
                               className="w-full h-full object-contain"
                               loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
+                              }}
                             />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -1214,53 +1217,80 @@ export default function ConfidencyPosPage() {
                   <div
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    className="bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-200 rounded-2xl p-3.5 flex flex-col justify-between border border-slate-100 hover:border-[#7052FF]/30 cursor-pointer group active:scale-[0.98] select-none relative"
+                    className="bg-white border-2 border-slate-200/90 hover:border-indigo-400 rounded-2xl p-3.5 shadow-xs hover:shadow-md transition-all duration-150 flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative"
                   >
                     {/* Top Row: Department Sinhala Pill + Stock Indicator */}
                     <div className="flex items-center justify-between mb-2">
                       <span
-                        className={`text-xs font-semibold px-2.5 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
+                        className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
                       >
-                        {dept.si}
+                        {dept.si || dept.en}
                       </span>
-                      {product.stockOnHand <= 5 ? (
-                        <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                      {product.stockOnHand <= 0 ? (
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-mono">
+                          0 left
+                        </span>
+                      ) : product.stockOnHand <= 5 ? (
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-mono">
                           {product.stockOnHand} left
                         </span>
                       ) : (
-                        <span className="text-xs font-mono font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60">
+                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 font-mono">
                           Qty: {product.stockOnHand}
                         </span>
                       )}
                     </div>
 
                     {/* High-Contrast Realistic Product Photo Container */}
-                    <div className="w-full h-32 relative bg-slate-50/80 rounded-2xl overflow-hidden mb-3 flex items-center justify-center p-2 group-hover:bg-slate-100 transition-colors">
+                    <div className="bg-slate-50/90 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:bg-slate-100/80 transition-colors relative">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
                         className="w-full h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
                         loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
+                        }}
                       />
                     </div>
 
-                    {/* Product Title, Department Subtitle & Price */}
-                    <div className="mt-3">
-                      <h4
-                        className="text-sm md:text-base font-bold text-slate-900 line-clamp-2 min-h-[38px] group-hover:text-[#7052FF] transition-colors leading-snug"
-                        title={product.name}
-                      >
-                        {product.name}
-                      </h4>
-                      <div className="text-xs text-slate-600 font-medium truncate mt-0.5">
-                        {dept.en}
+                    {/* Product Details, Legible Typography & Tactile Add Action */}
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <h4
+                          className="text-sm md:text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px] group-hover:text-indigo-600 transition-colors"
+                          title={product.name}
+                        >
+                          {product.name}
+                        </h4>
+                        <div className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                          {dept.en}
+                        </div>
                       </div>
-                      <div className="text-sm md:text-base font-black text-slate-950 mt-1.5 font-mono">
-                        LKR{' '}
-                        {product.retailPrice.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+
+                      {/* Bottom Row: Large High-Contrast Price + Tactile '+' Add Button */}
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100">
+                        <div className="flex items-baseline">
+                          <span className="text-xs font-bold text-slate-400 mr-1">LKR</span>
+                          <span className="text-base md:text-lg font-black font-mono text-slate-950 tracking-tight">
+                            {product.retailPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product);
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-sm active:scale-90 transition-all cursor-pointer shrink-0"
+                          title="Add to cart"
+                          aria-label={`Add ${product.name} to cart`}
+                        >
+                          <Plus className="w-5 h-5 stroke-[2.5]" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1366,6 +1396,9 @@ export default function ConfidencyPosPage() {
                     alt={item.name}
                     className="w-full h-full object-contain"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
+                    }}
                   />
                 </div>
 

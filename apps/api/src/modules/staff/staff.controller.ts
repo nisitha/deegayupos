@@ -118,3 +118,4 @@ export class StaffController {
     return this.staffService.deleteStaff(tenant.id, id);
   }
 }
+
