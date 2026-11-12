@@ -97,6 +97,7 @@ export class ProductsService {
       sku: p.sku,
       barcode: p.barcode,
       description: p.description,
+      imageUrl: p.imageUrl || null,
       type: p.type,
       costPrice: Number(p.costPrice || 0),
       retailPrice: Number(p.retailPrice || 0),
@@ -203,6 +204,7 @@ export class ProductsService {
     const updateData: Record<string, unknown> = {};
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.imageUrl !== undefined) updateData.imageUrl = dto.imageUrl;
     if (dto.parentId !== undefined) updateData.parentId = dto.parentId;
     if (dto.slug !== undefined) {
       const slug = this.slugify(dto.slug);
@@ -683,6 +685,7 @@ export class ProductsService {
           sku,
           barcode,
           description: dto.description || null,
+          imageUrl: dto.imageUrl !== undefined ? dto.imageUrl : null,
           type: dto.type || 'STANDARD',
           categoryId: dto.categoryId || null,
           brandId: dto.brandId || null,
@@ -752,6 +755,7 @@ export class ProductsService {
     const updateData: Record<string, unknown> = {};
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.imageUrl !== undefined) updateData.imageUrl = dto.imageUrl;
     if (dto.categoryId !== undefined) updateData.categoryId = dto.categoryId;
     if (dto.brandId !== undefined) updateData.brandId = dto.brandId;
     if (dto.unitId !== undefined) updateData.unitId = dto.unitId;

@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
           name: true,
           sku: true,
           barcode: true,
+          imageUrl: true,
           costPrice: true,
           retailPrice: true,
           wholesalePrice: true,
@@ -109,6 +110,7 @@ export async function GET(request: NextRequest) {
         name: p.name,
         sku: p.sku,
         barcode: p.barcode || null,
+        imageUrl: p.imageUrl || null,
         costPrice: Number(p.costPrice),
         retailPrice: Number(p.retailPrice),
         wholesalePrice: p.wholesalePrice ? Number(p.wholesalePrice) : null,
@@ -162,6 +164,116 @@ export async function GET(request: NextRequest) {
       { success: false, error: message },
       { status: 500 },
     );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const tenantIdParam = request.headers.get('x-tenant-id');
+    const { searchParams } = new URL(request.url);
+    const tenantSlug = searchParams.get('slug') || 'deegayu';
+
+    let tenant = null;
+    if (tenantIdParam) {
+      tenant = await prisma.business.findUnique({
+        where: { id: tenantIdParam },
+        select: { id: true, slug: true },
+      });
+    }
+    if (!tenant) {
+      tenant = await prisma.business.findUnique({
+        where: { slug: tenantSlug },
+        select: { id: true, slug: true },
+      });
+    }
+
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant organization not found' },
+        { status: 404 },
+      );
+    }
+
+    const tenantId = tenant.id;
+    const body = await request.json();
+
+    if (!body.name || !body.name.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Product name is required' },
+        { status: 400 },
+      );
+    }
+
+    const name = body.name.trim();
+    const slug = body.slug
+      ? body.slug.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      : name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 6);
+    const sku = body.sku && body.sku.trim()
+      ? body.sku.trim().toUpperCase()
+      : 'SKU-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const barcode = body.barcode && body.barcode.trim() ? body.barcode.trim() : null;
+
+    // Check duplicate SKU in this tenant
+    const existingSku = await prisma.product.findUnique({
+      where: { tenantId_sku: { tenantId, sku } },
+    });
+    if (existingSku) {
+      return NextResponse.json(
+        { success: false, error: `Product with SKU '${sku}' already exists` },
+        { status: 409 },
+      );
+    }
+
+    if (barcode) {
+      const existingBarcode = await prisma.product.findUnique({
+        where: { tenantId_barcode: { tenantId, barcode } },
+      });
+      if (existingBarcode) {
+        return NextResponse.json(
+          { success: false, error: `Product with barcode '${barcode}' already exists` },
+          { status: 409 },
+        );
+      }
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        tenantId,
+        name,
+        slug,
+        sku,
+        barcode,
+        description: body.description || null,
+        imageUrl: body.imageUrl || null,
+        type: body.type || 'STANDARD',
+        categoryId: body.categoryId || null,
+        brandId: body.brandId || null,
+        unitId: body.unitId || null,
+        costPrice: body.costPrice !== undefined ? Number(body.costPrice) : 0,
+        retailPrice: Number(body.retailPrice || 0),
+        wholesalePrice: body.wholesalePrice !== undefined && body.wholesalePrice !== null ? Number(body.wholesalePrice) : null,
+        alertQuantity: body.alertQuantity !== undefined ? Number(body.alertQuantity) : 5,
+        isTrackStock: body.isTrackStock !== undefined ? Boolean(body.isTrackStock) : true,
+        isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+      },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...product,
+        costPrice: Number(product.costPrice),
+        retailPrice: Number(product.retailPrice),
+        wholesalePrice: product.wholesalePrice ? Number(product.wholesalePrice) : null,
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create product';
+    console.error('Create product API error:', error);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 

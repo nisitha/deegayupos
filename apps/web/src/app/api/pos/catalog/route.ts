@@ -18,6 +18,7 @@ interface CachedCatalogItem {
   stockOnHand: number;
   unit: string;
   alertQuantity: number | null;
+  imageUrl?: string | null;
 }
 
 interface CachedCategoryItem {
@@ -136,6 +137,7 @@ async function fetchFreshCatalog(params: {
         name: true,
         sku: true,
         barcode: true,
+        imageUrl: true,
         retailPrice: true,
         wholesalePrice: true,
         costPrice: true,
@@ -170,6 +172,7 @@ async function fetchFreshCatalog(params: {
       stockOnHand,
       unit: p.unit?.shortCode || 'pcs',
       alertQuantity: p.alertQuantity,
+      imageUrl: p.imageUrl || null,
     };
   });
 

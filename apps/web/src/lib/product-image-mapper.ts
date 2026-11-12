@@ -2,8 +2,8 @@ import { classifyAyurvedicDepartment } from './ayurvedic-departments';
 
 export interface ProductLike {
   name: string;
-  category?: { name?: string; slug?: string } | string;
-  imageUrl?: string;
+  category?: { name?: string; slug?: string } | string | null;
+  imageUrl?: string | null;
   departmentId?: string;
 }
 

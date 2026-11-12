@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -22,6 +23,9 @@ import {
   Tag,
   Ruler,
   Eye,
+  UploadCloud,
+  Loader2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import type {
   BrandDto,
@@ -34,13 +38,21 @@ import type {
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { productsApi } from '../../../lib/api-client';
-import { getCachedCatalogData, setCachedCatalogData } from '../../../lib/catalog-db';
+import {
+  getCachedCatalogData,
+  setCachedCatalogData,
+  invalidateCatalogCache,
+  updateCachedProductImage,
+} from '../../../lib/catalog-db';
+import { uploadProductImage } from '../../../lib/upload-product-image';
+import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
 
 export interface ManagedProductItem {
   id: string;
   name: string;
   sku: string;
   barcode?: string | null;
+  imageUrl?: string | null;
   costPrice: number;
   retailPrice: number;
   wholesalePrice?: number | null;
@@ -104,6 +116,7 @@ export default function ProductsPage() {
     sku: '',
     barcode: '',
     description: '',
+    imageUrl: '',
     type: 'STANDARD',
     categoryId: '',
     brandId: '',
@@ -119,6 +132,37 @@ export default function ProductsPage() {
 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Image Upload Engine State
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUrlInputVisible, setIsUrlInputVisible] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleImageFileSelected = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setFormError('Please select a valid image file (JPEG, PNG, WebP)');
+      return;
+    }
+    try {
+      setIsUploadingImage(true);
+      setFormError(null);
+
+      // Instant local preview
+      const previewUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, imageUrl: previewUrl }));
+
+      // Client-side compression to 600px WebP (<90KB) & upload to Supabase Storage
+      const uploadedUrl = await uploadProductImage(file, 'deegayu');
+      setFormData((prev) => ({ ...prev, imageUrl: uploadedUrl }));
+      URL.revokeObjectURL(previewUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Image upload failed';
+      setFormError(msg);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   // Load Categories, Brands, Units
   const loadTaxonomy = useCallback(async () => {
@@ -217,11 +261,13 @@ export default function ProductsPage() {
   // Open Add Product Modal
   const handleOpenAddModal = () => {
     setEditingProduct(null);
+    setIsUrlInputVisible(false);
     setFormData({
       name: '',
       sku: '',
       barcode: '',
       description: '',
+      imageUrl: '',
       type: 'STANDARD',
       categoryId: categories[0]?.id || '',
       brandId: brands[0]?.id || '',
@@ -242,11 +288,13 @@ export default function ProductsPage() {
   // Open Edit Product Modal
   const handleOpenEditModal = (p: ManagedProductItem) => {
     setEditingProduct(p as unknown as ProductDto);
+    setIsUrlInputVisible(false);
     setFormData({
       name: p.name,
       sku: p.sku,
       barcode: p.barcode || '',
       description: p.description || '',
+      imageUrl: p.imageUrl || '',
       type: (p.type as ProductType) || 'STANDARD',
       categoryId: p.categoryId || p.category?.id || '',
       brandId: p.brandId || '',
@@ -307,9 +355,18 @@ export default function ProductsPage() {
 
       if (editingProduct) {
         await productsApi.update(editingProduct.id, payload);
+        if (payload.imageUrl) {
+          await updateCachedProductImage(editingProduct.id, payload.imageUrl, 'deegayu');
+        }
       } else {
-        await productsApi.create(payload);
+        const res = await productsApi.create(payload);
+        if (res.data?.id && payload.imageUrl) {
+          await updateCachedProductImage(res.data.id, payload.imageUrl, 'deegayu');
+        }
       }
+
+      // Invalidate IndexedDB catalog cache so POS terminal instantly pulls updated image
+      await invalidateCatalogCache('deegayu');
 
       setIsProductModalOpen(false);
       loadProducts();
@@ -592,8 +649,24 @@ export default function ProductsPage() {
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-4 py-3.5">
-                        <div className="text-sm font-semibold text-slate-900 leading-snug">{p.name}</div>
-                        <div className="font-mono text-xs text-slate-500 mt-0.5">{p.sku}</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 overflow-hidden shrink-0 flex items-center justify-center p-0.5">
+                            <img
+                              src={getProductPhoto(p)}
+                              alt={p.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
+                              }}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 leading-snug truncate max-w-[260px]" title={p.name}>
+                              {p.name}
+                            </div>
+                            <div className="font-mono text-xs text-slate-500 mt-0.5">{p.sku}</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-slate-700">
                         {p.barcode ? (
@@ -789,6 +862,154 @@ export default function ProductsPage() {
               {/* TAB 1: General */}
               {activeTab === 'general' && (
                 <div className="space-y-4">
+                  {/* Interactive Product Image Dropzone */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Product Photograph</span>
+                      </label>
+                      <span className="text-[11px] text-slate-400">
+                        Max 600×600px • Auto-compressed WebP
+                      </span>
+                    </div>
+
+                    {formData.imageUrl && formData.imageUrl.trim() !== '' ? (
+                      /* Uploaded Image Preview Box */
+                      <div className="bg-slate-50 border-2 border-slate-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center p-1 shadow-xs">
+                            <img
+                              src={formData.imageUrl}
+                              alt="Product preview"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Photo Ready</span>
+                            </div>
+                            <div
+                              className="text-[11px] text-slate-500 font-mono truncate max-w-[200px] sm:max-w-xs mt-0.5"
+                              title={formData.imageUrl}
+                            >
+                              {formData.imageUrl}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploadingImage}
+                            className="px-3 py-1.5 rounded-xl border border-slate-300 hover:border-indigo-500 text-xs font-semibold text-slate-700 hover:text-indigo-600 bg-white shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            <span>Replace</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                            disabled={isUploadingImage}
+                            className="p-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 hover:text-rose-700 bg-white transition-colors cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Drag & Drop Visual Dropzone */
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDragging(true);
+                        }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsDragging(false);
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) handleImageFileSelected(file);
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all duration-150 flex flex-col items-center justify-center min-h-[135px] relative group ${
+                          isDragging
+                            ? 'border-indigo-500 bg-indigo-50/60 scale-[1.01]'
+                            : 'border-slate-300 hover:border-indigo-500 bg-slate-50/70 hover:bg-slate-50'
+                        }`}
+                      >
+                        {isUploadingImage ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                            <span className="text-xs font-semibold text-slate-700">
+                              Compressing & uploading to Supabase Storage...
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-center text-indigo-600 shadow-xs mb-2 group-hover:scale-105 transition-transform">
+                              <UploadCloud className="w-6 h-6 stroke-[2]" />
+                            </div>
+                            <div className="text-xs font-bold text-slate-800">
+                              Click to browse, capture with camera, or drag & drop
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              JPEG, PNG, WebP • Auto-compressed to 600px (&lt;90KB)
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hidden Native File Input (supports Camera capture on phones & tablets) */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageFileSelected(file);
+                        e.target.value = '';
+                      }}
+                    />
+
+                    {/* Collapsible "Or paste image URL" option */}
+                    <div className="mt-1.5 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsUrlInputVisible(!isUrlInputVisible)}
+                        className="text-[11px] text-indigo-600 hover:text-indigo-700 font-semibold hover:underline"
+                      >
+                        {isUrlInputVisible ? 'Hide URL input' : 'Or paste image URL'}
+                      </button>
+                    </div>
+
+                    {isUrlInputVisible && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://images.example.com/product.webp"
+                          value={formData.imageUrl || ''}
+                          onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors"
+                        />
+                        {formData.imageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setIsUrlInputVisible(false)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                          >
+                            Apply
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1341,6 +1562,18 @@ export default function ProductsPage() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Product Photo Hero */}
+            <div className="w-full h-44 bg-slate-50 border border-slate-200/80 rounded-2xl overflow-hidden flex items-center justify-center p-3 relative">
+              <img
+                src={getProductPhoto(viewingProduct)}
+                alt={viewingProduct.name}
+                className="w-full h-full object-contain drop-shadow-sm"
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
+                }}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">

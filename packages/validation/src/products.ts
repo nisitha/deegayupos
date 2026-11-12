@@ -50,6 +50,7 @@ export const createProductSchema = z.object({
   sku: z.string().min(1).max(128).optional(),
   barcode: z.string().max(128).optional().nullable(),
   description: z.string().max(5000).optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
   type: z.enum(['STANDARD', 'VARIABLE', 'SERVICE', 'BUNDLE']).default('STANDARD'),
   categoryId: z.string().uuid().optional().nullable(),
   brandId: z.string().uuid().optional().nullable(),

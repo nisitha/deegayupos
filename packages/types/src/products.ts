@@ -100,6 +100,7 @@ export interface ProductDto {
   sku: string;
   barcode?: string | null;
   description?: string | null;
+  imageUrl?: string | null;
   type: ProductType;
   costPrice: number;
   retailPrice: number;
@@ -121,6 +122,7 @@ export interface CreateProductPayload {
   sku?: string;
   barcode?: string | null;
   description?: string | null;
+  imageUrl?: string | null;
   type?: ProductType;
   categoryId?: string | null;
   brandId?: string | null;
@@ -140,6 +142,7 @@ export interface UpdateProductPayload {
   sku?: string;
   barcode?: string | null;
   description?: string | null;
+  imageUrl?: string | null;
   type?: ProductType;
   categoryId?: string | null;
   brandId?: string | null;

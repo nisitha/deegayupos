@@ -309,3 +309,61 @@ export function searchIndexedProducts<T extends { _searchStr: string }>(
 
   return results;
 }
+
+/**
+ * Invalidate the local catalog cache (e.g. after uploading a product image or editing product)
+ */
+export async function invalidateCatalogCache(slug: string = 'deegayu'): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const key = getCatalogCacheKey(slug);
+  try {
+    const db = await getDatabase();
+    if (db) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(key);
+    }
+  } catch (err) {
+    console.warn('Failed to clear IndexedDB cache key:', err);
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Optimistically update a single product's image inside the local IndexedDB cache
+ */
+export async function updateCachedProductImage(
+  productId: string,
+  imageUrl: string,
+  slug: string = 'deegayu'
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const cached = await getCachedCatalogData<Record<string, unknown>>(slug);
+    if (!cached || !Array.isArray(cached.products)) return;
+
+    let modified = false;
+    const updatedProducts = cached.products.map((item) => {
+      if (item.id === productId) {
+        modified = true;
+        return { ...item, imageUrl };
+      }
+      return item;
+    });
+
+    if (modified) {
+      await setCachedCatalogData(slug, {
+        products: updatedProducts,
+        categories: cached.categories,
+        total: cached.total,
+        version: cached.version,
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to optimistically update product image in cache:', err);
+  }
+}
