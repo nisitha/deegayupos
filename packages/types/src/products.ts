@@ -19,6 +19,7 @@ export interface CreateCategoryPayload {
   slug?: string;
   description?: string | null;
   parentId?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface UpdateCategoryPayload {
@@ -26,6 +27,7 @@ export interface UpdateCategoryPayload {
   slug?: string;
   description?: string | null;
   parentId?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface BrandDto {

@@ -514,7 +514,7 @@ export class PrinterBridge {
         sale.payments?.some((p) => p.paymentMethod === 'CASH'),
       printBarcode: settings.printBarcode,
       printQrCode: settings.printQrCode,
-      verificationUrl: `https://pos.pixelcraftlk.com/verify/${sale.invoiceNumber}`,
+      verificationUrl: `https://pos.pixelcraftlk.com/receipt/${sale.invoiceNumber}`,
       currencySymbol: 'LKR',
     };
 

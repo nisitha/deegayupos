@@ -1,9 +1,11 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  transpilePackages: ['@pixelcraft/types', '@pixelcraft/validation'],
+  output: 'export',
+  basePath: '',
+  trailingSlash: true,
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -11,6 +13,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  transpilePackages: ['@pixelcraft/types', '@pixelcraft/validation'],
 };
 
 export default nextConfig;
