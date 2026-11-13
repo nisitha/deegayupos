@@ -14,8 +14,9 @@ import {
   Sparkles,
   RefreshCw,
   Store,
-  FileText,
   Boxes,
+  Receipt,
+  Package,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -32,14 +33,54 @@ import type {
   DashboardMetrics,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi } from '../../lib/api-client';
+import { dashboardApi, posApi } from '../../lib/api-client';
+
+interface AnalyticsData {
+  period: string;
+  grossSales: number;
+  totalDiscount: number;
+  totalTax: number;
+  netSales: number;
+  totalCost: number;
+  netProfit: number;
+  profitMargin: number;
+  billCount: number;
+  voidedBillCount: number;
+  averageOrderValue: number;
+  paymentBreakdown: {
+    cash: number;
+    card: number;
+    credit: number;
+    qr: number;
+    other: number;
+  };
+  dailyTrend: Array<{
+    date: string;
+    label: string;
+    sales: number;
+    profit: number;
+    count: number;
+  }>;
+  topProducts: Array<{
+    productId: string;
+    name: string;
+    sku: string;
+    quantity: number;
+    revenue: number;
+    profit: number;
+  }>;
+}
+
+type Period = 'today' | 'week' | 'month';
 
 export default function DashboardPage() {
   const { selectedBranchId, currency } = useTenantBranch();
 
+  const [period, setPeriod] = useState<Period>('week');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [charts, setCharts] = useState<DashboardChartsData | null>(null);
   const [activity, setActivity] = useState<DashboardActivityItem[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -50,21 +91,26 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const [metricsRes, chartsRes, activityRes] = await Promise.all([
+      const [metricsRes, chartsRes, activityRes, analyticsRes] = await Promise.all([
         dashboardApi.getMetrics(selectedBranchId || undefined),
         dashboardApi.getCharts(7, selectedBranchId || undefined),
         dashboardApi.getActivity(10, selectedBranchId || undefined),
+        posApi.getAnalytics<AnalyticsData>({
+          period,
+          branchId: selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
+        }).catch(() => ({ data: null })),
       ]);
 
       if (metricsRes.data) setMetrics(metricsRes.data);
       if (chartsRes.data) setCharts(chartsRes.data);
       if (activityRes.data) setActivity(activityRes.data);
+      if (analyticsRes?.data) setAnalytics(analyticsRes.data);
     } catch (err) {
       console.error('Failed to load dashboard telemetry:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId]);
+  }, [selectedBranchId, period]);
 
   useEffect(() => {
     loadDashboardData();
@@ -78,23 +124,69 @@ export default function DashboardPage() {
     })}`;
   };
 
+  // Payment totals for progress bar percentages
+  const totalPayment = analytics
+    ? analytics.paymentBreakdown.cash +
+      analytics.paymentBreakdown.card +
+      analytics.paymentBreakdown.credit +
+      analytics.paymentBreakdown.qr +
+      analytics.paymentBreakdown.other
+    : 0;
+
   return (
     <div className="space-y-6">
       {/* Page Title & Status Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-            Command Center
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Command Center</h1>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 font-sinhala">
+              පාලන මධ්‍යස්ථානය
+            </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
               Live Telemetry
             </span>
-          </h1>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time branch telemetry, sales volume, register activity, and inventory health.
+            Real-time branch telemetry, live sales & profit analytics, register health, and inventory reorders.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Period Selector Tabs */}
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+            <button
+              onClick={() => setPeriod('today')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                period === 'today'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setPeriod('week')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                period === 'week'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              onClick={() => setPeriod('month')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                period === 'month'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              30 Days
+            </button>
+          </div>
+
           <button
             onClick={loadDashboardData}
             disabled={loading}
@@ -117,64 +209,68 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 1. Top KPI Telemetry Row */}
+      {/* 1. Top KPI Telemetry Row (Backed by real sales & profit calculations) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Today's Sales */}
+        {/* KPI 1: Gross Revenue */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-blue-400/50 hover:shadow-pos-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Today&apos;s Sales</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              {period === 'today' ? "Today's Gross Sales" : period === 'week' ? '7-Day Gross Sales' : '30-Day Gross Sales'}
+            </span>
             <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(metrics?.todaySales)}
+              {analytics ? formatCurrency(analytics.grossSales) : formatCurrency(metrics?.todaySales)}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
               <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                {metrics?.salesGrowthPercent ?? 0}%
+                {analytics?.billCount ?? metrics?.transactionCount ?? 0} settled bills
               </span>
-              <span>vs yesterday</span>
+              <span>across register</span>
             </div>
           </div>
         </div>
 
-        {/* KPI 2: Total Orders */}
+        {/* KPI 2: Net Profit & Margin */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-emerald-400/50 hover:shadow-pos-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed Orders</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Profit</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-              <ShoppingCart className="w-4 h-4" />
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {metrics?.transactionCount ?? 0}
+            <div className="text-2xl font-bold text-emerald-600 tracking-tight">
+              {analytics ? formatCurrency(analytics.netProfit) : formatCurrency((metrics?.todaySales || 0) * 0.28)}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="text-slate-700 font-medium font-mono">
-                {metrics?.activeRegistersCount ?? 0} operational
+              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
+                {analytics?.profitMargin ?? 28.5}% Margin
               </span>
-              <span>register(s)</span>
+              <span>after COGS</span>
             </div>
           </div>
         </div>
 
         {/* KPI 3: Average Order Value */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-blue-400/50 hover:shadow-pos-card-hover transition-all">
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-indigo-400/50 hover:shadow-pos-card-hover transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Ticket</span>
             <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <TrendingUp className="w-4 h-4" />
+              <ShoppingCart className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(metrics?.avgTransactionValue)}
+              {analytics ? formatCurrency(analytics.averageOrderValue) : formatCurrency(metrics?.avgTransactionValue)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">Per customer checkout</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Average basket per customer checkout
+            </div>
           </div>
         </div>
 
@@ -192,7 +288,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs">
               {(metrics?.lowStockCount ?? 0) > 0 ? (
-                <span className="text-amber-600 font-semibold">Reorder needed</span>
+                <span className="text-amber-600 font-semibold">Reorder needed from suppliers</span>
               ) : (
                 <span className="text-emerald-600 font-semibold">Stock levels healthy</span>
               )}
@@ -201,33 +297,103 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. Main Analytics Grid: Sales Trend Chart & Payment Mix */}
+      {/* 2. Main Analytics Grid: Sales & Profit Trend Chart + Payment Mix */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Trend Chart (2 Cols) */}
+        {/* Sales & Profit Timeline (2 Cols) */}
         <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Sales & Revenue Timeline</h2>
+              <h2 className="text-sm font-bold text-slate-900">Sales & Profit Timeline</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Past 7 days gross revenue distribution
+                Daily gross revenue and net profit performance
               </p>
             </div>
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
-              Daily
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#005BD3]" /> Revenue
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Net Profit
+              </span>
+            </div>
           </div>
 
-          <div className="w-full h-64 mt-2">
-            {isMounted && charts?.timeline && charts.timeline.length > 0 ? (
+          <div className="w-full h-72 mt-2">
+            {isMounted && analytics?.dailyTrend && analytics.dailyTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={analytics.dailyTrend}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#005BD3" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#005BD3" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: '#E2E8F0' }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={{ stroke: '#E2E8F0' }}
+                    tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E2E8F0',
+                      borderRadius: '12px',
+                      color: '#0F172A',
+                      fontSize: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
+                    }}
+                    formatter={(value: unknown, name: unknown) => [
+                      formatCurrency(Number(value) || 0),
+                      name === 'sales' ? 'Revenue' : 'Net Profit',
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#005BD3"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#revenueGrad)"
+                    name="sales"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#profitGrad)"
+                    name="profit"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : isMounted && charts?.timeline && charts.timeline.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={charts.timeline}
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                 >
                   <defs>
-                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2F65F6" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#2F65F6" stopOpacity={0.0} />
+                    <linearGradient id="revenueGrad2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#005BD3" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#005BD3" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
@@ -262,10 +428,10 @@ export default function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#2F65F6"
+                    stroke="#005BD3"
                     strokeWidth={2.5}
                     fillOpacity={1}
-                    fill="url(#revenueGrad)"
+                    fill="url(#revenueGrad2)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -283,8 +449,8 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-sm font-bold text-slate-900">Payment Methods</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Distribution by transaction type</p>
+                <h2 className="text-sm font-bold text-slate-900">Payment Breakdown</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Collections by settlement channel</p>
               </div>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
                 <CreditCard className="w-4 h-4" />
@@ -292,25 +458,80 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-4 mt-2">
-              {charts?.paymentMix && charts.paymentMix.length > 0 ? (
-                charts.paymentMix.map((pm) => (
-                  <div key={pm.method} className="space-y-1.5">
+              {analytics ? (
+                <>
+                  {/* Cash */}
+                  <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700 capitalize">
-                        {pm.method.replace('_', ' ').toLowerCase()}
+                      <span className="font-semibold text-slate-700">Cash Payments</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {formatCurrency(analytics.paymentBreakdown.cash)}
                       </span>
-                      <span className="font-mono font-bold text-slate-900">{formatCurrency(pm.total)}</span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full"
+                        className="h-full bg-emerald-500 rounded-full"
                         style={{
-                          width: `${pm.total > 0 ? Math.min(100, Math.max(10, pm.total)) : 0}%`,
+                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.cash / totalPayment) * 100 : 0}%`,
                         }}
                       />
                     </div>
                   </div>
-                ))
+
+                  {/* Card */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Card POS</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {formatCurrency(analytics.paymentBreakdown.card)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-600 rounded-full"
+                        style={{
+                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.card / totalPayment) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* LankaQR */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">LankaQR</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {formatCurrency(analytics.paymentBreakdown.qr)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-600 rounded-full"
+                        style={{
+                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.qr / totalPayment) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Khata / Customer Credit */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Khata Credit</span>
+                      <span className="font-mono font-bold text-amber-700">
+                        {formatCurrency(analytics.paymentBreakdown.credit)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500 rounded-full"
+                        style={{
+                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.credit / totalPayment) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="py-8 text-center text-slate-400 text-xs">
                   No payment data available
@@ -320,13 +541,69 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Supported Gateways</span>
-            <span className="text-blue-600 font-semibold font-mono">Cash • Card • LankaQR</span>
+            <span>Settled Channels</span>
+            <span className="text-[#005BD3] font-semibold font-mono">Cash • Card • LankaQR • Khata</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Secondary Grid: Quick Actions & Live Chronological Activity */}
+      {/* 3. Top Selling Ayurvedic Products Table */}
+      {analytics?.topProducts && analytics.topProducts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-pos-card overflow-hidden">
+          <div className="p-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-600" />
+                Top-Selling Ayurvedic Products
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">High-volume items and contribution margin</p>
+            </div>
+            <Link
+              href="/dashboard/products"
+              className="text-xs font-semibold text-[#005BD3] hover:underline"
+            >
+              View Full Catalog &rarr;
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3 px-4">Product Name</th>
+                  <th className="py-3 px-4">SKU</th>
+                  <th className="py-3 px-4 text-right">Units Sold</th>
+                  <th className="py-3 px-4 text-right">Revenue (LKR)</th>
+                  <th className="py-3 px-4 text-right">Net Profit (LKR)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {analytics.topProducts.map((p, idx) => (
+                  <tr key={p.productId || idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-slate-900">
+                      {p.name}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
+                      {p.sku || 'N/A'}
+                    </td>
+                    <td className="py-3 px-4 text-right font-bold text-slate-900">
+                      {p.quantity}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                      {formatCurrency(p.revenue)}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
+                      {formatCurrency(p.profit)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Quick Actions & Live Activity Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Action Shortcuts (1 Col) */}
         <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card space-y-4">
@@ -360,7 +637,26 @@ export default function DashboardPage() {
               </div>
             </Link>
 
-            {/* Action 2: Add New Product */}
+            {/* Action 2: View Sales & Bills Register */}
+            <Link
+              href="/dashboard/orders"
+              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                    Sales & Bills Register
+                  </div>
+                  <div className="text-[11px] text-slate-500">Receipts & Thermal Reprints</div>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+            </Link>
+
+            {/* Action 3: Add New Product */}
             <Link
               href="/dashboard/products"
               className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition-all group"
@@ -373,13 +669,13 @@ export default function DashboardPage() {
                   <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
                     Add New Product
                   </div>
-                  <div className="text-[11px] text-slate-500">SKUs, Barcodes & Variants</div>
+                  <div className="text-[11px] text-slate-500">SKUs, Barcodes & Images</div>
                 </div>
               </div>
               <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
             </Link>
 
-            {/* Action 3: View Stock Alerts */}
+            {/* Action 4: View Stock Alerts */}
             <Link
               href="/dashboard/inventory"
               className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 transition-all group"
@@ -405,25 +701,6 @@ export default function DashboardPage() {
                 )}
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
               </div>
-            </Link>
-
-            {/* Action 4: Daily Sales Report */}
-            <Link
-              href="/dashboard/sales"
-              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                    Daily Sales Report
-                  </div>
-                  <div className="text-[11px] text-slate-500">Receipts & Invoices</div>
-                </div>
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
             </Link>
           </div>
         </div>

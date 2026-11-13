@@ -9,14 +9,11 @@ import {
   LayoutGrid,
   Activity,
   Bell,
-  ShoppingBag,
   Package,
   Tag,
   Users,
   Receipt,
-  CreditCard,
   FileText,
-  Store,
   Layers,
   Settings,
   Search,
@@ -52,7 +49,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
   {
     title: 'COMMERCE',
     items: [
-      { name: 'Order Queue', href: '/dashboard/orders', icon: ShoppingBag },
+      { name: 'Sales & Bills', href: '/dashboard/orders', icon: Receipt },
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
@@ -64,14 +61,12 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
     title: 'FINANCE',
     items: [
       { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },
-      { name: 'Payouts', href: '/dashboard/finance/payouts', icon: CreditCard },
       { name: 'Tax Engine', href: '/dashboard/finance/tax', icon: FileText },
     ],
   },
   {
     title: 'PLATFORM',
     items: [
-      { name: 'Marketplace', href: '/dashboard/marketplace', icon: Store },
       { name: 'POS', href: '/dashboard/pos', icon: Layers, badge: 'POS' },
       { name: 'Staff & Roles', href: '/dashboard/staff', icon: UserCheck },
       { name: 'Hardware & Printers', href: '/dashboard/settings/hardware', icon: Printer },

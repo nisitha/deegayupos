@@ -359,6 +359,18 @@ export const productsApi = {
 
 export const posApi = {
   checkout: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
+    try {
+      const res = await fetch('/api/pos/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        return (await res.json()) as ApiResponse<SaleDto>;
+      }
+    } catch {
+      // Fallback to apiClient
+    }
     return apiClient.post<SaleDto>('/pos/checkout', data);
   },
   holdCart: async (data: HoldCartPayload): Promise<ApiResponse<HeldCartDto>> => {
@@ -371,12 +383,40 @@ export const posApi = {
     return apiClient.post<HeldCartDto>(`/pos/cart/resume/${id}`);
   },
   voidSale: async (id: string, reason: string): Promise<ApiResponse<SaleDto>> => {
+    try {
+      const res = await fetch(`/api/sales/${encodeURIComponent(id)}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        return (await res.json()) as ApiResponse<SaleDto>;
+      }
+    } catch {
+      // Fallback to apiClient
+    }
     return apiClient.post<SaleDto>(`/pos/void/${id}`, { reason });
   },
   getSaleById: async (id: string): Promise<ApiResponse<SaleDto>> => {
+    try {
+      const res = await fetch(`/api/sales/${encodeURIComponent(id)}`);
+      if (res.ok) {
+        return (await res.json()) as ApiResponse<SaleDto>;
+      }
+    } catch {
+      // Fallback
+    }
     return apiClient.get<SaleDto>(`/pos/sales/${id}`);
   },
   getReceiptDocument: async (id: string): Promise<ApiResponse<ReceiptDocumentDto>> => {
+    try {
+      const res = await fetch(`/api/pos/sales/${encodeURIComponent(id)}/receipt`);
+      if (res.ok) {
+        return (await res.json()) as ApiResponse<ReceiptDocumentDto>;
+      }
+    } catch {
+      // Fallback
+    }
     return apiClient.get<ReceiptDocumentDto>(`/pos/sales/${id}/receipt`);
   },
   downloadPdf: async (id: string, invoiceNumber: string): Promise<void> => {
@@ -405,7 +445,38 @@ export const posApi = {
     document.body.removeChild(a);
   },
   getSales: async (params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<SaleDto>>> => {
+    try {
+      const sp = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== '') sp.append(k, String(v));
+        });
+      }
+      const q = sp.toString() ? `?${sp.toString()}` : '';
+      const res = await fetch(`/api/sales${q}`, { cache: 'no-store' });
+      if (res.ok) {
+        return (await res.json()) as ApiResponse<PaginatedResult<SaleDto>>;
+      }
+    } catch {
+      // Fallback
+    }
     return apiClient.get<PaginatedResult<SaleDto>>('/pos/sales', { params });
+  },
+  getAnalytics: async <T = Record<string, unknown>>(
+    params?: Record<string, unknown>,
+  ): Promise<ApiResponse<T>> => {
+    const sp = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') sp.append(k, String(v));
+      });
+    }
+    const q = sp.toString() ? `?${sp.toString()}` : '';
+    const res = await fetch(`/api/sales/analytics${q}`, { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error('Failed to load sales analytics');
+    }
+    return (await res.json()) as ApiResponse<T>;
   },
 };
 
