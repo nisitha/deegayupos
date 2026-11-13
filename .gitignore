@@ -1,21 +1,25 @@
 # Dependencies
-node_modules
-.pnpm-store
+node_modules/
+.pnpm-store/
 
 # Production & Build outputs
-dist
-.next
-out
-build
+dist/
+.next/
+out/
+build/
 *.tsbuildinfo
 
-# Turbo cache
-.turbo
+# Turbo & Cache
+.turbo/
+.cache/
 
-# Environment variables
+# Environment variables & secrets (CRITICAL)
 .env
+.env.*
 .env.local
 .env.*.local
+!.env.example
+!.env.*.example
 
 # Logs
 npm-debug.log*
@@ -31,10 +35,10 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-.idea
+.idea/
 
-# External data imports
+# External data imports & scratch files
 xPOS/
 __pycache__/
-
-
+*.pyc
+scratch/
