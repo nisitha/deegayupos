@@ -12,7 +12,6 @@
     "clean": "rimraf .next dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "@pixelcraft/database": "workspace:*",
     "@pixelcraft/types": "workspace:*",
     "@pixelcraft/validation": "workspace:*",
     "@supabase/supabase-js": "^2.119.0",
