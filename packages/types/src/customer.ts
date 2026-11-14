@@ -18,11 +18,12 @@ export interface CustomerDto {
   email?: string | null;
   nicNumber?: string | null;
   address?: string | null;
-  customerType: CustomerType;
+  customerType?: CustomerType;
   creditLimit: number;
   currentBalance: number;
   availableCredit: number;
   loyaltyPoints: number;
+  totalSpent?: number;
   status: CustomerStatus;
   createdAt: string;
   updatedAt: string;
@@ -55,9 +56,12 @@ export interface CustomerLedgerDto {
   customerName?: string;
   entryType: CustomerLedgerEntryType;
   referenceId?: string | null;
+  referenceNumber?: string | null;
   debitAmount: number;
   creditAmount: number;
   runningBalance: number;
+  amount?: number;
+  balanceAfter?: number;
   notes?: string | null;
   createdById?: string | null;
   createdAt: string;
@@ -98,4 +102,8 @@ export interface CustomerTelemetryDto {
   totalReceivables: number;
   activeCreditAccounts: number;
   totalCreditLimit: number;
+  totalOutstandingDebt?: number;
+  creditAccounts?: number;
+  settlementsThisMonth?: number;
+  averageDebtPerDebtor?: number;
 }

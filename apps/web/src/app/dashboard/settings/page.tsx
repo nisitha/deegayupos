@@ -24,10 +24,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { tenantSettingsApi } from '../../../lib/api-client';
 import type { TenantStoreSettingsDto } from '@pixelcraft/types';
 import { ReceiptBarcodeBlock } from '@/components/pos/receipt-barcode-block';
 import { uploadStoreLogo } from '../../../lib/upload-store-logo';
+import { supabase } from '../../../lib/supabase';
 
 export default function SettingsDocumentPage() {
   const router = useRouter();
@@ -109,15 +109,23 @@ export default function SettingsDocumentPage() {
         : `${uploadedUrl}?t=${Date.now()}`;
       setLogoUrl(cacheBustedPreview);
 
-      // Auto-persist clean URL immediately to database
-      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logoUrl: uploadedUrl }),
-      });
+      // Auto-persist clean URL immediately to database & localStorage
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('pixelcraft_store_settings');
+        const prevObj = stored ? JSON.parse(stored) : {};
+        localStorage.setItem(
+          'pixelcraft_store_settings',
+          JSON.stringify({ ...prevObj, logoUrl: uploadedUrl })
+        );
+      }
 
-      if (!persistRes.ok) {
-        await tenantSettingsApi.updateSettings({ logoUrl: uploadedUrl }, 'deegayu');
+      try {
+        await supabase
+          .from('businesses')
+          .update({ logo_url: uploadedUrl })
+          .eq('slug', 'deegayu');
+      } catch (sbErr) {
+        console.warn('Could not update logo_url in Supabase businesses:', sbErr);
       }
 
       await refreshProfile();
@@ -145,14 +153,22 @@ export default function SettingsDocumentPage() {
     setLogoUrl('');
 
     try {
-      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logoUrl: null }),
-      });
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('pixelcraft_store_settings');
+        const prevObj = stored ? JSON.parse(stored) : {};
+        localStorage.setItem(
+          'pixelcraft_store_settings',
+          JSON.stringify({ ...prevObj, logoUrl: null })
+        );
+      }
 
-      if (!persistRes.ok) {
-        await tenantSettingsApi.updateSettings({ logoUrl: null }, 'deegayu');
+      try {
+        await supabase
+          .from('businesses')
+          .update({ logo_url: null })
+          .eq('slug', 'deegayu');
+      } catch (sbErr) {
+        console.warn('Could not remove logo_url in Supabase businesses:', sbErr);
       }
 
       await refreshProfile();
@@ -173,30 +189,48 @@ export default function SettingsDocumentPage() {
     }
   };
 
-  // Fetch settings from API on load
+  // Fetch settings from Supabase / localStorage on load
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      let resData: TenantStoreSettingsDto | null = null;
-      try {
-        const fetchRes = await fetch(`/api/tenant/settings?slug=deegayu&t=${Date.now()}`, {
-          cache: 'no-store',
-        });
-        if (fetchRes.ok) {
-          const json = await fetchRes.json();
-          if (json.success && json.data) {
-            resData = json.data;
+      let resData: Partial<TenantStoreSettingsDto> | null = null;
+
+      // 1. Check localStorage first
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('pixelcraft_store_settings');
+          if (stored) {
+            resData = JSON.parse(stored);
           }
+        } catch {
+          // Ignore parse errors
         }
-      } catch {
-        // Fallback
       }
 
-      if (!resData) {
-        const res = await tenantSettingsApi.getSettings('deegayu');
-        if (res.success && res.data) {
-          resData = res.data;
+      // 2. Fetch from Supabase directly
+      try {
+        const { data: sbBiz, error: sbErr } = await supabase
+          .from('businesses')
+          .select('*, settings:business_settings(*)')
+          .eq('slug', 'deegayu')
+          .maybeSingle();
+
+        if (!sbErr && sbBiz) {
+          resData = {
+            ...resData,
+            name: sbBiz.name || resData?.name,
+            legalName: sbBiz.legal_name || sbBiz.legalName || resData?.legalName,
+            logoUrl: sbBiz.logo_url || sbBiz.logoUrl || resData?.logoUrl,
+            phone: sbBiz.phone || resData?.phone,
+            email: sbBiz.email || resData?.email,
+            address: sbBiz.address || resData?.address,
+            receiptHeaderNote: sbBiz.settings?.receipt_header || resData?.receiptHeaderNote,
+            receiptFooterNote: sbBiz.settings?.receipt_footer || resData?.receiptFooterNote,
+            returnPolicy: sbBiz.settings?.return_policy_text || resData?.returnPolicy,
+          };
         }
+      } catch (sbErr) {
+        console.warn('Could not load settings from Supabase businesses:', sbErr);
       }
 
       if (resData) {
@@ -219,7 +253,7 @@ export default function SettingsDocumentPage() {
         if (d.showQr !== undefined) setShowQr(d.showQr);
       }
     } catch (err) {
-      console.warn('Could not load tenant settings from API, using default store profile:', err);
+      console.warn('Could not load tenant settings, using default store profile:', err);
       // Fallback to business profile context if available
       if (business) {
         if (business.name) setStoreName(business.name);
@@ -268,27 +302,33 @@ export default function SettingsDocumentPage() {
         showQr,
       };
 
-      const persistRes = await fetch('/api/tenant/settings?slug=deegayu', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      let saveOk = persistRes.ok;
-      if (!saveOk) {
-        const res = await tenantSettingsApi.updateSettings(payload, 'deegayu');
-        saveOk = res.success;
+      // 1. Persist to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pixelcraft_store_settings', JSON.stringify(payload));
       }
 
-      if (saveOk) {
-        setSaveSuccess(true);
-        setIsDirty(false);
-        await refreshProfile();
-        router.refresh();
-        setTimeout(() => setSaveSuccess(false), 3500);
-      } else {
-        setErrorMessage('Failed to save store settings.');
+      // 2. Persist to Supabase
+      try {
+        await supabase
+          .from('businesses')
+          .update({
+            name: payload.name,
+            legal_name: payload.legalName,
+            logo_url: payload.logoUrl,
+            phone: payload.phone,
+            email: payload.email,
+            address: payload.address,
+          })
+          .eq('slug', 'deegayu');
+      } catch (sbErr) {
+        console.warn('Could not update Supabase businesses:', sbErr);
       }
+
+      setSaveSuccess(true);
+      setIsDirty(false);
+      await refreshProfile();
+      router.refresh();
+      setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err: unknown) {
       console.error('Failed to save store settings:', err);
       const msg =

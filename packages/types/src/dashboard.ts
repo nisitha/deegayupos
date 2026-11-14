@@ -5,12 +5,18 @@ import type { ApiResponse } from './api';
  */
 export interface DashboardMetrics {
   todaySales: number;
-  yesterdaySales: number;
-  salesGrowthPercent: number;
-  transactionCount: number;
-  avgTransactionValue: number;
-  lowStockCount: number;
-  activeRegistersCount: number;
+  yesterdaySales?: number;
+  salesGrowthPercent?: number;
+  transactionCount?: number;
+  avgTransactionValue?: number;
+  lowStockCount?: number;
+  activeRegistersCount?: number;
+  todaySalesGrowth?: number;
+  ordersCount?: number;
+  ordersGrowth?: number;
+  activeCustomers?: number;
+  customersGrowth?: number;
+  inventoryAlertsCount?: number;
 }
 
 export type DashboardMetricsResponse = ApiResponse<DashboardMetrics>;
@@ -37,8 +43,10 @@ export interface PaymentMethodDistribution {
  * Aggregate chart visualization data payload.
  */
 export interface DashboardChartsData {
-  timeline: DailySalesTimelinePoint[];
-  paymentMix: PaymentMethodDistribution[];
+  timeline?: DailySalesTimelinePoint[];
+  paymentMix?: PaymentMethodDistribution[];
+  salesTrend?: any[];
+  categoryDistribution?: any[];
 }
 
 export type DashboardChartsResponse = ApiResponse<DashboardChartsData>;
@@ -53,6 +61,9 @@ export interface DashboardActivityItem {
   entityId?: string | null;
   description?: string | null;
   createdAt: string;
+  type?: string;
+  timestamp?: string | Date;
+  actorName?: string;
   user?: {
     fullName: string;
     email: string;

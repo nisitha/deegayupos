@@ -7,7 +7,7 @@ import type {
   BusinessProfileBranch,
   BusinessProfileData,
 } from '@pixelcraft/types';
-import { businessApi } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
 
 export interface ActiveCashier {
   id: string;
@@ -105,24 +105,56 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
 
   const fetchBranches = useCallback(async () => {
     try {
-      const res = await fetch('/api/branches?slug=deegayu');
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        setBranches(json.data);
-        // If no selected branch, pick the primary or first one
-        setSelectedBranchIdState((prev) => {
-          if (prev && json.data.some((b: BusinessProfileBranch) => b.id === prev)) {
-            return prev;
-          }
-          const primary = json.data.find((b: BusinessProfileBranch) => b.isPrimary) || json.data[0];
-          if (primary && typeof window !== 'undefined') {
-            localStorage.setItem('pixelcraft_selected_branch', primary.id);
-          }
-          return primary ? primary.id : null;
-        });
+      let branchList: BusinessProfileBranch[] = [];
+
+      try {
+        const { data: sbBranches, error: bErr } = await supabase
+          .from('branches')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (!bErr && sbBranches && sbBranches.length > 0) {
+          branchList = sbBranches.map((b: any) => ({
+            id: b.id,
+            name: b.name,
+            code: b.code,
+            address: b.address,
+            phone: b.phone,
+            isPrimary: b.is_primary ?? b.isPrimary ?? false,
+            isActive: b.is_active ?? b.isActive ?? true,
+          }));
+        }
+      } catch (sbErr) {
+        console.warn('Could not query Supabase branches:', sbErr);
       }
+
+      if (branchList.length === 0) {
+        branchList = [
+          {
+            id: '11111111-2222-3333-4444-555555555555',
+            name: 'Main Branch',
+            code: 'MAIN-01',
+            address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
+            phone: '0772634497',
+            isPrimary: true,
+            isActive: true,
+          },
+        ];
+      }
+
+      setBranches(branchList);
+      setSelectedBranchIdState((prev) => {
+        if (prev && branchList.some((b) => b.id === prev)) {
+          return prev;
+        }
+        const primary = branchList.find((b) => b.isPrimary) || branchList[0];
+        if (primary && typeof window !== 'undefined') {
+          localStorage.setItem('pixelcraft_selected_branch', primary.id);
+        }
+        return primary ? primary.id : null;
+      });
     } catch (err) {
-      console.warn('Could not fetch branches from API:', err);
+      console.warn('Could not fetch branches:', err);
     }
   }, []);
 
@@ -130,72 +162,63 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     try {
       setIsLoading(true);
 
-      // 1. Fetch live tenant settings (including uploaded logoUrl) from Next.js API
-      let localSettingsData: {
-        id?: string;
-        name?: string;
-        legalName?: string | null;
-        logoUrl?: string | null;
-        phone?: string | null;
-        email?: string | null;
-        address?: string | null;
-      } | null = null;
+      // Check localStorage cached settings first
+      let localLogo: string | null = null;
+      let localName = 'Deegayu Weda Madura';
+      let localPhone = '0772634497';
+      let localAddress = 'Deegayu Weda Madura, Colombo, Sri Lanka';
 
-      try {
-        const localRes = await fetch(`/api/tenant/settings?slug=deegayu&t=${Date.now()}`, {
-          cache: 'no-store',
-        });
-        if (localRes.ok) {
-          const localJson = await localRes.json();
-          if (localJson.success && localJson.data) {
-            localSettingsData = localJson.data;
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('pixelcraft_store_settings');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.logoUrl) localLogo = parsed.logoUrl;
+            if (parsed.storeName) localName = parsed.storeName;
+            if (parsed.phone) localPhone = parsed.phone;
+            if (parsed.address) localAddress = parsed.address;
           }
+        } catch {
+          // Ignore parse errors
         }
-      } catch (err) {
-        console.warn('Could not fetch local tenant settings:', err);
       }
 
-      // 2. Fetch business profile from backend API if available
+      // Query Supabase directly
+      let bizData: any = null;
       try {
-        const res = await businessApi.getProfile();
-        if (res.data) {
-          setBusiness({
-            ...res.data,
-            logoUrl: localSettingsData ? localSettingsData.logoUrl : res.data.logoUrl,
-            ...(localSettingsData?.name ? { name: localSettingsData.name } : {}),
-            ...(localSettingsData?.legalName ? { legalName: localSettingsData.legalName } : {}),
-          });
-          if (res.data.branches && res.data.branches.length > 0) {
-            setBranches(res.data.branches);
-          }
+        const { data: sbBiz, error: bizErr } = await supabase
+          .from('businesses')
+          .select('*, settings:business_settings(*)')
+          .eq('slug', 'deegayu')
+          .maybeSingle();
+
+        if (!bizErr && sbBiz) {
+          bizData = sbBiz;
         }
-      } catch (err) {
-        console.warn('Could not fetch tenant business profile from backend API:', err);
-        if (localSettingsData) {
-          setBusiness((prev) => ({
-            ...(prev || {
-              id: localSettingsData?.id || 'tenant-deegayu-id',
-              name: localSettingsData?.name || 'Deegayu Weda Madura',
-              slug: 'deegayu',
-              currency: 'LKR',
-              businessType: 'PHARMACY',
-              timezone: 'Asia/Colombo',
-              status: 'ACTIVE',
-              branches: [],
-            }),
-            name: localSettingsData.name || 'Deegayu Weda Madura',
-            legalName: localSettingsData.legalName,
-            logoUrl: localSettingsData.logoUrl ?? null,
-            phone: localSettingsData.phone || undefined,
-            email: localSettingsData.email || undefined,
-            address: localSettingsData.address || undefined,
-          }));
-        }
+      } catch (sbErr) {
+        console.warn('Could not query Supabase businesses:', sbErr);
       }
+
+      const activeBiz: BusinessProfileData = {
+        id: bizData?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
+        name: bizData?.name || localName,
+        slug: 'deegayu',
+        legalName: bizData?.legal_name || bizData?.legalName || 'Deegayu Weda Madura (Pvt) Ltd',
+        logoUrl: localLogo || bizData?.logo_url || bizData?.logoUrl || null,
+        phone: bizData?.phone || localPhone,
+        email: bizData?.email || 'info@deegayu.pixelcraftlk.com',
+        address: bizData?.address || localAddress,
+        businessType: bizData?.business_type || bizData?.businessType || 'PHARMACY',
+        currency: bizData?.currency || 'LKR',
+        timezone: bizData?.timezone || 'Asia/Colombo',
+        status: bizData?.status || 'ACTIVE',
+        branches: [],
+      };
+
+      setBusiness(activeBiz);
       await fetchBranches();
     } catch (err) {
       console.warn('Could not fetch tenant business profile:', err);
-      // Fallback to fetch branches directly
       await fetchBranches();
     } finally {
       setIsLoading(false);

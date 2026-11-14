@@ -46,6 +46,7 @@ import {
 } from '../../../lib/catalog-db';
 import { uploadProductImage } from '../../../lib/upload-product-image';
 import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
+import { supabase } from '../../../lib/supabase';
 
 export interface ManagedProductItem {
   id: string;
@@ -168,19 +169,55 @@ export default function ProductsPage() {
   const loadTaxonomy = useCallback(async () => {
     try {
       const [catsRes, brandsRes, unitsRes] = await Promise.all([
-        productsApi.getCategories().catch(() => ({ data: [] })),
-        productsApi.getBrands().catch(() => ({ data: [] })),
-        productsApi.getUnits().catch(() => ({ data: [] })),
+        supabase.from('categories').select('*').order('name', { ascending: true }),
+        supabase.from('brands').select('*').order('name', { ascending: true }),
+        supabase.from('units').select('*').order('name', { ascending: true }),
       ]);
-      if (catsRes.data && catsRes.data.length > 0) setCategories(catsRes.data);
-      if (brandsRes.data) setBrands(brandsRes.data);
-      if (unitsRes.data) setUnits(unitsRes.data);
+      if (catsRes.data && catsRes.data.length > 0) {
+        setCategories(
+          catsRes.data.map((c: any) => ({
+            id: c.id,
+            tenantId: c.business_id || c.tenant_id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
+            name: c.name,
+            slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
+            description: c.description || null,
+            parentId: c.parent_id || null,
+            createdAt: c.created_at || new Date().toISOString(),
+            updatedAt: c.updated_at || new Date().toISOString(),
+            productCount: c.product_count,
+          }))
+        );
+      }
+      if (brandsRes.data) {
+        setBrands(
+          brandsRes.data.map((b: any) => ({
+            id: b.id,
+            tenantId: b.business_id || b.tenant_id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
+            name: b.name,
+            slug: b.slug || b.name.toLowerCase().replace(/\s+/g, '-'),
+            createdAt: b.created_at || new Date().toISOString(),
+            updatedAt: b.updated_at || new Date().toISOString(),
+          }))
+        );
+      }
+      if (unitsRes.data) {
+        setUnits(
+          unitsRes.data.map((u: any) => ({
+            id: u.id,
+            tenantId: u.business_id || u.tenant_id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
+            name: u.name,
+            shortCode: u.short_code || u.code || 'pcs',
+            createdAt: u.created_at || new Date().toISOString(),
+            updatedAt: u.updated_at || new Date().toISOString(),
+          }))
+        );
+      }
     } catch (err) {
       console.warn('Catalog taxonomy background load note:', err);
     }
   }, []);
 
-  // Load Products list from internal Next.js Supabase API with 0ms IndexedDB hydration
+  // Load Products list directly from Supabase / IndexedDB
   const loadProducts = useCallback(async () => {
     const isDefaultQuery =
       page === 1 && !search.trim() && selectedCategory === 'all' && selectedStatus === 'all';
@@ -203,39 +240,76 @@ export default function ProductsPage() {
     }
 
     try {
-      const params = new URLSearchParams({
-        slug: 'deegayu',
-        page: String(page),
-        limit: String(limit),
-      });
+      // 2. Query Supabase directly
+      let query = supabase
+        .from('products')
+        .select('*, category:categories(*), stock_levels(*)', { count: 'exact' });
 
-      if (search.trim()) params.set('search', search.trim());
-      if (selectedCategory && selectedCategory !== 'all') params.set('categoryId', selectedCategory);
-      if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
+      if (search.trim()) {
+        query = query.ilike('name', `%${search.trim()}%`);
+      }
+      if (selectedCategory && selectedCategory !== 'all') {
+        query = query.eq('category_id', selectedCategory);
+      }
+      if (selectedStatus && selectedStatus !== 'all') {
+        query = query.eq('is_active', selectedStatus === 'ACTIVE');
+      }
 
-      const res = await fetch(`/api/products?${params.toString()}`);
-      const json = await res.json();
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      const { data: sbProducts, count: sbCount, error: sbErr } = await query
+        .order('name', { ascending: true })
+        .range(from, to);
 
-      if (json.success && json.data) {
-        const freshProducts = json.data.products || [];
+      if (!sbErr && sbProducts) {
+        const freshProducts: ManagedProductItem[] = sbProducts.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku || '',
+          barcode: p.barcode || '',
+          costPrice: Number(p.cost_price ?? p.purchase_price ?? p.purchasePrice ?? 0),
+          retailPrice: Number(p.retail_price ?? p.retailPrice ?? 0),
+          wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? p.retail_price ?? 0),
+          categoryId: p.category_id ?? p.categoryId,
+          category: p.category ? { id: p.category.id, name: p.category.name, slug: p.category.slug } : null,
+          imageUrl: p.image_url ?? p.imageUrl ?? null,
+          stock: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
+          stockOnHand: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
+          isActive: p.is_active ?? p.isActive ?? true,
+        }));
+
         setProducts(freshProducts);
-        setTotalPages(json.data.totalPages || 1);
-        setTotalCount(json.data.total || 0);
-        if (json.data.categories && json.data.categories.length > 0) {
-          setCategories(json.data.categories);
-        }
+        const total = sbCount || freshProducts.length;
+        setTotalCount(total);
+        setTotalPages(Math.ceil(total / limit) || 1);
 
         // Mirror fresh full catalog to IndexedDB in background
         if (isDefaultQuery && freshProducts.length > 0) {
           setCachedCatalogData('deegayu', {
             products: freshProducts,
-            categories: json.data.categories || [],
-            total: json.data.total || freshProducts.length,
+            categories: [],
+            total,
           }).catch(() => {});
+        }
+      } else {
+        // Fallback to IndexedDB
+        const cached = await getCachedCatalogData<ManagedProductItem>('deegayu');
+        if (cached && cached.products) {
+          let filtered = cached.products;
+          if (search.trim()) {
+            const q = search.trim().toLowerCase();
+            filtered = filtered.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+          }
+          if (selectedCategory && selectedCategory !== 'all') {
+            filtered = filtered.filter((p) => p.categoryId === selectedCategory);
+          }
+          setProducts(filtered.slice(from, to + 1));
+          setTotalCount(filtered.length);
+          setTotalPages(Math.ceil(filtered.length / limit) || 1);
         }
       }
     } catch (err: unknown) {
-      console.error('Failed to load products from /api/products:', err);
+      console.error('Failed to load products:', err);
     } finally {
       setLoading(false);
     }

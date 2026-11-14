@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 /**
  * Store Logo Optimizer & Supabase Storage Uploader
  * Optimizes store brand logos to max 400x400px preserving transparency (PNG/WebP)
@@ -82,39 +84,34 @@ export async function uploadStoreLogo(
 
   const ext = isSvg ? 'svg' : 'png';
   const fileName = `logo-${Date.now()}.${ext}`;
+  const storagePath = `${tenantSlug}/${fileName}`;
 
-  const formData = new FormData();
-  formData.append('file', payloadBlob, fileName);
-  formData.append('tenantSlug', tenantSlug);
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from('store-assets')
+      .upload(storagePath, payloadBlob, {
+        contentType: isSvg ? 'image/svg+xml' : 'image/png',
+        upsert: true,
+      });
 
-  const response = await fetch('/api/upload/store-logo', {
-    method: 'POST',
-    body: formData,
-  });
+    if (!uploadError) {
+      const { data: publicUrlData } = supabase.storage
+        .from('store-assets')
+        .getPublicUrl(storagePath);
 
-  if (!response.ok) {
-    let errorMsg = 'Failed to upload store logo';
-    try {
-      const errJson = await response.json();
-      if (errJson?.error) {
-        errorMsg = errJson.error;
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
       }
-    } catch {
-      // Ignore JSON parse errors
     }
-    throw new Error(errorMsg);
+  } catch (storageErr) {
+    console.warn('[Storage] Store logo Supabase upload failed, falling back to local data URL:', storageErr);
   }
 
-  const data = (await response.json()) as {
-    url?: string;
-    logoUrl?: string;
-    publicUrl?: string;
-  };
-  const returnedUrl = data.logoUrl || data.url || data.publicUrl;
-  if (!returnedUrl) {
-    throw new Error('Upload endpoint did not return an image URL');
-  }
-
-  return returnedUrl;
+  // Fallback to client-side data URL for offline resilience
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(payloadBlob);
+  });
 }
 

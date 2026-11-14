@@ -9,8 +9,8 @@ export type GrnStatus = 'RECEIVED' | 'VERIFIED';
 
 export interface SupplierDto {
   id: string;
-  tenantId: string;
-  code: string;
+  tenantId?: string;
+  code?: string;
   name: string;
   contactPerson?: string | null;
   phone?: string | null;
@@ -18,7 +18,9 @@ export interface SupplierDto {
   address?: string | null;
   taxNumber?: string | null;
   paymentTerms?: string | null;
-  status: string;
+  leadTimeDays?: number;
+  isActive?: boolean;
+  status?: string;
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -36,6 +38,8 @@ export interface CreateSupplierDto {
   address?: string;
   taxNumber?: string;
   paymentTerms?: string;
+  leadTimeDays?: number;
+  isActive?: boolean;
 }
 
 export interface UpdateSupplierDto extends Partial<CreateSupplierDto> {
@@ -133,13 +137,14 @@ export interface CreateGrnItemDto {
 }
 
 export interface CreateGrnDto {
-  branchId: string;
-  warehouseId: string;
+  branchId?: string;
+  warehouseId?: string;
   supplierId: string;
   purchaseOrderId?: string;
   supplierInvoiceNo?: string;
+  supplierInvoiceNumber?: string;
   receivedDate?: string;
   notes?: string;
-  items: CreateGrnItemDto[];
+  items?: CreateGrnItemDto[];
 }
 

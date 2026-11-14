@@ -93,22 +93,24 @@ export interface CreateProductVariantPayload {
 
 export interface ProductDto {
   id: string;
-  tenantId: string;
+  tenantId?: string;
   categoryId?: string | null;
   brandId?: string | null;
   unitId?: string | null;
   name: string;
-  slug: string;
+  slug?: string;
   sku: string;
   barcode?: string | null;
   description?: string | null;
   imageUrl?: string | null;
-  type: ProductType;
-  costPrice: number;
+  type?: ProductType;
+  costPrice?: number;
   retailPrice: number;
+  purchasePrice?: number;
+  stock?: number;
   wholesalePrice?: number | null;
-  alertQuantity: number;
-  isTrackStock: boolean;
+  alertQuantity?: number;
+  isTrackStock?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -159,8 +161,9 @@ export interface UpdateProductPayload {
 }
 
 export interface ProductLookupResult {
-  product: ProductDto;
+  product?: ProductDto | null;
   matchedVariant?: ProductVariantDto | null;
+  found?: boolean;
 }
 
 export interface BulkImportRowError {
@@ -174,6 +177,8 @@ export interface BulkImportResult {
   total: number;
   inserted: number;
   errors: BulkImportRowError[];
+  importedCount?: number;
+  skippedCount?: number;
 }
 
 export type ProductResponse = ApiResponse<ProductDto>;

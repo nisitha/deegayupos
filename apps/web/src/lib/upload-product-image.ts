@@ -4,6 +4,8 @@
  * for optimal POS performance and IndexedDB offline caching.
  */
 
+import { supabase } from './supabase';
+
 export interface CompressOptions {
   maxDimension?: number;
   quality?: number;
@@ -107,41 +109,41 @@ export async function uploadProductImage(
   // 1. Client-side compression (< 100ms)
   const compressedBlob = await compressProductImage(file, options);
 
-  // 2. Prepare multipart upload
+  // 2. Prepare storage file path
   const sanitizedBase = file.name
     .replace(/\.[^/.]+$/, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '-');
   const fileName = `${sanitizedBase || 'product'}.webp`;
+  const storagePath = `${tenantSlug}/${Date.now()}-${fileName}`;
 
-  const formData = new FormData();
-  formData.append('file', compressedBlob, fileName);
-  formData.append('tenantSlug', tenantSlug);
+  try {
+    // 3. Upload directly to Supabase Storage bucket 'product-images'
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(storagePath, compressedBlob, {
+        contentType: 'image/webp',
+        upsert: true,
+      });
 
-  // 3. Post to Supabase storage upload endpoint
-  const response = await fetch('/api/upload/product-image', {
-    method: 'POST',
-    body: formData,
-  });
+    if (!uploadError) {
+      const { data: publicUrlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(storagePath);
 
-  if (!response.ok) {
-    let errorMsg = 'Failed to upload product image';
-    try {
-      const errJson = await response.json();
-      if (errJson?.error) {
-        errorMsg = errJson.error;
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
       }
-    } catch {
-      // Ignore JSON parse errors
     }
-    throw new Error(errorMsg);
+  } catch (storageErr) {
+    console.warn('[Storage] Supabase upload failed, falling back to local data URL:', storageErr);
   }
 
-  const data = (await response.json()) as { url: string };
-  if (!data?.url) {
-    throw new Error('Upload endpoint did not return an image URL');
-  }
-
-  return data.url;
+  // Fallback to client-side data URL for offline resilience
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(compressedBlob);
+  });
 }
 

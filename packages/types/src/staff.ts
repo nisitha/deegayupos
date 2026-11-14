@@ -6,14 +6,14 @@ export interface StaffUserDto {
   fullName: string;
   phone?: string | null;
   role: StaffRole;
-  roleName: string;
-  roleId: string;
+  roleName?: string;
+  roleId?: string;
   hasPin: boolean;
   isActive: boolean;
   branchId?: string | null;
   branchName?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateStaffUserDto {

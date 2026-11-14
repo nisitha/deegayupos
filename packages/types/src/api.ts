@@ -4,7 +4,7 @@
 export interface ApiErrorPayload {
   code: string;
   message: string;
-  statusCode: number;
+  statusCode?: number;
   details?: unknown;
   timestamp?: string;
   path?: string;
@@ -16,9 +16,9 @@ export interface ApiErrorPayload {
  */
 export interface ApiResponse<T = unknown> {
   success: boolean;
-  data?: T;
+  data: T;
   error?: ApiErrorPayload;
-  timestamp: string;
+  timestamp?: string;
   path?: string;
 }
 

@@ -144,7 +144,9 @@ export interface CreateStockTransferDto {
   sourceWarehouseId: string;
   targetWarehouseId: string;
   notes?: string;
-  items: CreateStockTransferItemDto[];
+  items?: CreateStockTransferItemDto[];
+  productId?: string;
+  quantity?: number;
 }
 
 export interface InventoryTelemetryDto {
@@ -159,6 +161,7 @@ export interface StockFilterParams {
   warehouseId?: string;
   categoryId?: string;
   search?: string;
+  status?: string;
   lowStockOnly?: boolean;
   page?: number;
   limit?: number;

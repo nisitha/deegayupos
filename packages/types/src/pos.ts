@@ -10,7 +10,7 @@ export type SalePaymentMethod =
   | 'STORE_CREDIT'
   | 'CUSTOMER_CREDIT';
 
-export type SalePaymentStatus = 'SUCCESS' | 'PENDING' | 'FAILED';
+export type SalePaymentStatus = 'SUCCESS' | 'PENDING' | 'FAILED' | 'COMPLETED';
 
 export interface SaleItemDto {
   id: string;
@@ -100,6 +100,7 @@ export interface CheckoutPayload {
   tableNumber?: string;
   items: CreateSaleItemPayload[];
   payments: CreateSalePaymentPayload[];
+  paymentMethod?: SalePaymentMethod;
   subtotal: number;
   discountAmount?: number;
   taxAmount?: number;
@@ -112,22 +113,31 @@ export interface CheckoutPayload {
 
 export interface HeldCartDto {
   id: string;
-  tenantId: string;
+  tenantId?: string;
   branchId: string;
   registerId?: string;
   shiftId?: string;
-  cashierId: string;
-  cartReference: string;
-  cartData: Record<string, unknown>;
+  cashierId?: string;
+  cartReference?: string;
+  cartData?: Record<string, unknown>;
+  customerName?: string;
+  customerPhone?: string;
+  note?: string;
+  items?: any[];
+  totalAmount?: number;
   createdAt: string | Date;
-  updatedAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface HoldCartPayload {
-  branchId: string;
+  branchId?: string;
   registerId?: string;
-  cartReference: string;
-  cartData: Record<string, unknown>;
+  cartReference?: string;
+  cartData?: Record<string, unknown>;
+  customerName?: string;
+  customerPhone?: string;
+  note?: string;
+  items?: any[];
 }
 
 export interface VoidSalePayload {

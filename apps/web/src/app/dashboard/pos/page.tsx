@@ -46,6 +46,7 @@ import {
 } from '../../../lib/ayurvedic-departments';
 import { getCachedCatalogData, setCachedCatalogData } from '../../../lib/catalog-db';
 import { PrinterBridge } from '../../../lib/hardware/printer-bridge';
+import { supabase } from '../../../lib/supabase';
 
 // =========================================================================
 // "CONFIDENCY OS" DESIGN SYSTEM SPECIFICATION
@@ -149,13 +150,10 @@ export default function ConfidencyPosPage() {
     let isMounted = true;
 
     async function initCatalog() {
-      let cachedTimestamp: number | null = null;
-
       // 1. Immediately read from IndexedDB with ZERO blocking spinner
       try {
         const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
         if (cached && cached.products && cached.products.length > 0 && isMounted) {
-          cachedTimestamp = cached.cachedAt;
           setProducts(cached.products);
           setIsLoadingProducts(false);
         }
@@ -163,28 +161,33 @@ export default function ConfidencyPosPage() {
         console.warn('Local cache read error:', cacheErr);
       }
 
-      // 2. Concurrently sync with /api/pos/catalog in background with If-Modified-Since
+      // 2. Concurrently sync with Supabase in background
       try {
-        const headers: Record<string, string> = {};
-        if (cachedTimestamp) {
-          headers['If-Modified-Since'] = new Date(cachedTimestamp).toUTCString();
-        }
+        const { data: sbProducts, error: sbErr } = await supabase
+          .from('products')
+          .select('*, category:categories(*), stock_levels(*)')
+          .order('name', { ascending: true })
+          .limit(3500);
 
-        const res = await fetch('/api/pos/catalog?slug=deegayu&limit=3500', {
-          headers,
-        });
-
-        if (res.status === 304) {
-          // IndexedDB cache is already pristine & fresh
-          return;
-        }
-
-        const json = await res.json();
-
-        if (json.success && json.data && isMounted) {
-          const freshProducts = json.data.products || [];
-          const freshCategories = json.data.categories || [];
-          const freshTotal = json.data.total || freshProducts.length;
+        if (!sbErr && sbProducts && sbProducts.length > 0 && isMounted) {
+          const freshProducts: RetailProductItem[] = sbProducts.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku || '',
+            barcode: p.barcode || '',
+            retailPrice: Number(p.retail_price ?? p.retailPrice ?? 0),
+            wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? p.retail_price ?? 0),
+            costPrice: Number(p.cost_price ?? p.costPrice ?? p.purchase_price ?? 0),
+            category: {
+              id: p.category?.id || p.category_id || '',
+              name: p.category?.name || 'General',
+              slug: p.category?.slug || 'general',
+            },
+            stockOnHand: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
+            unit: p.unit || 'units',
+            imageUrl: p.image_url ?? p.imageUrl ?? undefined,
+            alertQuantity: p.min_stock_level ?? p.alert_quantity ?? null,
+          }));
 
           setProducts(freshProducts);
           setCatalogError(null);
@@ -192,8 +195,8 @@ export default function ConfidencyPosPage() {
           // Update IndexedDB asynchronously
           await setCachedCatalogData('deegayu', {
             products: freshProducts,
-            categories: freshCategories,
-            total: freshTotal,
+            categories: [],
+            total: freshProducts.length,
           });
         }
       } catch (netErr: unknown) {
