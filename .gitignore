@@ -42,3 +42,11 @@ xPOS/
 __pycache__/
 *.pyc
 scratch/
+scripts/legacy*
+scripts/migrate*
+scripts/*.json
+scripts/*.sql
+scripts/*.py
+legacy-data/
+*.legacy.json
+

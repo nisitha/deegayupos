@@ -20,6 +20,7 @@ export interface SaleItemDto {
   productName: string;
   sku: string;
   unitPrice: number;
+  costPrice?: number;
   quantity: number;
   discountAmount: number;
   taxAmount: number;
@@ -76,6 +77,7 @@ export interface CreateSaleItemPayload {
   productName: string;
   sku: string;
   unitPrice: number;
+  costPrice?: number;
   quantity: number;
   discountAmount?: number;
   taxAmount?: number;
