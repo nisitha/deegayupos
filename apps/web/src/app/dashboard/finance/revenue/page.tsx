@@ -522,7 +522,7 @@ export default function RevenueDeskPage() {
                 {analytics.topProducts.map((p, idx) => (
                   <tr key={p.productId || idx} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">
-                      {p.name}
+                      {p?.name || 'Product'}
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
                       {p.sku || 'N/A'}

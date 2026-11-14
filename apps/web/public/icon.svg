@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#brandGrad)" />
+  <path d="M20 18C18.8954 18 18 18.8954 18 20V44C18 45.1046 18.8954 46 20 46H24C25.1046 46 26 45.1046 26 44V38H34C40.6274 38 46 32.6274 46 26C46 19.3726 40.6274 18 34 18H20ZM26 24H34C35.1046 24 36 24.8954 36 26C36 27.1046 35.1046 28 34 28H26V24Z" fill="white" />
+  <circle cx="34" cy="26" r="3" fill="#6366F1" />
+</svg>

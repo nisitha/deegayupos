@@ -683,11 +683,11 @@ export default function CustomersManagementPage() {
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
-                            {c.name.slice(0, 2).toUpperCase()}
+                            {c?.name ? c.name.slice(0, 2).toUpperCase() : 'CU'}
                           </div>
                           <div>
                             <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                              {c.name}
+                              {c?.name || 'Customer'}
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono">
                               {c.nicNumber ? `NIC: ${c.nicNumber}` : 'No NIC on file'}
@@ -844,11 +844,11 @@ export default function CustomersManagementPage() {
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center shadow-xs">
-                  {drawerCustomer.name.slice(0, 2).toUpperCase()}
+                  {drawerCustomer?.name ? drawerCustomer.name.slice(0, 2).toUpperCase() : 'CU'}
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                    {drawerCustomer.name}
+                    {drawerCustomer?.name || 'Customer'}
                   </h2>
                   <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
                     {drawerCustomer.phone && <span>📞 {drawerCustomer.phone}</span>}
@@ -1059,7 +1059,7 @@ export default function CustomersManagementPage() {
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left text-xs space-y-2 font-mono">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Customer:</span>
-                      <strong className="text-slate-900">{settlementSuccessVoucher.customer.name}</strong>
+                      <strong className="text-slate-900">{settlementSuccessVoucher?.customer?.name || 'Customer'}</strong>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Amount Paid:</span>
@@ -1109,13 +1109,13 @@ export default function CustomersManagementPage() {
                   {/* Customer & Debt Banner */}
                   <div className="p-3.5 bg-rose-50/70 border border-rose-100 rounded-2xl flex items-center justify-between text-xs">
                     <div>
-                      <div className="font-bold text-slate-900">{settlementCustomer.name}</div>
+                      <div className="font-bold text-slate-900">{settlementCustomer?.name || 'Customer'}</div>
                       <div className="text-[11px] text-slate-500">Khata Credit Account</div>
                     </div>
                     <div className="text-right font-mono">
                       <span className="text-[10px] text-rose-500 font-bold block">Current Debt</span>
                       <strong className="text-sm font-black text-rose-700">
-                        LKR {settlementCustomer.currentBalance.toLocaleString()}
+                        LKR {(settlementCustomer?.currentBalance ?? 0).toLocaleString()}
                       </strong>
                     </div>
                   </div>

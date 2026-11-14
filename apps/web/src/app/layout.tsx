@@ -14,7 +14,11 @@ export const metadata: Metadata = {
   description:
     'PixelCraft POS (pos.pixelcraftlk.com) - Enterprise-grade Multi-Tenant SaaS platform engineered by PixelCraft LK.',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/icon.svg',
   },
 };
 

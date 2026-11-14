@@ -247,21 +247,21 @@ export function ReceiptModal({
   };
 
   const businessName =
-    receiptData?.business.legalName || receiptData?.business.name || business?.name || 'DEEGAYU WEDA MADURA';
+    receiptData?.business?.legalName || receiptData?.business?.name || business?.name || 'DEEGAYU WEDA MADURA';
   const logoUrl =
     (receiptData?.settings as { logoUrl?: string | null } | undefined)?.logoUrl ||
     (receiptData?.business as { logoUrl?: string | null } | undefined)?.logoUrl ||
     business?.logoUrl;
-  const branchName = receiptData?.branch.name || 'Flagship Clinic & Dispensary';
-  const branchAddress = receiptData?.branch.address || 'Colombo Road, Kiribathgoda, Sri Lanka';
-  const branchPhone = receiptData?.branch.phone || '+94 11 291 4500';
-  const taxNumber = receiptData?.settings.taxNumber || 'VAT-10928392-8000';
-  const receiptHeader = receiptData?.settings.receiptHeader;
+  const branchName = receiptData?.branch?.name || business?.name || 'Flagship Clinic & Dispensary';
+  const branchAddress = receiptData?.branch?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka';
+  const branchPhone = receiptData?.branch?.phone || business?.phone || '+94 11 291 4500';
+  const taxNumber = receiptData?.settings?.taxNumber || 'VAT-10928392-8000';
+  const receiptHeader = receiptData?.settings?.receiptHeader;
   const receiptFooter =
-    receiptData?.settings.receiptFooter || 'නිරෝගී සුවය පතමු! / Thank You Come Again';
-  const returnPolicy = receiptData?.settings.returnPolicyText;
-  const showBarcode = receiptData ? receiptData.settings.showBarcode : true;
-  const showTax = receiptData ? receiptData.settings.showTaxDetails : true;
+    receiptData?.settings?.receiptFooter || 'නිරෝගී සුවය පතමු! / Thank You Come Again';
+  const returnPolicy = receiptData?.settings?.returnPolicyText;
+  const showBarcode = receiptData?.settings ? (receiptData.settings.showBarcode ?? true) : true;
+  const showTax = receiptData?.settings ? (receiptData.settings.showTaxDetails ?? true) : true;
 
   const isA4OrA5 = paperSize === 'A4' || paperSize === 'A5';
 

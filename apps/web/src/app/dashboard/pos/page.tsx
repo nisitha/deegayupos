@@ -1463,7 +1463,7 @@ export default function ConfidencyPosPage() {
               </div>
               <div className="truncate">
                 <div className="text-xs md:text-sm font-bold text-sky-950 truncate">
-                  {selectedCustomer.name}
+                  {selectedCustomer?.name || 'Customer'}
                 </div>
                 {selectedCustomer.loyaltyPoints ? (
                   <div className="text-xs text-sky-700 font-mono font-medium">
@@ -1663,7 +1663,7 @@ export default function ConfidencyPosPage() {
                 ) : (
                   <div className="bg-indigo-50/70 border border-indigo-100 p-2.5 rounded-xl space-y-1">
                     <div className="flex justify-between font-bold text-slate-800">
-                      <span className="truncate">{selectedCustomer.name}</span>
+                      <span className="truncate">{selectedCustomer?.name || 'Customer'}</span>
                       <span className="font-mono text-indigo-700 shrink-0">
                         Limit: LKR {Number(selectedCustomer.creditLimit || 0).toLocaleString()}
                       </span>
@@ -1792,7 +1792,7 @@ export default function ConfidencyPosPage() {
               {cart.map((item) => (
                 <div key={item.id} className="py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h5 className="text-sm font-bold text-slate-900 truncate">{item.name}</h5>
+                    <h5 className="text-sm font-bold text-slate-900 truncate">{item?.name || 'Item'}</h5>
                     <div className="text-xs text-slate-500 font-mono">
                       LKR {item.price.toFixed(2)}
                     </div>
