@@ -131,7 +131,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       if (branchList.length === 0) {
         branchList = [
           {
-            id: '11111111-2222-3333-4444-555555555555',
+            id: '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
             name: 'Main Branch',
             code: 'MAIN-01',
             address: 'Deegayu Weda Madura, Colombo, Sri Lanka',

@@ -24,6 +24,11 @@ import {
   Clock,
   Barcode,
   BookOpen,
+  CheckCircle2,
+  Printer,
+  QrCode,
+  AlertCircle,
+  Check,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -129,6 +134,14 @@ export default function ConfidencyPosPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
+
+  // Checkout & Payment Confirmation Modal State
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'CASH' | 'CARD' | 'LANKA_QR' | 'STORE_CREDIT'>('CASH');
+  const [cashTendered, setCashTendered] = useState<string>('');
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutSuccessBanner, setCheckoutSuccessBanner] = useState<{ invoiceNumber: string; amount: number } | null>(null);
+  const cashInputRef = useRef<HTMLInputElement>(null);
 
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
@@ -590,271 +603,238 @@ export default function ConfidencyPosPage() {
     setHeldTickets((prev) => prev.filter((t) => t.id !== ticketId));
   };
 
-  // Execute Checkout Transaction
-  const handleCharge = useCallback(async () => {
+  // Open Checkout / Payment Confirmation Modal
+  const handleOpenCheckoutModal = useCallback(() => {
     if (cart.length === 0) return;
+    setCheckoutError(null);
+    const initialMethod =
+      paymentMethod === 'STORE_CREDIT'
+        ? 'STORE_CREDIT'
+        : paymentMethod === 'CARD'
+        ? 'CARD'
+        : 'CASH';
+    setCheckoutPaymentMethod(initialMethod);
+    setCashTendered(totalAmount > 0 ? totalAmount.toFixed(2) : '');
+    setIsCheckoutModalOpen(true);
+  }, [cart.length, paymentMethod, totalAmount]);
 
-    // Credit limit and customer validation for STORE_CREDIT
-    if (paymentMethod === 'STORE_CREDIT') {
-      if (!selectedCustomer) {
-        setIsCustomerModalOpen(true);
-        setScanFeedback('⚠️ Please select a customer for Store Credit purchase');
-        setTimeout(() => setScanFeedback(null), 3000);
-        return;
-      }
+  // Backward compatibility alias
+  const handleCharge = handleOpenCheckoutModal;
 
-      if (selectedCustomer.status === 'SUSPENDED') {
-        setScanFeedback('❌ Customer account is suspended. Cannot issue credit.');
-        setTimeout(() => setScanFeedback(null), 3000);
-        return;
-      }
-
-      const debt = Number(selectedCustomer.currentBalance || 0);
-      const limit = Number(selectedCustomer.creditLimit || 0);
-      const avail = Math.max(0, limit - debt);
-
-      if (totalAmount > avail) {
-        const excess = (totalAmount - avail).toFixed(2);
-        setScanFeedback(`❌ Credit limit exceeded by LKR ${excess}. Available: LKR ${avail.toLocaleString()}`);
-        setTimeout(() => setScanFeedback(null), 4000);
-        return;
-      }
+  // Auto-focus cash input when Cash tab is active
+  useEffect(() => {
+    if (!isCheckoutModalOpen || checkoutPaymentMethod !== 'CASH') {
+      return undefined;
     }
+    const timer = setTimeout(() => {
+      cashInputRef.current?.focus();
+      cashInputRef.current?.select();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isCheckoutModalOpen, checkoutPaymentMethod]);
 
-    setIsProcessingCheckout(true);
+  // Execute Checkout Transaction with Supabase Persistence
+  const executeCheckout = useCallback(
+    async (shouldPrintReceipt: boolean) => {
+      if (cart.length === 0) return;
 
-    try {
-      const formattedCustomer = selectedCustomer
-        ? selectedCustomer.phone
-          ? `${selectedCustomer.name} (${selectedCustomer.phone})`
-          : selectedCustomer.name
-        : 'Walk-in Customer';
-
-      const payload: CheckoutPayload = {
-        branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-        cashierId,
-        customerId: selectedCustomer?.id || undefined,
-        customerName: formattedCustomer,
-        orderType: 'RETAIL_WALKIN',
-        subtotal,
-        discountAmount,
-        taxAmount,
-        totalAmount,
-        paidAmount: totalAmount,
-        changeDue: 0,
-        items: cart.map((item) => ({
-          productId: item.productId,
-          productName: item.name,
-          sku: item.sku,
-          unitPrice: item.price,
-          quantity: item.quantity,
-          subtotal: item.price * item.quantity,
-          discountAmount: 0,
-          taxAmount: 0,
-        })),
-        payments: [
-          {
-            paymentMethod:
-              paymentMethod === 'STORE_CREDIT'
-                ? 'CUSTOMER_CREDIT'
-                : paymentMethod === 'CASH'
-                ? 'CASH'
-                : 'CARD',
-            amount: totalAmount,
-          },
-        ],
-      };
-
-      const res = await posApi.checkout(payload);
-
-      const rawSale: SaleDto = res.data || {
-        id: `sale-${Date.now()}`,
-        tenantId: 'deegayu',
-        branchId: selectedBranchId || 'branch-1',
-        cashierId,
-        cashierName,
-        cashier: {
-          id: cashierId,
-          fullName: cashierName,
-          email: activeCashier?.email || user?.email || 'owner@deegayu.pixelcraftlk.com',
-        },
-        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-        orderType: 'RETAIL_WALKIN',
-        status: 'COMPLETED',
-        subtotal,
-        discountAmount,
-        taxAmount,
-        totalAmount,
-        paidAmount: totalAmount,
-        changeDue: 0,
-        customerName: formattedCustomer,
-        items: cart.map((i) => ({
-          id: `si-${Math.random()}`,
-          saleId: 'sale-1',
-          productName: i.name,
-          sku: i.sku,
-          unitPrice: i.price,
-          quantity: i.quantity,
-          subtotal: i.price * i.quantity,
-          discountAmount: 0,
-          taxAmount: 0,
-        })),
-        payments: [
-          {
-            id: `sp-${Math.random()}`,
-            saleId: 'sale-1',
-            paymentMethod: paymentMethod === 'CARD' ? 'CARD' : 'CASH',
-            amount: totalAmount,
-            status: 'SUCCESS',
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const finalizedSale: SaleDto = {
-        ...rawSale,
-        cashierId: rawSale.cashierId || cashierId,
-        cashierName: rawSale.cashierName || rawSale.cashier?.fullName || cashierName,
-        cashier: rawSale.cashier || {
-          id: cashierId,
-          fullName: cashierName,
-          email: activeCashier?.email || user?.email || 'cashier@deegayu.pixelcraftlk.com',
-        },
-      };
-
-      setCompletedSale(finalizedSale);
-      setShowReceiptModal(true);
-
-      // Phase 13 Hardware Automation: Cash drawer kick & Auto thermal print
-      try {
-        const hw = PrinterBridge.getSettings();
-        if (
-          hw.autoOpenCashDrawer &&
-          finalizedSale.payments?.some((p) => p.paymentMethod === 'CASH')
-        ) {
-          PrinterBridge.kickCashDrawer().catch(() => {});
+      // Credit limit and customer validation for STORE_CREDIT
+      if (checkoutPaymentMethod === 'STORE_CREDIT') {
+        if (!selectedCustomer) {
+          setIsCustomerModalOpen(true);
+          setScanFeedback('⚠️ Please select a customer for Store Credit purchase');
+          setTimeout(() => setScanFeedback(null), 3000);
+          return;
         }
-        if (hw.autoPrintReceipt) {
-          PrinterBridge.printReceipt(finalizedSale).catch(() => {});
+
+        if (selectedCustomer.status === 'SUSPENDED') {
+          setCheckoutError('Customer account is suspended. Cannot issue credit.');
+          return;
         }
-      } catch {
-        // ignore
+
+        const debt = Number(selectedCustomer.currentBalance || 0);
+        const limit = Number(selectedCustomer.creditLimit || 0);
+        const avail = Math.max(0, limit - debt);
+
+        if (totalAmount > avail) {
+          const excess = (totalAmount - avail).toFixed(2);
+          setCheckoutError(`Credit limit exceeded by LKR ${excess}. Available: LKR ${avail.toLocaleString()}`);
+          return;
+        }
       }
-      if (paymentMethod === 'STORE_CREDIT' && selectedCustomer) {
-        setSelectedCustomer((prev) =>
-          prev
-            ? {
-                ...prev,
-                currentBalance: (prev.currentBalance || 0) + totalAmount,
-                availableCredit: Math.max(
-                  0,
-                  (prev.creditLimit || 0) - ((prev.currentBalance || 0) + totalAmount),
-                ),
-              }
-            : null,
+
+      const tenderedNum =
+        checkoutPaymentMethod === 'CASH'
+          ? parseFloat(cashTendered) || 0
+          : totalAmount;
+
+      if (checkoutPaymentMethod === 'CASH' && tenderedNum < totalAmount) {
+        setCheckoutError(
+          `Insufficient cash tendered. Total is LKR ${totalAmount.toFixed(2)}, received LKR ${tenderedNum.toFixed(2)}.`
         );
+        return;
       }
-      clearCart();
-      resetDiscount();
-    } catch {
-      const formattedCustomer = selectedCustomer
-        ? selectedCustomer.phone
-          ? `${selectedCustomer.name} (${selectedCustomer.phone})`
-          : selectedCustomer.name
-        : 'Walk-in Customer';
 
-      // Offline fallback
-      const fallbackSale: SaleDto = {
-        id: `sale-${Date.now()}`,
-        tenantId: 'deegayu',
-        branchId: selectedBranchId || 'branch-1',
-        cashierId,
-        cashierName,
-        cashier: {
-          id: cashierId,
-          fullName: cashierName,
-          email: activeCashier?.email || user?.email || 'owner@deegayu.pixelcraftlk.com',
-        },
-        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-        orderType: 'RETAIL_WALKIN',
-        status: 'COMPLETED',
-        subtotal,
-        discountAmount,
-        taxAmount,
-        totalAmount,
-        paidAmount: totalAmount,
-        changeDue: 0,
-        customerName: formattedCustomer,
-        items: cart.map((i) => ({
-          id: `si-${Math.random()}`,
-          saleId: 'sale-1',
-          productName: i.name,
-          sku: i.sku,
-          unitPrice: i.price,
-          quantity: i.quantity,
-          subtotal: i.price * i.quantity,
-          discountAmount: 0,
-          taxAmount: 0,
-        })),
-        payments: [
-          {
-            id: `sp-${Math.random()}`,
-            saleId: 'sale-1',
-            paymentMethod: paymentMethod === 'CARD' ? 'CARD' : 'CASH',
-            amount: totalAmount,
-            status: 'SUCCESS',
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const changeDue = Math.max(0, tenderedNum - totalAmount);
 
-      setCompletedSale(fallbackSale);
-      setShowReceiptModal(true);
+      setIsProcessingCheckout(true);
+      setCheckoutError(null);
 
-      // Phase 13 Hardware Automation: Cash drawer kick & Auto thermal print
       try {
-        const hw = PrinterBridge.getSettings();
-        if (
-          hw.autoOpenCashDrawer &&
-          fallbackSale.payments?.some((p) => p.paymentMethod === 'CASH')
-        ) {
-          PrinterBridge.kickCashDrawer().catch(() => {});
-        }
-        if (hw.autoPrintReceipt) {
-          PrinterBridge.printReceipt(fallbackSale).catch(() => {});
-        }
-      } catch {
-        // ignore
-      }
-      clearCart();
-      resetDiscount();
-    } finally {
-      setIsProcessingCheckout(false);
-    }
-  }, [
-    cart,
-    selectedBranchId,
-    subtotal,
-    discountAmount,
-    taxAmount,
-    totalAmount,
-    paymentMethod,
-    cashierId,
-    cashierName,
-    activeCashier,
-    user,
-    selectedCustomer,
-    clearCart,
-    resetDiscount,
-  ]);
+        const formattedCustomer = selectedCustomer
+          ? selectedCustomer.phone
+            ? `${selectedCustomer.name} (${selectedCustomer.phone})`
+            : selectedCustomer.name
+          : 'Walk-in Customer';
 
-  // Keyboard shortcut listener (F2: Search Barcode, F4: Hold Ticket, Esc: Dismiss)
+        const payload: CheckoutPayload = {
+          branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+          cashierId,
+          cashierName,
+          customerId: selectedCustomer?.id || undefined,
+          customerName: formattedCustomer,
+          orderType: 'RETAIL_WALKIN',
+          subtotal,
+          discountAmount,
+          taxAmount,
+          totalAmount,
+          paidAmount: tenderedNum,
+          changeDue,
+          paymentMethod:
+            checkoutPaymentMethod === 'STORE_CREDIT'
+              ? 'CUSTOMER_CREDIT'
+              : checkoutPaymentMethod === 'CARD'
+              ? 'CARD'
+              : checkoutPaymentMethod === 'LANKA_QR'
+              ? 'QR_PAYMENT'
+              : 'CASH',
+          items: cart.map((item) => ({
+            productId: item.productId,
+            productName: item.name,
+            sku: item.sku,
+            unitPrice: item.price,
+            quantity: item.quantity,
+            subtotal: item.price * item.quantity,
+            discountAmount: 0,
+            taxAmount: 0,
+          })),
+          payments: [
+            {
+              paymentMethod:
+                checkoutPaymentMethod === 'STORE_CREDIT'
+                  ? 'CUSTOMER_CREDIT'
+                  : checkoutPaymentMethod === 'CARD'
+                  ? 'CARD'
+                  : checkoutPaymentMethod === 'LANKA_QR'
+                  ? 'QR_PAYMENT'
+                  : 'CASH',
+              amount: totalAmount,
+            },
+          ],
+        };
+
+        const res = await posApi.checkout(payload);
+
+        if (!res.success || !res.data) {
+          throw new Error('Failed to complete checkout transaction');
+        }
+
+        const finalizedSale: SaleDto = {
+          ...res.data,
+          cashierId: res.data.cashierId || cashierId,
+          cashierName: res.data.cashierName || cashierName,
+          customerName: formattedCustomer,
+          paidAmount: tenderedNum,
+          changeDue,
+        };
+
+        // Show top success banner
+        setCheckoutSuccessBanner({
+          invoiceNumber: finalizedSale.invoiceNumber,
+          amount: totalAmount,
+        });
+        setTimeout(() => {
+          setCheckoutSuccessBanner(null);
+        }, 5000);
+
+        // Phase 13 Hardware Automation: Cash drawer kick & Auto thermal print
+        try {
+          const hw = PrinterBridge.getSettings();
+          if (
+            hw.autoOpenCashDrawer &&
+            checkoutPaymentMethod === 'CASH'
+          ) {
+            PrinterBridge.kickCashDrawer().catch(() => {});
+          }
+          if (hw.autoPrintReceipt) {
+            PrinterBridge.printReceipt(finalizedSale).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+
+        if (checkoutPaymentMethod === 'STORE_CREDIT' && selectedCustomer) {
+          setSelectedCustomer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentBalance: (prev.currentBalance || 0) + totalAmount,
+                  availableCredit: Math.max(
+                    0,
+                    (prev.creditLimit || 0) - ((prev.currentBalance || 0) + totalAmount),
+                  ),
+                }
+              : null,
+          );
+        }
+
+        clearCart();
+        resetDiscount();
+        setIsCheckoutModalOpen(false);
+
+        if (shouldPrintReceipt) {
+          setCompletedSale(finalizedSale);
+          setShowReceiptModal(true);
+        }
+      } catch (err: any) {
+        console.error('[Checkout DB Error]:', err);
+        setCheckoutError(err.message || 'Payment processing failed. Could not save to database.');
+      } finally {
+        setIsProcessingCheckout(false);
+      }
+    },
+    [
+      cart,
+      checkoutPaymentMethod,
+      cashTendered,
+      totalAmount,
+      subtotal,
+      discountAmount,
+      taxAmount,
+      selectedBranchId,
+      cashierId,
+      cashierName,
+      selectedCustomer,
+      clearCart,
+      resetDiscount,
+    ]
+  );
+
+  // Keyboard shortcut listener (F2: Search Barcode, F4: Hold Ticket, Esc: Dismiss, Enter: Confirm checkout)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isCheckoutModalOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setIsCheckoutModalOpen(false);
+        } else if (e.key === 'Enter') {
+          if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+          e.preventDefault();
+          executeCheckout(true);
+        }
+        return;
+      }
+
       if (e.key === 'F2') {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -872,12 +852,13 @@ export default function ConfidencyPosPage() {
         setIsCustomerModalOpen(false);
         setIsCustomSaleModalOpen(false);
         setIsHeldTicketsModalOpen(false);
+        setIsCheckoutModalOpen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, handleHoldTicket, searchQuery]);
+  }, [isCheckoutModalOpen, executeCheckout, cart, handleHoldTicket, searchQuery]);
 
   return (
     <div className="h-full w-full flex overflow-hidden bg-white select-none">
@@ -886,6 +867,16 @@ export default function ConfidencyPosPage() {
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
           <Sparkles className="w-3.5 h-3.5 text-[#7052FF]" />
           <span>{scanFeedback}</span>
+        </div>
+      )}
+
+      {/* Sale Confirmation & Persistence Banner */}
+      {checkoutSuccessBanner && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white text-sm font-bold px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+          <span>
+            ✓ Sale {checkoutSuccessBanner.invoiceNumber} Marked & Saved (LKR {checkoutSuccessBanner.amount.toFixed(2)})
+          </span>
         </div>
       )}
 
@@ -1970,6 +1961,338 @@ export default function ConfidencyPosPage() {
           setTimeout(() => setScanFeedback(null), 3000);
         }}
       />
+
+      {/* 8. Checkout & Payment Confirmation Modal */}
+      {isCheckoutModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/90 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Confirm & Complete Sale</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)} items • {selectedCustomer?.name || 'Walk-in Customer'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCheckoutModalOpen(false)}
+                className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+              {/* Total Payable Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#7052FF]/10 via-[#7052FF]/5 to-transparent border border-[#7052FF]/20 flex items-baseline justify-between">
+                <div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#7052FF]">
+                    Total Payable
+                  </span>
+                  <div className="text-2xl sm:text-3xl font-black font-mono text-slate-950">
+                    LKR {totalAmount.toFixed(2)}
+                  </div>
+                </div>
+                <div className="text-right text-xs text-slate-500">
+                  {discountType !== 'NONE' && (
+                    <span className="text-emerald-600 font-semibold block">Discount Applied</span>
+                  )}
+                  <span>Cashier: {cashierName}</span>
+                </div>
+              </div>
+
+              {/* Payment Method Selector Tabs */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Select Payment Method
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'CASH' as const, label: 'Cash', icon: Banknote },
+                    { id: 'CARD' as const, label: 'Card', icon: CreditCard },
+                    { id: 'LANKA_QR' as const, label: 'LankaQR', icon: QrCode },
+                    { id: 'STORE_CREDIT' as const, label: 'Credit', icon: User },
+                  ].map((m) => {
+                    const Icon = m.icon;
+                    const isActive = checkoutPaymentMethod === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setCheckoutPaymentMethod(m.id);
+                          setCheckoutError(null);
+                        }}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-[#7052FF] text-white border-[#7052FF] shadow-md shadow-[#7052FF]/25'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 mb-1" />
+                        <span>{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mode-Specific Body */}
+              {checkoutPaymentMethod === 'CASH' && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  {/* Cash Received Input */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-700">Cash Received (LKR)</label>
+                      <span className="text-[11px] text-slate-400">Type or click quick-fill bills</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                        LKR
+                      </span>
+                      <input
+                        ref={cashInputRef}
+                        type="number"
+                        step="any"
+                        inputMode="decimal"
+                        value={cashTendered}
+                        onChange={(e) => {
+                          setCashTendered(e.target.value);
+                          setCheckoutError(null);
+                        }}
+                        placeholder={totalAmount.toFixed(2)}
+                        className="w-full pl-13 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-lg font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#7052FF]/30 focus:border-[#7052FF] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick-Fill Pills */}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Quick Amount
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: 'Exact', value: totalAmount.toFixed(2) },
+                        { label: '500', value: '500' },
+                        { label: '1,000', value: '1000' },
+                        { label: '2,000', value: '2000' },
+                        { label: '5,000', value: '5000' },
+                        { label: '10,000', value: '10000' },
+                      ].map((pill) => (
+                        <button
+                          key={pill.label}
+                          type="button"
+                          onClick={() => {
+                            setCashTendered(pill.value);
+                            setCheckoutError(null);
+                            cashInputRef.current?.focus();
+                          }}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                            cashTendered === pill.value
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {pill.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live Change / Balance Calculation */}
+                  {(() => {
+                    const tendered = parseFloat(cashTendered) || 0;
+                    const change = Math.max(0, tendered - totalAmount);
+                    const remaining = Math.max(0, totalAmount - tendered);
+
+                    if (tendered >= totalAmount) {
+                      return (
+                        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                            <span className="text-xs font-extrabold uppercase tracking-wider">
+                              Change to Return
+                            </span>
+                          </div>
+                          <span className="text-xl font-black font-mono text-emerald-700">
+                            LKR {change.toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (tendered > 0) {
+                      return (
+                        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-amber-600" />
+                            <span className="text-xs font-extrabold uppercase tracking-wider">
+                              Remaining Due
+                            </span>
+                          </div>
+                          <span className="text-lg font-black font-mono text-amber-700">
+                            LKR {remaining.toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-xs text-center font-medium">
+                        Enter cash received to calculate customer balance
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {checkoutPaymentMethod === 'CARD' && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                    <CreditCard className="w-4 h-4 text-[#7052FF]" />
+                    <span>Card Terminal Payment</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Swipe, insert, or tap the customer’s Visa / Mastercard / Amex on the POS payment terminal. Ensure approval response on the terminal before confirming.
+                  </p>
+                  <div className="pt-1 flex justify-between font-mono font-bold text-slate-800">
+                    <span>Charge Amount:</span>
+                    <span>LKR {totalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {checkoutPaymentMethod === 'LANKA_QR' && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                    <QrCode className="w-4 h-4 text-[#7052FF]" />
+                    <span>LankaQR Instant Mobile Pay</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Prompt customer to scan the merchant LankaQR dynamic display code using any Sri Lankan bank app (BOC, Commercial Bank, Sampath Vishwa, FriMi, Genie, etc.).
+                  </p>
+                  <div className="pt-1 flex justify-between font-mono font-bold text-slate-800">
+                    <span>Payable Amount:</span>
+                    <span>LKR {totalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {checkoutPaymentMethod === 'STORE_CREDIT' && (
+                <div className="space-y-3">
+                  {!selectedCustomer ? (
+                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <span>Customer Profile Required for Credit</span>
+                      </div>
+                      <p className="text-amber-800">
+                        Please attach an active customer account with an approved credit limit before proceeding with a store credit sale.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomerModalOpen(true)}
+                        className="mt-1 w-full bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold py-2 rounded-xl text-xs cursor-pointer"
+                      >
+                        Select or Add Customer
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-xs space-y-2">
+                      <div className="flex justify-between font-bold text-slate-900 text-sm">
+                        <span>{selectedCustomer.name}</span>
+                        <span className="text-[#7052FF] font-mono">
+                          Limit: LKR {Number(selectedCustomer.creditLimit || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Current Balance (ණය):</span>
+                        <span className="font-mono font-bold text-rose-600">
+                          LKR {Number(selectedCustomer.currentBalance || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Available Credit:</span>
+                        <span className="font-mono font-bold text-emerald-600">
+                          LKR {Math.max(0, Number(selectedCustomer.creditLimit || 0) - Number(selectedCustomer.currentBalance || 0)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error Banner */}
+              {checkoutError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-in shake duration-200">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Checkout Transaction Failed</span>
+                    <span className="text-rose-600 leading-tight">{checkoutError}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-6 border-t border-slate-100 bg-slate-50/80 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => executeCheckout(true)}
+                disabled={
+                  isProcessingCheckout ||
+                  (checkoutPaymentMethod === 'CASH' && (parseFloat(cashTendered) || 0) < totalAmount) ||
+                  (checkoutPaymentMethod === 'STORE_CREDIT' && !selectedCustomer)
+                }
+                className="w-full bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-[0.99] disabled:opacity-40 text-white font-bold text-sm py-4 rounded-2xl shadow-lg shadow-[#7052FF]/25 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                {isProcessingCheckout ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving to Database & Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    <span>Confirm Sale & Print Receipt [Enter]</span>
+                  </>
+                )}
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => executeCheckout(false)}
+                  disabled={
+                    isProcessingCheckout ||
+                    (checkoutPaymentMethod === 'CASH' && (parseFloat(cashTendered) || 0) < totalAmount) ||
+                    (checkoutPaymentMethod === 'STORE_CREDIT' && !selectedCustomer)
+                  }
+                  className="bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 border border-slate-200 font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Confirm (No Print)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCheckoutModalOpen(false)}
+                  disabled={isProcessingCheckout}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel (Esc)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

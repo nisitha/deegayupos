@@ -37,6 +37,7 @@ import type {
   CreateUnitPayload,
   BulkImportResult,
   CheckoutPayload,
+  SalePaymentMethod,
   HeldCartDto,
   HoldCartPayload,
   SaleDto,
@@ -904,126 +905,217 @@ export const productsApi = {
   },
 };
 
+const DEEGAYU_TENANT_ID = '0fef1423-5d89-4147-8af8-17c7e641c88a';
+const DEEGAYU_BRANCH_ID = '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
+const DEEGAYU_CASHIER_ID = '96b2747b-9d22-4266-94ce-b035fadef498';
+const DEEGAYU_CASHIER_NAME = 'Dr. Deegayu (Owner)';
+
+function isValidUuid(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+}
+
 export const posApi = {
+  createSale: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
+    return posApi.checkout(data);
+  },
   checkout: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
-    const tenantId =
-      (typeof window !== 'undefined'
-        ? localStorage.getItem('pixelcraft_tenant_id')
-        : null) || '0fef1423-5d89-4147-8af8-17c7e641c88a';
-
-    const branchId =
-      data.branchId ||
-      (typeof window !== 'undefined'
-        ? localStorage.getItem('pixelcraft_selected_branch')
-        : null) ||
-      '11111111-2222-3333-4444-555555555555';
-
-    let cashierId = '99999999-9999-9999-9999-999999999999';
-    let cashierName = 'Dr. Deegayu (Owner)';
+    // 1. Resolve Tenant ID (Fallback to Deegayu Weda Madura seeded UUID)
+    let tenantId = DEEGAYU_TENANT_ID;
     if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('pixelcraft_tenant_id');
+      if (isValidUuid(stored)) tenantId = stored!;
+    }
+
+    // 2. Resolve Branch ID (Fallback to Main Branch seeded UUID)
+    let branchId = DEEGAYU_BRANCH_ID;
+    if (isValidUuid(data.branchId)) {
+      branchId = data.branchId;
+    } else if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('pixelcraft_selected_branch');
+      if (isValidUuid(stored)) branchId = stored!;
+    }
+
+    // 3. Resolve Cashier ID & Name (Fallback to owner cashier seeded UUID)
+    let cashierId = DEEGAYU_CASHIER_ID;
+    let cashierName = DEEGAYU_CASHIER_NAME;
+    if (isValidUuid(data.cashierId)) {
+      cashierId = data.cashierId!;
+      cashierName = data.cashierName || cashierName;
+    } else if (typeof window !== 'undefined') {
       const act = localStorage.getItem('pixelcraft_active_cashier');
       if (act) {
         try {
           const parsed = JSON.parse(act);
-          cashierId = parsed.id || cashierId;
-          cashierName = parsed.name || parsed.fullName || cashierName;
+          if (isValidUuid(parsed.id)) cashierId = parsed.id;
+          cashierName = parsed.fullName || parsed.name || cashierName;
         } catch {
           // Ignore
         }
       }
     }
 
-    const invoiceNumber = `DGM-${Date.now().toString().slice(-6)}`;
-    const saleId = `sale-${Date.now()}`;
+    // 4. Resolve Customer ID (Must be valid UUID or null to prevent FK violation)
+    const validCustomerId = isValidUuid(data.customerId) ? data.customerId : null;
+    const customerName = data.customerName || (validCustomerId ? null : 'Walk-in Customer');
 
-    const createdSale: any = {
+    // 5. Generate clean, unique invoice number
+    const invYear = new Date().getFullYear();
+    const invRandom = Math.floor(10000 + Math.random() * 90000);
+    const invoiceNumber = `INV-${invYear}-${invRandom}`;
+
+    // 6. Insert Sale Record into Supabase
+    const { data: sbSale, error: saleErr } = await supabase
+      .from('sales')
+      .insert({
+        tenant_id: tenantId,
+        branch_id: branchId,
+        cashier_id: cashierId,
+        cashier_name: cashierName,
+        customer_id: validCustomerId,
+        customer_name: customerName,
+        invoice_number: invoiceNumber,
+        order_type: data.orderType || 'RETAIL_WALKIN',
+        status: 'COMPLETED',
+        subtotal: Number(data.subtotal || 0),
+        discount_amount: Number(data.discountAmount || 0),
+        tax_amount: Number(data.taxAmount || 0),
+        total_amount: Number(data.totalAmount || 0),
+        paid_amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
+        change_due: Number(data.changeDue || 0),
+        notes: data.notes || null,
+      })
+      .select()
+      .single();
+
+    if (saleErr || !sbSale?.id) {
+      const errMsg = saleErr ? `${saleErr.message} (${saleErr.details || saleErr.code || ''})` : 'Database rejected sale record';
+      console.error('[posApi.checkout] Supabase sales insert failed:', saleErr);
+      throw new Error(`Failed to record transaction in database: ${errMsg}`);
+    }
+
+    const saleId = sbSale.id;
+
+    // 7. Insert Sale Items into Supabase
+    const saleItemsToInsert = data.items.map((i) => ({
+      tenant_id: tenantId,
+      sale_id: saleId,
+      product_id: isValidUuid(i.productId) ? i.productId : null,
+      product_name: i.productName,
+      sku: i.sku || 'N/A',
+      unit_price: Number(i.unitPrice || 0),
+      quantity: Number(i.quantity || 1),
+      discount_amount: Number(i.discountAmount || 0),
+      tax_amount: Number(i.taxAmount || 0),
+      subtotal: Number(i.subtotal ?? (Number(i.unitPrice || 0) * Number(i.quantity || 1))),
+    }));
+
+    if (saleItemsToInsert.length > 0) {
+      const { error: itemsErr } = await supabase.from('sale_items').insert(saleItemsToInsert);
+      if (itemsErr) {
+        console.error('[posApi.checkout] Supabase sale_items insert error:', itemsErr);
+        throw new Error(`Sale created (${invoiceNumber}), but failed to save line items: ${itemsErr.message}`);
+      }
+    }
+
+    // 8. Insert Payment Record into Supabase
+    let mappedMethod: SalePaymentMethod = 'CASH';
+    const rawMethod = (data.paymentMethod || data.payments?.[0]?.paymentMethod || 'CASH').toUpperCase();
+    if (rawMethod.includes('CARD')) mappedMethod = 'CARD';
+    else if (rawMethod.includes('QR') || rawMethod.includes('LANKA')) mappedMethod = 'QR_PAYMENT';
+    else if (rawMethod.includes('BANK')) mappedMethod = 'BANK_TRANSFER';
+    else if (rawMethod.includes('CREDIT')) mappedMethod = 'STORE_CREDIT';
+    else mappedMethod = 'CASH';
+
+    const { error: payErr } = await supabase.from('sale_payments').insert({
+      tenant_id: tenantId,
+      sale_id: saleId,
+      payment_method: mappedMethod,
+      amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
+      status: 'SUCCESS',
+    });
+    if (payErr) {
+      console.warn('[posApi.checkout] Supabase sale_payments insert warning:', payErr.message);
+    }
+
+    // 9. Decrement stock levels in Supabase for each sold item
+    for (const item of data.items) {
+      if (item.productId && isValidUuid(item.productId)) {
+        try {
+          const { data: stockRow, error: sErr } = await supabase
+            .from('stock_levels')
+            .select('id, quantity_on_hand')
+            .eq('product_id', item.productId)
+            .limit(1)
+            .maybeSingle();
+
+          if (!sErr && stockRow) {
+            const currentQty = Number(stockRow.quantity_on_hand) || 0;
+            const nextQty = Math.max(0, currentQty - Number(item.quantity || 1));
+            await supabase
+              .from('stock_levels')
+              .update({
+                quantity_on_hand: nextQty,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', stockRow.id);
+          }
+        } catch (stockErr) {
+          console.warn(`[posApi.checkout] Stock decrement warning for product ${item.productId}:`, stockErr);
+        }
+      }
+    }
+
+    // 10. Construct full SaleDto for UI and local receipt cache
+    const createdSale: SaleDto = {
       id: saleId,
       tenantId,
       branchId,
       invoiceNumber,
       cashierId,
       cashierName,
-      customerId: data.customerId || null,
-      customerName: data.customerName || null,
-      orderType: data.orderType || 'RETAIL_WALKIN',
+      customerId: validCustomerId || undefined,
+      customerName: customerName || undefined,
+      orderType: (data.orderType as any) || 'RETAIL_WALKIN',
       status: 'COMPLETED',
-      subtotal: data.subtotal,
-      discountAmount: data.discountAmount || 0,
-      taxAmount: data.taxAmount || 0,
-      totalAmount: data.totalAmount,
-      paidAmount: data.paidAmount,
-      changeDue: data.changeDue || 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      subtotal: Number(data.subtotal || 0),
+      discountAmount: Number(data.discountAmount || 0),
+      taxAmount: Number(data.taxAmount || 0),
+      totalAmount: Number(data.totalAmount || 0),
+      paidAmount: Number(data.paidAmount ?? data.totalAmount ?? 0),
+      changeDue: Number(data.changeDue || 0),
+      createdAt: sbSale.created_at || new Date().toISOString(),
+      updatedAt: sbSale.updated_at || new Date().toISOString(),
       items: data.items.map((i, idx) => ({
         id: `item-${Date.now()}-${idx}`,
-        tenantId,
         saleId,
         productId: i.productId,
         productName: i.productName,
-        sku: i.sku || '',
-        unitPrice: i.unitPrice,
-        quantity: i.quantity,
-        discountAmount: i.discountAmount || 0,
-        taxAmount: i.taxAmount || 0,
-        subtotal: i.subtotal,
+        sku: i.sku || 'N/A',
+        unitPrice: Number(i.unitPrice || 0),
+        quantity: Number(i.quantity || 1),
+        discountAmount: Number(i.discountAmount || 0),
+        taxAmount: Number(i.taxAmount || 0),
+        subtotal: Number(i.subtotal ?? (Number(i.unitPrice || 0) * Number(i.quantity || 1))),
       })),
       payments: [
         {
           id: `pay-${Date.now()}`,
           saleId,
-          paymentMethod: data.paymentMethod || data.payments?.[0]?.paymentMethod || 'CASH',
-          amount: data.paidAmount,
+          paymentMethod: mappedMethod,
+          amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
           status: 'SUCCESS',
           createdAt: new Date().toISOString(),
         },
       ],
+      cashier: {
+        id: cashierId,
+        fullName: cashierName,
+        email: 'owner@deegayu.pixelcraftlk.com',
+      },
     };
 
-    try {
-      const { data: sbSale, error: saleErr } = await supabase
-        .from('sales')
-        .insert({
-          tenant_id: tenantId,
-          branch_id: branchId,
-          cashier_id: cashierId,
-          cashier_name: cashierName,
-          customer_id: data.customerId || null,
-          customer_name: data.customerName || null,
-          invoice_number: invoiceNumber,
-          order_type: data.orderType || 'RETAIL_WALKIN',
-          status: 'COMPLETED',
-          subtotal: data.subtotal,
-          discount_amount: data.discountAmount || 0,
-          tax_amount: data.taxAmount || 0,
-          total_amount: data.totalAmount,
-          paid_amount: data.paidAmount,
-          change_due: data.changeDue || 0,
-        })
-        .select()
-        .maybeSingle();
-
-      if (!saleErr && sbSale?.id) {
-        createdSale.id = sbSale.id;
-        const saleItemsToInsert = data.items.map((i) => ({
-          tenant_id: tenantId,
-          sale_id: sbSale.id,
-          product_id: i.productId,
-          product_name: i.productName,
-          sku: i.sku || '',
-          unit_price: i.unitPrice,
-          quantity: i.quantity,
-          discount_amount: i.discountAmount || 0,
-          tax_amount: i.taxAmount || 0,
-          subtotal: i.subtotal,
-        }));
-        await supabase.from('sale_items').insert(saleItemsToInsert);
-      }
-    } catch (sbErr) {
-      console.warn('Supabase checkout note:', sbErr);
-    }
-
-    // Persist to local sales history for instant reprint & offline resilience
+    // 11. Persist to local sales history for offline resilience & instant reprint
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('pixelcraft_sales_history');
@@ -1137,14 +1229,17 @@ export const posApi = {
 
       if (s) {
         let saleItems: any[] = [];
+        let salePayments: any[] = [];
+
         try {
-          const { data: itemsData } = await supabase
-            .from('sale_items')
-            .select('*')
-            .eq('sale_id', s.id);
-          if (itemsData) saleItems = itemsData;
+          const [itemsRes, payRes] = await Promise.all([
+            supabase.from('sale_items').select('*').eq('sale_id', s.id),
+            supabase.from('sale_payments').select('*').eq('sale_id', s.id),
+          ]);
+          if (itemsRes.data) saleItems = itemsRes.data;
+          if (payRes.data) salePayments = payRes.data;
         } catch (itemErr) {
-          console.warn('[SaleById API] Items query note:', itemErr);
+          console.warn('[SaleById API] Items/Payments query note:', itemErr);
         }
 
         const sale: SaleDto = {
@@ -1178,7 +1273,23 @@ export const posApi = {
             taxAmount: Number(i.tax_amount || 0),
             subtotal: Number(i.subtotal || 0),
           })),
-          payments: [],
+          payments: salePayments.length > 0 ? salePayments.map((p: any) => ({
+            id: p.id,
+            saleId: p.sale_id,
+            paymentMethod: p.payment_method,
+            amount: Number(p.amount || 0),
+            status: p.status,
+            createdAt: p.created_at,
+          })) : [
+            {
+              id: `pay-${s.id}`,
+              saleId: s.id,
+              paymentMethod: 'CASH' as const,
+              amount: Number(s.total_amount || 0),
+              status: 'SUCCESS' as const,
+              createdAt: s.created_at,
+            }
+          ],
         };
         return { success: true, data: sale };
       }
@@ -1315,24 +1426,37 @@ export const posApi = {
       if (!sbErr && sbSales && sbSales.length > 0) {
         const saleIds = sbSales.map((s: any) => s.id);
         const itemsBySaleId = new Map<string, any[]>();
+        const paymentsBySaleId = new Map<string, any[]>();
+
         try {
-          const { data: allItems, error: itemsErr } = await supabase
-            .from('sale_items')
-            .select('*')
-            .in('sale_id', saleIds);
-          if (!itemsErr && allItems) {
-            allItems.forEach((item: any) => {
+          const [itemsRes, paymentsRes] = await Promise.all([
+            supabase.from('sale_items').select('*').in('sale_id', saleIds),
+            supabase.from('sale_payments').select('*').in('sale_id', saleIds),
+          ]);
+
+          if (!itemsRes.error && itemsRes.data) {
+            itemsRes.data.forEach((item: any) => {
               const current = itemsBySaleId.get(item.sale_id) || [];
               current.push(item);
               itemsBySaleId.set(item.sale_id, current);
             });
           }
-        } catch (itemErr) {
-          console.warn('[Sales API] Items query note:', itemErr);
+
+          if (!paymentsRes.error && paymentsRes.data) {
+            paymentsRes.data.forEach((pay: any) => {
+              const current = paymentsBySaleId.get(pay.sale_id) || [];
+              current.push(pay);
+              paymentsBySaleId.set(pay.sale_id, current);
+            });
+          }
+        } catch (queryErr) {
+          console.warn('[Sales API] Items/Payments query note:', queryErr);
         }
 
         list = sbSales.map((s: any) => {
           const sItems = itemsBySaleId.get(s.id) || [];
+          const sPayments = paymentsBySaleId.get(s.id) || [];
+
           return {
             id: s.id,
             tenantId: s.tenant_id,
@@ -1364,7 +1488,23 @@ export const posApi = {
               taxAmount: Number(i.tax_amount || 0),
               subtotal: Number(i.subtotal || 0),
             })),
-            payments: [],
+            payments: sPayments.length > 0 ? sPayments.map((p: any) => ({
+              id: p.id,
+              saleId: p.sale_id,
+              paymentMethod: p.payment_method,
+              amount: Number(p.amount || 0),
+              status: p.status,
+              createdAt: p.created_at,
+            })) : [
+              {
+                id: `pay-${s.id}`,
+                saleId: s.id,
+                paymentMethod: 'CASH' as const,
+                amount: Number(s.total_amount || 0),
+                status: 'SUCCESS' as const,
+                createdAt: s.created_at,
+              }
+            ],
           };
         });
       }
@@ -2206,7 +2346,5 @@ export const staffApi = {
   },
 };
 
-
-
-
+export const createSale = (data: CheckoutPayload) => posApi.checkout(data);
 
