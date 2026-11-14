@@ -142,57 +142,120 @@ export default function ConfidencyPosPage() {
   const registerCode = 'REG-01';
   const openingFloat = 15000.0;
 
-  // Instant 0ms Hydration via IndexedDB (< 15ms) + Background Sync
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard/pos') {
-      return;
-    }
-    let isMounted = true;
+  // Instant 0ms Hydration via IndexedDB (< 15ms) + Decoupled Flat Background Sync
+  const initCatalog = useCallback(async () => {
+    setIsLoadingProducts(true);
+    setCatalogError(null);
 
-    async function initCatalog() {
-      // 1. Immediately read from IndexedDB with ZERO blocking spinner
+    // 1. Immediately read from IndexedDB with ZERO blocking spinner
+    try {
+      const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
+      if (cached && cached.products && cached.products.length > 0) {
+        setProducts(cached.products);
+        setIsLoadingProducts(false);
+      }
+    } catch (cacheErr) {
+      console.warn('[POS Catalog] Local cache read error:', cacheErr);
+    }
+
+    // 2. Concurrently sync with Supabase in background via decoupled flat queries
+    try {
+      // Step A: Fetch categories in a flat query
+      const categoryMap = new Map<string, { id: string; name: string; slug: string }>();
       try {
-        const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
-        if (cached && cached.products && cached.products.length > 0 && isMounted) {
-          setProducts(cached.products);
-          setIsLoadingProducts(false);
+        const { data: catData, error: catErr } = await supabase
+          .from('categories')
+          .select('id, name, slug');
+        if (!catErr && catData) {
+          catData.forEach((c: any) => {
+            categoryMap.set(c.id, { id: c.id, name: c.name, slug: c.slug || '' });
+          });
         }
-      } catch (cacheErr) {
-        console.warn('Local cache read error:', cacheErr);
+      } catch (cErr) {
+        console.warn('[POS Catalog] Categories fetch error:', cErr);
       }
 
-      // 2. Concurrently sync with Supabase in background (chunked in 1,000-item batches)
+      // Step B: Fetch stock levels in 1,000-row chunks
+      const stockMap = new Map<string, number>();
       try {
-        let allProducts: any[] = [];
-        let chunkPage = 0;
-        const chunkSize = 1000;
-        let hasMore = true;
+        let stockPage = 0;
+        const stockChunkSize = 1000;
+        let hasMoreStock = true;
 
-        while (hasMore && isMounted) {
-          const from = chunkPage * chunkSize;
-          const to = from + chunkSize - 1;
-          const { data: chunk, error: chunkErr } = await supabase
-            .from('products')
-            .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, category:categories(id, name, slug), stock_levels(quantity_on_hand)')
-            .eq('is_active', true)
-            .order('name', { ascending: true })
-            .range(from, to);
+        while (hasMoreStock) {
+          const sFrom = stockPage * stockChunkSize;
+          const sTo = sFrom + stockChunkSize - 1;
+          const { data: stockChunk, error: sErr } = await supabase
+            .from('stock_levels')
+            .select('product_id, quantity_on_hand')
+            .range(sFrom, sTo);
 
-          if (chunkErr || !chunk || chunk.length === 0) {
-            hasMore = false;
+          if (sErr || !stockChunk || stockChunk.length === 0) {
+            hasMoreStock = false;
             break;
           }
 
-          allProducts = allProducts.concat(chunk);
-          if (chunk.length < chunkSize) {
-            hasMore = false;
+          stockChunk.forEach((sl: any) => {
+            if (sl.product_id) {
+              const cur = stockMap.get(sl.product_id) || 0;
+              stockMap.set(sl.product_id, cur + Number(sl.quantity_on_hand ?? 0));
+            }
+          });
+
+          if (stockChunk.length < stockChunkSize) {
+            hasMoreStock = false;
           } else {
-            chunkPage++;
+            stockPage++;
           }
         }
+      } catch (sErr) {
+        console.warn('[POS Catalog] Stock levels fetch error:', sErr);
+      }
 
-        if (allProducts.length > 0 && isMounted) {
-          const freshProducts: RetailProductItem[] = allProducts.map((p: any) => ({
+      // Step C: Fetch products in 1,000-row chunks (pure flat query, no embedded joins)
+      let allProducts: any[] = [];
+      let chunkPage = 0;
+      const chunkSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = chunkPage * chunkSize;
+        const to = from + chunkSize - 1;
+        const { data: chunk, error: chunkErr } = await supabase
+          .from('products')
+          .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id')
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+          .range(from, to);
+
+        if (chunkErr) {
+          console.error('[POS Catalog] Product chunk fetch error:', chunkErr.message);
+          if (allProducts.length === 0) {
+            throw new Error(chunkErr.message || 'Failed to fetch products from store server');
+          }
+          hasMore = false;
+          break;
+        }
+
+        if (!chunk || chunk.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        allProducts = allProducts.concat(chunk);
+        if (chunk.length < chunkSize) {
+          hasMore = false;
+        } else {
+          chunkPage++;
+        }
+      }
+
+      if (allProducts.length > 0) {
+        const freshProducts: RetailProductItem[] = allProducts.map((p: any) => {
+          const cat = p.category_id ? categoryMap.get(p.category_id) : null;
+          const stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 100;
+
+          return {
             id: p.id,
             name: p.name,
             sku: p.sku || '',
@@ -201,44 +264,51 @@ export default function ConfidencyPosPage() {
             wholesalePrice: Number(p.wholesale_price ?? p.retail_price ?? 0),
             costPrice: Number(p.cost_price ?? 0),
             category: {
-              id: p.category?.id || p.category_id || '',
-              name: p.category?.name || 'General',
-              slug: p.category?.slug || 'general',
+              id: cat?.id || p.category_id || '',
+              name: cat?.name || 'General',
+              slug: cat?.slug || 'general',
             },
-            stockOnHand: Number(p.stock_levels?.[0]?.quantity_on_hand ?? 100),
+            stockOnHand: stockQty,
             unit: 'units',
             imageUrl: p.image_url || undefined,
             alertQuantity: p.alert_quantity ?? null,
-          }));
+          };
+        });
 
-          setProducts(freshProducts);
-          setCatalogError(null);
+        setProducts(freshProducts);
+        setCatalogError(null);
 
-          // Update IndexedDB asynchronously
-          await setCachedCatalogData('deegayu', {
-            products: freshProducts,
-            categories: [],
-            total: freshProducts.length,
-          });
+        // Update IndexedDB asynchronously for instant 0ms subsequent loads
+        await setCachedCatalogData('deegayu', {
+          products: freshProducts,
+          categories: Array.from(categoryMap.values()),
+          total: freshProducts.length,
+        });
+      } else {
+        const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
+        if (cached && cached.products && cached.products.length > 0) {
+          setProducts(cached.products);
+        } else {
+          setCatalogError('No products found in store database');
         }
-      } catch (netErr: unknown) {
-        console.warn('Background sync error (operating offline):', netErr);
-        if (isMounted) {
-          setProducts((prev) => {
-            if (prev.length === 0) setCatalogError('Operating in offline mode');
-            return prev;
-          });
-        }
-      } finally {
-        if (isMounted) setIsLoadingProducts(false);
       }
+    } catch (netErr: unknown) {
+      console.warn('[POS Catalog] Background sync error:', netErr);
+      setProducts((prev) => {
+        if (prev.length === 0) {
+          const msg = netErr instanceof Error ? netErr.message : 'Unable to connect to store server';
+          setCatalogError(msg);
+        }
+        return prev;
+      });
+    } finally {
+      setIsLoadingProducts(false);
     }
-
-    initCatalog();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    initCatalog();
+  }, [initCatalog]);
 
   // Classify each product into the 10 Ayurvedic Departments & pre-build lowercase search tokens
   const productsWithDept = useMemo(() => {
@@ -1207,14 +1277,21 @@ export default function ConfidencyPosPage() {
               <Loader2 className="w-8 h-8 animate-spin text-[#7052FF] mb-3" />
               <h3 className="text-sm font-bold text-slate-800">Loading Deegayu Ayurvedic Catalog...</h3>
               <p className="text-xs text-slate-400 mt-1">
-                Connecting to live Supabase repository (3,120 products)...
+                Syncing store inventory & price list...
               </p>
             </div>
           ) : catalogError && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <Package className="w-10 h-10 text-rose-400 mb-2" />
               <h3 className="text-sm font-bold text-slate-800">Catalogue Sync Failed</h3>
-              <p className="text-xs text-rose-500 max-w-sm mt-1">{catalogError}</p>
+              <p className="text-xs text-rose-500 max-w-sm mt-1 mb-4">{catalogError}</p>
+              <button
+                type="button"
+                onClick={() => initCatalog()}
+                className="px-4 py-2 bg-[#7052FF] text-white text-xs font-semibold rounded-xl hover:bg-[#5E3FE6] transition active:scale-95 shadow-sm"
+              >
+                Unable to load catalog. Click to retry.
+              </button>
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">

@@ -199,10 +199,10 @@ export function TerminalActionsModal({
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-800 group-hover:text-amber-600 transition-colors">
-                  Force Remote Supabase Resync
+                  Force Remote Catalog Resync
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Refreshes all 3,120 catalog items and IndexedDB cache
+                  Refreshes all 3,120 catalog items and local terminal cache
                 </div>
               </div>
             </div>

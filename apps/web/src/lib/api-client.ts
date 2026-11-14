@@ -596,7 +596,7 @@ export const productsApi = {
     try {
       const { data: sbProds } = await supabase
         .from('products')
-        .select('*, category:categories(*), stock_levels(*)')
+        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
         .limit(100);
 
       if (sbProds && sbProds.length > 0) {
@@ -612,7 +612,7 @@ export const productsApi = {
           categoryId: p.category_id,
           imageUrl: p.image_url || null,
           isActive: p.is_active ?? true,
-          stock: Number(p.stock_levels?.[0]?.quantity_on_hand ?? 100),
+          stock: 100,
           createdAt: p.created_at || new Date().toISOString(),
           updatedAt: p.updated_at || new Date().toISOString(),
         }));
@@ -634,7 +634,7 @@ export const productsApi = {
     try {
       const { data: p } = await supabase
         .from('products')
-        .select('*, category:categories(*), stock_levels(*)')
+        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -653,7 +653,7 @@ export const productsApi = {
             categoryId: p.category_id,
             imageUrl: p.image_url || null,
             isActive: p.is_active ?? true,
-            stock: Number(p.stock_levels?.[0]?.quantity_on_hand ?? 100),
+            stock: 100,
             createdAt: p.created_at || new Date().toISOString(),
             updatedAt: p.updated_at || new Date().toISOString(),
           },

@@ -240,10 +240,10 @@ export default function ProductsPage() {
     }
 
     try {
-      // 2. Query Supabase directly
+      // 2. Query flat products table directly (no fragile PostgREST joins)
       let query = supabase
         .from('products')
-        .select('*, category:categories(*), stock_levels(*)', { count: 'exact' });
+        .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, created_at, updated_at', { count: 'exact' });
 
       if (search.trim()) {
         query = query.ilike('name', `%${search.trim()}%`);
@@ -261,22 +261,50 @@ export default function ProductsPage() {
         .order('name', { ascending: true })
         .range(from, to);
 
+      if (sbErr) {
+        console.error('[Products] Fetch error:', sbErr.message);
+      }
+
       if (!sbErr && sbProducts) {
-        const freshProducts: ManagedProductItem[] = sbProducts.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku || '',
-          barcode: p.barcode || '',
-          costPrice: Number(p.cost_price ?? 0),
-          retailPrice: Number(p.retail_price ?? 0),
-          wholesalePrice: Number(p.wholesale_price ?? p.retail_price ?? 0),
-          categoryId: p.category_id ?? p.categoryId,
-          category: p.category ? { id: p.category.id, name: p.category.name, slug: p.category.slug } : null,
-          imageUrl: p.image_url ?? p.imageUrl ?? null,
-          stock: Number(p.stock_levels?.[0]?.quantity_on_hand ?? p.stock_quantity ?? 100),
-          stockOnHand: Number(p.stock_levels?.[0]?.quantity_on_hand ?? p.stock_quantity ?? 100),
-          isActive: p.is_active ?? true,
-        }));
+        // Query stock levels for these specific product IDs
+        const prodIds = sbProducts.map((p: any) => p.id);
+        const stockMap = new Map<string, number>();
+        if (prodIds.length > 0) {
+          try {
+            const { data: slData } = await supabase
+              .from('stock_levels')
+              .select('product_id, quantity_on_hand')
+              .in('product_id', prodIds);
+            if (slData) {
+              slData.forEach((sl: any) => {
+                const current = stockMap.get(sl.product_id) || 0;
+                stockMap.set(sl.product_id, current + Number(sl.quantity_on_hand ?? 0));
+              });
+            }
+          } catch {
+            // Non-blocking stock query
+          }
+        }
+
+        const freshProducts: ManagedProductItem[] = sbProducts.map((p: any) => {
+          const cat = categories.find((c) => c.id === p.category_id);
+          const stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 100;
+          return {
+            id: p.id,
+            name: p.name,
+            sku: p.sku || '',
+            barcode: p.barcode || '',
+            costPrice: Number(p.cost_price ?? 0),
+            retailPrice: Number(p.retail_price ?? 0),
+            wholesalePrice: Number(p.wholesale_price ?? p.retail_price ?? 0),
+            categoryId: p.category_id,
+            category: cat ? { id: cat.id, name: cat.name, slug: cat.slug } : null,
+            imageUrl: p.image_url || null,
+            stock: stockQty,
+            stockOnHand: stockQty,
+            isActive: p.is_active ?? true,
+          };
+        });
 
         setProducts(freshProducts);
         const total = sbCount || freshProducts.length;
@@ -1019,7 +1047,7 @@ export default function ProductsPage() {
                           <div className="flex flex-col items-center gap-2">
                             <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                             <span className="text-xs font-semibold text-slate-700">
-                              Compressing & uploading to Supabase Storage...
+                              Optimizing & saving image to Cloud Storage...
                             </span>
                           </div>
                         ) : (
