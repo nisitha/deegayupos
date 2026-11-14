@@ -138,13 +138,12 @@ export default function LoginPage() {
           return;
         }
 
-        // 1. Query Supabase directly
+        // 1. Query Supabase directly from 'users' table (mapped from Prisma @@map("users"))
         let userRecord: any = null;
 
-        // Try 'User' table first
         try {
           const { data: uData, error: uErr } = await supabase
-            .from('User')
+            .from('users')
             .select('*')
             .eq('email', cleanEmail)
             .maybeSingle();
@@ -153,24 +152,7 @@ export default function LoginPage() {
             userRecord = uData;
           }
         } catch {
-          // Ignore and try 'users' table
-        }
-
-        // Try 'users' table if not found
-        if (!userRecord) {
-          try {
-            const { data: u2Data, error: u2Err } = await supabase
-              .from('users')
-              .select('*')
-              .eq('email', cleanEmail)
-              .maybeSingle();
-
-            if (!u2Err && u2Data) {
-              userRecord = u2Data;
-            }
-          } catch {
-            // Ignore
-          }
+          // Ignore
         }
 
         // 2. Validate Password

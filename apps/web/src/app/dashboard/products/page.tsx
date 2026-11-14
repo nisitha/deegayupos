@@ -267,15 +267,15 @@ export default function ProductsPage() {
           name: p.name,
           sku: p.sku || '',
           barcode: p.barcode || '',
-          costPrice: Number(p.cost_price ?? p.purchase_price ?? p.purchasePrice ?? 0),
-          retailPrice: Number(p.retail_price ?? p.retailPrice ?? 0),
-          wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? p.retail_price ?? 0),
+          costPrice: Number(p.cost_price ?? 0),
+          retailPrice: Number(p.retail_price ?? 0),
+          wholesalePrice: Number(p.wholesale_price ?? p.retail_price ?? 0),
           categoryId: p.category_id ?? p.categoryId,
           category: p.category ? { id: p.category.id, name: p.category.name, slug: p.category.slug } : null,
           imageUrl: p.image_url ?? p.imageUrl ?? null,
-          stock: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
-          stockOnHand: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
-          isActive: p.is_active ?? p.isActive ?? true,
+          stock: Number(p.stock_levels?.[0]?.quantity_on_hand ?? p.stock_quantity ?? 100),
+          stockOnHand: Number(p.stock_levels?.[0]?.quantity_on_hand ?? p.stock_quantity ?? 100),
+          isActive: p.is_active ?? true,
         }));
 
         setProducts(freshProducts);

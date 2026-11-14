@@ -161,32 +161,54 @@ export default function ConfidencyPosPage() {
         console.warn('Local cache read error:', cacheErr);
       }
 
-      // 2. Concurrently sync with Supabase in background
+      // 2. Concurrently sync with Supabase in background (chunked in 1,000-item batches)
       try {
-        const { data: sbProducts, error: sbErr } = await supabase
-          .from('products')
-          .select('*, category:categories(*), stock_levels(*)')
-          .order('name', { ascending: true })
-          .limit(3500);
+        let allProducts: any[] = [];
+        let chunkPage = 0;
+        const chunkSize = 1000;
+        let hasMore = true;
 
-        if (!sbErr && sbProducts && sbProducts.length > 0 && isMounted) {
-          const freshProducts: RetailProductItem[] = sbProducts.map((p: any) => ({
+        while (hasMore && isMounted) {
+          const from = chunkPage * chunkSize;
+          const to = from + chunkSize - 1;
+          const { data: chunk, error: chunkErr } = await supabase
+            .from('products')
+            .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, category:categories(id, name, slug), stock_levels(quantity_on_hand)')
+            .eq('is_active', true)
+            .order('name', { ascending: true })
+            .range(from, to);
+
+          if (chunkErr || !chunk || chunk.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          allProducts = allProducts.concat(chunk);
+          if (chunk.length < chunkSize) {
+            hasMore = false;
+          } else {
+            chunkPage++;
+          }
+        }
+
+        if (allProducts.length > 0 && isMounted) {
+          const freshProducts: RetailProductItem[] = allProducts.map((p: any) => ({
             id: p.id,
             name: p.name,
             sku: p.sku || '',
             barcode: p.barcode || '',
-            retailPrice: Number(p.retail_price ?? p.retailPrice ?? 0),
-            wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? p.retail_price ?? 0),
-            costPrice: Number(p.cost_price ?? p.costPrice ?? p.purchase_price ?? 0),
+            retailPrice: Number(p.retail_price ?? 0),
+            wholesalePrice: Number(p.wholesale_price ?? p.retail_price ?? 0),
+            costPrice: Number(p.cost_price ?? 0),
             category: {
               id: p.category?.id || p.category_id || '',
               name: p.category?.name || 'General',
               slug: p.category?.slug || 'general',
             },
-            stockOnHand: Number(p.stock_quantity ?? p.stock_levels?.[0]?.quantity ?? 100),
-            unit: p.unit || 'units',
-            imageUrl: p.image_url ?? p.imageUrl ?? undefined,
-            alertQuantity: p.min_stock_level ?? p.alert_quantity ?? null,
+            stockOnHand: Number(p.stock_levels?.[0]?.quantity_on_hand ?? 100),
+            unit: 'units',
+            imageUrl: p.image_url || undefined,
+            alertQuantity: p.alert_quantity ?? null,
           }));
 
           setProducts(freshProducts);

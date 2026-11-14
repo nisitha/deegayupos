@@ -123,10 +123,10 @@ export default function RevenueDeskPage() {
       ['Completed Bills', analytics.billCount.toString()],
       ['Voided Bills', analytics.voidedBillCount.toString()],
       ['Average Order Value (LKR)', analytics.averageOrderValue.toFixed(2)],
-      ['Cash Collections (LKR)', analytics.paymentBreakdown.cash.toFixed(2)],
-      ['Card POS Collections (LKR)', analytics.paymentBreakdown.card.toFixed(2)],
-      ['LankaQR Collections (LKR)', analytics.paymentBreakdown.qr.toFixed(2)],
-      ['Customer Khata Credit (LKR)', analytics.paymentBreakdown.credit.toFixed(2)],
+      ['Cash Collections (LKR)', (analytics.paymentBreakdown?.cash ?? 0).toFixed(2)],
+      ['Card POS Collections (LKR)', (analytics.paymentBreakdown?.card ?? 0).toFixed(2)],
+      ['LankaQR Collections (LKR)', (analytics.paymentBreakdown?.qr ?? 0).toFixed(2)],
+      ['Customer Khata Credit (LKR)', (analytics.paymentBreakdown?.credit ?? 0).toFixed(2)],
     ];
 
     let csvContent = 'data:text/csv;charset=utf-8,';
@@ -134,7 +134,7 @@ export default function RevenueDeskPage() {
     csvContent += summaryHeaders.join(',') + '\n';
     csvContent += summaryRows.map((r) => r.join(',')).join('\n') + '\n\n';
 
-    if (analytics.topProducts.length > 0) {
+    if (analytics.topProducts && analytics.topProducts.length > 0) {
       csvContent += '--- TOP PRODUCTS PERFORMANCE ---\n';
       const prodHeaders = ['Product Name', 'SKU', 'Units Sold', 'Revenue (LKR)', 'Profit (LKR)'];
       csvContent += prodHeaders.join(',') + '\n';
@@ -161,13 +161,13 @@ export default function RevenueDeskPage() {
     document.body.removeChild(link);
   };
 
-  const totalPayments = analytics
-    ? analytics.paymentBreakdown.cash +
-      analytics.paymentBreakdown.card +
-      analytics.paymentBreakdown.credit +
-      analytics.paymentBreakdown.qr +
-      analytics.paymentBreakdown.other
-    : 0;
+  const pb = analytics?.paymentBreakdown || { cash: 0, card: 0, credit: 0, qr: 0, other: 0 };
+  const totalPayments =
+    (pb.cash ?? 0) +
+    (pb.card ?? 0) +
+    (pb.credit ?? 0) +
+    (pb.qr ?? 0) +
+    (pb.other ?? 0);
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -435,11 +435,11 @@ export default function RevenueDeskPage() {
             <span>Cash Tendered</span>
           </div>
           <div className="text-xl font-bold text-slate-900 mt-2">
-            {formatCurrency(analytics?.paymentBreakdown.cash)}
+            {formatCurrency(pb.cash ?? 0)}
           </div>
           <div className="mt-1 text-[11px] text-slate-400">
             {totalPayments > 0
-              ? `${(((analytics?.paymentBreakdown.cash || 0) / totalPayments) * 100).toFixed(1)}% of total collections`
+              ? `${(((pb.cash ?? 0) / totalPayments) * 100).toFixed(1)}% of total collections`
               : '0%'}
           </div>
         </div>
@@ -451,11 +451,11 @@ export default function RevenueDeskPage() {
             <span>Card POS Terminal</span>
           </div>
           <div className="text-xl font-bold text-slate-900 mt-2">
-            {formatCurrency(analytics?.paymentBreakdown.card)}
+            {formatCurrency(pb.card ?? 0)}
           </div>
           <div className="mt-1 text-[11px] text-slate-400">
             {totalPayments > 0
-              ? `${(((analytics?.paymentBreakdown.card || 0) / totalPayments) * 100).toFixed(1)}% of total collections`
+              ? `${(((pb.card ?? 0) / totalPayments) * 100).toFixed(1)}% of total collections`
               : '0%'}
           </div>
         </div>
@@ -467,11 +467,11 @@ export default function RevenueDeskPage() {
             <span>LankaQR Digital</span>
           </div>
           <div className="text-xl font-bold text-slate-900 mt-2">
-            {formatCurrency(analytics?.paymentBreakdown.qr)}
+            {formatCurrency(pb.qr ?? 0)}
           </div>
           <div className="mt-1 text-[11px] text-slate-400">
             {totalPayments > 0
-              ? `${(((analytics?.paymentBreakdown.qr || 0) / totalPayments) * 100).toFixed(1)}% of total collections`
+              ? `${(((pb.qr ?? 0) / totalPayments) * 100).toFixed(1)}% of total collections`
               : '0%'}
           </div>
         </div>
@@ -483,11 +483,11 @@ export default function RevenueDeskPage() {
             <span>Customer Credit (Khata)</span>
           </div>
           <div className="text-xl font-bold text-amber-800 mt-2">
-            {formatCurrency(analytics?.paymentBreakdown.credit)}
+            {formatCurrency(pb.credit ?? 0)}
           </div>
           <div className="mt-1 text-[11px] text-slate-400">
             {totalPayments > 0
-              ? `${(((analytics?.paymentBreakdown.credit || 0) / totalPayments) * 100).toFixed(1)}% of total collections`
+              ? `${(((pb.credit ?? 0) / totalPayments) * 100).toFixed(1)}% of total collections`
               : '0%'}
           </div>
         </div>

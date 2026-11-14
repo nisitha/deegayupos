@@ -125,13 +125,19 @@ export default function DashboardPage() {
   };
 
   // Payment totals for progress bar percentages
-  const totalPayment = analytics
-    ? analytics.paymentBreakdown.cash +
-      analytics.paymentBreakdown.card +
-      analytics.paymentBreakdown.credit +
-      analytics.paymentBreakdown.qr +
-      analytics.paymentBreakdown.other
-    : 0;
+  const paymentBreakdown = analytics?.paymentBreakdown || {
+    cash: 0,
+    card: 0,
+    credit: 0,
+    qr: 0,
+    other: 0,
+  };
+  const totalPayment =
+    (paymentBreakdown.cash ?? 0) +
+    (paymentBreakdown.card ?? 0) +
+    (paymentBreakdown.credit ?? 0) +
+    (paymentBreakdown.qr ?? 0) +
+    (paymentBreakdown.other ?? 0);
 
   return (
     <div className="space-y-6">
@@ -465,14 +471,14 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Cash Payments</span>
                       <span className="font-mono font-bold text-slate-900">
-                        {formatCurrency(analytics.paymentBreakdown.cash)}
+                        {formatCurrency(paymentBreakdown.cash ?? 0)}
                       </span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-emerald-500 rounded-full"
                         style={{
-                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.cash / totalPayment) * 100 : 0}%`,
+                          width: `${totalPayment > 0 ? ((paymentBreakdown.cash ?? 0) / totalPayment) * 100 : 0}%`,
                         }}
                       />
                     </div>
@@ -483,14 +489,14 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Card POS</span>
                       <span className="font-mono font-bold text-slate-900">
-                        {formatCurrency(analytics.paymentBreakdown.card)}
+                        {formatCurrency(paymentBreakdown.card ?? 0)}
                       </span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-600 rounded-full"
                         style={{
-                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.card / totalPayment) * 100 : 0}%`,
+                          width: `${totalPayment > 0 ? ((paymentBreakdown.card ?? 0) / totalPayment) * 100 : 0}%`,
                         }}
                       />
                     </div>
@@ -501,14 +507,14 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">LankaQR</span>
                       <span className="font-mono font-bold text-slate-900">
-                        {formatCurrency(analytics.paymentBreakdown.qr)}
+                        {formatCurrency(paymentBreakdown.qr ?? 0)}
                       </span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-indigo-600 rounded-full"
                         style={{
-                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.qr / totalPayment) * 100 : 0}%`,
+                          width: `${totalPayment > 0 ? ((paymentBreakdown.qr ?? 0) / totalPayment) * 100 : 0}%`,
                         }}
                       />
                     </div>
@@ -519,14 +525,14 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Khata Credit</span>
                       <span className="font-mono font-bold text-amber-700">
-                        {formatCurrency(analytics.paymentBreakdown.credit)}
+                        {formatCurrency(paymentBreakdown.credit ?? 0)}
                       </span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-amber-500 rounded-full"
                         style={{
-                          width: `${totalPayment > 0 ? (analytics.paymentBreakdown.credit / totalPayment) * 100 : 0}%`,
+                          width: `${totalPayment > 0 ? ((paymentBreakdown.credit ?? 0) / totalPayment) * 100 : 0}%`,
                         }}
                       />
                     </div>
