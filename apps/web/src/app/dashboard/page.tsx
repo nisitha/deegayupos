@@ -74,7 +74,8 @@ interface AnalyticsData {
 type Period = 'today' | 'week' | 'month';
 
 export default function DashboardPage() {
-  const { selectedBranchId, currency } = useTenantBranch();
+  const { selectedBranchId, currency, isOwner, grnBranchIds } = useTenantBranch();
+  const hasGrnAccess = isOwner || (Array.isArray(grnBranchIds) && grnBranchIds.length > 0);
 
   const [period, setPeriod] = useState<Period>('week');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -216,7 +217,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 1. Top KPI Telemetry Row (Backed by real sales & profit calculations) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         {/* KPI 1: Gross Revenue */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-blue-400/50 hover:shadow-pos-card-hover transition-all">
           <div className="flex items-center justify-between">
@@ -241,26 +242,28 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* KPI 2: Net Profit & Margin */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-emerald-400/50 hover:shadow-pos-card-hover transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Profit</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-              <TrendingUp className="w-4 h-4" />
+        {/* KPI 2: Net Profit & Margin (OWNER ONLY) */}
+        {isOwner && (
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-emerald-400/50 hover:shadow-pos-card-hover transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Profit</span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-emerald-600 tracking-tight">
+                {analytics ? formatCurrency(analytics.netProfit) : formatCurrency((metrics?.todaySales || 0) * 0.28)}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
+                  {analytics?.profitMargin ?? 28.5}% Margin
+                </span>
+                <span>after COGS</span>
+              </div>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-emerald-600 tracking-tight">
-              {analytics ? formatCurrency(analytics.netProfit) : formatCurrency((metrics?.todaySales || 0) * 0.28)}
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
-                {analytics?.profitMargin ?? 28.5}% Margin
-              </span>
-              <span>after COGS</span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* KPI 3: Average Order Value */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card relative overflow-hidden group hover:border-indigo-400/50 hover:shadow-pos-card-hover transition-all">
@@ -379,15 +382,17 @@ export default function DashboardPage() {
                     fill="url(#revenueGrad)"
                     name="sales"
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="profit"
-                    stroke="#10B981"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#profitGrad)"
-                    name="profit"
-                  />
+                  {isOwner && (
+                    <Area
+                      type="monotone"
+                      dataKey="profit"
+                      stroke="#10B981"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#profitGrad)"
+                      name="profit"
+                    />
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             ) : isMounted && charts?.timeline && charts.timeline.length > 0 ? (
@@ -562,14 +567,18 @@ export default function DashboardPage() {
                 <Package className="w-4 h-4 text-emerald-600" />
                 Top-Selling Ayurvedic Products
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">High-volume items and contribution margin</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isOwner ? 'High-volume items and contribution margin' : 'High-volume fast-moving items'}
+              </p>
             </div>
-            <Link
-              href="/dashboard/products"
-              className="text-xs font-semibold text-[#005BD3] hover:underline"
-            >
-              View Full Catalog &rarr;
-            </Link>
+            {isOwner && (
+              <Link
+                href="/dashboard/products"
+                className="text-xs font-semibold text-[#005BD3] hover:underline"
+              >
+                View Full Catalog &rarr;
+              </Link>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -580,7 +589,7 @@ export default function DashboardPage() {
                   <th className="py-3 px-4">SKU</th>
                   <th className="py-3 px-4 text-right">Units Sold</th>
                   <th className="py-3 px-4 text-right">Revenue (LKR)</th>
-                  <th className="py-3 px-4 text-right">Net Profit (LKR)</th>
+                  {isOwner && <th className="py-3 px-4 text-right">Net Profit (LKR)</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -598,9 +607,11 @@ export default function DashboardPage() {
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                       {formatCurrency(p.revenue)}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
-                      {formatCurrency(p.profit)}
-                    </td>
+                    {isOwner && (
+                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
+                        {formatCurrency(p.profit)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -619,7 +630,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
-            {/* Action 1: Open POS Terminal */}
+            {/* Action 1: Open POS Terminal (Visible to All) */}
             <Link
               href="/dashboard/pos"
               className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 hover:border-[#005BD3]/50 transition-all group"
@@ -643,47 +654,93 @@ export default function DashboardPage() {
               </div>
             </Link>
 
-            {/* Action 2: View Sales & Bills Register */}
-            <Link
-              href="/dashboard/orders"
-              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Receipt className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                    Sales & Bills Register
+            {isOwner ? (
+              <>
+                {/* Action 2 (Owner): View Sales & Bills Register */}
+                <Link
+                  href="/dashboard/orders"
+                  className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                        Sales & Bills Register
+                      </div>
+                      <div className="text-[11px] text-slate-500">Receipts & Thermal Reprints</div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">Receipts & Thermal Reprints</div>
-                </div>
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-            </Link>
+                  <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                </Link>
 
-            {/* Action 3: Add New Product */}
-            <Link
-              href="/dashboard/products"
-              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <PlusCircle className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    Add New Product
+                {/* Action 3 (Owner): Add New Product */}
+                <Link
+                  href="/dashboard/products"
+                  className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <PlusCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                        Add New Product
+                      </div>
+                      <div className="text-[11px] text-slate-500">SKUs, Barcodes & Images</div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">SKUs, Barcodes & Images</div>
-                </div>
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
-            </Link>
+                  <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                </Link>
+              </>
+            ) : (
+              <>
+                {/* Action 2 (Staff): Cash Reconciliation */}
+                <Link
+                  href="/dashboard/finance/reconciliation"
+                  className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                        Daily Cash Reconciliation
+                      </div>
+                      <div className="text-[11px] text-slate-500">Drawer Count & End-of-Day Float</div>
+                    </div>
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                </Link>
 
-            {/* Action 4: View Stock Alerts */}
+                {/* Action 3 (Staff - GRN Authorized): Purchases & GRN */}
+                {hasGrnAccess && (
+                  <Link
+                    href="/dashboard/purchases"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200/80 hover:border-indigo-300 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <Boxes className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                          Incoming Goods (GRN)
+                        </div>
+                        <div className="text-[11px] text-slate-500">Record Branch Supplier Stock</div>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                  </Link>
+                )}
+              </>
+            )}
+
+            {/* Action 4: View Stock Alerts (Visible to All) */}
             <Link
-              href="/dashboard/inventory"
+              href="/dashboard/alerts"
               className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 transition-all group"
             >
               <div className="flex items-center gap-3">

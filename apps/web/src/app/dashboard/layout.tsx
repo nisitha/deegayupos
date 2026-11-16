@@ -1,17 +1,34 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { PosSidebar } from '../../components/layout/pos-sidebar';
 import { Header } from '../../components/layout/header';
 import { BottomNavBar } from '../../components/layout/bottom-nav-bar';
-import { TenantBranchProvider } from '../../context/tenant-branch-context';
+import { TenantBranchProvider, useTenantBranch } from '../../context/tenant-branch-context';
+
+// Master list of administrative routes restricted exclusively to OWNER
+const OWNER_ONLY_ROUTES = [
+  '/dashboard/orders',
+  '/dashboard/sales',
+  '/dashboard/products',
+  '/dashboard/suppliers',
+  '/dashboard/pricing',
+  '/dashboard/customers',
+  '/dashboard/reports',
+  '/dashboard/finance/revenue',
+  '/dashboard/finance/tax',
+  '/dashboard/finance/payouts',
+  '/dashboard/staff',
+  '/dashboard/settings',
+];
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isPosPage = pathname === '/dashboard/pos';
   const [authChecked, setAuthChecked] = useState(false);
+  const { isOwner, grnBranchIds, isLoading: isTenantLoading } = useTenantBranch();
 
   // Authentication Guard: Redirect to /login if no active session
   useEffect(() => {
@@ -31,7 +48,35 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
-  if (!authChecked) {
+  // Determine if active route is restricted for current staff session
+  const isRestrictedForStaff = useMemo(() => {
+    if (!authChecked || isTenantLoading || isOwner) {
+      return false;
+    }
+
+    // Direct match or sub-path match on OWNER_ONLY_ROUTES
+    const isOwnerRoute = OWNER_ONLY_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+    if (isOwnerRoute) return true;
+
+    // Purchases & GRN is allowed for staff ONLY if authorized with grnBranchIds (e.g. Shashini, Tharindu, Kumari)
+    if (pathname === '/dashboard/purchases' || pathname.startsWith('/dashboard/purchases/')) {
+      return !grnBranchIds || grnBranchIds.length === 0;
+    }
+
+    return false;
+  }, [authChecked, isTenantLoading, isOwner, grnBranchIds, pathname]);
+
+  // Enforce Route Guard: redirect unauthorized staff to /dashboard/pos
+  useEffect(() => {
+    if (isRestrictedForStaff) {
+      console.warn(`[RouteGuard] Access denied to ${pathname} for non-owner staff. Redirecting to /dashboard/pos`);
+      router.replace('/dashboard/pos');
+    }
+  }, [isRestrictedForStaff, pathname, router]);
+
+  if (!authChecked || isRestrictedForStaff) {
     return (
       <div className="h-screen w-screen bg-[#EDE9FE] flex items-center justify-center">
         <div className="w-8 h-8 border-3 border-[#7052FF] border-t-transparent rounded-full animate-spin" />
@@ -43,9 +88,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     /* Outer Viewport Canvas (Soft Modern Canvas Tint) */
     <div className="h-screen w-screen bg-[#EDE9FE] p-2 sm:p-3 md:p-4 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
       {/* Inner Floating App Surface (Confidency OS Design System) */}
-      <div className={`rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
-        isPosPage ? 'bg-[#0F1222]' : 'bg-white'
-      }`}>
+      <div
+        className={`rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
+          isPosPage ? 'bg-[#0F1222]' : 'bg-white'
+        }`}
+      >
         {/* Left Column: Categorized Navigation Sidebar (220px-240px) */}
         <PosSidebar />
 

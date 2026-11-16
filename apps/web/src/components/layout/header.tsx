@@ -16,6 +16,7 @@ import {
   MapPin,
   Plus,
   Check,
+  Banknote,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { BranchCreateModal } from '../branches/branch-create-modal';
@@ -390,15 +391,27 @@ export function Header() {
                     <span>Launch POS Checkout</span>
                   </Link>
 
-                  <Link
-                    href="/dashboard/settings"
-                    prefetch={false}
-                    onClick={() => setProfileDropdownOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
-                  >
-                    <Layers className="w-4 h-4 text-slate-400" />
-                    <span>Business Settings</span>
-                  </Link>
+                  {isOwner ? (
+                    <Link
+                      href="/dashboard/settings"
+                      prefetch={false}
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <Layers className="w-4 h-4 text-slate-400" />
+                      <span>Business Settings</span>
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/dashboard/finance/reconciliation"
+                      prefetch={false}
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <Banknote className="w-4 h-4 text-emerald-600" />
+                      <span>Daily Reconciliation</span>
+                    </Link>
+                  )}
                 </div>
 
                 <div className="my-1.5 border-t border-slate-100" />

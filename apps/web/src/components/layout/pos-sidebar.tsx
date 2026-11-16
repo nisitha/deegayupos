@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -79,13 +79,25 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
   },
 ];
 
-const ALL_HREFS = MENU_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
-
 export function PosSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, tenant, business, isOwner } = useTenantBranch();
+  const { user, tenant, business, isOwner, grnBranchIds } = useTenantBranch();
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global ⌘K / Ctrl+K shortcut listener to quickly focus command search
+  useEffect(() => {
+    const handleGlobalCmdK = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalCmdK);
+    return () => window.removeEventListener('keydown', handleGlobalCmdK);
+  }, []);
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
@@ -111,6 +123,64 @@ export function PosSidebar() {
   const displayName = user?.fullName || 'Dr. Deegayu';
   const userEmail = user?.email || 'owner@deegayu.pixelcraftlk.com';
 
+  const hasGrnAccess = isOwner || (Array.isArray(grnBranchIds) && grnBranchIds.length > 0);
+
+  // Strict Role-Based Navigation Sections
+  // OWNER sees 100% of sections (COMMAND, COMMERCE, FINANCE & REPORTS, PLATFORM).
+  // STAFF sees a clean operational tree:
+  // - Entire COMMERCE section is HIDDEN
+  // - FINANCE & REPORTS is simplified to FINANCE with only Cash Reconciliation (Reports Suite, Revenue Desk, Tax Engine hidden)
+  // - PLATFORM is replaced with OPERATIONS (POS Terminal, and Purchases & GRN only if authorized for a branch)
+  const sectionsToDisplay: SidebarMenuSection[] = React.useMemo(() => {
+    if (isOwner) {
+      return MENU_SECTIONS;
+    }
+
+    const staffSections: SidebarMenuSection[] = [
+      {
+        title: 'COMMAND',
+        items: [
+          { name: 'Overview', href: '/dashboard', icon: LayoutGrid },
+          { name: 'Live Monitor', href: '/dashboard/live', icon: Activity },
+          { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
+        ],
+      },
+      {
+        title: 'FINANCE',
+        items: [
+          {
+            name: 'Cash Reconciliation',
+            href: '/dashboard/finance/reconciliation',
+            icon: Banknote,
+            badge: 'Daily',
+          },
+        ],
+      },
+      {
+        title: 'OPERATIONS',
+        items: [
+          { name: 'POS Terminal', href: '/dashboard/pos', icon: Layers, badge: 'POS' },
+          ...(hasGrnAccess
+            ? [
+                {
+                  name: 'Purchases & GRN',
+                  href: '/dashboard/purchases',
+                  icon: ClipboardCheck,
+                  badge: 'Stock',
+                },
+              ]
+            : []),
+        ],
+      },
+    ];
+
+    return staffSections;
+  }, [isOwner, hasGrnAccess]);
+
+  const allVisibleHrefs = React.useMemo(() => {
+    return sectionsToDisplay.flatMap((s) => s.items.map((i) => i.href));
+  }, [sectionsToDisplay]);
+
   const isItemActive = useCallback(
     (href: string) => {
       if (!href || href === '#') return false;
@@ -123,30 +193,27 @@ export function PosSidebar() {
         return true;
       }
       // If another menu item matches pathname exactly, don't greedily match parent
-      if (ALL_HREFS.includes(pathname)) {
+      if (allVisibleHrefs.includes(pathname)) {
         return false;
       }
       // Exact match or sub-route match with strict trailing slash boundary
       return pathname.startsWith(`${href}/`);
     },
-    [pathname],
+    [pathname, allVisibleHrefs],
   );
 
   const filteredSections = React.useMemo(() => {
-    return MENU_SECTIONS.map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        if (item.href === '/dashboard/staff' && !isOwner) {
-          return false;
-        }
-        if (searchTerm.trim()) {
+    return sectionsToDisplay
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          if (!searchTerm.trim()) return true;
           const q = searchTerm.toLowerCase();
           return item.name.toLowerCase().includes(q) || section.title.toLowerCase().includes(q);
-        }
-        return true;
-      }),
-    })).filter((section) => section.items.length > 0);
-  }, [isOwner, searchTerm]);
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [sectionsToDisplay, searchTerm]);
 
   return (
     <aside className="hidden md:flex w-[240px] lg:w-[260px] bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30">
@@ -181,16 +248,34 @@ export function PosSidebar() {
             <div className="flex items-center gap-2 min-w-0">
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search... ⌘K"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchTerm('');
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
                 className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-400 focus:outline-none"
               />
             </div>
-            <kbd className="text-[10px] font-mono bg-white/10 border border-white/10 px-1.5 py-0.5 rounded text-slate-400 shadow-2xs shrink-0 font-medium">
-              ⌘K
-            </kbd>
+            {searchTerm ? (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-[10px] text-slate-400 hover:text-white px-1 cursor-pointer"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            ) : (
+              <kbd className="text-[10px] font-mono bg-white/10 border border-white/10 px-1.5 py-0.5 rounded text-slate-400 shadow-2xs shrink-0 font-medium">
+                ⌘K
+              </kbd>
+            )}
           </div>
         </div>
       </div>
