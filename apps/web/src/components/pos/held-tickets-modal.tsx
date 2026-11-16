@@ -20,6 +20,9 @@ export interface HeldTicket {
     stockOnHand: number;
     unit: string;
     imageUrl?: string;
+    departmentId?: string;
+    selectedUnit?: string;
+    displayQuantity?: number;
   }[];
   discountType: 'NONE' | 'PERCENT' | 'FLAT';
   discountPercent: number;

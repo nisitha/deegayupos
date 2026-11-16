@@ -12,6 +12,7 @@ import {
   type EscPosReceiptOptions,
 } from './escpos-generator';
 import { generateReceiptBarcodeHtml } from '../../components/pos/receipt-barcode-block';
+import { detectUnitConfig } from '../unit-utils';
 
 export type PrinterConnectionType =
   | 'BROWSER_PRINT'
@@ -193,11 +194,33 @@ export class PrinterBridge {
       const currency = 'LKR';
       const itemsHtml = sale.items
         .map(
-          (item) => `
+          (item) => {
+            const conf = detectUnitConfig({ name: item.productName });
+            const num = Number(item.quantity);
+            let formattedQty = `${num}`;
+            if (conf.mode === 'weight_g') {
+              if (num >= 1000) {
+                const kg = Math.round((num / 1000) * 1000) / 1000;
+                formattedQty = `${kg} kg (${num.toLocaleString()} g)`;
+              } else {
+                formattedQty = `${num.toLocaleString()} g`;
+              }
+            } else if (conf.mode === 'volume_ml') {
+              if (num >= 1000) {
+                const l = Math.round((num / 1000) * 1000) / 1000;
+                formattedQty = `${l} L (${num.toLocaleString()} ml)`;
+              } else {
+                formattedQty = `${num.toLocaleString()} ml`;
+              }
+            } else if (conf.mode === 'fractional') {
+              formattedQty = `${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${conf.baseUnit}`;
+            }
+
+            return `
           <div style="margin-bottom: 4px;">
             <div style="font-weight: bold;">${item.productName}</div>
             <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444;">
-              <span>${item.quantity} x ${Number(item.unitPrice).toFixed(2)}</span>
+              <span>${formattedQty} x ${Number(item.unitPrice).toFixed(2)}</span>
               <span style="font-weight: bold; color: #000;">${currency} ${Number(item.subtotal).toFixed(2)}</span>
             </div>
             ${
@@ -206,7 +229,8 @@ export class PrinterBridge {
                 : ''
             }
           </div>
-        `,
+        `;
+          },
         )
         .join('');
 

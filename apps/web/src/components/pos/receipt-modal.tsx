@@ -21,6 +21,30 @@ import { posApi } from '../../lib/api-client';
 import { PrinterBridge } from '../../lib/hardware/printer-bridge';
 import { ReceiptBarcodeBlock } from './receipt-barcode-block';
 import { useTenantBranch } from '../../context/tenant-branch-context';
+import { detectUnitConfig } from '../../lib/unit-utils';
+
+function formatReceiptQuantity(productName: string, quantity: number | string): string {
+  const num = Number(quantity);
+  const conf = detectUnitConfig({ name: productName });
+  if (conf.mode === 'weight_g') {
+    if (num >= 1000) {
+      const kg = Math.round((num / 1000) * 1000) / 1000;
+      return `${kg} kg (${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} g)`;
+    }
+    return `${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} g`;
+  }
+  if (conf.mode === 'volume_ml') {
+    if (num >= 1000) {
+      const l = Math.round((num / 1000) * 1000) / 1000;
+      return `${l} L (${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} ml)`;
+    }
+    return `${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} ml`;
+  }
+  if (conf.mode === 'fractional') {
+    return `${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${conf.baseUnit}`;
+  }
+  return `${num}`;
+}
 
 export type PaperSize = 'MM_80' | 'MM_58' | 'A4' | 'A5';
 
@@ -488,7 +512,7 @@ export function ReceiptModal({
                         </td>
                         <td className="py-2 px-3 text-slate-500">{item.sku || 'N/A'}</td>
                         <td className="py-2 px-3 text-right">{Number(item.unitPrice).toFixed(2)}</td>
-                        <td className="py-2 px-3 text-center font-bold">{item.quantity}</td>
+                        <td className="py-2 px-3 text-center font-bold">{formatReceiptQuantity(item.productName, item.quantity)}</td>
                         <td className="py-2 px-3 text-right text-emerald-700">
                           {item.discountAmount && Number(item.discountAmount) > 0
                             ? `-${Number(item.discountAmount).toFixed(2)}`
@@ -670,7 +694,7 @@ export function ReceiptModal({
                       </span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>{item.quantity} x {formatCurrency(Number(item.unitPrice))}</span>
+                      <span>{formatReceiptQuantity(item.productName, item.quantity)} x {formatCurrency(Number(item.unitPrice))}</span>
                       {item.discountAmount && Number(item.discountAmount) > 0 && (
                         <span className="text-emerald-700 font-semibold text-[9px]">
                           (Disc: -{formatCurrency(Number(item.discountAmount))})

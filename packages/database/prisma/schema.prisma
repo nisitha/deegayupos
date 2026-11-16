@@ -830,7 +830,7 @@ model SaleItem {
   sku            String    @db.VarChar(128)
   unitPrice      Decimal   @map("unit_price") @db.Decimal(12, 2)
   costPrice      Decimal   @default(0.00) @map("cost_price") @db.Decimal(12, 2)
-  quantity       Decimal   @default(1.000) @db.Decimal(10, 3)
+  quantity       Decimal   @default(1.000) @db.Decimal(12, 3)
   discountAmount Decimal   @default(0.00) @map("discount_amount") @db.Decimal(12, 2)
   taxAmount      Decimal   @default(0.00) @map("tax_amount") @db.Decimal(12, 2)
   subtotal       Decimal   @map("subtotal") @db.Decimal(12, 2)
@@ -900,7 +900,7 @@ model StockLevel {
   warehouseId      String          @map("warehouse_id") @db.Uuid
   productId        String          @map("product_id") @db.Uuid
   variantId        String?         @map("variant_id") @db.Uuid
-  quantityOnHand   Decimal         @default(0.000) @map("quantity_on_hand") @db.Decimal(10, 3)
+  quantityOnHand   Decimal         @default(0.000) @map("quantity_on_hand") @db.Decimal(12, 3)
   quantityReserved Decimal         @default(0.000) @map("quantity_reserved") @db.Decimal(10, 3)
   reorderPoint     Decimal         @default(5.000) @map("reorder_point") @db.Decimal(10, 3)
   updatedAt        DateTime        @updatedAt @map("updated_at")

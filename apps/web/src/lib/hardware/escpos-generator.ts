@@ -5,6 +5,7 @@
  */
 
 import type { SaleDto } from '@pixelcraft/types';
+import { detectUnitConfig } from '../unit-utils';
 
 // Standard ESC/POS Control Byte Constants
 const ESC = 0x1b;
@@ -330,7 +331,28 @@ export function generateEscPosReceipt(
   let totalSavings = 0;
 
   for (const item of sale.items) {
-    const qtyText = `${item.quantity} x ${Number(item.unitPrice).toFixed(2)}`;
+    const conf = detectUnitConfig({ name: item.productName });
+    const num = Number(item.quantity);
+    let formattedQty = `${num}`;
+    if (conf.mode === 'weight_g') {
+      if (num >= 1000) {
+        const kg = Math.round((num / 1000) * 1000) / 1000;
+        formattedQty = `${kg}kg (${num}g)`;
+      } else {
+        formattedQty = `${num}g`;
+      }
+    } else if (conf.mode === 'volume_ml') {
+      if (num >= 1000) {
+        const l = Math.round((num / 1000) * 1000) / 1000;
+        formattedQty = `${l}L (${num}ml)`;
+      } else {
+        formattedQty = `${num}ml`;
+      }
+    } else if (conf.mode === 'fractional') {
+      formattedQty = `${num} ${conf.baseUnit}`;
+    }
+
+    const qtyText = `${formattedQty} x ${Number(item.unitPrice).toFixed(2)}`;
     const lineTotalText = `${currency} ${Number(item.subtotal).toFixed(2)}`;
 
     builder.itemRow(item.productName, qtyText, lineTotalText);
