@@ -39,6 +39,7 @@ const VOLUME_ML_PRESETS: QuickPreset[] = [
   { label: '100ml', valueInBase: 100, displayValue: 100, unit: 'ml' },
   { label: '250ml', valueInBase: 250, displayValue: 250, unit: 'ml' },
   { label: '500ml', valueInBase: 500, displayValue: 500, unit: 'ml' },
+  { label: '750ml', valueInBase: 750, displayValue: 750, unit: 'ml' },
   { label: '1 L', valueInBase: 1000, displayValue: 1, unit: 'L' },
   { label: '2 L', valueInBase: 2000, displayValue: 2, unit: 'L' },
 ];
@@ -170,13 +171,21 @@ export function detectUnitConfig(product: {
 
   // 4. Discrete Unit Mode (type: 'discrete')
   // Default for Bottles, Boxes, Packets, Soaps, general whole numbers (1, 2, 3...)
+  const discreteUnit = unit || 'pcs';
   return {
     mode: 'discrete',
-    baseUnit: unit || 'Nos',
+    baseUnit: discreteUnit,
     allowDecimals: false,
     step: '1',
-    quickPresets: [],
-    label: 'Discrete Unit',
+    quickPresets: [
+      { label: '1', valueInBase: 1, displayValue: 1, unit: discreteUnit },
+      { label: '2', valueInBase: 2, displayValue: 2, unit: discreteUnit },
+      { label: '3', valueInBase: 3, displayValue: 3, unit: discreteUnit },
+      { label: '5', valueInBase: 5, displayValue: 5, unit: discreteUnit },
+      { label: '10', valueInBase: 10, displayValue: 10, unit: discreteUnit },
+      { label: '12', valueInBase: 12, displayValue: 12, unit: discreteUnit },
+    ],
+    label: `Discrete Unit (${discreteUnit})`,
   };
 }
 
@@ -255,6 +264,6 @@ export function formatQuantityWithUnit(
   }
 
   // Discrete
-  return `${baseQuantity}`;
+  return `${baseQuantity} ${config.baseUnit || 'pcs'}`;
 }
 

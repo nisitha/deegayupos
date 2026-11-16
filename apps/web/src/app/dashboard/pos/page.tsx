@@ -479,6 +479,9 @@ export default function ConfidencyPosPage() {
     initialCustomPrice?: number;
   } | null>(null);
 
+  // Qty Popup Mode: 'ALL' (every item click opens modal) vs 'WEIGHT_LIQUID' (only 1g/1ml triggers modal)
+  const [qtyPopupMode, setQtyPopupMode] = useState<'ALL' | 'WEIGHT_LIQUID'>('ALL');
+
   // Add Item to Cart
   const addToCart = useCallback((product: RetailProductItem & { departmentId?: string }) => {
     const config = detectUnitConfig(product);
@@ -526,16 +529,30 @@ export default function ConfidencyPosPage() {
     setTimeout(() => setScanFeedback(null), 1500);
   }, []);
 
-  // Handle clicking product in catalog or search (weight/volume triggers spacious modal)
+  // Handle clicking product in catalog or search (respects Qty Popup toggle)
   const handleProductClick = useCallback(
     (product: RetailProductItem & { departmentId?: string }) => {
       const config = detectUnitConfig(product);
-      if (
+      const isWeightOrVolumeOrFractional =
         config.mode === 'weight_g' ||
         config.mode === 'volume_ml' ||
-        config.mode === 'fractional'
-      ) {
+        config.mode === 'fractional';
+
+      if (qtyPopupMode === 'ALL' || isWeightOrVolumeOrFractional) {
         const existingInCart = cart.find((it) => it.productId === product.id);
+        const defaultUnit =
+          existingInCart?.selectedUnit ||
+          (config.mode === 'weight_g' ? 'g' : config.mode === 'volume_ml' ? 'ml' : config.baseUnit);
+
+        const defaultDisplayQty =
+          existingInCart?.displayQuantity !== undefined
+            ? existingInCart.displayQuantity
+            : config.mode === 'weight_g'
+            ? (defaultUnit === 'kg' ? 1 : 100)
+            : config.mode === 'volume_ml'
+            ? (defaultUnit === 'L' ? 1 : 250)
+            : 1;
+
         setQuantityModalTarget({
           product: {
             id: product.id,
@@ -550,28 +567,22 @@ export default function ConfidencyPosPage() {
             departmentId: product.departmentId,
           },
           cartItemId: existingInCart?.id,
-          initialUnit:
-            existingInCart?.selectedUnit ||
-            (config.mode === 'weight_g' ? 'g' : config.baseUnit),
-          initialDisplayQuantity:
-            existingInCart?.displayQuantity !== undefined
-              ? existingInCart.displayQuantity
-              : config.mode === 'weight_g'
-              ? 100
-              : 1,
+          initialUnit: defaultUnit,
+          initialDisplayQuantity: defaultDisplayQty,
           initialCustomPrice: existingInCart?.price ?? product.retailPrice,
         });
         return;
       }
 
-      // Discrete items add directly to cart for maximum cashier speed
+      // Discrete items add directly to cart if Qty Popup is set to Weight/Liquid only
       addToCart(product);
     },
-    [cart, addToCart],
+    [cart, qtyPopupMode, addToCart],
   );
 
   // Open modal from Order Summary cart item badge
   const handleOpenEditItemModal = useCallback((item: CartItem) => {
+    const config = detectUnitConfig(item);
     setQuantityModalTarget({
       product: {
         id: item.productId,
@@ -586,7 +597,7 @@ export default function ConfidencyPosPage() {
         departmentId: item.departmentId,
       },
       cartItemId: item.id,
-      initialUnit: item.selectedUnit || detectUnitConfig(item).baseUnit,
+      initialUnit: item.selectedUnit || config.baseUnit,
       initialDisplayQuantity:
         item.displayQuantity !== undefined ? item.displayQuantity : item.quantity,
       initialCustomPrice: item.price,
@@ -698,32 +709,6 @@ export default function ConfidencyPosPage() {
     ]);
     setScanFeedback(`Custom Item Added: ${customTitle}`);
     setTimeout(() => setScanFeedback(null), 2000);
-  };
-
-  // Stepper Quantity Editor (- / +) for discrete items
-  const handleStepQuantity = (itemId: string, delta: number) => {
-    setCart((prev) => {
-      const target = prev.find((it) => it.id === itemId);
-      if (!target) return prev;
-      const config = detectUnitConfig(target);
-      const curUnit = target.selectedUnit || config.baseUnit;
-      const curDisplay = target.displayQuantity !== undefined ? target.displayQuantity : target.quantity;
-      const stepVal = config.mode === 'fractional' ? 0.5 : 1;
-      const nextDisplay = Math.max(0, Math.round((curDisplay + delta * stepVal) * 1000) / 1000);
-      if (nextDisplay <= 0) {
-        return prev.filter((it) => it.id !== itemId);
-      }
-      const nextBase = calculateBaseQuantity(nextDisplay, curUnit, config);
-      return prev.map((it) =>
-        it.id === itemId
-          ? {
-              ...it,
-              displayQuantity: nextDisplay,
-              quantity: nextBase,
-            }
-          : it,
-      );
-    });
   };
 
   const removeCartItem = (itemId: string) => {
@@ -1156,9 +1141,37 @@ export default function ConfidencyPosPage() {
             </div>
           </div>
 
-          {/* Right: Auto-refresh indicator & End Shift Button */}
-          <div className="flex items-center gap-3 shrink-0 ml-2">
-            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+          {/* Right: Qty Popup Mode Pill Switcher, Catalog Ready & End Shift Button */}
+          <div className="flex items-center gap-2.5 shrink-0 ml-2">
+            {/* Pill Toggle for Qty Popup */}
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/90 text-xs shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setQtyPopupMode('ALL')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                  qtyPopupMode === 'ALL'
+                    ? 'bg-[#5B46F6] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Clicking any product card immediately pops up the large centered modal"
+              >
+                Qty Popup: All Items
+              </button>
+              <button
+                type="button"
+                onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                  qtyPopupMode === 'WEIGHT_LIQUID'
+                    ? 'bg-[#5B46F6] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Only 1g weight & 1ml liquid items open modal; boxed/discrete items add 1 directly"
+              >
+                Weight/Liquid (1g/1ml)
+              </button>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>Catalog Ready</span>
             </div>
@@ -1819,72 +1832,32 @@ export default function ConfidencyPosPage() {
                     </button>
                   </div>
 
-                  {/* Bottom Row: Quantity & Rate Badge or Stepper + Line Total */}
+                  {/* Bottom Row: Neat Clickable Summary Badge + Line Total */}
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                    {isWeightOrVolume ? (
-                      /* Weight / Volume / Fractional: Clickable badge that re-opens spacious modal */
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditItemModal(item)}
-                        className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
-                        title="Click to edit quantity, unit, or custom price"
-                      >
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
-                            <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
-                            <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
-                            <span>LKR {item.price.toFixed(2)}/{unitConfig.baseUnit}</span>
-                            {item.price !== item.originalUnitPrice && (
-                              <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
-                                Edited
-                              </span>
-                            )}
-                          </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditItemModal(item)}
+                      className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
+                      title="Click to edit quantity, unit, or custom price in modal"
+                    >
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
+                          <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                          <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
                         </div>
-                      </button>
-                    ) : (
-                      /* Discrete items: Stepper + Clickable Qty Badge + Unit Price */
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-                          <button
-                            type="button"
-                            onClick={() => handleStepQuantity(item.id, -1)}
-                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
-                            title="Decrease quantity"
-                          >
-                            -
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditItemModal(item)}
-                            className="px-2 h-5 text-center font-mono font-bold text-xs text-slate-900 hover:text-indigo-600 hover:bg-white rounded transition-colors flex items-center gap-1 cursor-pointer"
-                            title="Click to edit quantity or price in modal"
-                          >
-                            <span>{item.quantity}</span>
-                            <Pencil className="w-2 h-2 text-slate-400" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStepQuantity(item.id, 1)}
-                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
-                            title="Increase quantity"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <div className="text-[11px] font-mono text-slate-500">
-                          LKR {item.price.toFixed(2)}
+                        <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
+                          <span>
+                            LKR {item.price.toFixed(2)}
+                            {isWeightOrVolume ? `/${unitConfig.baseUnit}` : ''}
+                          </span>
                           {item.price !== item.originalUnitPrice && (
-                            <span className="ml-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200/80">
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
                               Edited
                             </span>
                           )}
                         </div>
                       </div>
-                    )}
+                    </button>
 
                     {/* Right: Line Total */}
                     <div className="text-right">
@@ -2169,68 +2142,30 @@ export default function ConfidencyPosPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                      {isWeightOrVolume ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditItemModal(item)}
-                          className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
-                          title="Click to edit quantity, unit, or custom price"
-                        >
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
-                              <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
-                              <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
-                              <span>LKR {item.price.toFixed(2)}/{unitConfig.baseUnit}</span>
-                              {item.price !== item.originalUnitPrice && (
-                                <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
-                                  Edited
-                                </span>
-                              )}
-                            </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditItemModal(item)}
+                        className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
+                        title="Click to edit quantity, unit, or custom price in modal"
+                      >
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
+                            <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                            <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
                           </div>
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-                            <button
-                              type="button"
-                              onClick={() => handleStepQuantity(item.id, -1)}
-                              className="w-6 h-6 flex items-center justify-center font-bold text-slate-600 hover:text-slate-900 rounded active:scale-90"
-                              title="Decrease quantity"
-                            >
-                              -
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditItemModal(item)}
-                              className="px-2 h-6 text-center font-mono font-bold text-xs text-slate-900 hover:text-indigo-600 rounded flex items-center gap-1"
-                              title="Click to edit quantity or price in modal"
-                            >
-                              <span>{item.quantity}</span>
-                              <Pencil className="w-2 h-2 text-slate-400" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStepQuantity(item.id, 1)}
-                              className="w-6 h-6 flex items-center justify-center font-bold text-slate-600 hover:text-slate-900 rounded active:scale-90"
-                              title="Increase quantity"
-                            >
-                              +
-                            </button>
-                          </div>
-
-                          <div className="text-[11px] font-mono text-slate-500">
-                            LKR {item.price.toFixed(2)}
+                          <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
+                            <span>
+                              LKR {item.price.toFixed(2)}
+                              {isWeightOrVolume ? `/${unitConfig.baseUnit}` : ''}
+                            </span>
                             {item.price !== item.originalUnitPrice && (
-                              <span className="ml-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200/80">
+                              <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
                                 Edited
                               </span>
                             )}
                           </div>
                         </div>
-                      )}
+                      </button>
 
                       <div className="text-right">
                         <span className="text-sm font-bold text-slate-900 font-mono tabular-nums">
