@@ -14,6 +14,8 @@ export interface ActiveCashier {
   fullName: string;
   role: string;
   email?: string;
+  assignedBranchIds?: string[];
+  grnBranchIds?: string[];
 }
 
 interface TenantBranchContextType {
@@ -21,6 +23,9 @@ interface TenantBranchContextType {
   setSelectedBranchId: (id: string | null) => void;
   business: BusinessProfileData | null;
   branches: BusinessProfileBranch[];
+  allowedBranches: BusinessProfileBranch[];
+  assignedBranchIds: string[];
+  grnBranchIds: string[];
   user: AuthUser | null;
   activeCashier: ActiveCashier | null;
   setActiveCashier: (cashier: ActiveCashier | null) => void;
@@ -29,6 +34,8 @@ interface TenantBranchContextType {
   currency: string;
   isLoading: boolean;
   isOwnerOrAdmin: boolean;
+  isOwner: boolean;
+  canCreateGrn: boolean;
   posMode: 'retail' | 'restaurant';
   setPosMode: (mode: 'retail' | 'restaurant') => void;
   orderType: string;
@@ -229,13 +236,81 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     fetchProfile();
   }, [fetchProfile]);
 
-  const isOwnerOrAdmin =
-    tenant?.role === 'OWNER' ||
-    tenant?.role === 'ADMIN' ||
-    user?.role === 'OWNER' ||
-    user?.role === 'ADMIN' ||
-    permissions.includes('*') ||
-    user?.isSuperAdmin === true;
+  const effectiveRole = activeCashier?.role || user?.role || tenant?.role || 'STAFF';
+  const isOwner =
+    effectiveRole === 'OWNER' ||
+    effectiveRole === 'ADMIN' ||
+    user?.isSuperAdmin === true ||
+    permissions.includes('*');
+
+  const isOwnerOrAdmin = isOwner;
+
+  const assignedBranchIds: string[] = React.useMemo(() => {
+    if (isOwner) {
+      return branches.map((b) => b.id);
+    }
+    const fromCashier = activeCashier?.assignedBranchIds;
+    if (Array.isArray(fromCashier) && fromCashier.length > 0) return fromCashier;
+    const fromUser = user?.assignedBranchIds;
+    if (Array.isArray(fromUser) && fromUser.length > 0) return fromUser;
+    if (typeof window !== 'undefined') {
+      try {
+        const sess = localStorage.getItem('pixelcraft_pos_session');
+        if (sess) {
+          const parsed = JSON.parse(sess);
+          if (Array.isArray(parsed.assignedBranchIds) && parsed.assignedBranchIds.length > 0) {
+            return parsed.assignedBranchIds;
+          }
+        }
+      } catch {}
+    }
+    return [];
+  }, [isOwner, branches, activeCashier?.assignedBranchIds, user?.assignedBranchIds]);
+
+  const grnBranchIds: string[] = React.useMemo(() => {
+    if (isOwner) {
+      return branches.map((b) => b.id);
+    }
+    const fromCashier = activeCashier?.grnBranchIds;
+    if (Array.isArray(fromCashier)) return fromCashier;
+    const fromUser = user?.grnBranchIds;
+    if (Array.isArray(fromUser)) return fromUser;
+    if (typeof window !== 'undefined') {
+      try {
+        const sess = localStorage.getItem('pixelcraft_pos_session');
+        if (sess) {
+          const parsed = JSON.parse(sess);
+          if (Array.isArray(parsed.grnBranchIds)) {
+            return parsed.grnBranchIds;
+          }
+        }
+      } catch {}
+    }
+    return [];
+  }, [isOwner, branches, activeCashier?.grnBranchIds, user?.grnBranchIds]);
+
+  const allowedBranches: BusinessProfileBranch[] = React.useMemo(() => {
+    if (isOwner) return branches;
+    if (assignedBranchIds.length === 0) return branches;
+    return branches.filter((b) => assignedBranchIds.includes(b.id));
+  }, [isOwner, branches, assignedBranchIds]);
+
+  // Guard selectedBranchId against out-of-scope branch selection for staff
+  useEffect(() => {
+    if (!isLoading && branches.length > 0 && !isOwner) {
+      if (allowedBranches.length > 0) {
+        if (!selectedBranchId || !allowedBranches.some((b) => b.id === selectedBranchId)) {
+          setSelectedBranchId(allowedBranches[0]?.id || null);
+        }
+      }
+    }
+  }, [isOwner, isLoading, branches.length, allowedBranches, selectedBranchId, setSelectedBranchId]);
+
+  const canCreateGrn = React.useMemo(() => {
+    if (isOwner) return true;
+    if (!selectedBranchId) return false;
+    return grnBranchIds.includes(selectedBranchId);
+  }, [isOwner, selectedBranchId, grnBranchIds]);
 
   const hasPermission = useCallback(
     (code: string): boolean => {
@@ -253,6 +328,9 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         setSelectedBranchId,
         business,
         branches,
+        allowedBranches,
+        assignedBranchIds,
+        grnBranchIds,
         user,
         activeCashier,
         setActiveCashier,
@@ -261,6 +339,8 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         currency: business?.currency || 'LKR',
         isLoading,
         isOwnerOrAdmin,
+        isOwner,
+        canCreateGrn,
         posMode,
         setPosMode,
         orderType,

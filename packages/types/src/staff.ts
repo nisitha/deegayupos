@@ -1,4 +1,4 @@
-export type StaffRole = 'OWNER' | 'MANAGER' | 'CASHIER';
+export type StaffRole = 'OWNER' | 'MANAGER' | 'CASHIER' | 'STAFF' | 'ARCHIVED';
 
 export interface StaffUserDto {
   id: string;
@@ -9,9 +9,12 @@ export interface StaffUserDto {
   roleName?: string;
   roleId?: string;
   hasPin: boolean;
+  pinCode?: string | null;
   isActive: boolean;
   branchId?: string | null;
   branchName?: string | null;
+  assignedBranches?: string[];
+  grnBranches?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

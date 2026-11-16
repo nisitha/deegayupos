@@ -84,7 +84,7 @@ const ALL_HREFS = MENU_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
 export function PosSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, tenant, business } = useTenantBranch();
+  const { user, tenant, business, isOwner } = useTenantBranch();
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleLogout = () => {
@@ -131,6 +131,22 @@ export function PosSidebar() {
     },
     [pathname],
   );
+
+  const filteredSections = React.useMemo(() => {
+    return MENU_SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.href === '/dashboard/staff' && !isOwner) {
+          return false;
+        }
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase();
+          return item.name.toLowerCase().includes(q) || section.title.toLowerCase().includes(q);
+        }
+        return true;
+      }),
+    })).filter((section) => section.items.length > 0);
+  }, [isOwner, searchTerm]);
 
   return (
     <aside className="hidden md:flex w-[240px] lg:w-[260px] bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30">
@@ -181,7 +197,7 @@ export function PosSidebar() {
 
       {/* 3. Categorized Menu Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 no-scrollbar">
-        {MENU_SECTIONS.map((section) => (
+        {filteredSections.map((section) => (
           <div key={section.title}>
             <div className="text-[11px] font-semibold tracking-wider text-slate-400/80 mb-2 px-3 uppercase">
               {section.title}

@@ -18,7 +18,14 @@ interface CashierSwitcherModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentCashierName: string;
-  onCashierSwitched: (cashier: { id: string; fullName: string; role: string; email?: string }) => void;
+  onCashierSwitched: (cashier: {
+    id: string;
+    fullName: string;
+    role: string;
+    email?: string;
+    assignedBranchIds?: string[];
+    grnBranchIds?: string[];
+  }) => void;
 }
 
 export function CashierSwitcherModal({
@@ -86,6 +93,8 @@ export function CashierSwitcherModal({
             fullName: staff.fullName,
             role: staff.role,
             email: staff.email,
+            assignedBranchIds: staff.assignedBranches,
+            grnBranchIds: staff.grnBranches,
           });
           onClose();
         }, 500);
@@ -110,6 +119,8 @@ export function CashierSwitcherModal({
       fullName: staff.fullName,
       role: staff.role,
       email: staff.email,
+      assignedBranchIds: staff.assignedBranches,
+      grnBranchIds: staff.grnBranches,
     });
     setSuccessMsg(`Switched cashier to ${staff.fullName}`);
     setTimeout(() => {

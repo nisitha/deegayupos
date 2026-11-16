@@ -30,9 +30,10 @@ export function Header() {
     setSelectedBranchId,
     business,
     branches,
+    allowedBranches,
     user,
     tenant,
-    isOwnerOrAdmin,
+    isOwner,
   } = useTenantBranch();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -156,25 +157,42 @@ export function Header() {
 
           {/* Interactive Multi-Branch Switcher Dropdown */}
           <div className="relative" ref={branchRef}>
-            <button
-              type="button"
-              onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none"
-              title="Switch Retail Branch / Location"
-            >
-              <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-              <span className="truncate max-w-[90px] sm:max-w-[120px] font-bold text-slate-800">
-                {currentBranchName}
-              </span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
-                  branchDropdownOpen ? 'rotate-180 text-slate-700' : ''
-                }`}
-              />
-            </button>
+            {allowedBranches.length <= 1 && !isOwner ? (
+              /* Single-branch staff: Locked Badge with MapPin */
+              <div
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 select-none"
+                title={`Branch Assigned: ${currentBranchName}`}
+              >
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate max-w-[120px] font-bold text-slate-800">
+                  {currentBranchName}
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-200/80 text-slate-600">
+                  Assigned
+                </span>
+              </div>
+            ) : (
+              /* Multi-branch staff or Owner: Switcher Button */
+              <button
+                type="button"
+                onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none cursor-pointer"
+                title="Switch Retail Branch / Location"
+              >
+                <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
+                <span className="truncate max-w-[90px] sm:max-w-[120px] font-bold text-slate-800">
+                  {currentBranchName}
+                </span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
+                    branchDropdownOpen ? 'rotate-180 text-slate-700' : ''
+                  }`}
+                />
+              </button>
+            )}
 
             {/* Branch Switcher Flyout */}
-            {branchDropdownOpen && (
+            {branchDropdownOpen && (allowedBranches.length > 1 || isOwner) && (
               <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-slate-200/90 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.14)] p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-3 py-2 border-b border-slate-100 mb-1 flex items-center justify-between">
                   <div>
@@ -182,20 +200,20 @@ export function Header() {
                       Branch & Inventory Location
                     </div>
                     <div className="text-xs font-bold text-slate-800">
-                      {branches.length} {branches.length === 1 ? 'Location' : 'Locations'} Configured
+                      {allowedBranches.length} {allowedBranches.length === 1 ? 'Location' : 'Locations'} Assigned
                     </div>
                   </div>
                 </div>
 
                 <div className="max-h-60 overflow-y-auto space-y-1 py-1">
-                  {isOwnerOrAdmin && (
+                  {isOwner && (
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedBranchId(null);
                         setBranchDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                         selectedBranchId === null
                           ? 'bg-blue-50 text-[#005BD3] font-bold'
                           : 'text-slate-700 hover:bg-slate-50 font-medium'
@@ -209,7 +227,7 @@ export function Header() {
                     </button>
                   )}
 
-                  {branches.map((b) => {
+                  {allowedBranches.map((b) => {
                     const isSelected = selectedBranchId === b.id;
                     return (
                       <button
@@ -219,7 +237,7 @@ export function Header() {
                           setSelectedBranchId(b.id);
                           setBranchDropdownOpen(false);
                         }}
-                        className={`w-full flex items-start justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors ${
+                        className={`w-full flex items-start justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-blue-50 text-[#005BD3]'
                             : 'text-slate-700 hover:bg-slate-50'
@@ -249,20 +267,22 @@ export function Header() {
                   })}
                 </div>
 
-                <div className="my-1 border-t border-slate-100" />
-
-                {/* + Add New Branch Action */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBranchDropdownOpen(false);
-                    setBranchModalOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#005BD3] hover:bg-blue-50/70 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add New Retail Branch</span>
-                </button>
+                {isOwner && (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBranchDropdownOpen(false);
+                        setBranchModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#005BD3] hover:bg-blue-50/70 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add New Retail Branch</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

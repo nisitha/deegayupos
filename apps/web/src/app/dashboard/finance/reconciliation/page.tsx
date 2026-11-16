@@ -35,10 +35,12 @@ import {
 type TabView = 'worksheet' | 'shortages' | 'ledger' | 'bank_accounts';
 
 export default function CashReconciliationPage() {
-  const { business, branches, selectedBranchId, setSelectedBranchId, user } = useTenantBranch();
+  const { business, branches, allowedBranches, selectedBranchId, setSelectedBranchId, user, isOwner } = useTenantBranch();
 
   const tenantId = business?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a';
-  const effectiveBranchId = selectedBranchId || (branches.length > 0 && branches[0] ? branches[0].id : '');
+  const effectiveBranchId =
+    selectedBranchId ||
+    (allowedBranches.length > 0 && allowedBranches[0] ? allowedBranches[0].id : (branches.length > 0 && branches[0] ? branches[0].id : ''));
 
   // Get current date in Sri Lanka (UTC+5:30)
   const getTodaySriLanka = (): string => {
@@ -438,20 +440,28 @@ export default function CashReconciliationPage() {
         {/* Action Bar: Branch, Date, Refresh & Print */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Branch Select */}
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
-            <Building2 className="w-4 h-4 text-slate-400" />
-            <select
-              value={effectiveBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
-              className="bg-transparent text-sm text-slate-200 outline-none cursor-pointer"
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {allowedBranches.length <= 1 && !isOwner ? (
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 select-none">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-semibold text-slate-200">{currentBranchName}</span>
+              <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">Assigned</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+              <Building2 className="w-4 h-4 text-slate-400" />
+              <select
+                value={effectiveBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-transparent text-sm text-slate-200 outline-none cursor-pointer"
+              >
+                {allowedBranches.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Date Picker */}
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">

@@ -12,6 +12,7 @@ import {
   Package,
   Sparkles,
   Trash2,
+  Lock,
 } from 'lucide-react';
 import type {
   GoodsReceivedNoteDto,
@@ -20,8 +21,17 @@ import type {
   GrnStatus,
   PurchaseOrderStatus,
 } from '@pixelcraft/types';
+import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { getCachedCatalogData } from '../../../lib/catalog-db';
 import { supabase } from '../../../lib/supabase';
+
+const BRANCH_TO_WAREHOUSE: Record<string, string> = {
+  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c': '81a14e32-4396-4d6f-9aec-d970db095d23', // Main Branch
+  'fa68e4a0-a515-44c8-a082-5b5590366658': '6e8904dd-b753-434e-a22d-2d8e428f0a02', // Dambadeniya
+  '133eeaec-5726-4702-a819-8423750db203': '4898d051-2faf-4553-a198-19566f5598e1', // Main store
+  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': '42f1fe9d-7e44-48eb-8eb0-10a6439b5619', // Alawwa
+  '197693d6-4247-48df-b614-6fcde9e34f7d': '5f0f4a53-75d7-411e-be5c-337ff170da50', // Giriulla
+};
 
 interface CatalogProductItem {
   id: string;
@@ -32,6 +42,7 @@ interface CatalogProductItem {
 }
 
 export default function PurchasesPage() {
+  const { selectedBranchId, canCreateGrn, activeCashier, user } = useTenantBranch();
   const [activeTab, setActiveTab] = useState<'GRN' | 'PO'>('GRN');
 
   // Data lists
@@ -204,6 +215,10 @@ export default function PurchasesPage() {
   // Submit GRN Receiving
   const handlePostGrn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateGrn) {
+      alert('Access restricted: GRN entry is permitted for designated branch stock officers only.');
+      return;
+    }
     if (grnItems.length === 0) {
       alert('Please add at least one line item to receive.');
       return;
@@ -217,15 +232,21 @@ export default function PurchasesPage() {
     try {
       const newGrnNumber = `GRN-${Date.now().toString().slice(-6)}`;
       const totalCost = grnItems.reduce((acc, i) => acc + i.receivedQuantity * i.unitCost, 0);
+      const effectiveBranch = selectedBranchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
+      const effectiveWarehouse = BRANCH_TO_WAREHOUSE[effectiveBranch] || '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
+      const receivedBy = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
 
       try {
         await supabase.from('goods_received_notes').insert({
           tenant_id: '0fef1423-5d89-4147-8af8-17c7e641c88a',
+          branch_id: effectiveBranch,
+          warehouse_id: effectiveWarehouse,
           supplier_id: grnSupplierId,
           grn_number: newGrnNumber,
           supplier_invoice_no: grnInvoiceNo || undefined,
           status: 'RECEIVED',
-          total_amount: totalCost,
+          total_cost: totalCost,
+          received_by_user_id: receivedBy,
           notes: grnNotes || undefined,
         });
       } catch (sbGrnErr) {
@@ -278,14 +299,21 @@ export default function PurchasesPage() {
 
         {/* Action CTAs */}
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setIsGrnModalOpen(true)}
-            className="bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-95 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm shadow-[#7052FF]/20 transition-all cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Receive Inventory (GRN Wizard)</span>
-          </button>
+          {canCreateGrn ? (
+            <button
+              type="button"
+              onClick={() => setIsGrnModalOpen(true)}
+              className="bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-95 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm shadow-[#7052FF]/20 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Receive Inventory (GRN Wizard)</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold select-none">
+              <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>GRN entry restricted to branch stock officer</span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -85,7 +85,7 @@ type ReportTab =
 const PIE_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1'];
 
 export default function ReportsSuitePage() {
-  const { currency, selectedBranchId } = useTenantBranch();
+  const { currency, selectedBranchId, allowedBranches, isOwner } = useTenantBranch();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<ReportTab>('sales-summary');
@@ -93,7 +93,20 @@ export default function ReportsSuitePage() {
 
   // Filters State
   const [period, setPeriod] = useState<ReportDatePreset>('all');
-  const [filterBranchId, setFilterBranchId] = useState<string>(selectedBranchId || 'ALL');
+  const [filterBranchId, setFilterBranchId] = useState<string>(() => {
+    if (!isOwner && allowedBranches.length > 0) {
+      return selectedBranchId || allowedBranches[0]?.id || 'ALL';
+    }
+    return selectedBranchId || 'ALL';
+  });
+
+  useEffect(() => {
+    if (!isOwner && allowedBranches.length > 0) {
+      if (!filterBranchId || !allowedBranches.some((b) => b.id === filterBranchId)) {
+        setFilterBranchId(selectedBranchId || allowedBranches[0]?.id || '');
+      }
+    }
+  }, [isOwner, allowedBranches, selectedBranchId, filterBranchId]);
   const [filterCashier, setFilterCashier] = useState<string>('ALL');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
@@ -449,21 +462,33 @@ export default function ReportsSuitePage() {
           )}
 
           {/* Branch Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={filterBranchId}
-              onChange={(e) => setFilterBranchId(e.target.value)}
-              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
-            >
-              <option value="ALL" className="bg-slate-900 text-white">All Physical Branches</option>
-              <option value="fa68e4a0-a515-44c8-a082-5b5590366658" className="bg-slate-900 text-white">Dabadeniya</option>
-              <option value="133eeaec-5726-4702-a819-8423750db203" className="bg-slate-900 text-white">Main store</option>
-              <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54" className="bg-slate-900 text-white">Alawwa</option>
-              <option value="197693d6-4247-48df-b614-6fcde9e34f7d" className="bg-slate-900 text-white">Giriulla</option>
-              <option value="85d48a94-b6a3-4b9f-a746-0ac2ff61355c" className="bg-slate-900 text-white">Main Branch</option>
-            </select>
-          </div>
+          {allowedBranches.length <= 1 && !isOwner ? (
+            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 select-none">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-slate-200 font-semibold">{allowedBranches[0]?.name || 'Assigned Branch'}</span>
+              <span className="text-[10px] bg-slate-800 text-slate-400 px-1 py-0.2 rounded font-mono">Assigned</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={filterBranchId}
+                onChange={(e) => setFilterBranchId(e.target.value)}
+                className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
+              >
+                {isOwner && (
+                  <option value="ALL" className="bg-slate-900 text-white">
+                    All Physical Branches
+                  </option>
+                )}
+                {allowedBranches.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-slate-900 text-white">
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Cashier Dropdown */}
           <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">

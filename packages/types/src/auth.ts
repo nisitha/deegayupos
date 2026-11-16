@@ -27,6 +27,8 @@ export interface AuthUser {
   isSuperAdmin?: boolean;
   isPlatformUser?: boolean;
   role?: string;
+  assignedBranchIds?: string[];
+  grnBranchIds?: string[];
 }
 
 /**

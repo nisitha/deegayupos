@@ -2170,7 +2170,8 @@ export const staffApi = {
       const { data: sbUsers, error: uErr } = await supabase
         .from('users')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .neq('role', 'ARCHIVED');
 
       if (!uErr && sbUsers && sbUsers.length > 0) {
         list = sbUsers.map((u: any) => ({
@@ -2178,11 +2179,14 @@ export const staffApi = {
           fullName: u.full_name || u.fullName,
           email: u.email,
           phone: u.phone,
-          role: u.role || 'CASHIER',
-          roleName: u.role || 'Cashier',
-          roleId: u.role_id || 'role-1',
+          role: u.role || 'STAFF',
+          roleName: u.role === 'OWNER' ? 'Owner / Admin' : 'Branch Staff',
+          roleId: u.role_id || 'role-staff',
           isActive: u.is_active ?? true,
           hasPin: !!(u.pin_code || u.pinCode),
+          pinCode: u.pin_code || u.pinCode,
+          assignedBranches: u.assigned_branches || [],
+          grnBranches: u.grn_branches || [],
           createdAt: u.created_at || new Date().toISOString(),
           updatedAt: u.updated_at || new Date().toISOString(),
         }));
@@ -2194,26 +2198,98 @@ export const staffApi = {
     if (list.length === 0) {
       list = [
         {
-          id: '99999999-9999-9999-9999-999999999999',
+          id: '96b2747b-9d22-4266-94ce-b035fadef498',
           fullName: 'Dr. Deegayu (Owner)',
           email: 'owner@deegayu.pixelcraftlk.com',
           role: 'OWNER',
-          roleName: 'Owner',
+          roleName: 'Owner / Admin',
           roleId: 'role-owner',
           isActive: true,
           hasPin: true,
+          assignedBranches: [
+            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+            '133eeaec-5726-4702-a819-8423750db203',
+            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+            'fa68e4a0-a515-44c8-a082-5b5590366658',
+            '197693d6-4247-48df-b614-6fcde9e34f7d',
+          ],
+          grnBranches: [
+            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+            '133eeaec-5726-4702-a819-8423750db203',
+            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+            'fa68e4a0-a515-44c8-a082-5b5590366658',
+            '197693d6-4247-48df-b614-6fcde9e34f7d',
+          ],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
         {
-          id: '88888888-8888-8888-8888-888888888888',
-          fullName: 'Kasun Bandara (Cashier)',
-          email: 'kasun@deegayu.pixelcraftlk.com',
-          role: 'CASHIER',
-          roleName: 'Cashier',
-          roleId: 'role-cashier',
+          id: '41363aeb-ba28-44b7-8822-983f1de593c0',
+          fullName: 'Shashini',
+          email: 'shashini@deegayu.pixelcraftlk.com',
+          role: 'STAFF',
+          roleName: 'Branch Staff',
+          roleId: 'role-staff',
           isActive: true,
           hasPin: true,
+          assignedBranches: ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'],
+          grnBranches: ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: '0f1d46e2-e943-4f24-b69e-f1ba5278a750',
+          fullName: 'Tharindu',
+          email: 'tharindu@deegayu.pixelcraftlk.com',
+          role: 'STAFF',
+          roleName: 'Branch Staff',
+          roleId: 'role-staff',
+          isActive: true,
+          hasPin: true,
+          assignedBranches: ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54', 'fa68e4a0-a515-44c8-a082-5b5590366658'],
+          grnBranches: ['fa68e4a0-a515-44c8-a082-5b5590366658'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: '1de49278-b4aa-466a-8493-d88c0c4d56de',
+          fullName: 'Anusha',
+          email: 'anusha@deegayu.pixelcraftlk.com',
+          role: 'STAFF',
+          roleName: 'Branch Staff',
+          roleId: 'role-staff',
+          isActive: true,
+          hasPin: true,
+          assignedBranches: ['fa68e4a0-a515-44c8-a082-5b5590366658'],
+          grnBranches: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: '1b50a131-4b75-4b22-86ee-bdd74665aeab',
+          fullName: 'Kumari',
+          email: 'kumari@deegayu.pixelcraftlk.com',
+          role: 'STAFF',
+          roleName: 'Branch Staff',
+          roleId: 'role-staff',
+          isActive: true,
+          hasPin: true,
+          assignedBranches: ['197693d6-4247-48df-b614-6fcde9e34f7d'],
+          grnBranches: ['197693d6-4247-48df-b614-6fcde9e34f7d'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: '192f7833-4465-4814-ab57-201cedd5f237',
+          fullName: 'Gindika',
+          email: 'gindika@deegayu.pixelcraftlk.com',
+          role: 'STAFF',
+          roleName: 'Branch Staff',
+          roleId: 'role-staff',
+          isActive: true,
+          hasPin: true,
+          assignedBranches: ['197693d6-4247-48df-b614-6fcde9e34f7d'],
+          grnBranches: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -2292,18 +2368,32 @@ export const staffApi = {
   },
   verifyPin: async (pinCode: string): Promise<ApiResponse<StaffUserDto | null>> => {
     const cleanPin = pinCode.trim();
-    if (cleanPin === '2026' || cleanPin === '1234') {
+    if (cleanPin === '2026') {
       return {
         success: true,
         data: {
-          id: '99999999-9999-9999-9999-999999999999',
+          id: '96b2747b-9d22-4266-94ce-b035fadef498',
           fullName: 'Dr. Deegayu (Owner)',
           email: 'owner@deegayu.pixelcraftlk.com',
           role: 'OWNER',
-          roleName: 'Owner',
+          roleName: 'Owner / Admin',
           roleId: 'role-owner',
           isActive: true,
           hasPin: true,
+          assignedBranches: [
+            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+            '133eeaec-5726-4702-a819-8423750db203',
+            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+            'fa68e4a0-a515-44c8-a082-5b5590366658',
+            '197693d6-4247-48df-b614-6fcde9e34f7d',
+          ],
+          grnBranches: [
+            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+            '133eeaec-5726-4702-a819-8423750db203',
+            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+            'fa68e4a0-a515-44c8-a082-5b5590366658',
+            '197693d6-4247-48df-b614-6fcde9e34f7d',
+          ],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -2314,7 +2404,8 @@ export const staffApi = {
       const { data: users } = await supabase
         .from('users')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .neq('role', 'ARCHIVED');
 
       if (users && users.length > 0) {
         const found = users.find((u: any) => {
@@ -2323,6 +2414,8 @@ export const staffApi = {
         });
 
         if (found) {
+          const role = found.role || 'STAFF';
+          const isOwner = role === 'OWNER';
           return {
             success: true,
             data: {
@@ -2330,11 +2423,25 @@ export const staffApi = {
               fullName: found.full_name || found.fullName,
               email: found.email,
               phone: found.phone,
-              role: found.role || 'CASHIER',
-              roleName: found.role || 'Cashier',
-              roleId: 'role-cashier',
+              role,
+              roleName: isOwner ? 'Owner / Admin' : 'Branch Staff',
+              roleId: 'role-staff',
               isActive: true,
               hasPin: true,
+              assignedBranches: found.assigned_branches || (isOwner ? [
+                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                '133eeaec-5726-4702-a819-8423750db203',
+                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                'fa68e4a0-a515-44c8-a082-5b5590366658',
+                '197693d6-4247-48df-b614-6fcde9e34f7d',
+              ] : []),
+              grnBranches: found.grn_branches || (isOwner ? [
+                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                '133eeaec-5726-4702-a819-8423750db203',
+                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                'fa68e4a0-a515-44c8-a082-5b5590366658',
+                '197693d6-4247-48df-b614-6fcde9e34f7d',
+              ] : []),
               createdAt: found.created_at || new Date().toISOString(),
               updatedAt: found.updated_at || new Date().toISOString(),
             },

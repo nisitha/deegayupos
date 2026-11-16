@@ -11,11 +11,75 @@ import {
   EyeOff,
   Store,
   AlertCircle,
-  Sparkles,
   KeyRound,
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
+
+const ALL_BRANCH_IDS = [
+  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+  '133eeaec-5726-4702-a819-8423750db203',
+  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+  'fa68e4a0-a515-44c8-a082-5b5590366658',
+  '197693d6-4247-48df-b614-6fcde9e34f7d',
+];
+
+const PRESET_STAFF = [
+  {
+    name: 'Dr. Deegayu (Owner)',
+    email: 'owner@deegayu.pixelcraftlk.com',
+    password: 'Deegayu@2026',
+    pin: '2026',
+    role: 'OWNER',
+    branchLabel: 'All Branches • Full Admin',
+    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+  },
+  {
+    name: 'Shashini',
+    email: 'shashini@deegayu.pixelcraftlk.com',
+    password: 'Shashini@2026',
+    pin: '1111',
+    role: 'STAFF',
+    branchLabel: 'Alawwa (Stock & GRN Officer)',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    name: 'Tharindu',
+    email: 'tharindu@deegayu.pixelcraftlk.com',
+    password: 'Tharindu@2026',
+    pin: '2222',
+    role: 'STAFF',
+    branchLabel: 'Alawwa & Dambadeniya (GRN Dambadeniya)',
+    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  {
+    name: 'Anusha',
+    email: 'anusha@deegayu.pixelcraftlk.com',
+    password: 'Anusha@2026',
+    pin: '3333',
+    role: 'STAFF',
+    branchLabel: 'Dambadeniya (Staff Cashier)',
+    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
+  },
+  {
+    name: 'Kumari',
+    email: 'kumari@deegayu.pixelcraftlk.com',
+    password: 'Kumari@2026',
+    pin: '4444',
+    role: 'STAFF',
+    branchLabel: 'Giriulla (Stock & GRN Officer)',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    name: 'Gindika',
+    email: 'gindika@deegayu.pixelcraftlk.com',
+    password: 'Gindika@2026',
+    pin: '5555',
+    role: 'STAFF',
+    branchLabel: 'Giriulla (Staff Cashier)',
+    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
+  },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,36 +100,57 @@ export default function LoginPage() {
       userRecord?.memberships?.[0]?.tenantId ||
       '0fef1423-5d89-4147-8af8-17c7e641c88a';
 
-    const branchId =
-      userRecord?.branch_id ||
-      userRecord?.branchId ||
-      userRecord?.memberships?.[0]?.default_branch_id ||
-      '11111111-2222-3333-4444-555555555555';
-
     const role =
       userRecord?.role ||
       userRecord?.memberships?.[0]?.role?.code ||
-      'OWNER';
+      (explicitEmail === 'owner@deegayu.pixelcraftlk.com' ? 'OWNER' : 'STAFF');
 
     const name =
       userRecord?.full_name ||
       userRecord?.fullName ||
       userRecord?.name ||
-      'Dr. Deegayu (Owner)';
+      (role === 'OWNER' ? 'Dr. Deegayu (Owner)' : 'Staff User');
 
     const userEmail =
       userRecord?.email ||
       explicitEmail ||
       'owner@deegayu.pixelcraftlk.com';
 
+    const isOwner = role === 'OWNER' || role === 'ADMIN';
+
+    const assignedBranchIds: string[] = Array.isArray(userRecord?.assigned_branches)
+      ? userRecord.assigned_branches
+      : Array.isArray(userRecord?.assignedBranches)
+      ? userRecord.assignedBranches
+      : isOwner
+      ? ALL_BRANCH_IDS
+      : [];
+
+    const grnBranchIds: string[] = Array.isArray(userRecord?.grn_branches)
+      ? userRecord.grn_branches
+      : Array.isArray(userRecord?.grnBranches)
+      ? userRecord.grnBranches
+      : isOwner
+      ? ALL_BRANCH_IDS
+      : [];
+
+    const branchId =
+      (assignedBranchIds.length > 0 ? assignedBranchIds[0] : null) ||
+      userRecord?.branch_id ||
+      userRecord?.branchId ||
+      userRecord?.memberships?.[0]?.default_branch_id ||
+      '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
+
     const sessionObj = {
-      id: userRecord?.id || '99999999-9999-9999-9999-999999999999',
+      id: userRecord?.id || (isOwner ? '96b2747b-9d22-4266-94ce-b035fadef498' : '99999999-9999-9999-9999-999999999999'),
       name,
       email: userEmail,
       role,
       tenantId,
       tenantSlug: 'deegayu',
       branchId,
+      assignedBranchIds,
+      grnBranchIds,
       authenticated: true,
     };
 
@@ -88,19 +173,24 @@ export default function LoginPage() {
           email: sessionObj.email,
           fullName: sessionObj.name,
           role: sessionObj.role,
+          assignedBranchIds,
+          grnBranchIds,
           isActive: true,
         })
       );
       localStorage.setItem('pixelcraft_tenant', JSON.stringify(tenantObj));
       localStorage.setItem('pixelcraft_tenant_id', tenantId);
-      localStorage.setItem('pixelcraft_permissions', JSON.stringify(['*']));
+      localStorage.setItem('pixelcraft_selected_branch', branchId);
+      localStorage.setItem('pixelcraft_permissions', JSON.stringify(isOwner ? ['*'] : ['pos:*', 'cashier:*']));
       localStorage.setItem(
         'pixelcraft_active_cashier',
         JSON.stringify({
           id: sessionObj.id,
-          name: sessionObj.name,
+          fullName: sessionObj.name,
           email: sessionObj.email,
           role: sessionObj.role,
+          assignedBranchIds,
+          grnBranchIds,
         })
       );
 
@@ -260,16 +350,13 @@ export default function LoginPage() {
     }
   };
 
-  const handleFillDemo = () => {
-    setAuthMode('password');
-    setEmail('owner@deegayu.pixelcraftlk.com');
-    setPassword('Deegayu@2026');
-    setError(null);
-  };
-
-  const handleFillPinDemo = () => {
-    setAuthMode('pin');
-    setPin('2026');
+  const handleFillPreset = (staff: typeof PRESET_STAFF[0]) => {
+    if (authMode === 'password') {
+      setEmail(staff.email);
+      setPassword(staff.password);
+    } else {
+      setPin(staff.pin);
+    }
     setError(null);
   };
 
@@ -448,44 +535,45 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Credentials 1-Click Pills */}
+          {/* Quick Staff Team 1-Click Selectors */}
           <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="w-full py-2.5 px-3 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 text-left transition-colors flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-[#005BD3]" />
-                <div>
-                  <div className="text-[11px] font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
-                    Deegayu Weda Madura (Admin Email)
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    owner@deegayu.pixelcraftlk.com • Deegayu@2026
-                  </div>
-                </div>
-              </div>
-              <span className="text-[10px] font-semibold text-[#005BD3] px-2 py-0.5 rounded bg-white shadow-2xs">
-                Auto-Fill
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Authorized Branch Team
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleFillPinDemo}
-              className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-colors flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-[11px] font-semibold text-slate-700">
-                  Quick Cashier PIN (2026)
-                </span>
-              </div>
-              <span className="text-[10px] font-semibold text-slate-600 px-2 py-0.5 rounded bg-white shadow-2xs">
-                Use PIN
+              <span className="text-[10px] text-slate-400">
+                {authMode === 'password' ? 'Click to fill credentials' : 'Click to fill 4-digit PIN'}
               </span>
-            </button>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
+              {PRESET_STAFF.map((staff) => (
+                <button
+                  key={staff.email}
+                  type="button"
+                  onClick={() => handleFillPreset(staff)}
+                  className="w-full py-2 px-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-left transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 group-hover:border-blue-400">
+                      {staff.name[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors truncate">
+                        {staff.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">
+                        {staff.branchLabel}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-semibold">
+                      {authMode === 'password' ? staff.email.split('@')[0] : `PIN: ${staff.pin}`}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

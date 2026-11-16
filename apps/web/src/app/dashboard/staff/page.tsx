@@ -27,7 +27,7 @@ import { staffApi } from '../../../lib/api-client';
 
 export default function StaffManagementPage() {
   const router = useRouter();
-  const { branches, activeCashier, setActiveCashier } = useTenantBranch();
+  const { branches, activeCashier, setActiveCashier, isOwner } = useTenantBranch();
 
   // Data state
   const [staffList, setStaffList] = useState<StaffUserDto[]>([]);
@@ -281,6 +281,34 @@ export default function StaffManagementPage() {
     }, 600);
   };
 
+  const branchMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    branches.forEach((b) => {
+      map[b.id] = b.name;
+    });
+    return map;
+  }, [branches]);
+
+  if (!isOwner) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900 mb-1">Access Restricted</h2>
+        <p className="text-xs text-slate-500 max-w-sm mb-4">
+          Staff and team permission management is restricted to the Organization Owner (Dr. Deegayu).
+        </p>
+        <button
+          onClick={() => router.push('/dashboard/pos')}
+          className="px-4 py-2 bg-[#005BD3] text-white text-xs font-semibold rounded-xl hover:bg-[#004bb5] transition cursor-pointer"
+        >
+          Return to POS Terminal
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50/50 pb-16">
       {/* 1. Header & Breadcrumbs */}
@@ -464,7 +492,7 @@ export default function StaffManagementPage() {
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-5">Staff Member</th>
                   <th className="py-3.5 px-4">Role & Access</th>
-                  <th className="py-3.5 px-4">Assigned Branch</th>
+                  <th className="py-3.5 px-4">Assigned Branch & GRN</th>
                   <th className="py-3.5 px-4">Terminal PIN</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-5 text-right">Actions</th>
@@ -551,11 +579,47 @@ export default function StaffManagementPage() {
                           </div>
                         </td>
 
-                        {/* Branch */}
+                        {/* Branch & GRN Privileges */}
                         <td className="py-4 px-4">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{staff.branchName || 'All Branches'}</span>
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {staff.role === 'OWNER' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  <Building2 className="w-3 h-3 text-purple-600" />
+                                  All 5 Branches
+                                </span>
+                              ) : staff.assignedBranches && staff.assignedBranches.length > 0 ? (
+                                staff.assignedBranches.map((bId) => (
+                                  <span
+                                    key={bId}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200"
+                                  >
+                                    <Building2 className="w-3 h-3 text-slate-500" />
+                                    {branchMap[bId] || 'Branch'}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-slate-400">All Branches</span>
+                              )}
+                            </div>
+                            <div>
+                              {staff.role === 'OWNER' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700">
+                                  <ShieldCheck className="w-3 h-3" />
+                                  Full GRN & Purchasing
+                                </span>
+                              ) : staff.grnBranches && staff.grnBranches.length > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                  GRN Stock Officer ({staff.grnBranches.map((bId) => branchMap[bId] || 'Branch').join(', ')})
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                  <Lock className="w-2.5 h-2.5 text-slate-300" />
+                                  No GRN Entry
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
 
