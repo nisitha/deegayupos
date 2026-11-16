@@ -29,8 +29,9 @@ const WEIGHT_G_PRESETS: QuickPreset[] = [
   { label: '100g', valueInBase: 100, displayValue: 100, unit: 'g' },
   { label: '250g', valueInBase: 250, displayValue: 250, unit: 'g' },
   { label: '500g', valueInBase: 500, displayValue: 500, unit: 'g' },
-  { label: '1kg', valueInBase: 1000, displayValue: 1, unit: 'kg' },
-  { label: '2kg', valueInBase: 2000, displayValue: 2, unit: 'kg' },
+  { label: '1 kg', valueInBase: 1000, displayValue: 1, unit: 'kg' },
+  { label: '2 kg', valueInBase: 2000, displayValue: 2, unit: 'kg' },
+  { label: '5 kg', valueInBase: 5000, displayValue: 5, unit: 'kg' },
 ];
 
 const VOLUME_ML_PRESETS: QuickPreset[] = [
@@ -38,7 +39,8 @@ const VOLUME_ML_PRESETS: QuickPreset[] = [
   { label: '100ml', valueInBase: 100, displayValue: 100, unit: 'ml' },
   { label: '250ml', valueInBase: 250, displayValue: 250, unit: 'ml' },
   { label: '500ml', valueInBase: 500, displayValue: 500, unit: 'ml' },
-  { label: '1L', valueInBase: 1000, displayValue: 1, unit: 'L' },
+  { label: '1 L', valueInBase: 1000, displayValue: 1, unit: 'L' },
+  { label: '2 L', valueInBase: 2000, displayValue: 2, unit: 'L' },
 ];
 
 const FRACTIONAL_KALAN_PRESETS: QuickPreset[] = [

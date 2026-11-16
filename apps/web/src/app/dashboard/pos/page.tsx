@@ -30,7 +30,6 @@ import {
   AlertCircle,
   Check,
   Pencil,
-  RotateCcw,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -45,6 +44,10 @@ import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
 import { CashierSwitcherModal } from '../../../components/pos/cashier-switcher-modal';
 import { CustomerModal, type CustomerData } from '../../../components/pos/customer-modal';
 import { HeldTicketsModal, type HeldTicket } from '../../../components/pos/held-tickets-modal';
+import {
+  QuantityUnitModal,
+  type QuantityUnitModalProduct,
+} from '../../../components/pos/quantity-unit-modal';
 import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
 import {
   AYURVEDIC_MASTER_DEPARTMENTS,
@@ -57,9 +60,7 @@ import { supabase } from '../../../lib/supabase';
 import {
   detectUnitConfig,
   calculateBaseQuantity,
-  calculateDisplayQuantity,
   formatQuantityWithUnit,
-  type QuickPreset,
 } from '../../../lib/unit-utils';
 
 // =========================================================================
@@ -158,19 +159,6 @@ export default function ConfidencyPosPage() {
 
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
-
-  // Inline Price Editing State for Order Summary
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editingPriceInput, setEditingPriceInput] = useState<string>('');
-  const inlinePriceInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Auto-focus & select inline input when editing starts
-  useEffect(() => {
-    if (editingItemId && inlinePriceInputRef.current) {
-      inlinePriceInputRef.current.focus();
-      inlinePriceInputRef.current.select();
-    }
-  }, [editingItemId]);
 
   // Scanner & Notification feedback
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
@@ -482,8 +470,14 @@ export default function ConfidencyPosPage() {
     }
   }, [searchQuery]);
 
-  // Active item tracking for quick presets strip
-  const [activeQtyItemId, setActiveQtyItemId] = useState<string | null>(null);
+  // Spacious Quantity & Unit Selector Modal State
+  const [quantityModalTarget, setQuantityModalTarget] = useState<{
+    product: QuantityUnitModalProduct;
+    cartItemId?: string;
+    initialUnit?: string;
+    initialDisplayQuantity?: number;
+    initialCustomPrice?: number;
+  } | null>(null);
 
   // Add Item to Cart
   const addToCart = useCallback((product: RetailProductItem & { departmentId?: string }) => {
@@ -532,6 +526,150 @@ export default function ConfidencyPosPage() {
     setTimeout(() => setScanFeedback(null), 1500);
   }, []);
 
+  // Handle clicking product in catalog or search (weight/volume triggers spacious modal)
+  const handleProductClick = useCallback(
+    (product: RetailProductItem & { departmentId?: string }) => {
+      const config = detectUnitConfig(product);
+      if (
+        config.mode === 'weight_g' ||
+        config.mode === 'volume_ml' ||
+        config.mode === 'fractional'
+      ) {
+        const existingInCart = cart.find((it) => it.productId === product.id);
+        setQuantityModalTarget({
+          product: {
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            barcode: product.barcode,
+            retailPrice: product.retailPrice,
+            costPrice: product.costPrice,
+            stockOnHand: product.stockOnHand,
+            unit: product.unit,
+            imageUrl: product.imageUrl,
+            departmentId: product.departmentId,
+          },
+          cartItemId: existingInCart?.id,
+          initialUnit:
+            existingInCart?.selectedUnit ||
+            (config.mode === 'weight_g' ? 'g' : config.baseUnit),
+          initialDisplayQuantity:
+            existingInCart?.displayQuantity !== undefined
+              ? existingInCart.displayQuantity
+              : config.mode === 'weight_g'
+              ? 100
+              : 1,
+          initialCustomPrice: existingInCart?.price ?? product.retailPrice,
+        });
+        return;
+      }
+
+      // Discrete items add directly to cart for maximum cashier speed
+      addToCart(product);
+    },
+    [cart, addToCart],
+  );
+
+  // Open modal from Order Summary cart item badge
+  const handleOpenEditItemModal = useCallback((item: CartItem) => {
+    setQuantityModalTarget({
+      product: {
+        id: item.productId,
+        name: item.name,
+        sku: item.sku,
+        barcode: item.barcode,
+        retailPrice: item.originalUnitPrice,
+        costPrice: item.costPrice,
+        stockOnHand: item.stockOnHand,
+        unit: item.unit,
+        imageUrl: item.imageUrl,
+        departmentId: item.departmentId,
+      },
+      cartItemId: item.id,
+      initialUnit: item.selectedUnit || detectUnitConfig(item).baseUnit,
+      initialDisplayQuantity:
+        item.displayQuantity !== undefined ? item.displayQuantity : item.quantity,
+      initialCustomPrice: item.price,
+    });
+  }, []);
+
+  // Handle confirmation from Spacious Quantity & Unit Modal
+  const handleConfirmQuantityModal = useCallback(
+    ({
+      productId,
+      cartItemId,
+      selectedUnit,
+      displayQuantity,
+      baseQuantity,
+      unitPrice,
+    }: {
+      productId: string;
+      cartItemId?: string;
+      selectedUnit: string;
+      displayQuantity: number;
+      baseQuantity: number;
+      unitPrice: number;
+    }) => {
+      setCart((prevCart) => {
+        if (cartItemId) {
+          return prevCart.map((it) =>
+            it.id === cartItemId
+              ? {
+                  ...it,
+                  selectedUnit,
+                  displayQuantity,
+                  quantity: baseQuantity,
+                  price: unitPrice,
+                }
+              : it,
+          );
+        }
+
+        const existing = prevCart.find((it) => it.productId === productId);
+        if (existing) {
+          return prevCart.map((it) =>
+            it.productId === productId
+              ? {
+                  ...it,
+                  selectedUnit,
+                  displayQuantity,
+                  quantity: baseQuantity,
+                  price: unitPrice,
+                }
+              : it,
+          );
+        }
+
+        const p = products.find((prod) => prod.id === productId) || quantityModalTarget?.product;
+        if (!p) return prevCart;
+
+        return [
+          ...prevCart,
+          {
+            id: `cart-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            productId: p.id,
+            name: p.name,
+            sku: p.sku,
+            barcode: p.barcode,
+            price: unitPrice,
+            originalUnitPrice: p.retailPrice,
+            costPrice: p.costPrice ?? 0,
+            quantity: baseQuantity,
+            displayQuantity,
+            selectedUnit,
+            stockOnHand: p.stockOnHand,
+            unit: p.unit,
+            imageUrl: p.imageUrl,
+            departmentId: (p as any).departmentId,
+          },
+        ];
+      });
+
+      setQuantityModalTarget(null);
+    },
+    [products, quantityModalTarget],
+  );
+
   // Add Custom Sale Item
   const handleAddCustomItem = (customItem: {
     name: string;
@@ -562,7 +700,7 @@ export default function ConfidencyPosPage() {
     setTimeout(() => setScanFeedback(null), 2000);
   };
 
-  // Stepper Quantity Editor (- / +)
+  // Stepper Quantity Editor (- / +) for discrete items
   const handleStepQuantity = (itemId: string, delta: number) => {
     setCart((prev) => {
       const target = prev.find((it) => it.id === itemId);
@@ -573,7 +711,6 @@ export default function ConfidencyPosPage() {
       const stepVal = config.mode === 'fractional' ? 0.5 : 1;
       const nextDisplay = Math.max(0, Math.round((curDisplay + delta * stepVal) * 1000) / 1000);
       if (nextDisplay <= 0) {
-        if (activeQtyItemId === itemId) setActiveQtyItemId(null);
         return prev.filter((it) => it.id !== itemId);
       }
       const nextBase = calculateBaseQuantity(nextDisplay, curUnit, config);
@@ -589,113 +726,12 @@ export default function ConfidencyPosPage() {
     });
   };
 
-  // Direct Numeric Quantity Input
-  const handleDirectQuantityInput = (itemId: string, rawVal: string) => {
-    const val = parseFloat(rawVal);
-    setCart((prev) =>
-      prev.map((it) => {
-        if (it.id !== itemId) return it;
-        const config = detectUnitConfig(it);
-        const curUnit = it.selectedUnit || config.baseUnit;
-        if (isNaN(val) || val < 0) {
-          return {
-            ...it,
-            displayQuantity: (rawVal === '' ? ('' as any) : 0),
-            quantity: 0,
-          };
-        }
-        const nextBase = calculateBaseQuantity(val, curUnit, config);
-        return {
-          ...it,
-          displayQuantity: val,
-          quantity: nextBase,
-        };
-      }),
-    );
-  };
-
-  // Unit Switcher (e.g. 'g' <-> 'kg', 'ml' <-> 'L')
-  const handleUnitChange = (itemId: string, newUnit: string) => {
-    setCart((prev) =>
-      prev.map((it) => {
-        if (it.id !== itemId) return it;
-        const config = detectUnitConfig(it);
-        const oldUnit = it.selectedUnit || config.baseUnit;
-        if (oldUnit === newUnit) return it;
-
-        const newDisplay = calculateDisplayQuantity(it.quantity, newUnit, config);
-        return {
-          ...it,
-          selectedUnit: newUnit,
-          displayQuantity: newDisplay,
-        };
-      }),
-    );
-  };
-
-  // Quick Preset Selector (e.g. 50g, 100g, 250g, 500g, 1kg, 2kg)
-  const handleApplyPreset = (itemId: string, preset: QuickPreset) => {
-    setCart((prev) =>
-      prev.map((it) => {
-        if (it.id !== itemId) return it;
-        return {
-          ...it,
-          selectedUnit: preset.unit,
-          displayQuantity: preset.displayValue,
-          quantity: preset.valueInBase,
-        };
-      }),
-    );
-  };
-
-  // Inline Unit Price Editor Handlers (Strictly Scoped to Current Bill)
-  const handleStartEditPrice = (item: CartItem) => {
-    setEditingItemId(item.id);
-    setEditingPriceInput(item.price.toFixed(2));
-  };
-
-  const handleSaveEditPrice = (itemId: string) => {
-    const parsed = parseFloat(editingPriceInput);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setCart((prev) =>
-        prev.map((it) =>
-          it.id === itemId
-            ? { ...it, price: Math.round(parsed * 100) / 100 }
-            : it
-        )
-      );
-    }
-    setEditingItemId(null);
-    setEditingPriceInput('');
-  };
-
-  const handleCancelEditPrice = () => {
-    setEditingItemId(null);
-    setEditingPriceInput('');
-  };
-
-  const handleResetUnitPrice = (itemId: string) => {
-    setCart((prev) =>
-      prev.map((it) =>
-        it.id === itemId ? { ...it, price: it.originalUnitPrice } : it
-      )
-    );
-  };
-
   const removeCartItem = (itemId: string) => {
-    if (editingItemId === itemId) {
-      setEditingItemId(null);
-      setEditingPriceInput('');
-    }
-    if (activeQtyItemId === itemId) setActiveQtyItemId(null);
     setCart((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   const clearCart = useCallback(() => {
     setCart([]);
-    setEditingItemId(null);
-    setEditingPriceInput('');
-    setActiveQtyItemId(null);
     setIsMobileCartOpen(false);
   }, []);
 
@@ -1004,6 +1040,9 @@ export default function ConfidencyPosPage() {
   // Keyboard shortcut listener (F2: Search Barcode, F4: Hold Ticket, Esc: Dismiss, Enter: Confirm checkout)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If QuantityUnitModal is open, it manages its own Enter & Escape
+      if (quantityModalTarget) return;
+
       // Ignore global shortcut keystrokes while typing quantity or editing an inline unit price
       const target = e.target as HTMLElement | null;
       if (
@@ -1016,7 +1055,6 @@ export default function ConfidencyPosPage() {
       ) {
         if (e.key === 'Escape') {
           (target as HTMLInputElement)?.blur();
-          setActiveQtyItemId(null);
         }
         return;
       }
@@ -1056,7 +1094,7 @@ export default function ConfidencyPosPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCheckoutModalOpen, executeCheckout, cart, handleHoldTicket, searchQuery]);
+  }, [isCheckoutModalOpen, executeCheckout, cart, handleHoldTicket, searchQuery, quantityModalTarget]);
 
   return (
     <div className="h-full w-full flex overflow-hidden bg-[#E6EAF2] select-none">
@@ -1310,7 +1348,7 @@ export default function ConfidencyPosPage() {
                 } else if (e.key === 'Enter') {
                   e.preventDefault();
                   if (isSearchDropdownOpen && liveSearchResults.length > 0 && liveSearchResults[selectedSearchIndex]) {
-                    addToCart(liveSearchResults[selectedSearchIndex]);
+                    handleProductClick(liveSearchResults[selectedSearchIndex]);
                     searchInputRef.current?.focus();
                   }
                 } else if (e.key === 'Escape') {
@@ -1363,7 +1401,7 @@ export default function ConfidencyPosPage() {
                         key={item.id}
                         onMouseEnter={() => setSelectedSearchIndex(idx)}
                         onClick={() => {
-                          addToCart(item);
+                          handleProductClick(item);
                           searchInputRef.current?.focus();
                         }}
                         className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
@@ -1421,7 +1459,7 @@ export default function ConfidencyPosPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              addToCart(item);
+                              handleProductClick(item);
                               searchInputRef.current?.focus();
                             }}
                             className="px-2.5 py-1.5 bg-slate-900 hover:bg-[#7052FF] text-white text-xs font-semibold rounded-lg transition-colors active:scale-95 flex items-center gap-1 shadow-2xs cursor-pointer"
@@ -1558,7 +1596,7 @@ export default function ConfidencyPosPage() {
                 return (
                   <div
                     key={product.id}
-                    onClick={() => addToCart(product)}
+                    onClick={() => handleProductClick(product)}
                     className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md hover:border-indigo-400 hover:-translate-y-0.5 transition-all duration-150 overflow-hidden flex flex-col p-3.5 cursor-pointer group active:scale-[0.98] select-none relative justify-between"
                   >
                     {/* Top Row: Department Sinhala Pill + Stock Indicator */}
@@ -1625,7 +1663,7 @@ export default function ConfidencyPosPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            addToCart(product);
+                            handleProductClick(product);
                           }}
                           className="w-8 h-8 rounded-lg bg-[#5B46F6] hover:bg-[#4935E3] text-white flex items-center justify-center font-bold shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
                           title="Add to cart"
@@ -1732,18 +1770,18 @@ export default function ConfidencyPosPage() {
             cart.map((item) => {
               const unitConfig = detectUnitConfig(item);
               const activeUnit = item.selectedUnit || unitConfig.baseUnit;
-              const displayQty = item.displayQuantity !== undefined ? item.displayQuantity : item.quantity;
               const isMultiUnit = unitConfig.mode === 'weight_g' || unitConfig.mode === 'volume_ml';
-              const isPresetOpen = activeQtyItemId === item.id || isMultiUnit || unitConfig.quickPresets.length > 0;
+              const isFractional = unitConfig.mode === 'fractional';
+              const isWeightOrVolume = isMultiUnit || isFractional;
 
               return (
                 <div
                   key={item.id}
                   className="bg-white rounded-xl border border-indigo-100/90 shadow-2xs p-3 flex flex-col gap-2 group transition-all hover:border-indigo-300 hover:shadow-xs"
                 >
+                  {/* Top Row: Squircle Photo + Name & SKU + Trash Button */}
                   <div className="flex items-start justify-between gap-2.5">
-                    {/* Rounded squircle realistic product photo preview */}
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5 mt-0.5">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
                       <img
                         src={getProductPhoto(item)}
                         alt={item.name}
@@ -1755,213 +1793,106 @@ export default function ConfidencyPosPage() {
                       />
                     </div>
 
-                    {/* Name, Unit Badges & Inline Unit Price */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h5 className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-snug max-w-[130px]" title={item.name}>
-                          {item.name}
-                        </h5>
-
-                        {/* Inline Unit Switcher (g / kg or ml / L) */}
-                        {isMultiUnit && (
-                          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200/80 text-[10px] font-semibold">
-                            <button
-                              type="button"
-                              onClick={() => handleUnitChange(item.id, unitConfig.baseUnit)}
-                              className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                                activeUnit === unitConfig.baseUnit
-                                  ? 'bg-[#5B46F6] text-white shadow-2xs font-bold'
-                                  : 'text-slate-600 hover:text-slate-900'
-                              }`}
-                            >
-                              {unitConfig.baseUnit}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUnitChange(item.id, unitConfig.alternateUnit!)}
-                              className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
-                                activeUnit === unitConfig.alternateUnit
-                                  ? 'bg-[#5B46F6] text-white shadow-2xs font-bold'
-                                  : 'text-slate-600 hover:text-slate-900'
-                              }`}
-                            >
-                              {unitConfig.alternateUnit}
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Traditional unit indicator */}
-                        {unitConfig.mode === 'fractional' && (
-                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1.5 py-0.2 rounded-md">
-                            {unitConfig.baseUnit}
+                      <h5 className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-snug" title={item.name}>
+                        {item.name}
+                      </h5>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded shrink-0">
+                          {item.sku}
+                        </span>
+                        {isWeightOrVolume && (
+                          <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded shrink-0">
+                            Sold by {unitConfig.baseUnit}
                           </span>
                         )}
                       </div>
-
-                      {/* Display formatted quantity description if converted (e.g. "2 kg (2,000 g)") */}
-                      {isMultiUnit && activeUnit === unitConfig.alternateUnit && (
-                        <div className="text-[10px] font-mono text-indigo-700 font-semibold mt-0.5">
-                          {formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}
-                        </div>
-                      )}
-
-                      {/* Unit Price & Per-Bill Inline Editor */}
-                      {editingItemId === item.id ? (
-                        <div className="flex items-center gap-1 mt-1" data-inline-price>
-                          <span className="text-[11px] font-semibold text-slate-400">LKR</span>
-                          <input
-                            ref={inlinePriceInputRef}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            data-inline-price-input="true"
-                            value={editingPriceInput}
-                            onChange={(e) => setEditingPriceInput(e.target.value)}
-                            onBlur={() => handleSaveEditPrice(item.id)}
-                            onKeyDown={(e) => {
-                              e.stopPropagation();
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveEditPrice(item.id);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                handleCancelEditPrice();
-                              }
-                            }}
-                            className="w-18 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#5B46F6] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/20"
-                          />
-                          <button
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              handleSaveEditPrice(item.id);
-                            }}
-                            className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs cursor-pointer"
-                            title="Save price"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditPrice(item)}
-                            className="group/price inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 font-mono font-medium cursor-pointer transition-colors"
-                            title={`Click to edit unit price per ${unitConfig.baseUnit} for this bill`}
-                          >
-                            <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
-                              LKR {item.price.toFixed(2)}{isMultiUnit || unitConfig.mode === 'fractional' ? `/${unitConfig.baseUnit}` : ''}
-                            </span>
-                            <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#5B46F6] transition-colors" />
-                          </button>
-
-                          {item.price !== item.originalUnitPrice && (
-                            <div className="inline-flex items-center gap-1">
-                              <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 px-1 py-0.2 rounded font-sans">
-                                Edited
-                              </span>
-                              <span className="text-[10px] text-slate-400 line-through font-mono">
-                                {item.originalUnitPrice.toFixed(2)}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleResetUnitPrice(item.id)}
-                                className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer rounded hover:bg-slate-100"
-                                title={`Revert to catalog price (LKR ${item.originalUnitPrice.toFixed(2)})`}
-                              >
-                                <RotateCcw className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Stepper & Direct Numeric Quantity Input + Line Total */}
-                    <div className="flex flex-col items-end gap-1 shrink-0" data-qty-control="true">
-                      {/* Direct Numeric Input with - and + */}
-                      <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-                        <button
-                          type="button"
-                          onClick={() => handleStepQuantity(item.id, -1)}
-                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
-                          title="Decrease quantity"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          step={unitConfig.step}
-                          min="0.001"
-                          data-qty-input="true"
-                          value={displayQty}
-                          onChange={(e) => handleDirectQuantityInput(item.id, e.target.value)}
-                          onFocus={() => setActiveQtyItemId(item.id)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter' || e.key === 'Escape') {
-                              (e.target as HTMLInputElement).blur();
-                              setActiveQtyItemId(null);
-                            }
-                          }}
-                          className="w-13 sm:w-15 h-5 text-center font-mono font-bold text-xs text-slate-900 bg-white rounded border border-slate-300 focus:outline-none focus:border-[#5B46F6] focus:ring-1 focus:ring-[#5B46F6] px-0.5"
-                          title="Type quantity directly"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleStepQuantity(item.id, 1)}
-                          className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
-                          title="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      {/* Line Total & Delete */}
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
-                          LKR {(item.price * item.quantity).toFixed(2)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeCartItem(item.id)}
-                          className="text-rose-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCartItem(item.id)}
+                      className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-rose-50 cursor-pointer shrink-0"
+                      title="Remove item"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
-                  {/* Quick Weight / Volume / Fractional Preset Pills (50g, 100g, 250g, 500g, 1kg, 2kg) */}
-                  {isPresetOpen && unitConfig.quickPresets.length > 0 && (
-                    <div className="flex items-center gap-1 pt-1 border-t border-slate-100 overflow-x-auto no-scrollbar">
-                      <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider shrink-0 mr-0.5">
-                        Presets:
-                      </span>
-                      {unitConfig.quickPresets.map((preset) => {
-                        const isSelectedPreset =
-                          item.quantity === preset.valueInBase &&
-                          (!preset.unit || activeUnit === preset.unit);
-                        return (
+                  {/* Bottom Row: Quantity & Rate Badge or Stepper + Line Total */}
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                    {isWeightOrVolume ? (
+                      /* Weight / Volume / Fractional: Clickable badge that re-opens spacious modal */
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditItemModal(item)}
+                        className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
+                        title="Click to edit quantity, unit, or custom price"
+                      >
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
+                            <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                            <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
+                            <span>LKR {item.price.toFixed(2)}/{unitConfig.baseUnit}</span>
+                            {item.price !== item.originalUnitPrice && (
+                              <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
+                                Edited
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ) : (
+                      /* Discrete items: Stepper + Clickable Qty Badge + Unit Price */
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
                           <button
-                            key={preset.label}
                             type="button"
-                            onClick={() => handleApplyPreset(item.id, preset)}
-                            className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border transition-all cursor-pointer shrink-0 ${
-                              isSelectedPreset
-                                ? 'bg-[#5B46F6] text-white border-[#5B46F6] shadow-2xs'
-                                : 'bg-slate-50 hover:bg-indigo-50 hover:text-[#5B46F6] hover:border-indigo-200 text-slate-600 border-slate-200/80'
-                            }`}
+                            onClick={() => handleStepQuantity(item.id, -1)}
+                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
+                            title="Decrease quantity"
                           >
-                            {preset.label}
+                            -
                           </button>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditItemModal(item)}
+                            className="px-2 h-5 text-center font-mono font-bold text-xs text-slate-900 hover:text-indigo-600 hover:bg-white rounded transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Click to edit quantity or price in modal"
+                          >
+                            <span>{item.quantity}</span>
+                            <Pencil className="w-2 h-2 text-slate-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStepQuantity(item.id, 1)}
+                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white rounded active:scale-90 font-bold transition-all cursor-pointer text-xs"
+                            title="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="text-[11px] font-mono text-slate-500">
+                          LKR {item.price.toFixed(2)}
+                          {item.price !== item.originalUnitPrice && (
+                            <span className="ml-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200/80">
+                              Edited
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Right: Line Total */}
+                    <div className="text-right">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono tabular-nums">
+                        LKR {(item.price * item.quantity).toFixed(2)}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })
@@ -2207,186 +2138,106 @@ export default function ConfidencyPosPage() {
               {cart.map((item) => {
                 const unitConfig = detectUnitConfig(item);
                 const activeUnit = item.selectedUnit || unitConfig.baseUnit;
-                const displayQty = item.displayQuantity !== undefined ? item.displayQuantity : item.quantity;
                 const isMultiUnit = unitConfig.mode === 'weight_g' || unitConfig.mode === 'volume_ml';
+                const isFractional = unitConfig.mode === 'fractional';
+                const isWeightOrVolume = isMultiUnit || isFractional;
 
                 return (
-                  <div key={item.id} className="py-2.5 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-3">
+                  <div key={item.id} className="py-2.5 flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h5 className="text-sm font-bold text-slate-900 truncate">{item?.name || 'Item'}</h5>
-                          {isMultiUnit && (
-                            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200/80 text-[10px] font-semibold">
-                              <button
-                                type="button"
-                                onClick={() => handleUnitChange(item.id, unitConfig.baseUnit)}
-                                className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                                  activeUnit === unitConfig.baseUnit
-                                    ? 'bg-[#5B46F6] text-white font-bold'
-                                    : 'text-slate-600'
-                                }`}
-                              >
-                                {unitConfig.baseUnit}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleUnitChange(item.id, unitConfig.alternateUnit!)}
-                                className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                                  activeUnit === unitConfig.alternateUnit
-                                    ? 'bg-[#5B46F6] text-white font-bold'
-                                    : 'text-slate-600'
-                                }`}
-                              >
-                                {unitConfig.alternateUnit}
-                              </button>
-                            </div>
-                          )}
-                          {unitConfig.mode === 'fractional' && (
-                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-1 py-0.2 rounded">
-                              {unitConfig.baseUnit}
+                        <h5 className="text-sm font-bold text-slate-900 truncate">{item?.name || 'Item'}</h5>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded shrink-0">
+                            {item.sku}
+                          </span>
+                          {isWeightOrVolume && (
+                            <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded shrink-0">
+                              Sold by {unitConfig.baseUnit}
                             </span>
                           )}
                         </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCartItem(item.id)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-lg hover:bg-rose-50 cursor-pointer shrink-0"
+                        title="Remove item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
-                        {isMultiUnit && activeUnit === unitConfig.alternateUnit && (
-                          <div className="text-[10px] font-mono text-indigo-700 font-semibold mt-0.5">
-                            {formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}
-                          </div>
-                        )}
-
-                        {editingItemId === item.id ? (
-                          <div className="flex items-center gap-1 mt-1" data-inline-price>
-                            <span className="text-[11px] font-semibold text-slate-400">LKR</span>
-                            <input
-                              ref={inlinePriceInputRef}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              data-inline-price-input="true"
-                              value={editingPriceInput}
-                              onChange={(e) => setEditingPriceInput(e.target.value)}
-                              onBlur={() => handleSaveEditPrice(item.id)}
-                              onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSaveEditPrice(item.id);
-                                } else if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  handleCancelEditPrice();
-                                }
-                              }}
-                              className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#5B46F6] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/20"
-                            />
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSaveEditPrice(item.id);
-                              }}
-                              className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs"
-                              title="Save price"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditPrice(item)}
-                              className="group/price inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 font-mono font-medium cursor-pointer transition-colors"
-                              title="Click to edit unit price for this bill"
-                            >
-                              <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
-                                LKR {item.price.toFixed(2)}{isMultiUnit || unitConfig.mode === 'fractional' ? `/${unitConfig.baseUnit}` : ''}
-                              </span>
-                              <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#5B46F6] transition-colors" />
-                            </button>
-
-                            {item.price !== item.originalUnitPrice && (
-                              <div className="inline-flex items-center gap-1">
-                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 px-1.5 py-0.2 rounded-md font-sans">
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                      {isWeightOrVolume ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditItemModal(item)}
+                          className="group/btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 text-left transition-all cursor-pointer"
+                          title="Click to edit quantity, unit, or custom price"
+                        >
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1 text-xs font-bold text-indigo-950 font-mono">
+                              <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                              <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/btn:text-indigo-700" />
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-mono">
+                              <span>LKR {item.price.toFixed(2)}/{unitConfig.baseUnit}</span>
+                              {item.price !== item.originalUnitPrice && (
+                                <span className="text-[9px] font-bold text-amber-700 bg-amber-100/80 px-1 rounded font-sans">
                                   Edited
                                 </span>
-                                <span className="text-[10px] text-slate-400 line-through font-mono">
-                                  {item.originalUnitPrice.toFixed(2)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleResetUnitPrice(item.id)}
-                                  className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer rounded hover:bg-slate-100"
-                                  title={`Revert to catalog price (LKR ${item.originalUnitPrice.toFixed(2)})`}
-                                >
-                                  <RotateCcw className="w-2.5 h-2.5" />
-                                </button>
-                              </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
+                            <button
+                              type="button"
+                              onClick={() => handleStepQuantity(item.id, -1)}
+                              className="w-6 h-6 flex items-center justify-center font-bold text-slate-600 hover:text-slate-900 rounded active:scale-90"
+                              title="Decrease quantity"
+                            >
+                              -
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditItemModal(item)}
+                              className="px-2 h-6 text-center font-mono font-bold text-xs text-slate-900 hover:text-indigo-600 rounded flex items-center gap-1"
+                              title="Click to edit quantity or price in modal"
+                            >
+                              <span>{item.quantity}</span>
+                              <Pencil className="w-2 h-2 text-slate-400" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStepQuantity(item.id, 1)}
+                              className="w-6 h-6 flex items-center justify-center font-bold text-slate-600 hover:text-slate-900 rounded active:scale-90"
+                              title="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <div className="text-[11px] font-mono text-slate-500">
+                            LKR {item.price.toFixed(2)}
+                            {item.price !== item.originalUnitPrice && (
+                              <span className="ml-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200/80">
+                                Edited
+                              </span>
                             )}
                           </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="text-xs text-slate-700 font-mono flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200/60" data-qty-control="true">
-                          <button
-                            type="button"
-                            onClick={() => handleStepQuantity(item.id, -1)}
-                            className="font-bold text-slate-500 hover:text-slate-900 px-1.5 py-0.5"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            step={unitConfig.step}
-                            min="0.001"
-                            data-qty-input="true"
-                            value={displayQty}
-                            onChange={(e) => handleDirectQuantityInput(item.id, e.target.value)}
-                            className="w-14 h-5 text-center font-mono font-bold text-xs text-slate-900 bg-white rounded border border-slate-300 focus:outline-none focus:border-[#5B46F6] px-0.5"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleStepQuantity(item.id, 1)}
-                            className="font-bold text-slate-500 hover:text-slate-900 px-1.5 py-0.5"
-                          >
-                            +
-                          </button>
                         </div>
+                      )}
 
-                        <span className="text-sm font-bold font-mono text-slate-900 shrink-0">
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-slate-900 font-mono tabular-nums">
                           LKR {(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     </div>
-
-                    {/* Quick presets for mobile */}
-                    {unitConfig.quickPresets.length > 0 && (
-                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1">
-                        <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider shrink-0 mr-0.5">
-                          Presets:
-                        </span>
-                        {unitConfig.quickPresets.map((preset) => {
-                          const isSelectedPreset =
-                            item.quantity === preset.valueInBase &&
-                            (!preset.unit || activeUnit === preset.unit);
-                          return (
-                            <button
-                              key={preset.label}
-                              type="button"
-                              onClick={() => handleApplyPreset(item.id, preset)}
-                              className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border transition-all cursor-pointer shrink-0 ${
-                                isSelectedPreset
-                                  ? 'bg-[#5B46F6] text-white border-[#5B46F6] shadow-2xs'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-indigo-50'
-                              }`}
-                            >
-                              {preset.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -2868,6 +2719,19 @@ export default function ConfidencyPosPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Spacious Quantity & Unit Selector Modal */}
+      {quantityModalTarget && (
+        <QuantityUnitModal
+          isOpen={!!quantityModalTarget}
+          onClose={() => setQuantityModalTarget(null)}
+          product={quantityModalTarget.product}
+          cartItemId={quantityModalTarget.cartItemId}
+          initialUnit={quantityModalTarget.initialUnit}
+          initialDisplayQuantity={quantityModalTarget.initialDisplayQuantity}
+          initialCustomPrice={quantityModalTarget.initialCustomPrice}
+          onConfirm={handleConfirmQuantityModal}
+        />
       )}
     </div>
   );
