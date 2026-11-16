@@ -960,12 +960,12 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-100 bg-white min-w-0">
+      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#EDF1F7] min-w-0">
         {/* 1. Top Terminal Status Bar */}
-        <div className="h-14 px-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+        <div className="h-14 px-5 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
           {/* Left: Breadcrumb & Cashier Metadata */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-purple-50 text-[#7052FF] flex items-center justify-center font-bold text-xs shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center font-bold text-xs shrink-0">
               <Layers className="w-4 h-4" />
             </div>
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
@@ -980,10 +980,10 @@ export default function ConfidencyPosPage() {
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="font-bold text-slate-900 group-hover:text-[#7052FF] transition-colors">
+              <span className="font-bold text-slate-900 group-hover:text-[#5B46F6] transition-colors">
                 Cashier: {cashierName}
               </span>
-              <span className="text-[10px] font-bold bg-[#7052FF]/10 text-[#7052FF] px-1.5 py-0.5 rounded group-hover:bg-[#7052FF] group-hover:text-white transition-colors">
+              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors">
                 PIN Switch
               </span>
             </button>
@@ -1014,7 +1014,7 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 2. Large Tactile Cashier Action Tabs (h-14 md:h-16, 4-column responsive grid) */}
-        <div className="px-5 pt-3.5 pb-2 bg-slate-50/50 border-b border-slate-100 shrink-0">
+        <div className="px-5 pt-3.5 pb-2 bg-white/70 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
             {/* Tab 1: Apply Discount */}
             <button
@@ -1111,14 +1111,14 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 3. Hero Search Station with Live Keystroke Autocomplete Dropdown */}
-        <div className="px-5 py-3 border-b border-slate-100 bg-white shrink-0" ref={searchContainerRef}>
+        <div className="px-5 py-3 border-b border-slate-200/80 bg-white/95 shrink-0" ref={searchContainerRef}>
           <div className="relative w-full mb-1">
             {/* Left: Magnifying Glass Icon (w-6 h-6 text-slate-400) */}
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none z-10">
               <Search className="w-6 h-6 text-slate-400" />
             </div>
 
-            {/* Expansive Input (h-14 md:h-16 text-base md:text-lg font-medium px-14 rounded-2xl border-2 border-slate-200 bg-white shadow-sm focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all) */}
+            {/* Expansive Input */}
             <input
               ref={searchInputRef}
               type="text"
@@ -1152,7 +1152,7 @@ export default function ConfidencyPosPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              className="w-full h-14 md:h-16 text-base md:text-lg font-medium pl-14 pr-44 rounded-2xl border-2 border-slate-200 bg-white shadow-sm focus:outline-none focus:border-[#7052FF] focus:ring-4 focus:ring-[#7052FF]/10 transition-all text-slate-900 placeholder:text-slate-400"
+              className="w-full h-14 md:h-16 text-base md:text-lg font-medium pl-14 pr-44 rounded-2xl border-2 border-slate-200 bg-white shadow-xs focus:outline-none focus:border-[#5B46F6] focus:ring-4 focus:ring-[#5B46F6]/10 transition-all text-slate-900 placeholder:text-slate-400"
             />
 
             {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
@@ -1174,7 +1174,7 @@ export default function ConfidencyPosPage() {
 
               {/* Barcode [F2] Tag */}
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs text-xs font-mono text-slate-500">
-                <Barcode className="w-4 h-4 text-[#7052FF]" />
+                <Barcode className="w-4 h-4 text-[#5B46F6]" />
                 <span className="font-semibold text-slate-700">[F2]</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
@@ -1282,15 +1282,15 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 4. Ayurvedic Master Department Tabs (10 Sri Lankan Departments + Sinhala/English Labels) */}
-        <div className="px-5 py-2.5 border-b border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white">
+        <div className="px-5 py-2.5 border-b border-slate-200/80 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white/90 backdrop-blur-xs">
           {/* All Departments Tab */}
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
             className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
               selectedDeptId === 'all'
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/80'
+                ? 'bg-[#0F1222] text-white border-[#0F1222] shadow-sm'
+                : 'bg-white/90 border border-slate-200/90 text-slate-700 hover:bg-white hover:border-indigo-300 shadow-2xs'
             }`}
           >
             <span>All Products (සියලු වර්ග)</span>
@@ -1315,20 +1315,22 @@ export default function ConfidencyPosPage() {
                 onClick={() => setSelectedDeptId(dept.id)}
                 className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
                   isActive
-                    ? `${dept.bgTint} ${dept.textColor} ${dept.borderTint} font-bold ring-2 ring-[#7052FF]/30 shadow-xs`
-                    : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200/70'
+                    ? 'bg-[#5B46F6] text-white border-[#5B46F6] font-bold shadow-md shadow-indigo-900/20'
+                    : 'bg-white/90 border border-slate-200/90 text-slate-700 hover:bg-white hover:border-indigo-300 shadow-2xs'
                 }`}
               >
                 {/* 3D Mini Dot */}
                 <span
-                  className={`w-2.5 h-2.5 rounded-full bg-gradient-to-br ${dept.gradient} shadow-2xs shrink-0`}
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isActive ? 'bg-white' : `bg-gradient-to-br ${dept.gradient}`
+                  } shadow-2xs shrink-0`}
                 />
                 <span className="whitespace-nowrap">
-                  {dept.en} <span className="opacity-80 font-normal text-xs">({dept.si})</span>
+                  {dept.en} <span className={`font-normal text-xs ${isActive ? 'text-white/80' : 'text-slate-500'}`}>({dept.si})</span>
                 </span>
                 <span
                   className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
-                    isActive ? 'bg-white/90 font-bold' : 'bg-slate-100 text-slate-600'
+                    isActive ? 'bg-white/20 text-white font-bold' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {count}
@@ -1339,10 +1341,10 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 5. Product Cards Grid with 3D Category Emblems */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-white">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-[#EDF1F7]">
           {isLoadingProducts && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <Loader2 className="w-8 h-8 animate-spin text-[#7052FF] mb-3" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#5B46F6] mb-3" />
               <h3 className="text-sm font-bold text-slate-800">Loading Deegayu Ayurvedic Catalog...</h3>
               <p className="text-xs text-slate-400 mt-1">
                 Syncing store inventory & price list...
@@ -1356,7 +1358,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => initCatalog()}
-                className="px-4 py-2 bg-[#7052FF] text-white text-xs font-semibold rounded-xl hover:bg-[#5E3FE6] transition active:scale-95 shadow-sm"
+                className="px-4 py-2 bg-[#5B46F6] text-white text-xs font-semibold rounded-xl hover:bg-[#4A35E5] transition active:scale-95 shadow-sm"
               >
                 Unable to load catalog. Click to retry.
               </button>
@@ -1374,7 +1376,7 @@ export default function ConfidencyPosPage() {
                   setSearchQuery('');
                   setSelectedDeptId('all');
                 }}
-                className="mt-3 text-xs font-semibold text-[#7052FF] hover:underline"
+                className="mt-3 text-xs font-semibold text-[#5B46F6] hover:underline"
               >
                 Clear Filters & Show All
               </button>
@@ -1390,7 +1392,7 @@ export default function ConfidencyPosPage() {
                   <div
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    className="bg-white border-2 border-slate-200/90 hover:border-indigo-400 rounded-2xl p-3.5 shadow-xs hover:shadow-md transition-all duration-150 flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative"
+                    className="bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-400/70 hover:-translate-y-0.5 transition-all duration-150 overflow-hidden flex flex-col p-3.5 cursor-pointer group active:scale-[0.98] select-none relative justify-between"
                   >
                     {/* Top Row: Department Sinhala Pill + Stock Indicator */}
                     <div className="flex items-center justify-between mb-2">
@@ -1400,26 +1402,26 @@ export default function ConfidencyPosPage() {
                         {dept.si || dept.en}
                       </span>
                       {product.stockOnHand <= 0 ? (
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-mono">
+                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70 font-mono">
                           0 left
                         </span>
                       ) : product.stockOnHand <= 5 ? (
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-mono">
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/70 font-mono">
                           {product.stockOnHand} left
                         </span>
                       ) : (
-                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 font-mono">
+                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 font-mono">
                           Qty: {product.stockOnHand}
                         </span>
                       )}
                     </div>
 
-                    {/* High-Contrast Realistic Product Photo Container */}
-                    <div className="bg-slate-50/90 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:bg-slate-100/80 transition-colors relative">
+                    {/* High-Contrast Realistic Product Photo Container (Studio-Tinted Stage) */}
+                    <div className="bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100/70 border-b border-slate-100 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:scale-[1.02] transition-transform relative">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
-                        className="w-full h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
+                        className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200"
                         loading="lazy"
                         onError={(e) => {
                           e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
@@ -1431,7 +1433,7 @@ export default function ConfidencyPosPage() {
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
                         <h4
-                          className="text-sm md:text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px] group-hover:text-indigo-600 transition-colors"
+                          className="text-sm md:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[42px] group-hover:text-indigo-600 transition-colors"
                           title={product.name}
                         >
                           {product.name}
@@ -1445,7 +1447,7 @@ export default function ConfidencyPosPage() {
                       <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100">
                         <div className="flex items-baseline">
                           <span className="text-xs font-bold text-slate-400 mr-1">LKR</span>
-                          <span className="text-base md:text-lg font-black font-mono text-slate-950 tracking-tight">
+                          <span className="text-slate-900 font-bold tabular-nums text-base md:text-lg tracking-tight">
                             {product.retailPrice.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -1458,7 +1460,7 @@ export default function ConfidencyPosPage() {
                             e.stopPropagation();
                             addToCart(product);
                           }}
-                          className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-sm active:scale-90 transition-all cursor-pointer shrink-0"
+                          className="bg-[#5B46F6] hover:bg-[#4A35E5] active:scale-95 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-xs transition-all cursor-pointer shrink-0"
                           title="Add to cart"
                           aria-label={`Add ${product.name} to cart`}
                         >
@@ -1500,12 +1502,12 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (340px-380px)
       ===================================================================== */}
-      <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-white flex-col h-full shrink-0 select-none border-l border-slate-100">
+      <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-[#F3F5FC] border-l border-indigo-200/70 shadow-[-4px_0_24px_-12px_rgba(15,23,42,0.08)] flex-col h-full shrink-0 select-none">
         {/* 1. Cart Header */}
-        <div className="h-14 px-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className="h-14 px-5 border-b border-indigo-100/80 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-xs">
           <div className="flex items-center gap-2">
             <h3 className="text-sm md:text-base font-bold text-slate-900">Order Summary</h3>
-            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-mono font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
               {totalItemCount}
             </span>
           </div>
@@ -1524,7 +1526,7 @@ export default function ConfidencyPosPage() {
 
         {/* 2. Customer Pill in Cart (if attached) */}
         {selectedCustomer && (
-          <div className="px-5 py-2.5 bg-sky-50/60 border-b border-sky-100 flex items-center justify-between">
+          <div className="px-5 py-2.5 bg-white/90 border-b border-indigo-100 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
                 <User className="w-4 h-4" />
@@ -1552,7 +1554,7 @@ export default function ConfidencyPosPage() {
         )}
 
         {/* 3. Scrollable Cart Items List */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100">
+        <div className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
               <ShoppingBag className="w-10 h-10 mb-2 opacity-20 text-slate-400" />
@@ -1561,9 +1563,12 @@ export default function ConfidencyPosPage() {
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="py-3 flex items-center justify-between gap-3 group">
+              <div
+                key={item.id}
+                className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-3 flex items-center justify-between gap-3 group transition-all hover:border-indigo-200 hover:shadow-xs"
+              >
                 {/* Rounded squircle realistic product photo preview */}
-                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
+                <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
                   <img
                     src={getProductPhoto(item)}
                     alt={item.name}
@@ -1577,7 +1582,7 @@ export default function ConfidencyPosPage() {
 
                 {/* Name & Unit Price */}
                 <div className="min-w-0 flex-1">
-                  <h5 className="text-sm font-bold text-slate-900 truncate leading-snug max-w-[140px]">
+                  <h5 className="text-sm font-bold text-slate-900 truncate leading-snug max-w-[135px]">
                     {item.name}
                   </h5>
                   {editingItemId === item.id ? (
@@ -1602,7 +1607,7 @@ export default function ConfidencyPosPage() {
                             handleCancelEditPrice();
                           }
                         }}
-                        className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#7052FF] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#7052FF]/20"
+                        className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#5B46F6] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/20"
                       />
                       <button
                         type="button"
@@ -1610,7 +1615,7 @@ export default function ConfidencyPosPage() {
                           e.preventDefault();
                           handleSaveEditPrice(item.id);
                         }}
-                        className="p-1 rounded-md bg-[#7052FF] text-white hover:bg-[#5b3ee0] transition-colors shadow-2xs"
+                        className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs"
                         title="Save price"
                       >
                         <Check className="w-3 h-3" />
@@ -1627,7 +1632,7 @@ export default function ConfidencyPosPage() {
                         <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
                           LKR {item.price.toFixed(2)}
                         </span>
-                        <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#7052FF] transition-colors" />
+                        <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#5B46F6] transition-colors" />
                       </button>
 
                       {item.price !== item.originalUnitPrice && (
@@ -1653,7 +1658,7 @@ export default function ConfidencyPosPage() {
                 </div>
 
                 {/* Stepper Quantity Controls: - [qty] + */}
-                <div className="text-sm text-slate-800 font-mono font-bold flex items-center gap-2.5 bg-slate-100/80 px-2.5 py-1 rounded-xl border border-slate-200/60 shrink-0">
+                <div className="text-sm text-slate-800 font-mono font-bold flex items-center gap-2 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/60 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
@@ -1673,7 +1678,7 @@ export default function ConfidencyPosPage() {
 
                 {/* Line Total & Delete */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-semibold text-slate-900 font-mono">
+                  <span className="text-sm font-bold text-slate-900 font-mono">
                     LKR {(item.price * item.quantity).toFixed(2)}
                   </span>
                   <button
@@ -1690,11 +1695,11 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 4. Financial Breakdown Summary */}
-        <div className="p-5 border-t border-slate-100 bg-white space-y-3">
+        <div className="p-5 border-t border-indigo-100 bg-white shadow-[0_-4px_16px_-6px_rgba(15,23,42,0.06)] space-y-3 shrink-0">
           <div className="space-y-1.5 font-mono">
             <div className="flex justify-between text-sm text-slate-600">
               <span className="font-sans font-medium">Subtotal</span>
-              <span className="font-bold">LKR {subtotal.toFixed(2)}</span>
+              <span className="font-bold text-slate-800">LKR {subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-slate-600">
               <span className="font-sans font-medium">Tax (0% / Ex)</span>
@@ -1736,12 +1741,13 @@ export default function ConfidencyPosPage() {
               </button>
             )}
 
-            <div className="pt-3 border-t border-slate-200/80 flex items-baseline justify-between">
+            {/* Highlighted TOTAL PAYABLE Card */}
+            <div className="mt-2 bg-[#F8F9FE] border border-indigo-100/90 rounded-xl p-3 flex items-baseline justify-between shadow-2xs">
               <div className="flex flex-col">
                 <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500">
                   Total Payable
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">Net Due (LKR)</span>
+                <span className="text-[11px] text-[#5B46F6] font-semibold">Net Due (LKR)</span>
               </div>
               <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-slate-950">
                 LKR {totalAmount.toFixed(2)}
@@ -1754,7 +1760,7 @@ export default function ConfidencyPosPage() {
             <label className="text-xs md:text-sm font-bold text-slate-800 block mb-2">
               Payment Method
             </label>
-            <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
+            <div className="bg-slate-100/90 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
               {[
                 { id: 'CARD', label: 'Card', icon: CreditCard },
                 { id: 'CASH', label: 'Cash', icon: Banknote },
@@ -1770,8 +1776,8 @@ export default function ConfidencyPosPage() {
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
                     className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isSelected
-                        ? 'bg-white text-slate-900 font-bold shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-slate-900 font-bold shadow-xs border border-slate-200/60'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
@@ -1832,7 +1838,7 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleCharge}
               disabled={cart.length === 0 || isProcessingCheckout}
-              className="w-full bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-[0.99] disabled:opacity-40 text-white font-bold text-base md:text-lg py-4 rounded-2xl shadow-lg shadow-[#7052FF]/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+              className="w-full bg-[#5B46F6] hover:bg-[#4A35E5] active:scale-[0.99] disabled:opacity-40 text-white font-bold text-base md:text-lg py-4 rounded-2xl shadow-lg shadow-[#5B46F6]/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
             >
               {isProcessingCheckout ? (
                 <>
@@ -1854,7 +1860,7 @@ export default function ConfidencyPosPage() {
         <aside
           aria-label="Floating Mobile Cart"
           onClick={() => setIsMobileCartOpen(true)}
-          className="fixed bottom-20 inset-x-3 md:hidden z-40 bg-[#7052FF] text-white rounded-2xl p-3.5 shadow-float flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all animate-in slide-in-from-bottom-4 duration-200"
+          className="fixed bottom-20 inset-x-3 md:hidden z-40 bg-[#5B46F6] text-white rounded-2xl p-3.5 shadow-float flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all animate-in slide-in-from-bottom-4 duration-200"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
@@ -1874,7 +1880,7 @@ export default function ConfidencyPosPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white text-[#7052FF] px-4 py-2 rounded-xl font-bold text-xs md:text-sm shadow-sm">
+          <div className="flex items-center gap-1.5 bg-white text-[#5B46F6] px-4 py-2 rounded-xl font-bold text-xs md:text-sm shadow-sm">
             <span>Checkout</span>
             <ArrowRight className="w-4 h-4" />
           </div>
@@ -1950,7 +1956,7 @@ export default function ConfidencyPosPage() {
                               handleCancelEditPrice();
                             }
                           }}
-                          className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#7052FF] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#7052FF]/20"
+                          className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#5B46F6] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/20"
                         />
                         <button
                           type="button"
@@ -1958,7 +1964,7 @@ export default function ConfidencyPosPage() {
                             e.preventDefault();
                             handleSaveEditPrice(item.id);
                           }}
-                          className="p-1 rounded-md bg-[#7052FF] text-white hover:bg-[#5b3ee0] transition-colors shadow-2xs"
+                          className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs"
                           title="Save price"
                         >
                           <Check className="w-3 h-3" />
@@ -1975,7 +1981,7 @@ export default function ConfidencyPosPage() {
                           <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
                             LKR {item.price.toFixed(2)}
                           </span>
-                          <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#7052FF] transition-colors" />
+                          <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#5B46F6] transition-colors" />
                         </button>
 
                         {item.price !== item.originalUnitPrice && (
@@ -2068,7 +2074,7 @@ export default function ConfidencyPosPage() {
                   handleCharge();
                 }}
                 disabled={cart.length === 0 || isProcessingCheckout}
-                className="w-full bg-[#7052FF] text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-[#7052FF]/20 flex items-center justify-center gap-2"
+                className="w-full bg-[#5B46F6] hover:bg-[#4A35E5] text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-[#5B46F6]/20 flex items-center justify-center gap-2"
               >
                 <span>Charge LKR {totalAmount.toFixed(2)}</span>
               </button>
