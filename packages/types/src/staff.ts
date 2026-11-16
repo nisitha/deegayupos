@@ -40,3 +40,48 @@ export interface UpdateStaffUserDto {
   phone?: string | null;
 }
 
+export interface StaffIncentiveDto {
+  id: string;
+  tenantId?: string;
+  staffId: string;
+  staffName?: string;
+  branchId?: string | null;
+  branchName?: string;
+  incentiveDate: string;
+  title: string;
+  amount: number;
+  status: 'approved' | 'paid';
+  notes?: string | null;
+  createdBy?: string | null;
+  creatorName?: string | null;
+  createdAt?: string;
+}
+
+export interface CreateStaffIncentiveDto {
+  staffId: string;
+  branchId?: string | null;
+  incentiveDate: string;
+  title: string;
+  amount: number;
+  status?: 'approved' | 'paid';
+  notes?: string | null;
+  createdBy?: string | null;
+}
+
+export interface CashierShortageDto {
+  id: string;
+  tenantId?: string;
+  reconciliationId?: string;
+  branchId: string;
+  branchName?: string;
+  staffId?: string | null;
+  cashierName: string;
+  shortageDate: string;
+  amount: number;
+  deductionStatus: 'pending_payroll' | 'deducted' | 'waived';
+  notes?: string | null;
+  deductedAt?: string | null;
+  createdAt?: string;
+}
+
+

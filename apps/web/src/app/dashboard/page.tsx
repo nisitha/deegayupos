@@ -34,6 +34,7 @@ import type {
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { dashboardApi, posApi } from '../../lib/api-client';
+import { StaffPersonalWorkspace } from './staff-portal';
 
 interface AnalyticsData {
   period: string;
@@ -74,7 +75,7 @@ interface AnalyticsData {
 type Period = 'today' | 'week' | 'month';
 
 export default function DashboardPage() {
-  const { selectedBranchId, currency, isOwner, grnBranchIds } = useTenantBranch();
+  const { selectedBranchId, currency, isOwner, grnBranchIds, isLoading: isTenantLoading } = useTenantBranch();
   const hasGrnAccess = isOwner || (Array.isArray(grnBranchIds) && grnBranchIds.length > 0);
 
   const [period, setPeriod] = useState<Period>('week');
@@ -90,6 +91,9 @@ export default function DashboardPage() {
   }, []);
 
   const loadDashboardData = useCallback(async () => {
+    // Zero sales/revenue telemetry loaded for non-owner staff
+    if (!isOwner) return;
+
     try {
       setLoading(true);
       const [metricsRes, chartsRes, activityRes, analyticsRes] = await Promise.all([
@@ -111,11 +115,29 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId, period]);
+  }, [isOwner, selectedBranchId, period]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (isOwner) {
+      loadDashboardData();
+    }
+  }, [isOwner, loadDashboardData]);
+
+  // Loading state during initial context hydration
+  if (!isMounted || isTenantLoading) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 border-3 border-[#7052FF] border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-semibold text-slate-500">Loading workspace...</span>
+      </div>
+    );
+  }
+
+  // Non-Owner Staff Users: Render dedicated "My Salary Deductions & Incentives" portal
+  // Strips 100% of gross revenue, net profit, sales timeline, and average ticket cards
+  if (!isOwner) {
+    return <StaffPersonalWorkspace />;
+  }
 
   const formatCurrency = (val?: number) => {
     const num = val ?? 0;

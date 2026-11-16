@@ -68,6 +68,9 @@ import type {
   StaffUserDto,
   CreateStaffUserDto,
   UpdateStaffUserDto,
+  StaffIncentiveDto,
+  CreateStaffIncentiveDto,
+  CashierShortageDto,
 } from '@pixelcraft/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -2873,4 +2876,202 @@ export const staffApi = {
 };
 
 export const createSale = (data: CheckoutPayload) => posApi.checkout(data);
+
+export const incentivesApi = {
+  getStaffIncentives: async (params?: {
+    staffId?: string;
+    month?: string; // YYYY-MM
+    status?: 'approved' | 'paid';
+  }): Promise<ApiResponse<StaffIncentiveDto[]>> => {
+    try {
+      let query = supabase.from('staff_incentives').select('*').order('incentive_date', { ascending: false });
+
+      if (params?.staffId) {
+        query = query.eq('staff_id', params.staffId);
+      }
+      if (params?.status) {
+        query = query.eq('status', params.status);
+      }
+      if (params?.month) {
+        const start = `${params.month}-01`;
+        const end = `${params.month}-31`;
+        query = query.gte('incentive_date', start).lte('incentive_date', end);
+      }
+
+      const [{ data, error }, { data: users }, { data: branches }] = await Promise.all([
+        query,
+        supabase.from('users').select('id, full_name, email'),
+        supabase.from('branches').select('id, name'),
+      ]);
+
+      if (error) {
+        console.warn('[IncentivesApi] getStaffIncentives error:', error.message);
+        return { success: false, data: [] };
+      }
+
+      const userMap = new Map<string, string>();
+      (users || []).forEach((u: any) => userMap.set(u.id, u.full_name || u.email));
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      const list: StaffIncentiveDto[] = (data || []).map((row: any) => ({
+        id: row.id,
+        tenantId: row.tenant_id,
+        staffId: row.staff_id,
+        staffName: userMap.get(row.staff_id) || 'Staff Member',
+        branchId: row.branch_id,
+        branchName: branchMap.get(row.branch_id) || undefined,
+        incentiveDate: row.incentive_date,
+        title: row.title,
+        amount: Number(row.amount || 0),
+        status: row.status as 'approved' | 'paid',
+        notes: row.notes,
+        createdBy: row.created_by,
+        creatorName: userMap.get(row.created_by) || (row.created_by ? 'Administrator' : undefined),
+        createdAt: row.created_at,
+      }));
+
+      return { success: true, data: list };
+    } catch (err) {
+      console.error('[IncentivesApi] getStaffIncentives fatal:', err);
+      return { success: false, data: [] };
+    }
+  },
+
+  createStaffIncentive: async (payload: CreateStaffIncentiveDto): Promise<ApiResponse<StaffIncentiveDto>> => {
+    try {
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
+      const { data, error } = await supabase
+        .from('staff_incentives')
+        .insert({
+          id,
+          staff_id: payload.staffId,
+          branch_id: payload.branchId || null,
+          incentive_date: payload.incentiveDate,
+          title: payload.title,
+          amount: payload.amount,
+          status: payload.status || 'approved',
+          notes: payload.notes || null,
+          created_by: payload.createdBy || null,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('[IncentivesApi] createStaffIncentive error:', error.message);
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INSERT_ERROR', message: error.message, statusCode: 500 },
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: data.id,
+          staffId: data.staff_id,
+          branchId: data.branch_id,
+          incentiveDate: data.incentive_date,
+          title: data.title,
+          amount: Number(data.amount || 0),
+          status: data.status,
+          notes: data.notes,
+          createdBy: data.created_by,
+          createdAt: data.created_at,
+        },
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        data: null as any,
+        error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
+  updateIncentiveStatus: async (id: string, status: 'approved' | 'paid'): Promise<ApiResponse<boolean>> => {
+    try {
+      const { error } = await supabase
+        .from('staff_incentives')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) {
+        return { success: false, data: false, error: { code: 'UPDATE_ERROR', message: error.message, statusCode: 500 } };
+      }
+      return { success: true, data: true };
+    } catch (err: any) {
+      return { success: false, data: false, error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 } };
+    }
+  },
+
+  getStaffShortages: async (params?: {
+    staffId?: string;
+    cashierName?: string;
+    status?: 'all' | 'pending_payroll' | 'deducted';
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<CashierShortageDto[]>> => {
+    try {
+      let query = supabase.from('cashier_shortages').select('*').order('shortage_date', { ascending: false });
+
+      if (params?.status && params.status !== 'all') {
+        query = query.eq('deduction_status', params.status);
+      }
+      if (params?.startDate) {
+        query = query.gte('shortage_date', params.startDate);
+      }
+      if (params?.endDate) {
+        query = query.lte('shortage_date', params.endDate);
+      }
+
+      const [{ data, error }, { data: branches }] = await Promise.all([
+        query,
+        supabase.from('branches').select('id, name'),
+      ]);
+
+      if (error) {
+        console.warn('[IncentivesApi] getStaffShortages error:', error.message);
+        return { success: false, data: [] };
+      }
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      let list: CashierShortageDto[] = (data || []).map((row: any) => ({
+        id: row.id,
+        tenantId: row.tenant_id,
+        reconciliationId: row.reconciliation_id,
+        branchId: row.branch_id,
+        branchName: branchMap.get(row.branch_id) || 'Dispensary Branch',
+        staffId: row.staff_id,
+        cashierName: row.cashier_name,
+        shortageDate: row.shortage_date,
+        amount: Number(row.amount || 0),
+        deductionStatus: row.deduction_status as 'pending_payroll' | 'deducted' | 'waived',
+        notes: row.notes,
+        deductedAt: row.deducted_at,
+        createdAt: row.created_at,
+      }));
+
+      // Filter by staffId or cashierName if provided
+      if (params?.staffId || params?.cashierName) {
+        const needle = (params.cashierName || '').toLowerCase().trim();
+        list = list.filter((item: CashierShortageDto) => {
+          if (params.staffId && item.staffId === params.staffId) return true;
+          if (needle && item.cashierName.toLowerCase().includes(needle)) return true;
+          return false;
+        });
+      }
+
+      return { success: true, data: list };
+    } catch (err) {
+      console.error('[IncentivesApi] getStaffShortages fatal:', err);
+      return { success: false, data: [] };
+    }
+  },
+};
+
 

@@ -20,17 +20,22 @@ import {
   UserCheck,
   Building2,
   RefreshCw,
+  Sparkles,
+  Coins,
+  Calendar,
 } from 'lucide-react';
-import type { StaffRole, StaffUserDto } from '@pixelcraft/types';
+import type { StaffRole, StaffUserDto, StaffIncentiveDto, CashierShortageDto } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { staffApi } from '../../../lib/api-client';
+import { staffApi, incentivesApi } from '../../../lib/api-client';
 
 export default function StaffManagementPage() {
   const router = useRouter();
-  const { branches, activeCashier, setActiveCashier, isOwner } = useTenantBranch();
+  const { branches, activeCashier, setActiveCashier, isOwner, user } = useTenantBranch();
 
   // Data state
   const [staffList, setStaffList] = useState<StaffUserDto[]>([]);
+  const [incentivesList, setIncentivesList] = useState<StaffIncentiveDto[]>([]);
+  const [shortagesList, setShortagesList] = useState<CashierShortageDto[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -73,17 +78,42 @@ export default function StaffManagementPage() {
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // Fetch Staff List
+  // Form State - Award Incentive Modal
+  const [isIncentiveModalOpen, setIsIncentiveModalOpen] = useState(false);
+  const [incentiveForm, setIncentiveForm] = useState({
+    staffId: '',
+    branchId: '',
+    incentiveDate: '',
+    title: 'Monthly Dispensary Sales Target Bonus',
+    amount: '2500',
+    notes: '',
+    status: 'approved' as 'approved' | 'paid',
+  });
+  const [isSubmittingIncentive, setIsSubmittingIncentive] = useState(false);
+  const [incentiveError, setIncentiveError] = useState<string | null>(null);
+
+  // Fetch Staff List, Incentives & Cashier Shortages in parallel
   const fetchStaff = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const res = await staffApi.list();
+      const [res, incRes, shortRes] = await Promise.all([
+        staffApi.list(),
+        incentivesApi.getStaffIncentives(),
+        incentivesApi.getStaffShortages(),
+      ]);
+
       if (res.data) {
         setStaffList(res.data);
       }
+      if (incRes.data) {
+        setIncentivesList(incRes.data);
+      }
+      if (shortRes.data) {
+        setShortagesList(shortRes.data);
+      }
     } catch (err: unknown) {
-      console.error('Failed to load staff list:', err);
+      console.error('Failed to load staff list & payroll figures:', err);
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
         'Failed to load staff accounts.';
@@ -97,14 +127,89 @@ export default function StaffManagementPage() {
     fetchStaff();
   }, [fetchStaff]);
 
-  // Telemetry Metrics
+  // Open Award Incentive Modal
+  const openAwardIncentiveModal = (staff?: StaffUserDto) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const targetStaff = staff || staffList.find((s) => s.role !== 'OWNER') || staffList[0];
+    setIncentiveForm({
+      staffId: targetStaff ? targetStaff.id : '',
+      branchId: targetStaff?.branchId || '',
+      incentiveDate: today,
+      title: 'Monthly Dispensary Sales Target Bonus',
+      amount: '2500',
+      notes: '',
+      status: 'approved',
+    });
+    setIncentiveError(null);
+    setIsIncentiveModalOpen(true);
+  };
+
+  // Handle Incentive Submit
+  const handleIncentiveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!incentiveForm.staffId) {
+      setIncentiveError('Please select a staff member.');
+      return;
+    }
+    const amt = parseFloat(incentiveForm.amount);
+    if (isNaN(amt) || amt <= 0) {
+      setIncentiveError('Please enter a valid amount greater than zero.');
+      return;
+    }
+    if (!incentiveForm.title.trim()) {
+      setIncentiveError('Please enter an incentive title.');
+      return;
+    }
+
+    setIsSubmittingIncentive(true);
+    setIncentiveError(null);
+    try {
+      const target = staffList.find((s) => s.id === incentiveForm.staffId);
+      const res = await incentivesApi.createStaffIncentive({
+        staffId: incentiveForm.staffId,
+        branchId: incentiveForm.branchId || target?.branchId || null,
+        incentiveDate: incentiveForm.incentiveDate,
+        title: incentiveForm.title.trim(),
+        amount: amt,
+        status: incentiveForm.status,
+        notes: incentiveForm.notes.trim() || null,
+        createdBy: user?.id || null,
+      });
+
+      if (res.success) {
+        setSuccessMessage(`Incentive of LKR ${amt.toLocaleString()} awarded to ${target?.fullName || 'staff member'} successfully.`);
+        setTimeout(() => setSuccessMessage(null), 4000);
+        setIsIncentiveModalOpen(false);
+        fetchStaff();
+      } else {
+        setIncentiveError(res.error?.message || 'Failed to award incentive.');
+      }
+    } catch (err: any) {
+      setIncentiveError(err?.message || 'Failed to award incentive.');
+    } finally {
+      setIsSubmittingIncentive(false);
+    }
+  };
+
+  // Telemetry Metrics including Incentives & Deductions
   const metrics = useMemo(() => {
     const total = staffList.length;
     const cashiers = staffList.filter((s) => s.role === 'CASHIER' && s.isActive).length;
     const managers = staffList.filter((s) => s.role === 'MANAGER' && s.isActive).length;
     const pinEnabled = staffList.filter((s) => s.hasPin && s.isActive).length;
-    return { total, cashiers, managers, pinEnabled };
-  }, [staffList]);
+    const totalIncentives = incentivesList.reduce((sum, i) => sum + i.amount, 0);
+    const pendingShortages = shortagesList.filter((s) => s.deductionStatus === 'pending_payroll');
+    const totalPendingShortages = pendingShortages.reduce((sum, s) => sum + s.amount, 0);
+    return {
+      total,
+      cashiers,
+      managers,
+      pinEnabled,
+      totalIncentives,
+      totalPendingShortages,
+      pendingShortagesCount: pendingShortages.length,
+    };
+  }, [staffList, incentivesList, shortagesList]);
 
   // Filtered staff list
   const filteredStaff = useMemo(() => {
@@ -328,7 +433,7 @@ export default function StaffManagementPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={fetchStaff}
@@ -337,6 +442,14 @@ export default function StaffManagementPage() {
               title="Refresh staff roster"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#7052FF]' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => openAwardIncentiveModal()}
+              className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>+ Award Incentive</span>
             </button>
             <button
               type="button"
@@ -369,11 +482,11 @@ export default function StaffManagementPage() {
         )}
 
         {/* 2. Top Telemetry Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Total Team Members
+                Total Team
               </span>
               <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#7052FF] flex items-center justify-center font-bold">
                 <Users className="w-4 h-4" />
@@ -388,38 +501,59 @@ export default function StaffManagementPage() {
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Active Cashiers
               </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.cashiers}</div>
-            <div className="text-xs text-slate-400 mt-1">Authorized for POS sales</div>
+            <div className="text-xs text-slate-400 mt-1">POS sales enabled</div>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Store Managers
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.managers}</div>
-            <div className="text-xs text-slate-400 mt-1">Supervisors & Approvers</div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                PIN Terminals Enabled
+                PIN Access
               </span>
               <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                 <KeyRound className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.pinEnabled}</div>
-            <div className="text-xs text-slate-400 mt-1">Instant 4-digit switch</div>
+            <div className="text-xs text-slate-400 mt-1">4-digit login set</div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Awarded Incentives
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-600 mt-3">
+              LKR {metrics.totalIncentives.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-emerald-700/80 mt-1 font-semibold">
+              {incentivesList.length} bonus records
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-rose-200/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Pending Deductions
+              </span>
+              <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <Coins className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-rose-600 mt-3">
+              LKR {metrics.totalPendingShortages.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-rose-700/80 mt-1 font-semibold">
+              {metrics.pendingShortagesCount} shortages to deduct
+            </div>
           </div>
         </div>
 
@@ -494,6 +628,7 @@ export default function StaffManagementPage() {
                   <th className="py-3.5 px-4">Role & Access</th>
                   <th className="py-3.5 px-4">Assigned Branch & GRN</th>
                   <th className="py-3.5 px-4">Terminal PIN</th>
+                  <th className="py-3.5 px-4">Payroll & Incentives</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
@@ -501,7 +636,7 @@ export default function StaffManagementPage() {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Loader2 className="w-6 h-6 animate-spin text-[#7052FF]" />
                         <span className="text-xs font-semibold">Loading team members...</span>
@@ -510,7 +645,7 @@ export default function StaffManagementPage() {
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Users className="w-8 h-8 text-slate-300" />
                         <p className="text-sm font-bold text-slate-600">No staff members match criteria</p>
@@ -530,6 +665,18 @@ export default function StaffManagementPage() {
                       : 'bg-emerald-100 text-emerald-700 border-emerald-200';
 
                     const isCurrentCashier = activeCashier?.id === staff.id;
+
+                    // Compute per-staff incentives and shortages
+                    const staffShortages = shortagesList.filter(
+                      (s) =>
+                        s.staffId === staff.id ||
+                        (s.cashierName && s.cashierName.toLowerCase().includes(staff.fullName.toLowerCase()))
+                    );
+                    const pendingShortages = staffShortages.filter((s) => s.deductionStatus === 'pending_payroll');
+                    const pendingShortagesSum = pendingShortages.reduce((sum, s) => sum + s.amount, 0);
+
+                    const staffIncentives = incentivesList.filter((i) => i.staffId === staff.id);
+                    const totalIncentivesSum = staffIncentives.reduce((sum, i) => sum + i.amount, 0);
 
                     return (
                       <tr
@@ -638,6 +785,42 @@ export default function StaffManagementPage() {
                           )}
                         </td>
 
+                        {/* Payroll & Incentives */}
+                        <td className="py-4 px-4">
+                          {isOwner ? (
+                            <span className="text-xs text-slate-400 font-medium">Exempt / Owner</span>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-semibold text-slate-500">Incentives:</span>
+                                <span className={`text-xs font-bold ${totalIncentivesSum > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                  {totalIncentivesSum > 0 ? `+LKR ${totalIncentivesSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'LKR 0.00'}
+                                </span>
+                                {staffIncentives.length > 0 && (
+                                  <span className="text-[10px] text-emerald-700/80 font-bold bg-emerald-50 px-1.5 py-0.2 rounded">
+                                    {staffIncentives.length}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-semibold text-slate-500">Shortages:</span>
+                                {pendingShortagesSum > 0 ? (
+                                  <span className="text-xs font-bold text-rose-600">
+                                    -LKR ${pendingShortagesSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-semibold text-slate-400">LKR 0.00</span>
+                                )}
+                                {pendingShortages.length > 0 && (
+                                  <span className="text-[10px] text-rose-700/80 font-bold bg-rose-50 px-1.5 py-0.2 rounded">
+                                    {pendingShortages.length} pending
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
                         {/* Status */}
                         <td className="py-4 px-4">
                           <span
@@ -657,6 +840,17 @@ export default function StaffManagementPage() {
                         {/* Actions */}
                         <td className="py-4 px-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Award Incentive Button */}
+                            <button
+                              type="button"
+                              onClick={() => openAwardIncentiveModal(staff)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                              title="Award target bonus or performance incentive"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">+ Incentive</span>
+                            </button>
+
                             {/* Switch to Cashier */}
                             <button
                               type="button"
@@ -1054,6 +1248,226 @@ export default function StaffManagementPage() {
                     </>
                   ) : (
                     <span>Save Changes</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* 7. Award Staff Incentive & Bonus Modal                                */}
+      {/* ===================================================================== */}
+      {isIncentiveModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Award Staff Incentive / Bonus
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Recognize performance, attendance, and dispensary targets
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIncentiveModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleIncentiveSubmit} className="p-6 space-y-4">
+              {incentiveError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{incentiveError}</span>
+                </div>
+              )}
+
+              {/* Staff Member Select */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center justify-between">
+                  <span>Staff Member</span>
+                  <span className="text-[10px] text-slate-400">Target recipient</span>
+                </label>
+                <select
+                  value={incentiveForm.staffId}
+                  onChange={(e) => {
+                    const st = staffList.find((s) => s.id === e.target.value);
+                    setIncentiveForm({
+                      ...incentiveForm,
+                      staffId: e.target.value,
+                      branchId: st?.branchId || '',
+                    });
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
+                  required
+                >
+                  <option value="" disabled>Select Staff Member</option>
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.fullName} ({s.role} • {s.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Incentive Date */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Award Date</span>
+                </label>
+                <input
+                  type="date"
+                  value={incentiveForm.incentiveDate}
+                  onChange={(e) => setIncentiveForm({ ...incentiveForm, incentiveDate: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              {/* Title & Quick Presets */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Incentive Reason / Title
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    'Monthly Dispensary Sales Target Bonus',
+                    'Punctuality & Accuracy Incentive',
+                    'Customer Service & Advisory Excellence',
+                    'Stock Management & Audit Bonus',
+                    'Counter Speed & Attendance Incentive',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setIncentiveForm({ ...incentiveForm, title: preset })}
+                      className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        incentiveForm.title === preset
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold'
+                          : 'bg-slate-100/80 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      }`}
+                    >
+                      {preset.split(' ')[0]} {preset.split(' ')[1]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="e.g. Monthly Dispensary Sales Target Bonus"
+                  value={incentiveForm.title}
+                  onChange={(e) => setIncentiveForm({ ...incentiveForm, title: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              {/* Amount (LKR) & Quick Presets */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center justify-between">
+                  <span>Incentive Amount (LKR)</span>
+                  <span className="text-[10px] text-slate-400">Added to payroll bonus</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {['1500', '2000', '2500', '3000', '3500', '5000'].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setIncentiveForm({ ...incentiveForm, amount: amt })}
+                      className={`text-xs font-bold px-3 py-1 rounded-lg border transition-all cursor-pointer ${
+                        incentiveForm.amount === amt
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                    >
+                      LKR {Number(amt).toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    LKR
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    placeholder="2500.00"
+                    value={incentiveForm.amount}
+                    onChange={(e) => setIncentiveForm({ ...incentiveForm, amount: e.target.value })}
+                    className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Notes / Justification */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Justification / Notes (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Commended by patients for exceptional ayurvedic herbal consultation"
+                  value={incentiveForm.notes}
+                  onChange={(e) => setIncentiveForm({ ...incentiveForm, notes: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
+                />
+              </div>
+
+              {/* Status Select */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Approval Status</span>
+                  <span className="text-[11px] text-slate-500">Approved bonuses are included on next payroll run</span>
+                </div>
+                <select
+                  value={incentiveForm.status}
+                  onChange={(e) => setIncentiveForm({ ...incentiveForm, status: e.target.value as 'approved' | 'paid' })}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold bg-white text-slate-800 cursor-pointer"
+                >
+                  <option value="approved">Approved</option>
+                  <option value="paid">Paid on Payroll</option>
+                </select>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsIncentiveModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingIncentive}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  {isSubmittingIncentive ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Awarding Incentive...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Award Incentive (LKR {parseFloat(incentiveForm.amount || '0').toLocaleString()})</span>
+                    </>
                   )}
                 </button>
               </div>

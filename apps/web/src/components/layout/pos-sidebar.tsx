@@ -141,7 +141,6 @@ export function PosSidebar() {
         title: 'COMMAND',
         items: [
           { name: 'Overview', href: '/dashboard', icon: LayoutGrid },
-          { name: 'Live Monitor', href: '/dashboard/live', icon: Activity },
           { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
         ],
       },

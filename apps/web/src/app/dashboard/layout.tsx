@@ -16,6 +16,7 @@ const OWNER_ONLY_ROUTES = [
   '/dashboard/pricing',
   '/dashboard/customers',
   '/dashboard/reports',
+  '/dashboard/live',
   '/dashboard/finance/revenue',
   '/dashboard/finance/tax',
   '/dashboard/finance/payouts',
