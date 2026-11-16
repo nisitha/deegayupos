@@ -60,7 +60,6 @@ export function QuantityUnitModal({
   const [selectedUnit, setSelectedUnit] = useState<string>('g');
   const [quantityInput, setQuantityInput] = useState<string>('1');
   const [customPriceInput, setCustomPriceInput] = useState<string>('');
-  const [showCustomPrice, setShowCustomPrice] = useState<boolean>(false);
 
   // Initialize modal state on open or product change
   useEffect(() => {
@@ -85,7 +84,6 @@ export function QuantityUnitModal({
     // Custom price
     const priceVal = initialCustomPrice ?? product.retailPrice;
     setCustomPriceInput(priceVal.toFixed(2));
-    setShowCustomPrice(initialCustomPrice !== undefined && initialCustomPrice !== product.retailPrice);
 
     // Focus and select input on open
     const timer = setTimeout(() => {
@@ -422,47 +420,39 @@ export function QuantityUnitModal({
           </div>
         )}
 
-        {/* 5. Optional Per-Bill Unit Price Override (Collapsible) */}
-        <div>
-          {!showCustomPrice ? (
-            <button
-              type="button"
-              onClick={() => setShowCustomPrice(true)}
-              className="text-xs font-semibold text-[#5B46F6] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Tag className="w-3.5 h-3.5" />
-              <span>Override Unit Rate for This Bill Only (LKR {effectiveRate.toFixed(2)})</span>
-            </button>
-          ) : (
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>Unit Price (LKR per 1 {readableUnitLabel})</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomPriceInput(product.retailPrice.toFixed(2));
-                    setShowCustomPrice(false);
-                  }}
-                  className="text-slate-400 hover:text-slate-600 font-normal underline cursor-pointer"
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  LKR
-                </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={customPriceInput}
-                  onChange={(e) => setCustomPriceInput(e.target.value)}
-                  className="w-full pl-11 pr-3 py-1.5 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-            </div>
-          )}
+        {/* 5. Always-Visible Per-Bill Unit Price Override Input */}
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/90 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-[#5B46F6]" />
+              <span>Unit Price (This Bill Only — LKR per 1 {readableUnitLabel})</span>
+            </label>
+            {parseFloat(customPriceInput) !== product.retailPrice && (
+              <button
+                type="button"
+                onClick={() => setCustomPriceInput(product.retailPrice.toFixed(2))}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer flex items-center gap-1"
+                title={`Reset to catalog price (LKR ${product.retailPrice.toFixed(2)})`}
+              >
+                <span>↺ Revert to Catalog (LKR {product.retailPrice.toFixed(2)})</span>
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold font-mono text-slate-400">
+              LKR
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={customPriceInput}
+              onChange={(e) => setCustomPriceInput(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              placeholder={product.retailPrice.toFixed(2)}
+              className="w-full h-11 pl-12 pr-4 text-sm font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/25 focus:border-[#5B46F6] transition-all shadow-2xs"
+            />
+          </div>
         </div>
 
         {/* 6. Live Calculation Strip */}
