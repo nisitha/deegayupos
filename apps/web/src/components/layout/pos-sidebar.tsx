@@ -23,6 +23,7 @@ import {
   Printer,
   UserCheck,
   BarChart3,
+  Banknote,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
@@ -61,6 +62,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
   {
     title: 'FINANCE & REPORTS',
     items: [
+      { name: 'Cash Reconciliation', href: '/dashboard/finance/reconciliation', icon: Banknote, badge: 'Daily' },
       { name: 'Reports Suite', href: '/dashboard/reports', icon: BarChart3, badge: '30' },
       { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },
       { name: 'Tax Engine', href: '/dashboard/finance/tax', icon: FileText },
