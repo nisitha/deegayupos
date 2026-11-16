@@ -1,28 +1,57 @@
-RewriteEngine On
+# =========================================================================
+# PIXELCRAFT POS — PRODUCTION APACHE / LITESPEED CPANEL CONFIGURATION
+# Tenant: Deegayu Weda Madura (pos.pixelcraftlk.com)
+# =========================================================================
 
-# Force HTTPS
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# 1. Strictly Prevent Directory Browsing ("Index of /")
+Options -Indexes
 
-# Serve index.html for directory routes
-DirectoryIndex index.html
+# 2. Directory Index Priority:
+# If index.html is temporarily absent mid-deployment, fallback directly to maintenance.html!
+DirectoryIndex index.html maintenance.html
 
-# Handle clean URLs without trailing slash if directory exists (ignore files with extensions)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{2,5}$
-RewriteCond %{REQUEST_URI} !(.*)/$
-RewriteRule ^(.*)$ /$1/ [L,R=301]
+# 3. Disable caching for maintenance assets & flag
+<FilesMatch "^(maintenance\.html|maintenance\.flag)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </IfModule>
+</FilesMatch>
 
-# Fallback for dynamic receipt verification routes
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^receipt/ /receipt/index.html [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^verify/ /receipt/index.html [L]
+# 4. URL Rewriting & Maintenance Mode Engine
+<IfModule mod_rewrite.c>
+  RewriteEngine On
 
-# Cache static Next.js assets aggressively
+  # Force HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Allow direct access to maintenance assets, favicon and flag check
+  RewriteCond %{REQUEST_URI} ^/(maintenance\.html|maintenance\.flag|favicon\.ico|icon\.svg)$ [NC]
+  RewriteRule ^ - [L]
+
+  # If maintenance.flag exists in document root, serve maintenance.html for all routes
+  RewriteCond %{DOCUMENT_ROOT}/maintenance.flag -f
+  RewriteRule ^ /maintenance.html [L]
+
+  # Handle clean URLs without trailing slash if directory exists (ignore files with extensions)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{2,5}$
+  RewriteCond %{REQUEST_URI} !(.*)/$
+  RewriteRule ^(.*)$ /$1/ [L,R=301]
+
+  # Fallback for dynamic receipt verification routes
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^receipt/ /receipt/index.html [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^verify/ /receipt/index.html [L]
+</IfModule>
+
+# 5. Cache static Next.js assets aggressively
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
@@ -31,4 +60,3 @@ RewriteRule ^verify/ /receipt/index.html [L]
   ExpiresByType image/png "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 1 year"
 </IfModule>
-
