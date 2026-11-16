@@ -43,7 +43,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     /* Outer Viewport Canvas (Soft Modern Canvas Tint) */
     <div className="h-screen w-screen bg-[#EDE9FE] p-2 sm:p-3 md:p-4 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
       {/* Inner Floating App Surface (Confidency OS Design System) */}
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative">
+      <div className={`rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
+        isPosPage ? 'bg-[#0F1222]' : 'bg-white'
+      }`}>
         {/* Left Column: Categorized Navigation Sidebar (220px-240px) */}
         <PosSidebar />
 
@@ -56,7 +58,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <main
             className={`flex-1 ${
               isPosPage
-                ? 'overflow-hidden p-0 h-full'
+                ? 'overflow-hidden p-0 h-full bg-[#E6EAF2]'
                 : 'overflow-y-auto p-4 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'
             }`}
           >

@@ -938,7 +938,7 @@ export default function ConfidencyPosPage() {
   }, [isCheckoutModalOpen, executeCheckout, cart, handleHoldTicket, searchQuery]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-white select-none">
+    <div className="h-full w-full flex overflow-hidden bg-[#E6EAF2] select-none">
       {/* Toast Feedback */}
       {scanFeedback && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -960,9 +960,9 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#EDF1F7] min-w-0">
+      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#E6EAF2] min-w-0">
         {/* 1. Top Terminal Status Bar */}
-        <div className="h-14 px-5 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
+        <div className="h-14 px-5 border-b border-slate-200/90 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md shadow-2xs">
           {/* Left: Breadcrumb & Cashier Metadata */}
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center font-bold text-xs shrink-0">
@@ -1006,40 +1006,57 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="border border-slate-200 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 transition-colors shadow-2xs active:scale-95"
+              className="border border-slate-200 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 transition-colors shadow-2xs active:scale-95 cursor-pointer"
             >
               End Shift
             </button>
           </div>
         </div>
 
-        {/* 2. Large Tactile Cashier Action Tabs (h-14 md:h-16, 4-column responsive grid) */}
-        <div className="px-5 pt-3.5 pb-2 bg-white/70 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+        {/* 2. Compact Elevated Action Bar (h-11, 4-column responsive grid, reclaiming ~55px of vertical space) */}
+        <div className="px-5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {/* Tab 1: Apply Discount */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className="h-14 md:h-16 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-emerald-400 cursor-pointer px-3 select-none"
+              className={`h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none ${
+                discountType !== 'NONE' ? 'ring-1 ring-emerald-500/30 border-emerald-300' : ''
+              }`}
+              title="Apply order discount (Percent or Flat)"
             >
-              <Percent className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
-              <span className="truncate">
-                {discountType === 'PERCENT'
-                  ? `${discountPercent}% Applied`
-                  : discountType === 'FLAT'
-                  ? `LKR ${discountFlat} Off`
-                  : 'Apply Discount'}
-              </span>
-              {discountType !== 'NONE' && (
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    discountType !== 'NONE'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-emerald-50 text-emerald-600'
+                  }`}
+                >
+                  <Percent className="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <span className="truncate text-xs font-semibold text-slate-700">
+                  {discountType === 'PERCENT'
+                    ? `${discountPercent}% Off`
+                    : discountType === 'FLAT'
+                    ? `LKR ${discountFlat} Off`
+                    : 'Apply Discount'}
+                </span>
+              </div>
+              {discountType !== 'NONE' ? (
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
                     resetDiscount();
                   }}
-                  className="ml-1 hover:bg-emerald-700/80 p-1 rounded-full transition-colors"
+                  className="hover:bg-slate-100 p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors"
                   title="Remove discount"
                 >
-                  <X className="w-3.5 h-3.5 text-white" />
+                  <X className="w-3.5 h-3.5" />
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                  %
                 </span>
               )}
             </button>
@@ -1048,22 +1065,37 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className="h-14 md:h-16 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-sky-500 cursor-pointer px-3 select-none"
+              className={`h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none ${
+                selectedCustomer ? 'ring-1 ring-sky-500/30 border-sky-300' : ''
+              }`}
+              title="Select customer for billing and credit"
             >
-              <UserPlus className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
-              <span className="truncate">
-                {selectedCustomer ? selectedCustomer.name : 'Customer (Walk-in)'}
-              </span>
-              {selectedCustomer && (
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedCustomer ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-600'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <span className="truncate text-xs font-semibold text-slate-700">
+                  {selectedCustomer ? selectedCustomer.name : 'Customer (Walk-in)'}
+                </span>
+              </div>
+              {selectedCustomer ? (
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedCustomer(null);
                   }}
-                  className="ml-1 hover:bg-sky-800/80 p-1 rounded-full transition-colors"
+                  className="hover:bg-slate-100 p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors"
                   title="Remove customer"
                 >
-                  <X className="w-3.5 h-3.5 text-white" />
+                  <X className="w-3.5 h-3.5" />
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                  Find
                 </span>
               )}
             </button>
@@ -1073,28 +1105,42 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="h-14 md:h-16 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-amber-400 disabled:opacity-50 disabled:pointer-events-none cursor-pointer px-3 select-none"
+              className="h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50 disabled:pointer-events-none"
+              title="Park current order ticket [F4]"
             >
-              <PauseCircle className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
-              <span className="truncate">Hold Ticket [F4]</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <PauseCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <span className="truncate text-xs font-semibold text-slate-700">Hold Ticket</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded">
+                F4
+              </span>
             </button>
 
             {/* Tab 4: Custom Sale Item */}
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="h-14 md:h-16 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-2xl shadow-sm hover:shadow-md flex items-center justify-center gap-2.5 active:scale-95 transition-all border border-purple-500 cursor-pointer px-3 select-none"
+              className="h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none"
+              title="Add non-catalog or custom priced item"
             >
-              <Tag className="w-5 h-5 text-white shrink-0 stroke-[2.5]" />
-              <span className="truncate">+ Custom Item</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center shrink-0">
+                  <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <span className="truncate text-xs font-semibold text-slate-700">+ Custom Item</span>
+              </div>
+              <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             </button>
           </div>
 
           {/* Held Tickets Banner (if tickets are held) */}
           {heldTickets.length > 0 && (
-            <div className="mb-1.5 flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-900 text-xs">
+            <div className="mt-2 flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs shadow-2xs">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span className="font-semibold">
                   {heldTickets.length} ticket{heldTickets.length > 1 ? 's' : ''} currently on hold
                 </span>
@@ -1111,14 +1157,14 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 3. Hero Search Station with Live Keystroke Autocomplete Dropdown */}
-        <div className="px-5 py-3 border-b border-slate-200/80 bg-white/95 shrink-0" ref={searchContainerRef}>
-          <div className="relative w-full mb-1">
-            {/* Left: Magnifying Glass Icon (w-6 h-6 text-slate-400) */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none z-10">
-              <Search className="w-6 h-6 text-slate-400" />
+        <div className="px-5 py-2.5 border-b border-slate-200/80 bg-white/95 shrink-0 backdrop-blur-xs" ref={searchContainerRef}>
+          <div className="relative w-full">
+            {/* Left: Magnifying Glass Icon */}
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none z-10">
+              <Search className="w-5 h-5 text-slate-400" />
             </div>
 
-            {/* Expansive Input */}
+            {/* Compact Expansive Input */}
             <input
               ref={searchInputRef}
               type="text"
@@ -1152,11 +1198,11 @@ export default function ConfidencyPosPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              className="w-full h-14 md:h-16 text-base md:text-lg font-medium pl-14 pr-44 rounded-2xl border-2 border-slate-200 bg-white shadow-xs focus:outline-none focus:border-[#5B46F6] focus:ring-4 focus:ring-[#5B46F6]/10 transition-all text-slate-900 placeholder:text-slate-400"
+              className="w-full h-12 md:h-13 text-sm md:text-base font-medium pl-11 pr-44 rounded-xl border border-slate-200/90 bg-white shadow-xs focus:outline-none focus:border-[#5B46F6] focus:ring-2 focus:ring-[#5B46F6]/15 transition-all text-slate-900 placeholder:text-slate-400"
             />
 
             {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
               {searchQuery && (
                 <button
                   type="button"
@@ -1165,22 +1211,22 @@ export default function ConfidencyPosPage() {
                     setIsSearchDropdownOpen(false);
                     searchInputRef.current?.focus();
                   }}
-                  className="w-7 h-7 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-6 h-6 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
                   title="Clear search"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
 
               {/* Barcode [F2] Tag */}
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs text-xs font-mono text-slate-500">
-                <Barcode className="w-4 h-4 text-[#5B46F6]" />
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 shadow-2xs text-xs font-mono text-slate-500">
+                <Barcode className="w-3.5 h-3.5 text-[#5B46F6]" />
                 <span className="font-semibold text-slate-700">[F2]</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
 
               {/* Live Count Badge */}
-              <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl shrink-0">
+              <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
                 {filteredProducts.length.toLocaleString()} items
               </div>
             </div>
@@ -1287,16 +1333,16 @@ export default function ConfidencyPosPage() {
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
-            className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
               selectedDeptId === 'all'
                 ? 'bg-[#0F1222] text-white border-[#0F1222] shadow-sm'
-                : 'bg-white/90 border border-slate-200/90 text-slate-700 hover:bg-white hover:border-indigo-300 shadow-2xs'
+                : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
             }`}
           >
             <span>All Products (සියලු වර්ග)</span>
             <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
-                selectedDeptId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
+                selectedDeptId === 'all' ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
               }`}
             >
               {departmentCounts.all || 0}
@@ -1313,24 +1359,24 @@ export default function ConfidencyPosPage() {
                 key={dept.id}
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
                   isActive
-                    ? 'bg-[#5B46F6] text-white border-[#5B46F6] font-bold shadow-md shadow-indigo-900/20'
-                    : 'bg-white/90 border border-slate-200/90 text-slate-700 hover:bg-white hover:border-indigo-300 shadow-2xs'
+                    ? 'bg-[#0F1222] text-white border-[#0F1222] font-bold shadow-sm'
+                    : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
                 }`}
               >
                 {/* 3D Mini Dot */}
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    isActive ? 'bg-white' : `bg-gradient-to-br ${dept.gradient}`
+                    isActive ? 'bg-[#5B46F6]' : `bg-gradient-to-br ${dept.gradient}`
                   } shadow-2xs shrink-0`}
                 />
                 <span className="whitespace-nowrap">
-                  {dept.en} <span className={`font-normal text-xs ${isActive ? 'text-white/80' : 'text-slate-500'}`}>({dept.si})</span>
+                  {dept.en} <span className={`font-normal text-xs ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>({dept.si})</span>
                 </span>
                 <span
                   className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
-                    isActive ? 'bg-white/20 text-white font-bold' : 'bg-slate-100 text-slate-600'
+                    isActive ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {count}
@@ -1341,7 +1387,7 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 5. Product Cards Grid with 3D Category Emblems */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-[#EDF1F7]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-[#E6EAF2]">
           {isLoadingProducts && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <Loader2 className="w-8 h-8 animate-spin text-[#5B46F6] mb-3" />
@@ -1392,7 +1438,7 @@ export default function ConfidencyPosPage() {
                   <div
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    className="bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-400/70 hover:-translate-y-0.5 transition-all duration-150 overflow-hidden flex flex-col p-3.5 cursor-pointer group active:scale-[0.98] select-none relative justify-between"
+                    className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md hover:border-indigo-400 hover:-translate-y-0.5 transition-all duration-150 overflow-hidden flex flex-col p-3.5 cursor-pointer group active:scale-[0.98] select-none relative justify-between"
                   >
                     {/* Top Row: Department Sinhala Pill + Stock Indicator */}
                     <div className="flex items-center justify-between mb-2">
@@ -1417,7 +1463,7 @@ export default function ConfidencyPosPage() {
                     </div>
 
                     {/* High-Contrast Realistic Product Photo Container (Studio-Tinted Stage) */}
-                    <div className="bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100/70 border-b border-slate-100 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:scale-[1.02] transition-transform relative">
+                    <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-emerald-50/30 border border-slate-100 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:scale-[1.02] transition-transform relative">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
@@ -1460,11 +1506,11 @@ export default function ConfidencyPosPage() {
                             e.stopPropagation();
                             addToCart(product);
                           }}
-                          className="bg-[#5B46F6] hover:bg-[#4A35E5] active:scale-95 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                          className="w-8 h-8 rounded-lg bg-[#5B46F6] hover:bg-[#4935E3] text-white flex items-center justify-center font-bold shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
                           title="Add to cart"
                           aria-label={`Add ${product.name} to cart`}
                         >
-                          <Plus className="w-5 h-5 stroke-[2.5]" />
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
                         </button>
                       </div>
                     </div>
@@ -1502,9 +1548,9 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (340px-380px)
       ===================================================================== */}
-      <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-[#F3F5FC] border-l border-indigo-200/70 shadow-[-4px_0_24px_-12px_rgba(15,23,42,0.08)] flex-col h-full shrink-0 select-none">
+      <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-[#ECEFF9] border-l-2 border-indigo-200/80 shadow-[-6px_0_24px_-12px_rgba(15,18,34,0.12)] flex-col h-full shrink-0 select-none">
         {/* 1. Cart Header */}
-        <div className="h-14 px-5 border-b border-indigo-100/80 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-xs">
+        <div className="h-14 px-5 border-b border-indigo-200/60 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-xs">
           <div className="flex items-center gap-2">
             <h3 className="text-sm md:text-base font-bold text-slate-900">Order Summary</h3>
             <span className="text-xs font-mono font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
@@ -1526,7 +1572,7 @@ export default function ConfidencyPosPage() {
 
         {/* 2. Customer Pill in Cart (if attached) */}
         {selectedCustomer && (
-          <div className="px-5 py-2.5 bg-white/90 border-b border-indigo-100 flex items-center justify-between">
+          <div className="px-5 py-2.5 bg-white/90 border-b border-indigo-200/60 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
                 <User className="w-4 h-4" />
@@ -1545,7 +1591,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setSelectedCustomer(null)}
-              className="text-sky-500 hover:text-sky-800 text-xs p-1"
+              className="text-sky-500 hover:text-sky-800 text-xs p-1 cursor-pointer"
               title="Remove customer"
             >
               <X className="w-3.5 h-3.5" />
@@ -1565,7 +1611,7 @@ export default function ConfidencyPosPage() {
             cart.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-3 flex items-center justify-between gap-3 group transition-all hover:border-indigo-200 hover:shadow-xs"
+                className="bg-white rounded-xl border border-indigo-100/90 shadow-2xs p-3 flex items-center justify-between gap-3 group transition-all hover:border-indigo-300 hover:shadow-xs"
               >
                 {/* Rounded squircle realistic product photo preview */}
                 <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
@@ -1615,7 +1661,7 @@ export default function ConfidencyPosPage() {
                           e.preventDefault();
                           handleSaveEditPrice(item.id);
                         }}
-                        className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs"
+                        className="p-1 rounded-md bg-[#5B46F6] text-white hover:bg-[#4A35E5] transition-colors shadow-2xs cursor-pointer"
                         title="Save price"
                       >
                         <Check className="w-3 h-3" />
@@ -1662,7 +1708,7 @@ export default function ConfidencyPosPage() {
                   <button
                     type="button"
                     onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                    className="text-slate-400 hover:text-slate-900 active:scale-90 transition-transform font-bold"
+                    className="text-slate-400 hover:text-slate-900 active:scale-90 transition-transform font-bold cursor-pointer"
                   >
                     -
                   </button>
@@ -1670,7 +1716,7 @@ export default function ConfidencyPosPage() {
                   <button
                     type="button"
                     onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                    className="text-slate-400 hover:text-slate-900 active:scale-90 transition-transform font-bold"
+                    className="text-slate-400 hover:text-slate-900 active:scale-90 transition-transform font-bold cursor-pointer"
                   >
                     +
                   </button>
@@ -1684,7 +1730,7 @@ export default function ConfidencyPosPage() {
                   <button
                     type="button"
                     onClick={() => removeCartItem(item.id)}
-                    className="text-rose-400 hover:text-rose-600 transition-colors p-0.5"
+                    className="text-rose-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -1694,8 +1740,8 @@ export default function ConfidencyPosPage() {
           )}
         </div>
 
-        {/* 4. Financial Breakdown Summary */}
-        <div className="p-5 border-t border-indigo-100 bg-white shadow-[0_-4px_16px_-6px_rgba(15,23,42,0.06)] space-y-3 shrink-0">
+        {/* 4. Financial Breakdown Summary & Bottom Checkout Dock */}
+        <div className="p-4 sm:p-5 border-t border-indigo-200/70 bg-white shadow-[0_-6px_20px_-8px_rgba(15,18,34,0.08)] space-y-3 shrink-0">
           <div className="space-y-1.5 font-mono">
             <div className="flex justify-between text-sm text-slate-600">
               <span className="font-sans font-medium">Subtotal</span>
@@ -1720,7 +1766,7 @@ export default function ConfidencyPosPage() {
                   <button
                     type="button"
                     onClick={resetDiscount}
-                    className="text-rose-400 hover:text-rose-600 p-0.5"
+                    className="text-rose-400 hover:text-rose-600 p-0.5 cursor-pointer"
                     title="Remove discount"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -1741,15 +1787,15 @@ export default function ConfidencyPosPage() {
               </button>
             )}
 
-            {/* Highlighted TOTAL PAYABLE Card */}
-            <div className="mt-2 bg-[#F8F9FE] border border-indigo-100/90 rounded-xl p-3 flex items-baseline justify-between shadow-2xs">
+            {/* TOTAL PAYABLE: Midnight Indigo Digital Readout Card */}
+            <div className="mt-2 bg-[#0F1222] text-white rounded-xl px-4 py-3.5 flex items-center justify-between shadow-inner border border-slate-800">
               <div className="flex flex-col">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500">
+                <span className="text-[11px] uppercase font-bold tracking-wider text-slate-400">
                   Total Payable
                 </span>
-                <span className="text-[11px] text-[#5B46F6] font-semibold">Net Due (LKR)</span>
+                <span className="text-[11px] text-indigo-400 font-medium">Net Due (LKR)</span>
               </div>
-              <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-slate-950">
+              <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-white">
                 LKR {totalAmount.toFixed(2)}
               </span>
             </div>
@@ -1757,10 +1803,10 @@ export default function ConfidencyPosPage() {
 
           {/* 5. Payment Method Segmented Control */}
           <div className="pt-1">
-            <label className="text-xs md:text-sm font-bold text-slate-800 block mb-2">
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">
               Payment Method
             </label>
-            <div className="bg-slate-100/90 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
+            <div className="bg-slate-100/90 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
               {[
                 { id: 'CARD', label: 'Card', icon: CreditCard },
                 { id: 'CASH', label: 'Cash', icon: Banknote },
@@ -1776,11 +1822,11 @@ export default function ConfidencyPosPage() {
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
                     className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isSelected
-                        ? 'bg-white text-slate-900 font-bold shadow-xs border border-slate-200/60'
-                        : 'text-slate-600 hover:text-slate-900 font-medium'
+                        ? 'bg-indigo-50 border-2 border-[#5B46F6] text-[#5B46F6] font-bold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-white/60'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{tab.label}</span>
                   </button>
                 );
@@ -1838,7 +1884,7 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleCharge}
               disabled={cart.length === 0 || isProcessingCheckout}
-              className="w-full bg-[#5B46F6] hover:bg-[#4A35E5] active:scale-[0.99] disabled:opacity-40 text-white font-bold text-base md:text-lg py-4 rounded-2xl shadow-lg shadow-[#5B46F6]/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+              className="w-full bg-gradient-to-r from-[#5B46F6] to-[#4A35E5] hover:from-[#4E39EC] hover:to-[#3E29D6] text-white font-semibold text-base md:text-lg py-3.5 rounded-xl shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-[0.99] disabled:opacity-40"
             >
               {isProcessingCheckout ? (
                 <>
