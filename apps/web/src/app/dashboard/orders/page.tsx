@@ -6,7 +6,6 @@ import {
   Receipt,
   Search,
   Filter,
-  Download,
   Eye,
   RefreshCw,
   Store,
@@ -27,31 +26,95 @@ import {
   Copy,
   Check,
   Clock,
+  Printer,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
+  FileSpreadsheet,
+  Building2,
+  User,
+  Award,
 } from 'lucide-react';
 import type { SaleDto, SalePaymentMethod, SaleStatus } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi } from '../../../lib/api-client';
+import { posApi, type SalesSummaryKPI } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
-type PeriodFilter = 'today' | 'week' | 'month' | 'all';
+type PeriodFilter = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom';
+type SortField = 'created_at' | 'total_amount' | 'invoice_number' | 'cashier_name';
+
+interface CashierOption {
+  id: string;
+  fullName: string;
+  role: string;
+}
+
+const BRANCH_MAP: Record<string, string> = {
+  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': 'Alawwa',
+  'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dambadeniya',
+  '197693d6-4247-48df-b614-6fcde9e34f7d': 'Giriulla',
+  '133eeaec-5726-4702-a819-8423750db203': 'Main Store',
+  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c': 'Main Branch',
+};
+
+// Asia/Colombo (+05:30) today's date in YYYY-MM-DD
+function getColomboTodayDateString(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Colombo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 
 export default function SalesOrdersPage() {
-  const { currency, selectedBranchId, branches, business } = useTenantBranch();
-  const currentBranch = branches.find((b) => b.id === selectedBranchId);
-  const branchName = currentBranch?.name || business?.name || 'Deegayu Main Store';
+  const { currency, selectedBranchId, branches } = useTenantBranch();
+
+  // Primary Data State
   const [sales, setSales] = useState<SaleDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+
+  // Filters State
   const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [customStartDate, setCustomStartDate] = useState(getColomboTodayDateString());
+  const [customEndDate, setCustomEndDate] = useState(getColomboTodayDateString());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
+  const [selectedCashier, setSelectedCashier] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedMethod, setSelectedMethod] = useState<string>('ALL');
+
+  // Sorting State
+  const [sortBy, setSortBy] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [copiedInvoice, setCopiedInvoice] = useState<string | null>(null);
 
-  // Active Receipt Modal
+  // Cashiers List from API
+  const [cashiers, setCashiers] = useState<CashierOption[]>([]);
+
+  // Accurate Backend Aggregated KPI Summary across ALL matching rows
+  const [kpiSummary, setKpiSummary] = useState<SalesSummaryKPI>({
+    totalGross: 0,
+    completedCount: 0,
+    voidedCount: 0,
+    totalVoidedAmount: 0,
+    avgTicket: 0,
+    totalBills: 0,
+  });
+
+  // UI Interactive Helpers
+  const [copiedInvoice, setCopiedInvoice] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Active Receipt Modal (Hardware reprints)
   const [activeReceiptSaleId, setActiveReceiptSaleId] = useState<string | null>(null);
 
   // Void Bill Modal State
@@ -59,15 +122,33 @@ export default function SalesOrdersPage() {
   const [voidReason, setVoidReason] = useState('');
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
-  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [isMounted, setIsMounted] = useState(false);
+  // Cashier & Sales Performance Audit Report Modal
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSales, setReportSales] = useState<SaleDto[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch Sales Data
+  // Sync initial branch from context
+  useEffect(() => {
+    if (selectedBranchId && selectedBranchId !== 'ALL') {
+      setSelectedBranch(selectedBranchId);
+    }
+  }, [selectedBranchId]);
+
+  // Load Cashiers List
+  useEffect(() => {
+    posApi.getCashiers().then((list) => {
+      if (list && list.length > 0) {
+        setCashiers(list);
+      }
+    });
+  }, []);
+
+  // Fetch Sales Data reactively based on active filters
   const fetchSales = useCallback(
     async (isManualRefresh = false) => {
       try {
@@ -79,18 +160,26 @@ export default function SalesOrdersPage() {
 
         const res = await posApi.getSales({
           page: currentPage,
-          limit: 25,
+          limit: 50,
           period,
+          startDate: period === 'custom' ? customStartDate : undefined,
+          endDate: period === 'custom' ? customEndDate : undefined,
           search: searchQuery.trim() || undefined,
           status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
           paymentMethod: selectedMethod !== 'ALL' ? selectedMethod : undefined,
-          branchId: selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
+          branchId: selectedBranch !== 'ALL' ? selectedBranch : undefined,
+          cashierName: selectedCashier !== 'ALL' ? selectedCashier : undefined,
+          sortBy,
+          sortOrder,
         });
 
         if (res.data) {
           setSales(res.data.items || []);
           setTotalCount(res.data.total || 0);
           setTotalPages(res.data.totalPages || 1);
+          if (res.data.summary) {
+            setKpiSummary(res.data.summary);
+          }
         }
       } catch (err) {
         console.error('Failed to load sales register:', err);
@@ -99,7 +188,19 @@ export default function SalesOrdersPage() {
         setIsRefreshing(false);
       }
     },
-    [currentPage, period, searchQuery, selectedStatus, selectedMethod, selectedBranchId],
+    [
+      currentPage,
+      period,
+      customStartDate,
+      customEndDate,
+      searchQuery,
+      selectedStatus,
+      selectedMethod,
+      selectedBranch,
+      selectedCashier,
+      sortBy,
+      sortOrder,
+    ],
   );
 
   useEffect(() => {
@@ -142,68 +243,123 @@ export default function SalesOrdersPage() {
     setTimeout(() => setCopiedInvoice(null), 2000);
   };
 
-  // Export Sales to CSV
-  const handleExportCsv = () => {
-    if (sales.length === 0) return;
-
-    const headers = [
-      'Invoice #',
-      'Date Time',
-      'Customer',
-      'Cashier',
-      'Payment Method',
-      'Status',
-      'Items Count',
-      'Subtotal (LKR)',
-      'Discount (LKR)',
-      'Tax (LKR)',
-      'Total Amount (LKR)',
-    ];
-
-    const rows = sales.map((s) => [
-      s.invoiceNumber,
-      new Date(s.createdAt).toISOString(),
-      `"${(s.customerName || 'Walk-in Customer').replace(/"/g, '""')}"`,
-      `"${(s.cashier?.fullName || s.cashierName || 'Staff').replace(/"/g, '""')}"`,
-      s.payments?.[0]?.paymentMethod || 'UNKNOWN',
-      s.status,
-      s.items?.reduce((cnt, it) => cnt + it.quantity, 0) || 0,
-      Number(s.subtotal || 0).toFixed(2),
-      Number(s.discountAmount || 0).toFixed(2),
-      Number(s.taxAmount || 0).toFixed(2),
-      Number(s.totalAmount || 0).toFixed(2),
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `pixelcraft-sales-${period}-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Toggle Column Header Sorting
+  const handleHeaderSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'cashier_name' || field === 'invoice_number' ? 'asc' : 'desc');
+    }
+    setCurrentPage(1);
   };
 
-  // Dynamic Metrics Summary from loaded sales
-  const completedSales = useMemo(() => sales.filter((s) => s.status === 'COMPLETED'), [sales]);
-  const voidedSales = useMemo(() => sales.filter((s) => s.status === 'VOIDED'), [sales]);
+  // Full CSV Export across ALL matching rows
+  const handleExportCsv = async () => {
+    try {
+      setIsExportingCsv(true);
+      const allMatching = await posApi.getAllSales({
+        period,
+        startDate: period === 'custom' ? customStartDate : undefined,
+        endDate: period === 'custom' ? customEndDate : undefined,
+        search: searchQuery.trim() || undefined,
+        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+        paymentMethod: selectedMethod !== 'ALL' ? selectedMethod : undefined,
+        branchId: selectedBranch !== 'ALL' ? selectedBranch : undefined,
+        cashierName: selectedCashier !== 'ALL' ? selectedCashier : undefined,
+        sortBy,
+        sortOrder,
+      });
 
-  const totalGross = useMemo(
-    () => completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0),
-    [completedSales],
-  );
+      if (!allMatching || allMatching.length === 0) {
+        alert('No sales records found for the active filter selection.');
+        return;
+      }
 
-  const totalVoidedAmount = useMemo(
-    () => voidedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0),
-    [voidedSales],
-  );
+      const headers = [
+        'Invoice #',
+        'Date Time (Asia/Colombo)',
+        'Branch',
+        'Cashier',
+        'Customer',
+        'Payment Method',
+        'Status',
+        'Subtotal (LKR)',
+        'Discount (LKR)',
+        'Tax (LKR)',
+        'Grand Total (LKR)',
+      ];
 
-  const avgTicket = useMemo(() => {
-    return completedSales.length > 0 ? totalGross / completedSales.length : 0;
-  }, [totalGross, completedSales]);
+      const rows = allMatching.map((s) => {
+        const bName = BRANCH_MAP[s.branchId] || branches.find((b) => b.id === s.branchId)?.name || 'Main Store';
+        const cName = s.cashier?.fullName || s.cashierName || 'Staff';
+        const custName = s.customerName || 'Walk-in Customer';
+        const dt = new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
+        const pm = s.payments?.[0]?.paymentMethod || 'CASH';
 
+        return [
+          `"${s.invoiceNumber}"`,
+          `"${dt}"`,
+          `"${bName.replace(/"/g, '""')}"`,
+          `"${cName.replace(/"/g, '""')}"`,
+          `"${custName.replace(/"/g, '""')}"`,
+          `"${pm}"`,
+          `"${s.status}"`,
+          Number(s.subtotal || 0).toFixed(2),
+          Number(s.discountAmount || 0).toFixed(2),
+          Number(s.taxAmount || 0).toFixed(2),
+          Number(s.totalAmount || 0).toFixed(2),
+        ].join(',');
+      });
+
+      // UTF-8 BOM for Microsoft Excel compatibility
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const cashierSlug = selectedCashier !== 'ALL' ? `_${selectedCashier.replace(/\s+/g, '_')}` : '';
+      link.download = `deegayu-sales-report-${period}${cashierSlug}-${getColomboTodayDateString()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('CSV Export failed:', err);
+      alert('Failed to export CSV. Please try again.');
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
+  // Open Cashier Performance & Sales Audit Report Modal
+  const handleOpenReportModal = async () => {
+    setIsReportModalOpen(true);
+    setReportLoading(true);
+    try {
+      const allMatching = await posApi.getAllSales({
+        period,
+        startDate: period === 'custom' ? customStartDate : undefined,
+        endDate: period === 'custom' ? customEndDate : undefined,
+        search: searchQuery.trim() || undefined,
+        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+        paymentMethod: selectedMethod !== 'ALL' ? selectedMethod : undefined,
+        branchId: selectedBranch !== 'ALL' ? selectedBranch : undefined,
+        cashierName: selectedCashier !== 'ALL' ? selectedCashier : undefined,
+        sortBy,
+        sortOrder,
+      });
+      setReportSales(allMatching);
+    } catch (err) {
+      console.error('Failed to load report data:', err);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  // Format Currency (LKR)
   const formatCurrency = (val: number) => {
-    return `${currency} ${val.toLocaleString('en-US', {
+    return `${currency} ${Number(val || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
@@ -240,7 +396,7 @@ export default function SalesOrdersPage() {
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            {method || 'N/A'}
+            {method || 'CASH'}
           </span>
         );
     }
@@ -268,8 +424,110 @@ export default function SalesOrdersPage() {
     );
   };
 
+  // Group Cashiers: Active Staff vs Legacy / Historical
+  const activeStaff = useMemo(
+    () => cashiers.filter((c) => c.role === 'OWNER' || c.role === 'STAFF'),
+    [cashiers],
+  );
+  const legacyCashiers = useMemo(
+    () => cashiers.filter((c) => c.role !== 'OWNER' && c.role !== 'STAFF'),
+    [cashiers],
+  );
+
+  // Computed Report Aggregates for Audit Modal
+  const reportCompleted = useMemo(
+    () => reportSales.filter((s) => s.status === 'COMPLETED'),
+    [reportSales],
+  );
+  const reportVoided = useMemo(
+    () => reportSales.filter((s) => s.status === 'VOIDED'),
+    [reportSales],
+  );
+  const reportGross = useMemo(
+    () => reportCompleted.reduce((sum, s) => sum + Number(s.totalAmount || 0), 0),
+    [reportCompleted],
+  );
+  const reportVoidedAmt = useMemo(
+    () => reportVoided.reduce((sum, s) => sum + Number(s.totalAmount || 0), 0),
+    [reportVoided],
+  );
+  const reportCashTotal = useMemo(() => {
+    return reportCompleted.reduce((sum, s) => {
+      const pCash = s.payments?.filter((p) => p.paymentMethod === 'CASH').reduce((ps, p) => ps + Number(p.amount || 0), 0);
+      return sum + (pCash !== undefined && pCash > 0 ? pCash : (!s.payments || s.payments.length === 0 ? Number(s.totalAmount || 0) : 0));
+    }, 0);
+  }, [reportCompleted]);
+
+  const reportCardTotal = useMemo(() => {
+    return reportCompleted.reduce((sum, s) => {
+      return sum + (s.payments?.filter((p) => p.paymentMethod === 'CARD').reduce((ps, p) => ps + Number(p.amount || 0), 0) || 0);
+    }, 0);
+  }, [reportCompleted]);
+
+  const reportQrTotal = useMemo(() => {
+    return reportCompleted.reduce((sum, s) => {
+      return sum + (s.payments?.filter((p) => p.paymentMethod === 'QR_PAYMENT').reduce((ps, p) => ps + Number(p.amount || 0), 0) || 0);
+    }, 0);
+  }, [reportCompleted]);
+
+  const reportCreditTotal = useMemo(() => {
+    return reportCompleted.reduce((sum, s) => {
+      return sum + (s.payments?.filter((p) => p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT').reduce((ps, p) => ps + Number(p.amount || 0), 0) || 0);
+    }, 0);
+  }, [reportCompleted]);
+
+  const cashierAuditBreakdown = useMemo(() => {
+    const map = new Map<string, { count: number; gross: number; cash: number; card: number; voidCount: number }>();
+    for (const s of reportSales) {
+      const cName = s.cashier?.fullName || s.cashierName || 'Staff';
+      const entry = map.get(cName) || { count: 0, gross: 0, cash: 0, card: 0, voidCount: 0 };
+      if (s.status === 'COMPLETED') {
+        entry.count++;
+        entry.gross += Number(s.totalAmount || 0);
+        entry.cash += s.payments?.filter((p) => p.paymentMethod === 'CASH').reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+        entry.card += s.payments?.filter((p) => p.paymentMethod === 'CARD').reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+      } else if (s.status === 'VOIDED') {
+        entry.voidCount++;
+      }
+      map.set(cName, entry);
+    }
+    return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
+  }, [reportSales]);
+
+  // Active Branch Label Helper
+  const getBranchLabel = (id?: string) => {
+    if (!id) return 'Main Store';
+    return BRANCH_MAP[id] || branches.find((b) => b.id === id)?.name || id.slice(0, 8);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Global Print Styles for Report Modal */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #cashier-audit-report-printable,
+          #cashier-audit-report-printable * {
+            visibility: visible !important;
+          }
+          #cashier-audit-report-printable {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 24px !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Feedback Alert Toast */}
       {feedbackMessage && (
         <div
@@ -302,37 +560,50 @@ export default function SalesOrdersPage() {
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sales & Bills Register</h1>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 font-sinhala">
-              විකුණුම් සහ බිල්පත්
+              විකුණුම් සහ බිල්පත් ලේඛනය
             </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-600 border border-blue-200/60">
               Live Audit Trail
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time transaction registers, customer receipts, 80mm/58mm reprints, and inventory-restoring void management.
+            Real-time multi-branch transaction register, cashier audit reports, 80mm/58mm reprints, and stock-restoring void management.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Printable Cashier Report Button */}
           <button
-            onClick={handleExportCsv}
-            disabled={sales.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
-            title="Export filtered records to CSV"
+            onClick={handleOpenReportModal}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all"
+            title="Generate executive printable cashier & sales audit report"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <Printer className="w-3.5 h-3.5" />
+            <span>Generate Report (Print / PDF)</span>
           </button>
 
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportCsv}
+            disabled={isExportingCsv || sales.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
+            title="Export all matching records across database to Excel CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{isExportingCsv ? 'Exporting...' : 'Export CSV'}</span>
+          </button>
+
+          {/* Refresh Button */}
           <button
             onClick={() => fetchSales(true)}
             disabled={loading || isRefreshing}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
             <span>Refresh</span>
           </button>
 
+          {/* Open POS Terminal */}
           <Link
             href="/dashboard/pos"
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-pos-btn transition-all group"
@@ -347,8 +618,8 @@ export default function SalesOrdersPage() {
       </div>
 
       {/* Period Quick Switcher Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200/80 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl">
           <button
             onClick={() => {
               setPeriod('today');
@@ -360,7 +631,20 @@ export default function SalesOrdersPage() {
                 : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            Today&apos;s Bills
+            Today&apos;s Bills (අද)
+          </button>
+          <button
+            onClick={() => {
+              setPeriod('yesterday');
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              period === 'yesterday'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            Yesterday (ඊයේ)
           </button>
           <button
             onClick={() => {
@@ -373,7 +657,7 @@ export default function SalesOrdersPage() {
                 : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            This Week
+            This Week (මෙම සතිය)
           </button>
           <button
             onClick={() => {
@@ -386,7 +670,20 @@ export default function SalesOrdersPage() {
                 : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            This Month
+            This Month (මෙම මාසය)
+          </button>
+          <button
+            onClick={() => {
+              setPeriod('last_month');
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              period === 'last_month'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            Last Month (පසුගිය මාසය)
           </button>
           <button
             onClick={() => {
@@ -399,18 +696,78 @@ export default function SalesOrdersPage() {
                 : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            All Bills
+            All Bills (සියල්ල)
+          </button>
+          <button
+            onClick={() => {
+              setPeriod('custom');
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+              period === 'custom'
+                ? 'bg-[#005BD3] text-white shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Custom Range (දින තෝරන්න)</span>
           </button>
         </div>
 
-        <div className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
-          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <span>Active Branch:</span>
-          <span className="font-bold text-slate-800">{branchName || 'Deegayu Main Store'}</span>
+        <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
+          <Clock className="w-3.5 h-3.5 text-blue-600" />
+          <span>Colombo Timezone (UTC+05:30)</span>
         </div>
       </div>
 
-      {/* KPI Cards Row */}
+      {/* Interactive Custom Date Range Bar */}
+      {period === 'custom' && (
+        <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/70 flex flex-wrap items-center gap-4 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+            <Calendar className="w-4 h-4 text-blue-700" />
+            <span>Select Date Range:</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600">From:</label>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => {
+                setCustomStartDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-white border border-slate-300 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600">To:</label>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => {
+                setCustomEndDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-white border border-slate-300 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3]"
+            />
+          </div>
+
+          <button
+            onClick={() => fetchSales(true)}
+            className="px-3 py-1.5 rounded-lg bg-[#005BD3] text-white text-xs font-bold shadow-2xs hover:bg-[#004bb5] transition-colors"
+          >
+            Apply Range
+          </button>
+
+          <span className="text-[11px] text-slate-500 italic">
+            Querying all transactions between {customStartDate} 00:00:00 and {customEndDate} 23:59:59
+          </span>
+        </div>
+      )}
+
+      {/* KPI Cards Row — Accurate Aggregates across ALL matching database records */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Sales */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
@@ -422,10 +779,10 @@ export default function SalesOrdersPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(totalGross)}
+              {formatCurrency(kpiSummary.totalGross)}
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              Settled payments across {completedSales.length} bill(s)
+              Settled payments across {kpiSummary.completedCount.toLocaleString()} bill(s)
             </div>
           </div>
         </div>
@@ -440,7 +797,7 @@ export default function SalesOrdersPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {completedSales.length}
+              {kpiSummary.completedCount.toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-slate-500">Fulfilled retail transactions</div>
           </div>
@@ -456,7 +813,7 @@ export default function SalesOrdersPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(avgTicket)}
+              {formatCurrency(kpiSummary.avgTicket)}
             </div>
             <div className="mt-1 text-xs text-slate-500">Per customer checkout</div>
           </div>
@@ -472,10 +829,10 @@ export default function SalesOrdersPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {voidedSales.length}
+              {kpiSummary.voidedCount.toLocaleString()}
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              {formatCurrency(totalVoidedAmount)} reversed
+              {formatCurrency(kpiSummary.totalVoidedAmount)} reversed
             </div>
           </div>
         </div>
@@ -483,8 +840,9 @@ export default function SalesOrdersPage() {
 
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-pos-card overflow-hidden">
-        {/* Table Filters & Search */}
-        <div className="p-4 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-slate-50/50">
+        {/* Table Filters & Search Bar */}
+        <div className="p-4 border-b border-slate-200/80 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 bg-slate-50/50">
+          {/* Keyword Search */}
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -494,15 +852,104 @@ export default function SalesOrdersPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by invoice #, customer name, or cashier..."
-              className="w-full pl-9 pr-4 py-2 text-xs bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] transition-all"
+              placeholder="Search by invoice #, customer, or cashier..."
+              className="w-full pl-9 pr-8 py-2 text-xs bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] transition-all"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
+          {/* Filter Dropdowns Grid */}
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* Branch Filter */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>Branch:</span>
+              <select
+                value={selectedBranch}
+                onChange={(e) => {
+                  setSelectedBranch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
+              >
+                <option value="ALL">All Branches (සියල්ල)</option>
+                <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa (අලව්ව)</option>
+                <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya (දඹදෙණිය)</option>
+                <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla (ගිරිඋල්ල)</option>
+                <option value="133eeaec-5726-4702-a819-8423750db203">Main Store (ප්‍රධාන)</option>
+              </select>
+            </div>
+
+            {/* Cashier Filter (Bills දාපු කෙනා) */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <User className="w-3.5 h-3.5 text-slate-400" />
+              <span>Cashier:</span>
+              <div className="relative flex items-center">
+                <select
+                  value={selectedCashier}
+                  onChange={(e) => {
+                    setSelectedCashier(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`bg-white border text-xs rounded-lg pl-2.5 pr-7 py-1.5 font-medium focus:outline-none focus:border-[#005BD3] ${
+                    selectedCashier !== 'ALL'
+                      ? 'border-blue-400 text-blue-700 bg-blue-50/50 font-bold'
+                      : 'border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <option value="ALL">All Cashiers (සියලු අයකැමියන්)</option>
+
+                  {/* Active Staff */}
+                  {activeStaff.length > 0 && (
+                    <optgroup label="Active Staff (වර්තමාන කාර්ය මණ්ඩලය)">
+                      {activeStaff.map((c) => (
+                        <option key={c.id} value={c.fullName}>
+                          {c.fullName} {c.role === 'OWNER' ? '★ (Owner)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+
+                  {/* Legacy Cashiers */}
+                  {legacyCashiers.length > 0 && (
+                    <optgroup label="Historical Cashiers (පෙර අයකැමියන්)">
+                      {legacyCashiers.map((c) => (
+                        <option key={c.id} value={c.fullName}>
+                          {c.fullName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+
+                {selectedCashier !== 'ALL' && (
+                  <button
+                    onClick={() => {
+                      setSelectedCashier('ALL');
+                      setCurrentPage(1);
+                    }}
+                    title="Clear Cashier Filter"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Status Filter */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Filter className="w-3.5 h-3.5" />
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
               <span>Status:</span>
               <select
                 value={selectedStatus}
@@ -536,6 +983,29 @@ export default function SalesOrdersPage() {
                 <option value="CUSTOMER_CREDIT">Khata Credit</option>
               </select>
             </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+              <span>Sort:</span>
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [f, o] = e.target.value.split('-') as [SortField, 'asc' | 'desc'];
+                  setSortBy(f);
+                  setSortOrder(o);
+                  setCurrentPage(1);
+                }}
+                className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
+              >
+                <option value="created_at-desc">Newest First (අලුත් මුලින්)</option>
+                <option value="created_at-asc">Oldest First (පැරණි මුලින්)</option>
+                <option value="total_amount-desc">Highest Amount (මුදල වැඩි)</option>
+                <option value="total_amount-asc">Lowest Amount (මුදල අඩු)</option>
+                <option value="cashier_name-asc">Cashier A-Z (අයකැමි)</option>
+                <option value="invoice_number-desc">Invoice # (බිල් අංකය)</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -544,22 +1014,79 @@ export default function SalesOrdersPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-3 px-4">Invoice / Time</th>
+                {/* Invoice / Time Header with Sort */}
+                <th
+                  onClick={() => handleHeaderSort('created_at')}
+                  className="py-3 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Invoice / Time</span>
+                    {sortBy === 'created_at' ? (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="w-3 h-3 text-[#005BD3]" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3 text-[#005BD3]" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 opacity-30" />
+                    )}
+                  </div>
+                </th>
+
+                <th className="py-3 px-4">Branch</th>
                 <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4">Cashier</th>
+
+                {/* Cashier Header with Sort */}
+                <th
+                  onClick={() => handleHeaderSort('cashier_name')}
+                  className="py-3 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Cashier (අයකැමි)</span>
+                    {sortBy === 'cashier_name' ? (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="w-3 h-3 text-[#005BD3]" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3 text-[#005BD3]" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 opacity-30" />
+                    )}
+                  </div>
+                </th>
+
                 <th className="py-3 px-4">Items</th>
                 <th className="py-3 px-4">Payment</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Grand Total</th>
+
+                {/* Grand Total Header with Sort */}
+                <th
+                  onClick={() => handleHeaderSort('total_amount')}
+                  className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100/80 transition-colors select-none"
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>Grand Total</span>
+                    {sortBy === 'total_amount' ? (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="w-3 h-3 text-[#005BD3]" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3 text-[#005BD3]" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 opacity-30" />
+                    )}
+                  </div>
+                </th>
+
                 <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && sales.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-14 text-center text-slate-400">
+                  <td colSpan={9} className="py-14 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 mx-auto mb-2 text-blue-600 animate-spin" />
-                    <p className="font-medium text-slate-600 text-xs">Loading sales transactions...</p>
+                    <p className="font-medium text-slate-600 text-xs">Loading sales register...</p>
                   </td>
                 </tr>
               ) : sales.length > 0 ? (
@@ -594,6 +1121,7 @@ export default function SalesOrdersPage() {
                           ? new Date(sale.createdAt).toLocaleDateString([], {
                               month: 'short',
                               day: 'numeric',
+                              year: 'numeric',
                             }) +
                             ' ' +
                             new Date(sale.createdAt).toLocaleTimeString([], {
@@ -604,22 +1132,41 @@ export default function SalesOrdersPage() {
                       </div>
                     </td>
 
+                    {/* Branch */}
+                    <td className="py-3.5 px-4 font-medium text-slate-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                        {getBranchLabel(sale.branchId)}
+                      </span>
+                    </td>
+
                     {/* Customer */}
                     <td className="py-3.5 px-4 font-medium text-slate-700">
                       <div>{sale.customerName || 'Walk-in Customer'}</div>
                     </td>
 
-                    {/* Cashier */}
+                    {/* Cashier with 1-Click Quick Filter */}
                     <td className="py-3.5 px-4 text-slate-600">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                        {sale.cashier?.fullName || sale.cashierName || 'Staff'}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
+                          setSelectedCashier(cName);
+                          setCurrentPage(1);
+                        }}
+                        title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
+                      >
+                        <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
+                        <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
+                      </button>
                     </td>
 
                     {/* Items */}
                     <td className="py-3.5 px-4 text-slate-600">
                       <span className="font-bold text-slate-900">
-                        {sale.items?.reduce((cnt, it) => cnt + it.quantity, 0) || 0}
+                        {sale.items && sale.items.length > 0
+                          ? sale.items.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0)
+                          : '—'}
                       </span>{' '}
                       item(s)
                     </td>
@@ -644,7 +1191,7 @@ export default function SalesOrdersPage() {
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        {/* View & Print Receipt */}
+                        {/* View & Print Hardware Receipt */}
                         <button
                           onClick={() => setActiveReceiptSaleId(sale.id)}
                           title="View & Reprint 80mm/58mm Slip"
@@ -681,10 +1228,12 @@ export default function SalesOrdersPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-14 text-center text-slate-400">
+                  <td colSpan={9} className="py-14 text-center text-slate-400">
                     <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-medium text-slate-600 text-sm">No sales records found</p>
-                    <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search keywords</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      No transactions matched the active filters for {period === 'today' ? "today's register" : 'selected period'}.
+                    </p>
                   </td>
                 </tr>
               )}
@@ -692,11 +1241,11 @@ export default function SalesOrdersPage() {
           </table>
         </div>
 
-        {/* Table Footer with Pagination */}
+        {/* Table Footer with Accurate Multi-Page Pagination */}
         <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 bg-slate-50/30">
           <div>
-            Showing <span className="font-semibold text-slate-700">{sales.length}</span> of{' '}
-            <span className="font-semibold text-slate-700">{totalCount}</span> total recorded orders
+            Showing <span className="font-semibold text-slate-700">{sales.length}</span> bills on this page •{' '}
+            <span className="font-semibold text-slate-700">{totalCount.toLocaleString()}</span> total matching transactions across database
           </div>
 
           {totalPages > 1 && (
@@ -722,7 +1271,7 @@ export default function SalesOrdersPage() {
           )}
 
           <div className="font-mono text-[11px] text-slate-400">
-            Encrypted Audit Logs • RLS Isolated
+            Encrypted Audit Logs • Colombo +05:30
           </div>
         </div>
       </div>
@@ -766,6 +1315,14 @@ export default function SalesOrdersPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Invoice:</span>
                 <span className="font-mono font-bold text-slate-900">{voidModalSale.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Branch:</span>
+                <span className="font-medium text-slate-800">{getBranchLabel(voidModalSale.branchId)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Cashier:</span>
+                <span className="font-medium text-slate-800">{voidModalSale.cashier?.fullName || voidModalSale.cashierName || 'Staff'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Customer:</span>
@@ -823,6 +1380,293 @@ export default function SalesOrdersPage() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Executive Printable Cashier & Sales Audit Report Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Modal Non-Print Action Header */}
+            <div className="no-print p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-[#005BD3]" />
+                <h2 className="text-sm font-bold text-slate-900">
+                  Cashier & Sales Performance Audit Report
+                </h2>
+                <span className="text-[11px] font-medium text-slate-500">
+                  ({reportSales.length} records matching current filter)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  disabled={reportLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#005BD3] hover:bg-[#004bb5] text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print / Save PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Report Canvas */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6" id="cashier-audit-report-printable">
+              {reportLoading ? (
+                <div className="py-20 text-center text-slate-400">
+                  <RefreshCw className="w-8 h-8 mx-auto mb-3 text-blue-600 animate-spin" />
+                  <p className="font-semibold text-slate-700 text-sm">Generating comprehensive audit report...</p>
+                  <p className="text-xs text-slate-400 mt-1">Aggregating tender records across branch database</p>
+                </div>
+              ) : (
+                <>
+                  {/* Executive Letterhead Header */}
+                  <div className="border-b-2 border-slate-900 pb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Award className="w-6 h-6 text-[#005BD3]" />
+                        <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase">
+                          Deegayu Weda Madura
+                        </h1>
+                      </div>
+                      <p className="text-xs text-slate-600 font-medium mt-0.5 font-sinhala">
+                        දීගායු වෙද මැදුර • ආයුර්වේද ඖෂධ සහ ප්‍රතිකාර සේවා
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Executive Sales & Cashier Settlement Ledger • Official Financial Audit
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right text-xs space-y-1">
+                      <div className="inline-block px-2.5 py-1 rounded-md bg-slate-100 font-mono font-bold text-slate-800 text-[11px]">
+                        AUDIT-REP-{new Date().toISOString().slice(0, 10).replace(/-/g, '')}
+                      </div>
+                      <div className="text-slate-500 text-[11px]">
+                        Generated: {new Date().toLocaleString('en-GB', { timeZone: 'Asia/Colombo' })} (SLST)
+                      </div>
+                      <div className="text-slate-500 text-[11px]">
+                        Branch: <span className="font-bold text-slate-800">{selectedBranch !== 'ALL' ? getBranchLabel(selectedBranch) : 'All Branches (Consolidated)'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Metadata Context Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Report Period</span>
+                      <span className="font-bold text-slate-900 capitalize">
+                        {period === 'custom' ? `${customStartDate} to ${customEndDate}` : period.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Cashier Scope</span>
+                      <span className="font-bold text-slate-900">
+                        {selectedCashier !== 'ALL' ? selectedCashier : 'All Cashiers'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Payment Method</span>
+                      <span className="font-bold text-slate-900">{selectedMethod}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Status Scope</span>
+                      <span className="font-bold text-slate-900">{selectedStatus}</span>
+                    </div>
+                  </div>
+
+                  {/* Executive Tender Summary Cards */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+                      Executive Settlement Summary
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <span className="text-[10px] font-bold uppercase text-emerald-800 block">Total Gross</span>
+                        <span className="text-base font-extrabold text-emerald-950 block mt-0.5">
+                          {formatCurrency(reportGross)}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 mt-0.5 block">
+                          {reportCompleted.length} Completed
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+                        <span className="text-[10px] font-bold uppercase text-blue-800 block">Physical Cash</span>
+                        <span className="text-base font-extrabold text-blue-950 block mt-0.5">
+                          {formatCurrency(reportCashTotal)}
+                        </span>
+                        <span className="text-[10px] text-blue-700 mt-0.5 block">Drawer Cash</span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+                        <span className="text-[10px] font-bold uppercase text-indigo-800 block">Card & QR</span>
+                        <span className="text-base font-extrabold text-indigo-950 block mt-0.5">
+                          {formatCurrency(reportCardTotal + reportQrTotal)}
+                        </span>
+                        <span className="text-[10px] text-indigo-700 mt-0.5 block">Bank Settlement</span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                        <span className="text-[10px] font-bold uppercase text-amber-800 block">Khata Credit</span>
+                        <span className="text-base font-extrabold text-amber-950 block mt-0.5">
+                          {formatCurrency(reportCreditTotal)}
+                        </span>
+                        <span className="text-[10px] text-amber-700 mt-0.5 block">Customer Credit</span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
+                        <span className="text-[10px] font-bold uppercase text-rose-800 block">Voided Bills</span>
+                        <span className="text-base font-extrabold text-rose-950 block mt-0.5">
+                          {formatCurrency(reportVoidedAmt)}
+                        </span>
+                        <span className="text-[10px] text-rose-700 mt-0.5 block">
+                          {reportVoided.length} Voided
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cashier Performance Breakdown (if multiple cashiers or all) */}
+                  {cashierAuditBreakdown.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                        Cashier Performance Breakdown (අයකැමි කාර්යසාධනය)
+                      </h3>
+                      <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                        <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="py-2 px-3">Cashier Name</th>
+                            <th className="py-2 px-3 text-center">Bills Count</th>
+                            <th className="py-2 px-3 text-right">Cash Total</th>
+                            <th className="py-2 px-3 text-right">Card Total</th>
+                            <th className="py-2 px-3 text-right">Gross Total (LKR)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {cashierAuditBreakdown.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 font-semibold text-slate-900">{row.name}</td>
+                              <td className="py-2 px-3 text-center font-mono">{row.count}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(row.cash)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(row.card)}</td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                {formatCurrency(row.gross)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Itemized Transactions Table */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                      Itemized Audit Records ({reportSales.length} Bills)
+                    </h3>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
+                          <tr>
+                            <th className="py-2 px-3">Invoice #</th>
+                            <th className="py-2 px-3">Date & Time</th>
+                            <th className="py-2 px-3">Branch</th>
+                            <th className="py-2 px-3">Cashier</th>
+                            <th className="py-2 px-3">Customer</th>
+                            <th className="py-2 px-3">Method</th>
+                            <th className="py-2 px-3">Status</th>
+                            <th className="py-2 px-3 text-right">Net Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-[11px]">
+                          {reportSales.slice(0, 300).map((sale) => (
+                            <tr key={sale.id} className={sale.status === 'VOIDED' ? 'bg-rose-50/30' : ''}>
+                              <td className="py-1.5 px-3 font-mono font-bold">{sale.invoiceNumber}</td>
+                              <td className="py-1.5 px-3 font-mono text-slate-500">
+                                {new Date(sale.createdAt).toLocaleString('en-GB', {
+                                  month: 'short',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  timeZone: 'Asia/Colombo',
+                                })}
+                              </td>
+                              <td className="py-1.5 px-3 text-slate-700">{getBranchLabel(sale.branchId)}</td>
+                              <td className="py-1.5 px-3 text-slate-700">{sale.cashier?.fullName || sale.cashierName || 'Staff'}</td>
+                              <td className="py-1.5 px-3 text-slate-700">{sale.customerName || 'Walk-in'}</td>
+                              <td className="py-1.5 px-3">{sale.payments?.[0]?.paymentMethod || 'CASH'}</td>
+                              <td className="py-1.5 px-3 font-bold">
+                                <span className={sale.status === 'COMPLETED' ? 'text-emerald-700' : 'text-rose-700'}>
+                                  {sale.status}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-3 text-right font-mono font-bold">
+                                <span className={sale.status === 'VOIDED' ? 'line-through text-slate-400' : 'text-slate-900'}>
+                                  {formatCurrency(Number(sale.totalAmount))}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                          <tr>
+                            <td colSpan={7} className="py-2 px-3 text-right uppercase text-[11px] text-slate-600">
+                              Grand Settled Total:
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono text-xs text-slate-950">
+                              {formatCurrency(reportGross)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    {reportSales.length > 300 && (
+                      <p className="text-[10px] text-slate-500 mt-1 italic text-center">
+                        * Showing first 300 itemized records for print optimization. Total verified dataset contains {reportSales.length} bills.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Executive Sign-off Signatures */}
+                  <div className="pt-8 grid grid-cols-2 gap-12 text-xs border-t border-slate-200">
+                    <div className="space-y-12">
+                      <div className="border-b border-slate-400 pb-1 font-mono text-center text-slate-400">
+                        Signature of Dispenser / Cashier
+                      </div>
+                      <div className="text-center text-slate-600">
+                        <span className="font-bold text-slate-800">
+                          {selectedCashier !== 'ALL' ? selectedCashier : 'Authorized Cashier'}
+                        </span>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Cash Register Settlement Officer</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-12">
+                      <div className="border-b border-slate-400 pb-1 font-mono text-center text-slate-400">
+                        Signature of Owner / Managing Director
+                      </div>
+                      <div className="text-center text-slate-600">
+                        <span className="font-bold text-slate-800">Dr. Deegayu (Managing Director)</span>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Deegayu Weda Madura Financial Governance</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-center text-[10px] text-slate-400 pt-4 font-mono">
+                    Official Audit Certificate • PixelCraft POS Enterprise Ledger • All Rights Reserved © {new Date().getFullYear()}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

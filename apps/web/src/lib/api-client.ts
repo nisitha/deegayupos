@@ -915,6 +915,115 @@ function isValidUuid(val?: string | null): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 }
 
+export interface GetSalesParams {
+  page?: number;
+  limit?: number;
+  period?: 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom' | string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  status?: string;
+  paymentMethod?: string;
+  branchId?: string;
+  cashierName?: string;
+  cashierId?: string;
+  sortBy?: 'created_at' | 'total_amount' | 'invoice_number' | 'cashier_name';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface SalesSummaryKPI {
+  totalGross: number;
+  completedCount: number;
+  voidedCount: number;
+  totalVoidedAmount: number;
+  avgTicket: number;
+  totalBills: number;
+}
+
+export function getColomboDateBounds(
+  period?: string,
+  startDate?: string,
+  endDate?: string
+): { from?: string; to?: string } {
+  if (!period || period === 'all') {
+    return {};
+  }
+
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Colombo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const todayStr = formatter.format(now); // "YYYY-MM-DD"
+  const parts = todayStr.split('-').map(Number);
+  const yearNum = parts[0] || 2026;
+  const monthNum = parts[1] || 11;
+  const dayNum = parts[2] || 16;
+
+  if (period === 'today') {
+    return {
+      from: `${todayStr}T00:00:00.000+05:30`,
+      to: `${todayStr}T23:59:59.999+05:30`,
+    };
+  }
+
+  if (period === 'yesterday') {
+    const d = new Date(Date.UTC(yearNum, monthNum - 1, dayNum - 1));
+    const yStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    return {
+      from: `${yStr}T00:00:00.000+05:30`,
+      to: `${yStr}T23:59:59.999+05:30`,
+    };
+  }
+
+  if (period === 'week') {
+    const currentColomboDate = new Date(`${todayStr}T12:00:00+05:30`);
+    const dayOfWeek = currentColomboDate.getDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(Date.UTC(yearNum, monthNum - 1, dayNum - diffToMonday));
+    const mStr = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+    return {
+      from: `${mStr}T00:00:00.000+05:30`,
+      to: `${todayStr}T23:59:59.999+05:30`,
+    };
+  }
+
+  if (period === 'month') {
+    const mStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+    return {
+      from: `${mStr}T00:00:00.000+05:30`,
+      to: `${todayStr}T23:59:59.999+05:30`,
+    };
+  }
+
+  if (period === 'last_month') {
+    let prevYear = yearNum;
+    let prevMonth = monthNum - 1;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear -= 1;
+    }
+    const daysInPrevMonth = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+    const startStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+    const endStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(daysInPrevMonth).padStart(2, '0')}`;
+    return {
+      from: `${startStr}T00:00:00.000+05:30`,
+      to: `${endStr}T23:59:59.999+05:30`,
+    };
+  }
+
+  if (period === 'custom') {
+    const res: { from?: string; to?: string } = {};
+    if (startDate) res.from = `${startDate}T00:00:00.000+05:30`;
+    if (endDate) res.to = `${endDate}T23:59:59.999+05:30`;
+    return res;
+  }
+
+  return {};
+}
+
 export const posApi = {
   createSale: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
     return posApi.checkout(data);
@@ -1411,15 +1520,136 @@ export const posApi = {
       window.print();
     }
   },
-  getSales: async (_params?: Record<string, unknown>): Promise<ApiResponse<PaginatedResult<SaleDto>>> => {
+  getSales: async (
+    params: GetSalesParams = {}
+  ): Promise<ApiResponse<PaginatedResult<SaleDto> & { summary?: SalesSummaryKPI }>> => {
     let list: SaleDto[] = [];
-    try {
-      const { data: sbSales, error: sbErr } = await supabase
-        .from('sales')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+    const page = Math.max(1, Number(params.page || 1));
+    const limit = Math.max(1, Number(params.limit || 50));
+    const offset = (page - 1) * limit;
 
+    let totalCount = 0;
+    let summary: SalesSummaryKPI = {
+      totalGross: 0,
+      completedCount: 0,
+      voidedCount: 0,
+      totalVoidedAmount: 0,
+      avgTicket: 0,
+      totalBills: 0,
+    };
+
+    try {
+      const bounds = getColomboDateBounds(params.period, params.startDate, params.endDate);
+
+      // Pre-filter for paymentMethod if requested
+      let matchingSaleIds: string[] | null = null;
+      if (params.paymentMethod && params.paymentMethod !== 'ALL') {
+        try {
+          const { data: pmData } = await supabase
+            .from('sale_payments')
+            .select('sale_id')
+            .eq('payment_method', params.paymentMethod)
+            .limit(2000);
+          matchingSaleIds = pmData ? pmData.map((p: any) => p.sale_id) : [];
+        } catch (e) {
+          console.warn('[Sales API] payment filter error:', e);
+        }
+      }
+
+      // 1. Fast Summary Query (calculates accurate KPIs across ALL matching records)
+      let summaryQuery = supabase.from('sales').select('status, total_amount');
+      if (bounds.from) summaryQuery = summaryQuery.gte('created_at', bounds.from);
+      if (bounds.to) summaryQuery = summaryQuery.lte('created_at', bounds.to);
+      if (params.branchId && params.branchId !== 'ALL') {
+        summaryQuery = summaryQuery.eq('branch_id', params.branchId);
+      }
+      if (params.status && params.status !== 'ALL') {
+        summaryQuery = summaryQuery.eq('status', params.status);
+      }
+      if (params.cashierId && params.cashierId !== 'ALL') {
+        summaryQuery = summaryQuery.eq('cashier_id', params.cashierId);
+      } else if (params.cashierName && params.cashierName !== 'ALL') {
+        summaryQuery = summaryQuery.eq('cashier_name', params.cashierName);
+      }
+      if (params.search && params.search.trim()) {
+        const term = params.search.trim();
+        summaryQuery = summaryQuery.or(
+          `invoice_number.ilike.%${term}%,customer_name.ilike.%${term}%,cashier_name.ilike.%${term}%`
+        );
+      }
+      if (matchingSaleIds !== null) {
+        if (matchingSaleIds.length > 0) {
+          summaryQuery = summaryQuery.in('id', matchingSaleIds);
+        } else {
+          summaryQuery = summaryQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+        }
+      }
+
+      const { data: summaryRows, error: summaryErr } = await summaryQuery;
+      if (!summaryErr && summaryRows) {
+        let gross = 0;
+        let compCnt = 0;
+        let voidCnt = 0;
+        let voidAmt = 0;
+        for (const row of summaryRows) {
+          const amt = Number(row.total_amount || 0);
+          if (row.status === 'COMPLETED') {
+            compCnt++;
+            gross += amt;
+          } else if (row.status === 'VOIDED') {
+            voidCnt++;
+            voidAmt += amt;
+          }
+        }
+        totalCount = summaryRows.length;
+        summary = {
+          totalGross: gross,
+          completedCount: compCnt,
+          voidedCount: voidCnt,
+          totalVoidedAmount: voidAmt,
+          avgTicket: compCnt > 0 ? gross / compCnt : 0,
+          totalBills: totalCount,
+        };
+      }
+
+      // 2. Paginated Data Query
+      let query = supabase.from('sales').select('*');
+      if (bounds.from) query = query.gte('created_at', bounds.from);
+      if (bounds.to) query = query.lte('created_at', bounds.to);
+      if (params.branchId && params.branchId !== 'ALL') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params.status && params.status !== 'ALL') {
+        query = query.eq('status', params.status);
+      }
+      if (params.cashierId && params.cashierId !== 'ALL') {
+        query = query.eq('cashier_id', params.cashierId);
+      } else if (params.cashierName && params.cashierName !== 'ALL') {
+        query = query.eq('cashier_name', params.cashierName);
+      }
+      if (params.search && params.search.trim()) {
+        const term = params.search.trim();
+        query = query.or(
+          `invoice_number.ilike.%${term}%,customer_name.ilike.%${term}%,cashier_name.ilike.%${term}%`
+        );
+      }
+      if (matchingSaleIds !== null) {
+        if (matchingSaleIds.length > 0) {
+          query = query.in('id', matchingSaleIds);
+        } else {
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+        }
+      }
+
+      // Sorting
+      const sortByCol = params.sortBy || 'created_at';
+      const isAsc = params.sortOrder === 'asc';
+      query = query.order(sortByCol, { ascending: isAsc });
+
+      // Range Pagination
+      query = query.range(offset, offset + limit - 1);
+
+      const { data: sbSales, error: sbErr } = await query;
       if (sbErr) {
         console.warn('[Sales API] Query error:', sbErr.message);
       }
@@ -1465,6 +1695,7 @@ export const posApi = {
             invoiceNumber: s.invoice_number,
             cashierId: s.cashier_id,
             cashierName: s.cashier_name,
+            cashier: s.cashier_name ? { id: s.cashier_id, fullName: s.cashier_name, email: s.cashier_email || '' } : undefined,
             customerId: s.customer_id,
             customerName: s.customer_name,
             orderType: s.order_type,
@@ -1513,27 +1744,202 @@ export const posApi = {
       console.warn('Supabase sales query note:', sbErr);
     }
 
-    if (list.length === 0 && typeof window !== 'undefined') {
+    if (list.length === 0 && totalCount === 0 && typeof window !== 'undefined') {
       const stored = localStorage.getItem('pixelcraft_sales_history');
       if (stored) {
         try {
-          list = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            list = parsed.slice(offset, offset + limit);
+            totalCount = parsed.length;
+          }
         } catch {
           // Ignore
         }
       }
     }
 
+    const calculatedTotal = totalCount > 0 ? totalCount : list.length;
+    const totalPages = Math.max(1, Math.ceil(calculatedTotal / limit));
+
     return {
       success: true,
       data: {
         items: list,
-        total: list.length,
-        page: 1,
-        limit: 50,
-        totalPages: 1,
+        total: calculatedTotal,
+        page,
+        limit,
+        totalPages,
+        summary,
       },
     };
+  },
+  getAllSales: async (params: GetSalesParams = {}): Promise<SaleDto[]> => {
+    let allSales: SaleDto[] = [];
+    try {
+      const bounds = getColomboDateBounds(params.period, params.startDate, params.endDate);
+
+      let matchingSaleIds: string[] | null = null;
+      if (params.paymentMethod && params.paymentMethod !== 'ALL') {
+        try {
+          const { data: pmData } = await supabase
+            .from('sale_payments')
+            .select('sale_id')
+            .eq('payment_method', params.paymentMethod)
+            .limit(2000);
+          matchingSaleIds = pmData ? pmData.map((p: any) => p.sale_id) : [];
+        } catch (e) {
+          console.warn('[Sales API] payment filter error:', e);
+        }
+      }
+
+      let offset = 0;
+      const chunkSize = 1000;
+      const rawSales: any[] = [];
+
+      while (true) {
+        let query = supabase.from('sales').select('*');
+        if (bounds.from) query = query.gte('created_at', bounds.from);
+        if (bounds.to) query = query.lte('created_at', bounds.to);
+        if (params.branchId && params.branchId !== 'ALL') {
+          query = query.eq('branch_id', params.branchId);
+        }
+        if (params.status && params.status !== 'ALL') {
+          query = query.eq('status', params.status);
+        }
+        if (params.cashierId && params.cashierId !== 'ALL') {
+          query = query.eq('cashier_id', params.cashierId);
+        } else if (params.cashierName && params.cashierName !== 'ALL') {
+          query = query.eq('cashier_name', params.cashierName);
+        }
+        if (params.search && params.search.trim()) {
+          const term = params.search.trim();
+          query = query.or(
+            `invoice_number.ilike.%${term}%,customer_name.ilike.%${term}%,cashier_name.ilike.%${term}%`
+          );
+        }
+        if (matchingSaleIds !== null) {
+          if (matchingSaleIds.length > 0) {
+            query = query.in('id', matchingSaleIds);
+          } else {
+            break;
+          }
+        }
+
+        const sortByCol = params.sortBy || 'created_at';
+        const isAsc = params.sortOrder === 'asc';
+        query = query.order(sortByCol, { ascending: isAsc });
+        query = query.range(offset, offset + chunkSize - 1);
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+
+        rawSales.push(...data);
+        if (data.length < chunkSize) break;
+        offset += chunkSize;
+        if (offset >= 10000) break;
+      }
+
+      if (rawSales.length > 0) {
+        const saleIds = rawSales.map((s) => s.id);
+        const paymentsBySaleId = new Map<string, any[]>();
+
+        for (let i = 0; i < saleIds.length; i += 500) {
+          const chunkIds = saleIds.slice(i, i + 500);
+          try {
+            const { data: payData } = await supabase
+              .from('sale_payments')
+              .select('*')
+              .in('sale_id', chunkIds);
+            if (payData) {
+              payData.forEach((pay: any) => {
+                const current = paymentsBySaleId.get(pay.sale_id) || [];
+                current.push(pay);
+                paymentsBySaleId.set(pay.sale_id, current);
+              });
+            }
+          } catch (e) {
+            console.warn('[Sales API] Payments batch fetch note:', e);
+          }
+        }
+
+        allSales = rawSales.map((s: any) => {
+          const sPayments = paymentsBySaleId.get(s.id) || [];
+          return {
+            id: s.id,
+            tenantId: s.tenant_id,
+            branchId: s.branch_id,
+            invoiceNumber: s.invoice_number,
+            cashierId: s.cashier_id,
+            cashierName: s.cashier_name,
+            cashier: s.cashier_name ? { id: s.cashier_id, fullName: s.cashier_name, email: s.cashier_email || '' } : undefined,
+            customerId: s.customer_id,
+            customerName: s.customer_name,
+            orderType: s.order_type,
+            status: s.status,
+            subtotal: Number(s.subtotal || 0),
+            discountAmount: Number(s.discount_amount || 0),
+            taxAmount: Number(s.tax_amount || 0),
+            totalAmount: Number(s.total_amount || 0),
+            paidAmount: Number(s.paid_amount || 0),
+            changeDue: Number(s.change_due || 0),
+            createdAt: s.created_at,
+            updatedAt: s.updated_at,
+            items: [],
+            payments: sPayments.length > 0 ? sPayments.map((p: any) => ({
+              id: p.id,
+              saleId: p.sale_id,
+              paymentMethod: p.payment_method,
+              amount: Number(p.amount || 0),
+              status: p.status,
+              createdAt: p.created_at,
+            })) : [
+              {
+                id: `pay-${s.id}`,
+                saleId: s.id,
+                paymentMethod: 'CASH' as const,
+                amount: Number(s.total_amount || 0),
+                status: 'SUCCESS' as const,
+                createdAt: s.created_at,
+              }
+            ],
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('[getAllSales] error:', err);
+    }
+    return allSales;
+  },
+  getCashiers: async (): Promise<{ id: string; fullName: string; role: string }[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, role')
+        .order('full_name');
+      if (!error && data && data.length > 0) {
+        return data.map((u: any) => ({
+          id: u.id,
+          fullName: u.full_name,
+          role: u.role,
+        }));
+      }
+    } catch (err) {
+      console.warn('[getCashiers] error:', err);
+    }
+    return [
+      { id: '96b2747b-9d22-4266-94ce-b035fadef498', fullName: 'Dr. Deegayu (Owner)', role: 'OWNER' },
+      { id: '41363aeb-ba28-44b7-8822-983f1de593c0', fullName: 'Shashini', role: 'STAFF' },
+      { id: '0f1d46e2-e943-4f24-b69e-f1ba5278a750', fullName: 'Tharindu', role: 'STAFF' },
+      { id: '1de49278-b4aa-466a-8493-d88c0c4d56de', fullName: 'Anusha', role: 'STAFF' },
+      { id: '1b50a131-4b75-4b22-86ee-bdd74665aeab', fullName: 'Kumari', role: 'STAFF' },
+      { id: '192f7833-4465-4814-ab57-201cedd5f237', fullName: 'Gindika', role: 'STAFF' },
+      { id: '219891d1-6264-4271-95a1-8781e5e5a7b1', fullName: 'Sale Alawwa', role: 'ARCHIVED' },
+      { id: '97e9b65f-1e57-4061-ad98-b79136359f07', fullName: 'Sale  Dabadeniya', role: 'ARCHIVED' },
+      { id: '97e9b65f-1e57-4061-ad98-b79136359f07', fullName: 'Sale Admin', role: 'ARCHIVED' },
+      { id: '23fed607-537b-41c8-9d29-2396d82e7cb8', fullName: 'User User1', role: 'ARCHIVED' },
+      { id: '057b87b9-2aa7-4c64-a17e-2be8ec9723ac', fullName: 'Sale Giriulla', role: 'ARCHIVED' },
+    ];
   },
   getAnalytics: async <T = Record<string, unknown>>(
     params?: Record<string, unknown>
