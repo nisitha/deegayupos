@@ -66,25 +66,32 @@ export default function CashReconciliationPage() {
     return datePart || new Date().toISOString().slice(0, 10);
   };
 
-  // Set default tab based on role and URL params
+  // Set default tab based on role and URL params (Strictly locked to worksheet for Staff)
   const [activeTab, setActiveTab] = useState<TabView>(() => {
+    if (!isOwner) return 'worksheet';
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('tab');
       if (p && ['admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
         return p as TabView;
       }
     }
-    return isOwner ? 'admin_summary' : 'worksheet';
+    return 'admin_summary';
   });
 
   useEffect(() => {
+    if (!isOwner) {
+      setActiveTab('worksheet');
+      return;
+    }
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('tab');
       if (p && ['admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
         setActiveTab(p as TabView);
       }
     }
-  }, []);
+  }, [isOwner]);
+
+  const [staffEditingSubmitted, setStaffEditingSubmitted] = useState<boolean>(false);
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodaySriLanka());
   const [loading, setLoading] = useState<boolean>(true);
@@ -226,6 +233,76 @@ export default function CashReconciliationPage() {
     setSaveSuccessMsg(null);
 
     try {
+      // =========================================================================
+      // STAFF MODE: ZERO MULTI-BRANCH DATA LEAKS
+      // If role !== 'OWNER', restrict strictly to today's assigned branch worksheet
+      // =========================================================================
+      if (!isOwner) {
+        const todayStr = getTodaySriLanka();
+        setSelectedDate(todayStr);
+
+        // Fetch company bank accounts for the deposit dropdown
+        const bankAccs = await reconciliationApi.getBankAccounts(tenantId);
+        setCompanyBankAccounts(bankAccs);
+
+        if (effectiveBranchId) {
+          const worksheet = await reconciliationApi.loadReconciliationWorksheet(effectiveBranchId, todayStr);
+          setSystemCashSales(worksheet.systemCashSales);
+          setCashierSummaries(worksheet.cashierBreakdown);
+
+          if (worksheet.existingRec) {
+            const rec = worksheet.existingRec;
+            setExistingRecord(rec);
+            setOpeningFloatA(Number(rec.opening_float_a) || 0);
+            setCashExpensesB(Number(rec.cash_expenses_b) || 0);
+            setGeneralNotes(rec.notes || '');
+
+            if (rec.denominations && typeof rec.denominations === 'object') {
+              const loadedDenoms: Record<number, number> = {};
+              SRI_LANKA_DENOMINATIONS.forEach((d) => {
+                loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
+              });
+              setDenominations(loadedDenoms);
+            }
+
+            if (worksheet.existingDeposits.length > 0) {
+              setBankDeposits(worksheet.existingDeposits);
+            }
+            setIsFloatLocked(true);
+          } else {
+            setExistingRecord(null);
+            if (worksheet.previousClosingF !== null) {
+              setOpeningFloatA(worksheet.previousClosingF);
+              setIsFloatLocked(true);
+            } else {
+              setOpeningFloatA(0);
+              setIsFloatLocked(false);
+            }
+
+            setCashExpensesB(worksheet.autoCashExpenses);
+
+            const initialDenoms: Record<number, number> = {};
+            SRI_LANKA_DENOMINATIONS.forEach((d) => {
+              initialDenoms[d] = 0;
+            });
+            setDenominations(initialDenoms);
+
+            const firstAcc = bankAccs[0];
+            if (firstAcc) {
+              setBankDeposits([
+                {
+                  bank_name: firstAcc.bank_name,
+                  account_number: firstAcc.account_number,
+                  account_name: firstAcc.account_name,
+                  amount: 0,
+                },
+              ]);
+            }
+          }
+        }
+        return;
+      }
+
       // Compute date filters for Admin Summary
       let sDate: string | undefined = undefined;
       let eDate: string | undefined = undefined;
@@ -359,6 +436,7 @@ export default function CashReconciliationPage() {
       setLoading(false);
     }
   }, [
+    isOwner,
     tenantId,
     effectiveBranchId,
     selectedDate,
@@ -507,6 +585,7 @@ export default function CashReconciliationPage() {
 
       setSaveSuccessMsg(`End-of-day cash reconciliation for ${selectedDate} has been posted successfully.`);
       setShowConfirmModal(false);
+      setStaffEditingSubmitted(false);
       await loadAllData();
     } catch (err: any) {
       console.error('Submission error:', err);
@@ -643,14 +722,16 @@ export default function CashReconciliationPage() {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
-                  Daily Cash Reconciliation & Banking Hub
+                  {isOwner ? 'Daily Cash Reconciliation & Banking Hub' : 'Daily Branch Cash Reconciliation'}
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {isOwner ? 'Executive Admin View' : 'Branch Staff'}
+                  {isOwner ? 'Executive Admin View' : `Branch Staff • ${currentBranchName}`}
                 </span>
               </div>
               <p className="text-sm text-slate-400 mt-0.5">
-                End-of-day physical drawer count, multi-branch summaries, bank deposit registers (BOC/NSB/NTB), and cashier shortages.
+                {isOwner
+                  ? 'End-of-day physical drawer count, multi-branch summaries, bank deposit registers (BOC/NSB/NTB), and cashier shortages.'
+                  : 'Submit your end-of-day drawer count, cash expenses, and bank deposits for your assigned branch.'}
               </p>
             </div>
           </div>
@@ -668,14 +749,16 @@ export default function CashReconciliationPage() {
             Refresh Data
           </button>
 
-          {/* Print Button */}
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            Print Report
-          </button>
+          {/* Print Button - Executive Admin Only */}
+          {isOwner && (
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Print Report
+            </button>
+          )}
         </div>
       </div>
 
@@ -696,103 +779,105 @@ export default function CashReconciliationPage() {
       )}
 
       {/* ========================================================= */}
-      {/* TABS NAVIGATION */}
+      {/* TABS NAVIGATION (Executive Admin Only) */}
       {/* ========================================================= */}
-      <div className="flex items-center gap-2 mb-6 border-b border-slate-800/80 pb-2 overflow-x-auto">
-        {/* Admin Multi-Branch Summary */}
-        <button
-          onClick={() => setActiveTab('admin_summary')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'admin_summary'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          Multi-Branch Summary
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
-            {consolidatedSummaries.length}
-          </span>
-        </button>
-
-        {/* Bank Deposit Register */}
-        <button
-          onClick={() => setActiveTab('bank_register')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'bank_register'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Wallet className="w-4 h-4" />
-          Bank Deposit Register (BOC / NSB / NTB)
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
-            {consolidatedBankDeposits.length}
-          </span>
-        </button>
-
-        {/* Cashier Shortages */}
-        <button
-          onClick={() => setActiveTab('shortages')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'shortages'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4" />
-          Cashier Shortages & Payroll
-          {shortageTotals.pendingAmt > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
-              LKR {shortageTotals.pendingAmt.toLocaleString()}
+      {isOwner && (
+        <div className="flex items-center gap-2 mb-6 border-b border-slate-800/80 pb-2 overflow-x-auto">
+          {/* Admin Multi-Branch Summary */}
+          <button
+            onClick={() => setActiveTab('admin_summary')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'admin_summary'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            Multi-Branch Summary
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
+              {consolidatedSummaries.length}
             </span>
-          )}
-        </button>
+          </button>
 
-        {/* Daily Accounts Ledger */}
-        <button
-          onClick={() => setActiveTab('ledger')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'ledger'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          Daily Accounts & Float (F) Audit
-        </button>
+          {/* Bank Deposit Register */}
+          <button
+            onClick={() => setActiveTab('bank_register')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'bank_register'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            Bank Deposit Register (BOC / NSB / NTB)
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
+              {consolidatedBankDeposits.length}
+            </span>
+          </button>
 
-        {/* Branch Worksheet */}
-        <button
-          onClick={() => setActiveTab('worksheet')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'worksheet'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Coins className="w-4 h-4" />
-          Branch Worksheet (Count Drawer)
-        </button>
+          {/* Cashier Shortages */}
+          <button
+            onClick={() => setActiveTab('shortages')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'shortages'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            Cashier Shortages & Payroll
+            {shortageTotals.pendingAmt > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
+                LKR {shortageTotals.pendingAmt.toLocaleString()}
+              </span>
+            )}
+          </button>
 
-        {/* Company Bank Accounts */}
-        <button
-          onClick={() => setActiveTab('bank_accounts')}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'bank_accounts'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          Bank Accounts ({companyBankAccounts.length})
-        </button>
-      </div>
+          {/* Daily Accounts Ledger */}
+          <button
+            onClick={() => setActiveTab('ledger')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'ledger'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Daily Accounts & Float (F) Audit
+          </button>
+
+          {/* Branch Worksheet */}
+          <button
+            onClick={() => setActiveTab('worksheet')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'worksheet'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Coins className="w-4 h-4" />
+            Branch Worksheet (Count Drawer)
+          </button>
+
+          {/* Company Bank Accounts */}
+          <button
+            onClick={() => setActiveTab('bank_accounts')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'bank_accounts'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            Bank Accounts ({companyBankAccounts.length})
+          </button>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* VIEW 1: MULTI-BRANCH DAILY RECONCILIATION SUMMARY */}
       {/* ========================================================= */}
-      {activeTab === 'admin_summary' && (
+      {activeTab === 'admin_summary' && isOwner && (
         <div className="space-y-6">
           {/* Executive KPI Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -1116,7 +1201,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* VIEW 2: BANK DEPOSIT & ACCOUNT-WISE REGISTER (BOC/NSB/NTB) */}
       {/* ========================================================= */}
-      {activeTab === 'bank_register' && (
+      {activeTab === 'bank_register' && isOwner && (
         <div className="space-y-6">
           {/* Bank Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1338,7 +1423,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* VIEW 3: CASHIER SHORTAGES & PAYROLL DEDUCTION MANAGER */}
       {/* ========================================================= */}
-      {activeTab === 'shortages' && (
+      {activeTab === 'shortages' && isOwner && (
         <div className="space-y-6">
           {/* Top Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1560,7 +1645,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* VIEW 4: DAILY ACCOUNTS LEDGER & CARRY-FORWARD FLOAT (F) AUDIT */}
       {/* ========================================================= */}
-      {activeTab === 'ledger' && (
+      {activeTab === 'ledger' && isOwner && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800">
             <div>
@@ -1700,16 +1785,18 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* VIEW 5: BRANCH WORKSHEET (Drawer Count Entry) */}
       {/* ========================================================= */}
-      {activeTab === 'worksheet' && (
+      {(activeTab === 'worksheet' || !isOwner) && (
         <div className="space-y-6">
           {/* Branch & Date Switcher Header */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl">
             <div className="flex items-center gap-3">
               <Coins className="w-5 h-5 text-amber-400" />
               <div>
-                <h2 className="text-base font-bold text-slate-100">Daily Branch Reconciliation Worksheet</h2>
+                <h2 className="text-base font-bold text-slate-100">
+                  {isOwner ? 'Daily Branch Reconciliation Worksheet' : `Daily Branch Reconciliation — ${currentBranchName}`}
+                </h2>
                 <p className="text-xs text-slate-400">
-                  Count physical currency notes & coins, allocate bank deposits, and verify zero variance.
+                  Count physical currency notes &amp; coins, allocate bank deposits, and verify zero variance.
                 </p>
               </div>
             </div>
@@ -1721,12 +1808,15 @@ export default function CashReconciliationPage() {
                   <Building2 className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="font-semibold text-slate-200">{currentBranchName}</span>
                 </div>
-              ) : (
+              ) : !isOwner ? (
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
                   <Building2 className="w-3.5 h-3.5 text-slate-400" />
                   <select
                     value={effectiveBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedBranchId(e.target.value);
+                      setStaffEditingSubmitted(false);
+                    }}
                     className="bg-transparent text-slate-200 outline-none cursor-pointer"
                   >
                     {allowedBranches.map((b) => (
@@ -1736,23 +1826,45 @@ export default function CashReconciliationPage() {
                     ))}
                   </select>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
+                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={effectiveBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    className="bg-transparent text-slate-200 outline-none cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
 
-              {/* Date Picker */}
-              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-slate-200 outline-none cursor-pointer"
-                />
-              </div>
+              {/* Date Display / Picker */}
+              {!isOwner ? (
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 select-none text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-semibold text-slate-200">{selectedDate} (Today)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-transparent text-slate-200 outline-none cursor-pointer"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Status banner for existing record */}
-          {existingRecord && (
+          {/* Status banner for existing record (Admin View) */}
+          {existingRecord && isOwner && (
             <div className="p-3 bg-blue-950/40 border border-blue-500/30 rounded-xl flex items-center justify-between text-xs text-blue-300">
               <span className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-blue-400" />
@@ -1762,6 +1874,146 @@ export default function CashReconciliationPage() {
               </span>
             </div>
           )}
+
+          {/* POST-SUBMISSION CONFIRMATION FOR STAFF */}
+          {!isOwner && existingRecord && !staffEditingSubmitted ? (
+            <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 space-y-6 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-xl font-bold text-slate-100">
+                        Today&apos;s End-of-Day Reconciliation Submitted
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {existingRecord.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Recorded for <strong className="text-slate-200">{currentBranchName}</strong> on{' '}
+                      <strong className="text-slate-200">{selectedDate}</strong> at{' '}
+                      {new Date(existingRecord.updated_at || existingRecord.created_at || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStaffEditingSubmitted(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs font-bold rounded-xl border border-slate-700 transition self-start sm:self-auto cursor-pointer"
+                >
+                  <Coins className="w-4 h-4" />
+                  Adjust / Update Count
+                </button>
+              </div>
+
+              {/* Submitted Figures Summary (A, B, C, D, E, F) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3.5">
+                  <div className="text-[11px] text-slate-400 font-medium">A. Opening Float</div>
+                  <div className="text-base font-bold text-slate-100 mt-1">
+                    LKR {Number(existingRecord.opening_float_a || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Carried forward</div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3.5">
+                  <div className="text-[11px] text-slate-400 font-medium">B. Cash Expenses</div>
+                  <div className="text-base font-bold text-slate-100 mt-1">
+                    LKR {Number(existingRecord.cash_expenses_b || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Paid out</div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3.5">
+                  <div className="text-[11px] text-slate-400 font-medium">C. Cash in Drawer</div>
+                  <div className="text-base font-bold text-amber-400 mt-1">
+                    LKR {Number(existingRecord.physical_cash_c || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Physical count</div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-emerald-500/20 bg-emerald-950/10 rounded-xl p-3.5">
+                  <div className="text-[11px] text-emerald-400 font-bold">D. Net Income</div>
+                  <div className="text-base font-black text-emerald-400 mt-1">
+                    LKR {Number(existingRecord.actual_net_income_d || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-emerald-500/70 mt-0.5">(C + B) - A</div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-indigo-500/20 bg-indigo-950/10 rounded-xl p-3.5">
+                  <div className="text-[11px] text-indigo-400 font-bold">E. Banked Today</div>
+                  <div className="text-base font-black text-indigo-400 mt-1">
+                    LKR {Number(existingRecord.total_bank_deposits_e || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-indigo-500/70 mt-0.5">Bank deposits</div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-purple-500/20 bg-purple-950/10 rounded-xl p-3.5">
+                  <div className="text-[11px] text-purple-400 font-bold">F. Tomorrow Float</div>
+                  <div className="text-base font-black text-purple-300 mt-1">
+                    LKR {Number(existingRecord.closing_cash_f || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-purple-500/70 mt-0.5">Left in drawer (C - E)</div>
+                </div>
+              </div>
+
+              {/* Bank Deposits Dispatched */}
+              {bankDeposits && bankDeposits.filter((d) => Number(d.amount) > 0).length > 0 && (
+                <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-2.5">
+                  <div className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4" />
+                    Dispatched Bank Deposits:
+                  </div>
+                  <div className="divide-y divide-slate-800/60">
+                    {bankDeposits
+                      .filter((d) => Number(d.amount) > 0)
+                      .map((d, idx) => (
+                        <div key={idx} className="py-2 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-bold text-slate-200">{d.bank_name}</span>
+                            <span className="text-slate-400 ml-2 font-mono">A/C: {d.account_number}</span>
+                            {d.deposit_reference && (
+                              <span className="text-amber-400 ml-2 font-mono">Ref: {d.deposit_reference}</span>
+                            )}
+                          </div>
+                          <span className="font-bold font-mono text-indigo-300">
+                            LKR {Number(d.amount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {existingRecord.notes && (
+                <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs">
+                  <span className="text-slate-400 font-medium">Reconciliation Notes: </span>
+                  <span className="text-slate-200">{existingRecord.notes}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* If staff is editing a previously submitted record, show reminder banner */}
+              {!isOwner && existingRecord && staffEditingSubmitted && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
+                  <span className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    You are editing today&apos;s previously submitted reconciliation. Make your adjustments and click &quot;Confirm &amp; Post&quot; below.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStaffEditingSubmitted(false)}
+                    className="text-xs text-amber-400 hover:text-amber-200 font-semibold underline ml-2"
+                  >
+                    Cancel Edit
+                  </button>
+                </div>
+              )}
 
           {/* TOP SUMMARY CARDS (A, B, C, D, E, F) */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -2206,13 +2458,15 @@ export default function CashReconciliationPage() {
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
+    </div>
+  )}
 
       {/* ========================================================= */}
       {/* VIEW 6: COMPANY BANK ACCOUNTS CATALOG */}
       {/* ========================================================= */}
-      {activeTab === 'bank_accounts' && (
+      {activeTab === 'bank_accounts' && isOwner && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800">
             <div>
@@ -2260,7 +2514,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* DENOMINATIONS BREAKDOWN MODAL */}
       {/* ========================================================= */}
-      {selectedRecForDenoms && (
+      {selectedRecForDenoms && isOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -2506,7 +2760,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {/* ADD BANK ACCOUNT MODAL */}
       {/* ========================================================= */}
-      {showAddAccountModal && (
+      {showAddAccountModal && isOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <form
             onSubmit={handleAddCompanyAccount}
