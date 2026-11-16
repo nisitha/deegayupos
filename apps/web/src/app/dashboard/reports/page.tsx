@@ -30,6 +30,7 @@ import {
   PieChart as PieChartIcon,
   Store,
   Boxes,
+  Banknote,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -596,11 +597,64 @@ export default function ReportsSuitePage() {
             <Users className="w-4 h-4" />
             <span>Customer Accounts & Taxes</span>
           </button>
+
+          <a
+            href="/dashboard/finance/reconciliation/?tab=admin_summary"
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20"
+          >
+            <Banknote className="w-4 h-4 text-amber-400" />
+            <span>End-of-Day Cash & Banking Hub</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-amber-400" />
+          </a>
         </nav>
       </div>
 
       {/* 3. Main Content View Area */}
       <main className="flex-1 p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Executive Multi-Branch Reconciliation & Banking Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-indigo-500/10 border border-amber-500/20 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 shrink-0">
+              <Banknote className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-100">
+                  Daily Cash Reconciliation & Multi-Branch Banking Hub
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
+                  Executive Ledgers
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Audit branch physical drawer counts, track BOC / NSB / NTB bank deposits, and manage cashier shortages.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href="/dashboard/finance/reconciliation/?tab=admin_summary"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow-sm"
+            >
+              <span>Multi-Branch Summary</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="/dashboard/finance/reconciliation/?tab=bank_register"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm"
+            >
+              <span>Bank Register</span>
+              <Building2 className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="/dashboard/finance/reconciliation/?tab=shortages"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition"
+            >
+              <span>Cashier Shortages</span>
+              <UserCheck className="w-3.5 h-3.5 text-rose-400" />
+            </a>
+          </div>
+        </div>
         {/* ======================================================== */}
         {/* TAB 1: SALES & PROFIT ANALYTICS (Reports #2, #12, #13, #19, #20, #21) */}
         {/* ======================================================== */}

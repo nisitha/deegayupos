@@ -76,6 +76,53 @@ export interface CashierShortageItem {
   created_at: string;
 }
 
+export interface ConsolidatedReconciliationRow {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  branch_name: string;
+  reconciliation_date: string;
+  opening_float_a: number;
+  cash_expenses_b: number;
+  denominations: Record<number, number>;
+  physical_cash_c: number;
+  actual_net_income_d: number;
+  total_bank_deposits_e: number;
+  closing_cash_f: number;
+  system_cash_sales: number;
+  variance_amount: number;
+  status: 'balanced' | 'shortage' | 'overage';
+  notes: string | null;
+  submitted_by: string | null;
+  submitter_name: string;
+  created_at?: string;
+  updated_at?: string;
+  bank_deposits?: BankDepositItem[];
+}
+
+export interface ConsolidatedBankDepositRow {
+  id: string;
+  reconciliation_id: string;
+  reconciliation_date: string;
+  branch_id: string;
+  branch_name: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  amount: number;
+  deposit_reference: string | null;
+  deposited_by: string | null;
+  created_at?: string;
+}
+
+export interface CashierShortageRow extends CashierShortageItem {
+  branch_name: string;
+}
+
+export interface ConsolidatedLedgerRow extends DailyAccountsLedgerRecord {
+  branch_name: string;
+}
+
 export interface CompanyBankAccountRecord {
   id: string;
   tenant_id: string;
@@ -569,6 +616,272 @@ export const reconciliationApi = {
       return (data || []) as DailyAccountsLedgerRecord[];
     } catch (err) {
       console.error('[ReconciliationApi] getAccountsLedger fatal:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch multi-branch consolidated reconciliation history with filters.
+   */
+  async getReconciliationHistory(params?: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<ConsolidatedReconciliationRow[]> {
+    try {
+      let query = supabase
+        .from('daily_cash_reconciliations')
+        .select('*')
+        .order('reconciliation_date', { ascending: false });
+
+      if (params?.branchId && params.branchId !== 'ALL') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params?.startDate) {
+        query = query.gte('reconciliation_date', params.startDate);
+      }
+      if (params?.endDate) {
+        query = query.lte('reconciliation_date', params.endDate);
+      }
+      if (params?.status && params.status !== 'all') {
+        query = query.eq('status', params.status);
+      }
+
+      const { data: recs, error } = await query;
+      if (error) {
+        console.warn('[ReconciliationApi] getReconciliationHistory error:', error.message);
+        return [];
+      }
+
+      if (!recs || recs.length === 0) return [];
+
+      // Fetch branches, users, and deposits for complete enrichment
+      const [{ data: branches }, { data: users }, { data: deposits }] = await Promise.all([
+        supabase.from('branches').select('id, name'),
+        supabase.from('users').select('id, full_name, email'),
+        supabase.from('daily_bank_deposits').select('*'),
+      ]);
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      const userMap = new Map<string, string>();
+      (users || []).forEach((u: any) => userMap.set(u.id, u.full_name || u.email || 'Staff Cashier'));
+
+      const depositsMap = new Map<string, BankDepositItem[]>();
+      (deposits || []).forEach((d: any) => {
+        const list = depositsMap.get(d.reconciliation_id) || [];
+        list.push({
+          id: d.id,
+          bank_name: d.bank_name,
+          account_number: d.account_number,
+          account_name: d.account_name,
+          amount: Number(d.amount) || 0,
+          deposit_reference: d.deposit_reference,
+          deposited_by: d.deposited_by,
+        });
+        depositsMap.set(d.reconciliation_id, list);
+      });
+
+      return recs.map((r: any) => ({
+        id: r.id,
+        tenant_id: r.tenant_id,
+        branch_id: r.branch_id,
+        branch_name: branchMap.get(r.branch_id) || 'Unknown Branch',
+        reconciliation_date: r.reconciliation_date,
+        opening_float_a: Number(r.opening_float_a) || 0,
+        cash_expenses_b: Number(r.cash_expenses_b) || 0,
+        denominations: (r.denominations || {}) as Record<number, number>,
+        physical_cash_c: Number(r.physical_cash_c) || 0,
+        actual_net_income_d: Number(r.actual_net_income_d) || 0,
+        total_bank_deposits_e: Number(r.total_bank_deposits_e) || 0,
+        closing_cash_f: Number(r.closing_cash_f) || 0,
+        system_cash_sales: Number(r.system_cash_sales) || 0,
+        variance_amount: Number(r.variance_amount) || 0,
+        status: r.status,
+        notes: r.notes || null,
+        submitted_by: r.submitted_by || null,
+        submitter_name: (r.submitted_by && userMap.get(r.submitted_by)) || 'Staff Cashier',
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        bank_deposits: depositsMap.get(r.id) || [],
+      }));
+    } catch (err) {
+      console.error('[ReconciliationApi] getReconciliationHistory fatal:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch consolidated bank deposits across branches with bank/account grouping.
+   */
+  async getBankDepositsReport(params?: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+    bankName?: string;
+  }): Promise<ConsolidatedBankDepositRow[]> {
+    try {
+      let depQuery = supabase.from('daily_bank_deposits').select('*').order('created_at', { ascending: false });
+
+      if (params?.bankName && params.bankName !== 'ALL') {
+        depQuery = depQuery.eq('bank_name', params.bankName);
+      }
+
+      const [{ data: deposits, error: depErr }, { data: recs }, { data: branches }] = await Promise.all([
+        depQuery,
+        supabase.from('daily_cash_reconciliations').select('id, branch_id, reconciliation_date'),
+        supabase.from('branches').select('id, name'),
+      ]);
+
+      if (depErr || !deposits) {
+        console.warn('[ReconciliationApi] getBankDepositsReport error:', depErr?.message);
+        return [];
+      }
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      const recMap = new Map<string, { branch_id: string; reconciliation_date: string }>();
+      (recs || []).forEach((r: any) => recMap.set(r.id, { branch_id: r.branch_id, reconciliation_date: r.reconciliation_date }));
+
+      const rows: ConsolidatedBankDepositRow[] = [];
+
+      for (const d of deposits) {
+        const rec = recMap.get(d.reconciliation_id);
+        const recDate = rec?.reconciliation_date || (d.created_at ? d.created_at.slice(0, 10) : '');
+        const branchId = rec?.branch_id || '';
+
+        if (params?.branchId && params.branchId !== 'ALL' && branchId !== params.branchId) {
+          continue;
+        }
+        if (params?.startDate && recDate < params.startDate) {
+          continue;
+        }
+        if (params?.endDate && recDate > params.endDate) {
+          continue;
+        }
+
+        rows.push({
+          id: d.id,
+          reconciliation_id: d.reconciliation_id,
+          reconciliation_date: recDate,
+          branch_id: branchId,
+          branch_name: branchMap.get(branchId) || 'Unknown Branch',
+          bank_name: d.bank_name,
+          account_number: d.account_number,
+          account_name: d.account_name || 'Main Account',
+          amount: Number(d.amount) || 0,
+          deposit_reference: d.deposit_reference || null,
+          deposited_by: d.deposited_by || null,
+          created_at: d.created_at,
+        });
+      }
+
+      return rows.sort((a, b) => b.reconciliation_date.localeCompare(a.reconciliation_date));
+    } catch (err) {
+      console.error('[ReconciliationApi] getBankDepositsReport fatal:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch consolidated cashier shortages with cashier, branch, date, and status filters.
+   */
+  async getShortagesReport(params?: {
+    branchId?: string;
+    cashierName?: string;
+    statusFilter?: 'all' | 'pending_payroll' | 'deducted';
+    startDate?: string;
+    endDate?: string;
+  }): Promise<CashierShortageRow[]> {
+    try {
+      let query = supabase.from('cashier_shortages').select('*').order('shortage_date', { ascending: false });
+
+      if (params?.branchId && params.branchId !== 'ALL') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params?.cashierName && params.cashierName !== 'ALL') {
+        query = query.ilike('cashier_name', `%${params.cashierName}%`);
+      }
+      if (params?.statusFilter && params.statusFilter !== 'all') {
+        query = query.eq('deduction_status', params.statusFilter);
+      }
+      if (params?.startDate) {
+        query = query.gte('shortage_date', params.startDate);
+      }
+      if (params?.endDate) {
+        query = query.lte('shortage_date', params.endDate);
+      }
+
+      const [{ data, error }, { data: branches }] = await Promise.all([
+        query,
+        supabase.from('branches').select('id, name'),
+      ]);
+
+      if (error) {
+        console.warn('[ReconciliationApi] getShortagesReport error:', error.message);
+        return [];
+      }
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      return (data || []).map((item: any) => ({
+        ...item,
+        branch_name: branchMap.get(item.branch_id) || 'Unknown Branch',
+      }));
+    } catch (err) {
+      console.error('[ReconciliationApi] getShortagesReport fatal:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch consolidated daily accounts ledger across branches.
+   */
+  async getConsolidatedLedger(params?: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }): Promise<ConsolidatedLedgerRow[]> {
+    try {
+      let query = supabase.from('daily_accounts_ledger').select('*').order('entry_date', { ascending: false });
+
+      if (params?.branchId && params.branchId !== 'ALL') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params?.startDate) {
+        query = query.gte('entry_date', params.startDate);
+      }
+      if (params?.endDate) {
+        query = query.lte('entry_date', params.endDate);
+      }
+      if (params?.limit) {
+        query = query.limit(params.limit);
+      }
+
+      const [{ data, error }, { data: branches }] = await Promise.all([
+        query,
+        supabase.from('branches').select('id, name'),
+      ]);
+
+      if (error) {
+        console.warn('[ReconciliationApi] getConsolidatedLedger error:', error.message);
+        return [];
+      }
+
+      const branchMap = new Map<string, string>();
+      (branches || []).forEach((b: any) => branchMap.set(b.id, b.name));
+
+      return (data || []).map((item: any) => ({
+        ...item,
+        branch_name: branchMap.get(item.branch_id) || 'Unknown Branch',
+      }));
+    } catch (err) {
+      console.error('[ReconciliationApi] getConsolidatedLedger fatal:', err);
       return [];
     }
   },
