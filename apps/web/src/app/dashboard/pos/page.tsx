@@ -29,6 +29,8 @@ import {
   QrCode,
   AlertCircle,
   Check,
+  Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -79,6 +81,8 @@ interface CartItem {
   sku: string;
   barcode?: string;
   price: number;
+  originalUnitPrice: number;
+  costPrice: number;
   quantity: number;
   stockOnHand: number;
   unit: string;
@@ -145,6 +149,19 @@ export default function ConfidencyPosPage() {
 
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+  // Inline Price Editing State for Order Summary
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingPriceInput, setEditingPriceInput] = useState<string>('');
+  const inlinePriceInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus & select inline input when editing starts
+  useEffect(() => {
+    if (editingItemId && inlinePriceInputRef.current) {
+      inlinePriceInputRef.current.focus();
+      inlinePriceInputRef.current.select();
+    }
+  }, [editingItemId]);
 
   // Scanner & Notification feedback
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
@@ -474,6 +491,8 @@ export default function ConfidencyPosPage() {
           sku: product.sku,
           barcode: product.barcode,
           price: product.retailPrice,
+          originalUnitPrice: product.retailPrice,
+          costPrice: product.costPrice ?? 0,
           quantity: 1,
           stockOnHand: product.stockOnHand,
           unit: product.unit,
@@ -503,6 +522,8 @@ export default function ConfidencyPosPage() {
         name: customTitle,
         sku: 'CUSTOM-SALE',
         price: customItem.price,
+        originalUnitPrice: customItem.price,
+        costPrice: 0,
         quantity: customItem.quantity,
         stockOnHand: 999,
         unit: 'pcs',
@@ -524,12 +545,52 @@ export default function ConfidencyPosPage() {
     );
   };
 
+  // Inline Unit Price Editor Handlers (Strictly Scoped to Current Bill)
+  const handleStartEditPrice = (item: CartItem) => {
+    setEditingItemId(item.id);
+    setEditingPriceInput(item.price.toFixed(2));
+  };
+
+  const handleSaveEditPrice = (itemId: string) => {
+    const parsed = parseFloat(editingPriceInput);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setCart((prev) =>
+        prev.map((it) =>
+          it.id === itemId
+            ? { ...it, price: Math.round(parsed * 100) / 100 }
+            : it
+        )
+      );
+    }
+    setEditingItemId(null);
+    setEditingPriceInput('');
+  };
+
+  const handleCancelEditPrice = () => {
+    setEditingItemId(null);
+    setEditingPriceInput('');
+  };
+
+  const handleResetUnitPrice = (itemId: string) => {
+    setCart((prev) =>
+      prev.map((it) =>
+        it.id === itemId ? { ...it, price: it.originalUnitPrice } : it
+      )
+    );
+  };
+
   const removeCartItem = (itemId: string) => {
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+      setEditingPriceInput('');
+    }
     setCart((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   const clearCart = useCallback(() => {
     setCart([]);
+    setEditingItemId(null);
+    setEditingPriceInput('');
     setIsMobileCartOpen(false);
   }, []);
 
@@ -589,7 +650,13 @@ export default function ConfidencyPosPage() {
 
   // Restore Held Ticket
   const handleRestoreHeldTicket = (held: HeldTicket) => {
-    setCart(held.items);
+    setCart(
+      held.items.map((it) => ({
+        ...it,
+        originalUnitPrice: it.originalUnitPrice ?? it.price,
+        costPrice: it.costPrice ?? 0,
+      }))
+    );
     setDiscountType(held.discountType);
     setDiscountPercent(held.discountPercent);
     setDiscountFlat(held.discountFlat);
@@ -713,6 +780,7 @@ export default function ConfidencyPosPage() {
             productName: item.name,
             sku: item.sku,
             unitPrice: item.price,
+            costPrice: item.costPrice ?? 0,
             quantity: item.quantity,
             subtotal: item.price * item.quantity,
             discountAmount: 0,
@@ -823,6 +891,15 @@ export default function ConfidencyPosPage() {
   // Keyboard shortcut listener (F2: Search Barcode, F4: Hold Ticket, Esc: Dismiss, Enter: Confirm checkout)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore global shortcut keystrokes while the cashier is editing an inline unit price
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.getAttribute('data-inline-price-input') === 'true' ||
+        target?.closest('[data-inline-price]')
+      ) {
+        return;
+      }
+
       if (isCheckoutModalOpen) {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -1503,9 +1580,76 @@ export default function ConfidencyPosPage() {
                   <h5 className="text-sm font-bold text-slate-900 truncate leading-snug max-w-[140px]">
                     {item.name}
                   </h5>
-                  <div className="text-xs text-slate-500 font-mono font-medium">
-                    LKR {item.price.toFixed(2)}
-                  </div>
+                  {editingItemId === item.id ? (
+                    <div className="flex items-center gap-1 mt-1" data-inline-price>
+                      <span className="text-[11px] font-semibold text-slate-400">LKR</span>
+                      <input
+                        ref={inlinePriceInputRef}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        data-inline-price-input="true"
+                        value={editingPriceInput}
+                        onChange={(e) => setEditingPriceInput(e.target.value)}
+                        onBlur={() => handleSaveEditPrice(item.id)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveEditPrice(item.id);
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            handleCancelEditPrice();
+                          }
+                        }}
+                        className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#7052FF] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#7052FF]/20"
+                      />
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSaveEditPrice(item.id);
+                        }}
+                        className="p-1 rounded-md bg-[#7052FF] text-white hover:bg-[#5b3ee0] transition-colors shadow-2xs"
+                        title="Save price"
+                      >
+                        <Check className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditPrice(item)}
+                        className="group/price inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 font-mono font-medium cursor-pointer transition-colors"
+                        title="Click to edit unit price for this bill"
+                      >
+                        <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
+                          LKR {item.price.toFixed(2)}
+                        </span>
+                        <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#7052FF] transition-colors" />
+                      </button>
+
+                      {item.price !== item.originalUnitPrice && (
+                        <div className="inline-flex items-center gap-1">
+                          <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 px-1.5 py-0.2 rounded-md font-sans">
+                            Edited
+                          </span>
+                          <span className="text-[10px] text-slate-400 line-through font-mono">
+                            {item.originalUnitPrice.toFixed(2)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleResetUnitPrice(item.id)}
+                            className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer rounded hover:bg-slate-100"
+                            title={`Revert to catalog price (LKR ${item.originalUnitPrice.toFixed(2)})`}
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Stepper Quantity Controls: - [qty] + */}
@@ -1784,9 +1928,76 @@ export default function ConfidencyPosPage() {
                 <div key={item.id} className="py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h5 className="text-sm font-bold text-slate-900 truncate">{item?.name || 'Item'}</h5>
-                    <div className="text-xs text-slate-500 font-mono">
-                      LKR {item.price.toFixed(2)}
-                    </div>
+                    {editingItemId === item.id ? (
+                      <div className="flex items-center gap-1 mt-1" data-inline-price>
+                        <span className="text-[11px] font-semibold text-slate-400">LKR</span>
+                        <input
+                          ref={inlinePriceInputRef}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          data-inline-price-input="true"
+                          value={editingPriceInput}
+                          onChange={(e) => setEditingPriceInput(e.target.value)}
+                          onBlur={() => handleSaveEditPrice(item.id)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveEditPrice(item.id);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEditPrice();
+                            }
+                          }}
+                          className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border-2 border-[#7052FF] rounded-md shadow-inner focus:outline-none focus:ring-2 focus:ring-[#7052FF]/20"
+                        />
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSaveEditPrice(item.id);
+                          }}
+                          className="p-1 rounded-md bg-[#7052FF] text-white hover:bg-[#5b3ee0] transition-colors shadow-2xs"
+                          title="Save price"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditPrice(item)}
+                          className="group/price inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 font-mono font-medium cursor-pointer transition-colors"
+                          title="Click to edit unit price for this bill"
+                        >
+                          <span className="group-hover/price:underline decoration-slate-400 underline-offset-2">
+                            LKR {item.price.toFixed(2)}
+                          </span>
+                          <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/price:text-[#7052FF] transition-colors" />
+                        </button>
+
+                        {item.price !== item.originalUnitPrice && (
+                          <div className="inline-flex items-center gap-1">
+                            <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 px-1.5 py-0.2 rounded-md font-sans">
+                              Edited
+                            </span>
+                            <span className="text-[10px] text-slate-400 line-through font-mono">
+                              {item.originalUnitPrice.toFixed(2)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleResetUnitPrice(item.id)}
+                              className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer rounded hover:bg-slate-100"
+                              title={`Revert to catalog price (LKR ${item.originalUnitPrice.toFixed(2)})`}
+                            >
+                              <RotateCcw className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="text-xs text-slate-700 font-mono flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60">

@@ -14,6 +14,8 @@ export interface HeldTicket {
     sku: string;
     barcode?: string;
     price: number;
+    originalUnitPrice?: number;
+    costPrice?: number;
     quantity: number;
     stockOnHand: number;
     unit: string;

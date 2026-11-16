@@ -997,13 +997,14 @@ export const posApi = {
     const saleId = sbSale.id;
 
     // 7. Insert Sale Items into Supabase
-    const saleItemsToInsert = data.items.map((i) => ({
+    const saleItemsToInsert = data.items.map((i: any) => ({
       tenant_id: tenantId,
       sale_id: saleId,
       product_id: isValidUuid(i.productId) ? i.productId : null,
       product_name: i.productName,
       sku: i.sku || 'N/A',
       unit_price: Number(i.unitPrice || 0),
+      cost_price: Number(i.costPrice || 0),
       quantity: Number(i.quantity || 1),
       discount_amount: Number(i.discountAmount || 0),
       tax_amount: Number(i.taxAmount || 0),
