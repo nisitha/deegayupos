@@ -2354,27 +2354,39 @@ export const procurementApi = {
     const found = list.data.items.find((g) => g.id === id);
     return { success: true, data: found || ({ id, grnNumber: id } as any) };
   },
-  createGrn: async (payload: CreateGrnDto): Promise<ApiResponse<GoodsReceivedNoteDto>> => {
+  createGrn: async (payload: CreateGrnDto & Record<string, any>): Promise<ApiResponse<GoodsReceivedNoteDto>> => {
+    const grnId = crypto.randomUUID();
+    const grnNumber = `GRN-${Date.now().toString().slice(-6)}`;
+    const effectiveBranch = payload.branchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
+    const effectiveWarehouse = payload.warehouseId || '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
     const grn: GoodsReceivedNoteDto = {
-      id: `grn-${Date.now()}`,
-      grnNumber: `GRN-${Date.now().toString().slice(-6)}`,
+      id: grnId,
+      grnNumber,
       supplierId: payload.supplierId,
-      status: 'VERIFIED',
+      branchId: effectiveBranch,
+      warehouseId: effectiveWarehouse,
+      status: 'RECEIVED' as any,
       receivedDate: new Date().toISOString(),
-      totalAmount: 0,
-      items: payload.items as any,
+      totalCost: payload.totalCost || payload.totalAmount || 0,
+      items: payload.items || [],
       createdAt: new Date().toISOString(),
     } as any;
     try {
       await supabase.from('goods_received_notes').insert({
-        grn_number: grn.grnNumber,
+        id: grnId,
+        tenant_id: '0fef1423-5d89-4147-8af8-17c7e641c88a',
+        branch_id: effectiveBranch,
+        warehouse_id: effectiveWarehouse,
         supplier_id: payload.supplierId,
-        supplier_invoice_number: payload.supplierInvoiceNumber,
-        notes: payload.notes,
-        total_amount: 0,
-        status: 'VERIFIED',
+        grn_number: grnNumber,
+        supplier_invoice_no: payload.supplierInvoiceNumber || payload.supplierInvoiceNo || undefined,
+        notes: payload.notes || undefined,
+        total_cost: payload.totalCost || payload.totalAmount || 0,
+        status: 'RECEIVED',
       });
-    } catch {}
+    } catch (e) {
+      console.warn('[createGrn] Supabase insert note:', e);
+    }
     return { success: true, data: grn };
   },
 };
