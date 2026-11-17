@@ -6,6 +6,7 @@
 
 import type { SaleDto } from '@pixelcraft/types';
 import { detectUnitConfig } from '../unit-utils';
+import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '../date-utils';
 
 // Standard ESC/POS Control Byte Constants
 const ESC = 0x1b;
@@ -284,8 +285,9 @@ export function generateEscPosReceipt(
     builder.textLine(options.storeNameNative);
   }
 
-  builder.bold(false);
-  if (options.branchName) builder.textLine(options.branchName);
+  const outletDisplayName = options.branchName || (sale as any).branchName || 'Main Store';
+  builder.bold(true).textLine(`Outlet: ${outletDisplayName}`).bold(false);
+
   if (options.address) builder.textLine(options.address);
   if (options.phone) builder.textLine(`Tel: ${options.phone}`);
   if (options.taxNumber) builder.textLine(`Tax Reg: ${options.taxNumber}`);
@@ -297,19 +299,15 @@ export function generateEscPosReceipt(
   builder.bold(true).textLine(`TAX INVOICE / RECEIPT #${sale.invoiceNumber}`);
   builder.bold(false);
 
-  const dateStr = sale.createdAt
-    ? new Date(sale.createdAt).toLocaleString('en-US', {
-        dateStyle: 'short',
-        timeStyle: 'medium',
-      })
-    : new Date().toLocaleString();
+  const billDate = formatSriLankaReceiptDate(sale.createdAt);
+  const billTime = formatSriLankaReceiptTime(sale.createdAt);
 
-  builder.row('Date:', dateStr);
+  builder.row('Date:', billDate);
+  builder.row('Time:', billTime);
+  builder.row('Outlet:', outletDisplayName);
   builder.row('Station:', options.cashierStation || 'REG-01');
-  const cashierDisplayName = sale.cashier?.fullName || sale.cashierName;
-  if (cashierDisplayName) {
-    builder.row('Cashier:', cashierDisplayName);
-  }
+  const cashierDisplayName = sale.cashier?.fullName || sale.cashierName || 'Branch Cashier';
+  builder.row('Cashier:', cashierDisplayName);
   if (sale.customerName && sale.customerName !== 'Walk-in Customer') {
     builder.row('Customer:', sale.customerName);
   }

@@ -13,6 +13,7 @@ import {
 } from './escpos-generator';
 import { generateReceiptBarcodeHtml } from '../../components/pos/receipt-barcode-block';
 import { detectUnitConfig } from '../unit-utils';
+import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '../date-utils';
 
 export type PrinterConnectionType =
   | 'BROWSER_PRINT'
@@ -249,6 +250,11 @@ export class PrinterBridge {
         })
         .join('');
 
+      const resolvedBranchName = storeDetails?.branchName || (sale as any).branchName || 'Main Store';
+      const cashierName = sale.cashier?.fullName || sale.cashierName || 'Branch Cashier';
+      const billDate = formatSriLankaReceiptDate(sale.createdAt);
+      const billTime = formatSriLankaReceiptTime(sale.createdAt);
+
       const html = `
         <!DOCTYPE html>
         <html>
@@ -293,7 +299,7 @@ export class PrinterBridge {
             ${storeDetails?.storeName || 'DEEGAYU WEDA MADURA'}
           </div>
           <div class="center" style="font-size: 10px;">දීගායු වෙද මැදුර</div>
-          ${storeDetails?.branchName ? `<div class="center">${storeDetails.branchName}</div>` : ''}
+          <div class="center bold" style="font-size: 11px; margin-top: 2px;">Outlet: ${resolvedBranchName}</div>
           ${storeDetails?.address ? `<div class="center" style="font-size: 9px;">${storeDetails.address}</div>` : ''}
           ${storeDetails?.phone ? `<div class="center">Tel: ${storeDetails.phone}</div>` : ''}
           ${storeDetails?.taxNumber ? `<div class="center">Tax ID: ${storeDetails.taxNumber}</div>` : ''}
@@ -301,9 +307,12 @@ export class PrinterBridge {
           <div class="divider-double"></div>
           <div class="bold center">TAX INVOICE / RECEIPT</div>
           <div class="row"><span>Invoice:</span><span class="bold">#${sale.invoiceNumber}</span></div>
-          <div class="row"><span>Date:</span><span>${new Date(sale.createdAt || Date.now()).toLocaleString()}</span></div>
+          <div class="row"><span>Date:</span><span class="bold">${billDate}</span></div>
+          <div class="row"><span>Time:</span><span class="bold">${billTime}</span></div>
+          <div class="row"><span>Outlet:</span><span class="bold">${resolvedBranchName}</span></div>
+          <div class="row"><span>Station:</span><span>REG-01</span></div>
+          <div class="row"><span>Cashier:</span><span class="bold">${cashierName}</span></div>
           ${sale.customerName ? `<div class="row"><span>Customer:</span><span>${sale.customerName}</span></div>` : ''}
-          ${(sale.cashier?.fullName || sale.cashierName) ? `<div class="row"><span>Cashier:</span><span>${sale.cashier?.fullName || sale.cashierName}</span></div>` : ''}
 
           <div class="divider"></div>
           <div class="row bold">
@@ -527,7 +536,7 @@ export class PrinterBridge {
       paperWidth: settings.paperWidth,
       storeName: storeDetails?.storeName || 'DEEGAYU WEDA MADURA',
       storeNameNative: 'දීගායු වෙද මැදුර',
-      branchName: storeDetails?.branchName,
+      branchName: storeDetails?.branchName || (sale as any).branchName || 'Main Store',
       address: storeDetails?.address,
       phone: storeDetails?.phone,
       taxNumber: storeDetails?.taxNumber,

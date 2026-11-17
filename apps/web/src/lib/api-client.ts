@@ -1355,13 +1355,56 @@ export const posApi = {
           console.warn('[SaleById API] Items/Payments query note:', itemErr);
         }
 
+        let cashierFullName = s.cashier_name || '';
+        let cashierEmail = s.cashier_email || '';
+        let resolvedBranchName = s.branch_name || '';
+
+        try {
+          if (!cashierFullName && s.cashier_id) {
+            const { data: uData } = await supabase
+              .from('users')
+              .select('full_name, email')
+              .eq('id', s.cashier_id)
+              .maybeSingle();
+            if (uData?.full_name) {
+              cashierFullName = uData.full_name;
+              if (uData.email) cashierEmail = uData.email;
+            }
+          }
+          if (s.branch_id) {
+            const { data: bData } = await supabase
+              .from('branches')
+              .select('name')
+              .eq('id', s.branch_id)
+              .maybeSingle();
+            if (bData?.name) {
+              resolvedBranchName = bData.name;
+            }
+          }
+        } catch (lookupErr) {
+          console.warn('[SaleById API] Cashier/Branch lookup note:', lookupErr);
+        }
+
+        if (!cashierFullName) {
+          cashierFullName = 'Branch Cashier';
+        }
+        if (!resolvedBranchName) {
+          resolvedBranchName = 'Main Store';
+        }
+
         const sale: SaleDto = {
           id: s.id,
           tenantId: s.tenant_id,
           branchId: s.branch_id,
+          branchName: resolvedBranchName,
           invoiceNumber: s.invoice_number,
           cashierId: s.cashier_id,
-          cashierName: s.cashier_name,
+          cashierName: cashierFullName,
+          cashier: {
+            id: s.cashier_id,
+            fullName: cashierFullName,
+            email: cashierEmail,
+          },
           customerId: s.customer_id,
           customerName: s.customer_name,
           orderType: s.order_type,
@@ -1500,9 +1543,14 @@ export const posApi = {
         },
         branch: {
           id: sale.branchId || 'main-branch',
-          name: 'Deegayu Flagship Store',
+          name: sale.branchName || 'Main Store',
           address: 'Colombo Road, Kiribathgoda, Sri Lanka',
           phone: '+94 11 291 4500',
+        },
+        cashier: {
+          id: sale.cashierId || 'cashier-1',
+          fullName: sale.cashier?.fullName || sale.cashierName || 'Branch Cashier',
+          email: sale.cashier?.email || '',
         },
         settings: {
           taxNumber: 'VAT-10928392-8000',

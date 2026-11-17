@@ -42,6 +42,7 @@ export interface SaleDto {
   id: string;
   tenantId: string;
   branchId: string;
+  branchName?: string;
   registerId?: string;
   shiftId?: string;
   cashierId: string;
@@ -93,6 +94,7 @@ export interface CreateSalePaymentPayload {
 
 export interface CheckoutPayload {
   branchId: string;
+  branchName?: string;
   registerId?: string;
   cashierId?: string;
   cashierName?: string;
@@ -117,6 +119,7 @@ export interface HeldCartDto {
   id: string;
   tenantId?: string;
   branchId: string;
+  branchName?: string;
   registerId?: string;
   shiftId?: string;
   cashierId?: string;

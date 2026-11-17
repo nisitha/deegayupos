@@ -63,6 +63,7 @@ import {
   calculateBaseQuantity,
   formatQuantityWithUnit,
 } from '../../../lib/unit-utils';
+import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 
 // =========================================================================
 // "CONFIDENCY OS" DESIGN SYSTEM SPECIFICATION
@@ -102,7 +103,17 @@ interface CartItem {
 }
 
 export default function ConfidencyPosPage() {
-  const { selectedBranchId, user, activeCashier, setActiveCashier } = useTenantBranch();
+  const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
+
+  // Live ticking clock locked to Sri Lanka time (Asia/Colombo, UTC+05:30)
+  const [liveClockStr, setLiveClockStr] = useState<string>('');
+  useEffect(() => {
+    setLiveClockStr(formatSriLankaHeaderClock(new Date()));
+    const timer = setInterval(() => {
+      setLiveClockStr(formatSriLankaHeaderClock(new Date()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
@@ -988,10 +999,20 @@ export default function ConfidencyPosPage() {
           throw new Error('Failed to complete checkout transaction');
         }
 
+        const currentBranchObj = branches.find((b) => b.id === (selectedBranchId || res.data?.branchId));
+        const branchDisplayName = currentBranchObj?.name || 'Main Store';
+
         const finalizedSale: SaleDto = {
           ...res.data,
+          branchId: res.data.branchId || selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+          branchName: branchDisplayName,
           cashierId: res.data.cashierId || cashierId,
           cashierName: res.data.cashierName || cashierName,
+          cashier: {
+            id: res.data.cashierId || cashierId,
+            fullName: res.data.cashierName || cashierName,
+            email: user?.email || '',
+          },
           customerName: formattedCustomer,
           paidAmount: tenderedNum,
           changeDue,
@@ -1016,7 +1037,13 @@ export default function ConfidencyPosPage() {
             PrinterBridge.kickCashDrawer().catch(() => {});
           }
           if (hw.autoPrintReceipt) {
-            PrinterBridge.printReceipt(finalizedSale).catch(() => {});
+            PrinterBridge.printReceipt(finalizedSale, undefined, {
+              storeName: business?.name || 'DEEGAYU WEDA MADURA',
+              branchName: branchDisplayName,
+              address: currentBranchObj?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka',
+              phone: currentBranchObj?.phone || business?.phone || '+94 11 291 4500',
+              taxNumber: 'VAT-10928392-8000',
+            }).catch(() => {});
           }
         } catch {
           // ignore
@@ -1187,6 +1214,17 @@ export default function ConfidencyPosPage() {
               </span>
             </div>
           </div>
+
+          {/* Center: Live Sri Lanka Ticking Clock Badge (Asia/Colombo, tabular-nums) */}
+          {liveClockStr && (
+            <div
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/70 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] font-mono tabular-nums shadow-2xs select-none shrink-0"
+              title="Sri Lanka Standard Time (Asia/Colombo, UTC+05:30)"
+            >
+              <Clock className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
+              <span>{liveClockStr}</span>
+            </div>
+          )}
 
           {/* Right: Qty Popup Mode Pill Switcher, Catalog Ready & End Shift Button */}
           <div className="flex items-center gap-2.5 shrink-0 ml-2">

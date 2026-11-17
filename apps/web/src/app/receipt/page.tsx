@@ -12,6 +12,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { ReceiptBarcodeBlock } from '@/components/pos/receipt-barcode-block';
+import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '@/lib/date-utils';
 
 export default function PublicReceiptPage() {
   const [invoiceNumber, setInvoiceNumber] = useState<string>('INV-2026-00042');
@@ -141,17 +142,21 @@ export default function PublicReceiptPage() {
             </div>
             <div className="text-right">
               <span className="text-slate-400 block text-[10px] uppercase font-sans">
-                Issued Date & Time
+                Bill Date & Time (Asia/Colombo)
               </span>
               <span className="font-medium text-slate-700">
-                {createdAt.toLocaleDateString('en-GB')} {createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatSriLankaReceiptDate(createdAt)} • {formatSriLankaReceiptTime(createdAt)}
               </span>
             </div>
             <div className="pt-1">
-              <span className="text-slate-400 block text-[10px] uppercase font-sans">Cashier</span>
-              <span className="font-medium text-slate-700 font-sans">Kamal Perera</span>
+              <span className="text-slate-400 block text-[10px] uppercase font-sans">Outlet</span>
+              <span className="font-bold text-slate-800 font-sans">Main Store</span>
             </div>
             <div className="text-right pt-1">
+              <span className="text-slate-400 block text-[10px] uppercase font-sans">Cashier</span>
+              <span className="font-medium text-slate-700 font-sans">Dr. Deegayu (Owner)</span>
+            </div>
+            <div className="pt-1 col-span-2">
               <span className="text-slate-400 block text-[10px] uppercase font-sans">Customer</span>
               <span className="font-medium text-slate-700 font-sans">Valued Customer</span>
             </div>

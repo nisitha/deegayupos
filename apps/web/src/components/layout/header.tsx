@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Search,
-  Calendar,
   Building2,
   Bell,
   Store,
@@ -17,9 +16,11 @@ import {
   Plus,
   Check,
   Banknote,
+  Clock,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { BranchCreateModal } from '../branches/branch-create-modal';
+import { formatSriLankaHeaderClock } from '../../lib/date-utils';
 
 export function Header() {
   const pathname = usePathname();
@@ -46,16 +47,13 @@ export function Header() {
   const profileRef = useRef<HTMLDivElement>(null);
   const branchRef = useRef<HTMLDivElement>(null);
 
-  // Hydration-safe date formatting
+  // Real-time ticking clock locked to Sri Lanka time (Asia/Colombo, UTC+05:30)
   useEffect(() => {
-    setCurrentDateStr(
-      new Intl.DateTimeFormat('en-US', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }).format(new Date()),
-    );
+    setCurrentDateStr(formatSriLankaHeaderClock(new Date()));
+    const timer = setInterval(() => {
+      setCurrentDateStr(formatSriLankaHeaderClock(new Date()));
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
   // Close profile & branch dropdowns on outside click
@@ -288,10 +286,13 @@ export function Header() {
             )}
           </div>
 
-          {/* Current Date Badge (Hydration safe) */}
+          {/* Real-Time Sri Lanka Clock Badge (Asia/Colombo, tabular-nums) */}
           {currentDateStr && (
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-600">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <div
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 font-mono tabular-nums shadow-2xs select-none"
+              title="Sri Lanka Standard Time (Asia/Colombo, UTC+05:30)"
+            >
+              <Clock className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
               <span>{currentDateStr}</span>
             </div>
           )}

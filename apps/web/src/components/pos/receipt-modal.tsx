@@ -22,6 +22,7 @@ import { PrinterBridge } from '../../lib/hardware/printer-bridge';
 import { ReceiptBarcodeBlock } from './receipt-barcode-block';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { detectUnitConfig } from '../../lib/unit-utils';
+import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '../../lib/date-utils';
 
 function formatReceiptQuantity(productName: string, quantity: number | string): string {
   const num = Number(quantity);
@@ -65,7 +66,7 @@ export function ReceiptModal({
   initialSale,
   currency = 'LKR',
 }: ReceiptModalProps) {
-  const { business } = useTenantBranch();
+  const { business, branches, user, activeCashier } = useTenantBranch();
   const [receiptData, setReceiptData] = useState<ReceiptDocumentDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [paperSize, setPaperSize] = useState<PaperSize>('MM_80');
@@ -194,9 +195,19 @@ export function ReceiptModal({
     setIsDirectPrinting(true);
     setDirectPrintStatus('Dispatching ESC/POS stream to thermal printer...');
     try {
-      await PrinterBridge.printReceipt(effectiveSale, {
-        paperWidth: paperSize === 'MM_58' ? '58mm' : '80mm',
-      });
+      await PrinterBridge.printReceipt(
+        effectiveSale,
+        {
+          paperWidth: paperSize === 'MM_58' ? '58mm' : '80mm',
+        },
+        {
+          storeName: businessName,
+          branchName: branchName,
+          address: branchAddress,
+          phone: branchPhone,
+          taxNumber: taxNumber,
+        },
+      );
       setDirectPrintStatus('✓ ESC/POS thermal print dispatched successfully!');
       setTimeout(() => setDirectPrintStatus(null), 3500);
     } catch (err: unknown) {
@@ -276,9 +287,33 @@ export function ReceiptModal({
     (receiptData?.settings as { logoUrl?: string | null } | undefined)?.logoUrl ||
     (receiptData?.business as { logoUrl?: string | null } | undefined)?.logoUrl ||
     business?.logoUrl;
-  const branchName = receiptData?.branch?.name || business?.name || 'Flagship Clinic & Dispensary';
-  const branchAddress = receiptData?.branch?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka';
-  const branchPhone = receiptData?.branch?.phone || business?.phone || '+94 11 291 4500';
+  const matchedBranch = branches?.find(
+    (b) => b.id === (effectiveSale?.branchId || receiptData?.branch?.id)
+  );
+  const branchName =
+    effectiveSale?.branchName ||
+    matchedBranch?.name ||
+    receiptData?.branch?.name ||
+    'Main Store';
+  const branchAddress =
+    matchedBranch?.address ||
+    receiptData?.branch?.address ||
+    business?.address ||
+    'Colombo Road, Kiribathgoda, Sri Lanka';
+  const branchPhone =
+    matchedBranch?.phone ||
+    receiptData?.branch?.phone ||
+    business?.phone ||
+    '+94 11 291 4500';
+  const cashierName =
+    receiptData?.cashier?.fullName ||
+    effectiveSale?.cashier?.fullName ||
+    effectiveSale?.cashierName ||
+    activeCashier?.fullName ||
+    user?.fullName ||
+    'Branch Cashier';
+  const billDate = formatSriLankaReceiptDate(effectiveSale?.createdAt);
+  const billTime = formatSriLankaReceiptTime(effectiveSale?.createdAt);
   const taxNumber = receiptData?.settings?.taxNumber || 'VAT-10928392-8000';
   const receiptHeader = receiptData?.settings?.receiptHeader;
   const receiptFooter =
@@ -442,8 +477,12 @@ export function ReceiptModal({
                       {businessName}
                     </h1>
                     <div className="text-xs font-bold text-indigo-700">දීගායු වෙද මැදුර සහ ආයුර්වේද ඖෂධාලය</div>
-                    <div className="text-[11px] text-slate-500 mt-1 max-w-xs leading-snug">
-                      {branchName} • {branchAddress}
+                    <div className="text-xs font-bold text-slate-900 mt-1 flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span>Outlet: {branchName}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 max-w-xs leading-snug">
+                      {branchAddress}
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono">Tel: {branchPhone}</div>
                     <div className="text-[11px] font-bold text-slate-800 mt-0.5">
@@ -460,11 +499,11 @@ export function ReceiptModal({
                   <div className="mt-2 text-xs font-mono font-bold text-slate-900">
                     #{invoiceNumber}
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Date: {new Date(effectiveSale?.createdAt || Date.now()).toLocaleDateString()}
+                  <div className="text-[11px] text-slate-700 font-mono font-bold">
+                    Date: {billDate}
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Time: {new Date(effectiveSale?.createdAt || Date.now()).toLocaleTimeString()}
+                  <div className="text-[11px] text-slate-700 font-mono font-bold">
+                    Time: {billTime}
                   </div>
                 </div>
               </div>
@@ -483,8 +522,9 @@ export function ReceiptModal({
                   </div>
                 </div>
                 <div className="text-right font-mono text-[11px] text-slate-600">
+                  <div>Outlet: <span className="font-bold text-slate-800">{branchName}</span></div>
                   <div>Station: REG-01</div>
-                  <div>Dispensed By: {effectiveSale?.cashier?.fullName || effectiveSale?.cashierName || 'Chief Pharmacist'}</div>
+                  <div>Dispensed By: <span className="font-bold text-slate-800">{cashierName}</span></div>
                   <div className="text-indigo-700 font-bold">Original Customer Copy</div>
                 </div>
               </div>
@@ -619,9 +659,9 @@ export function ReceiptModal({
                   {businessName}
                 </div>
                 <div className="text-[11px] font-bold text-indigo-700">දීගායු වෙද මැදුර</div>
-                <div className="text-[11px] text-slate-600 font-sans font-medium flex items-center justify-center gap-1">
-                  <Building2 className="w-3 h-3 text-slate-400" />
-                  <span>{branchName}</span>
+                <div className="text-[11px] font-bold text-slate-900 font-sans flex items-center justify-center gap-1 mt-0.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Outlet: {branchName}</span>
                 </div>
                 {branchAddress && (
                   <div className="text-[10px] text-slate-500 font-sans max-w-[240px] mx-auto leading-tight">
@@ -657,11 +697,15 @@ export function ReceiptModal({
                 </div>
                 <div className="flex justify-between">
                   <span>Date:</span>
-                  <span>{new Date(effectiveSale?.createdAt || Date.now()).toLocaleDateString()}</span>
+                  <span className="font-semibold text-slate-900">{billDate}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Time:</span>
-                  <span>{new Date(effectiveSale?.createdAt || Date.now()).toLocaleTimeString()}</span>
+                  <span className="font-semibold text-slate-900">{billTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Outlet:</span>
+                  <span className="font-semibold text-slate-900">{branchName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Station:</span>
@@ -669,7 +713,7 @@ export function ReceiptModal({
                 </div>
                 <div className="flex justify-between">
                   <span>Cashier:</span>
-                  <span>{effectiveSale?.cashier?.fullName || effectiveSale?.cashierName || 'Cashier Station'}</span>
+                  <span className="font-bold text-slate-900">{cashierName}</span>
                 </div>
                 {effectiveSale?.customerName && (
                   <div className="flex justify-between">
