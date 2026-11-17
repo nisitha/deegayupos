@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type {
   AuthTenant,
   AuthUser,
@@ -99,16 +99,34 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  const isOwnerRef = useRef(false);
+
   const setSelectedBranchId = useCallback((id: string | null) => {
+    // If not owner and already has a selected branch, lock branch switching during active session
+    if (!isOwnerRef.current && selectedBranchId && id && id !== selectedBranchId) {
+      console.warn('Branch switching is locked for staff sessions. Please logout to switch shop.');
+      return;
+    }
     setSelectedBranchIdState(id);
     if (typeof window !== 'undefined') {
       if (id) {
         localStorage.setItem('pixelcraft_selected_branch', id);
+        localStorage.setItem('pixelcraft_active_branch_id', id);
+        try {
+          const sess = localStorage.getItem('pixelcraft_pos_session');
+          if (sess) {
+            const parsed = JSON.parse(sess);
+            parsed.activeBranchId = id;
+            parsed.branchId = id;
+            localStorage.setItem('pixelcraft_pos_session', JSON.stringify(parsed));
+          }
+        } catch {}
       } else {
         localStorage.removeItem('pixelcraft_selected_branch');
+        localStorage.removeItem('pixelcraft_active_branch_id');
       }
     }
-  }, []);
+  }, [selectedBranchId]);
 
   const fetchBranches = useCallback(async () => {
     try {
@@ -153,6 +171,12 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
       setSelectedBranchIdState((prev) => {
         if (prev && branchList.some((b) => b.id === prev)) {
           return prev;
+        }
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('pixelcraft_selected_branch');
+          if (stored && branchList.some((b) => b.id === stored)) {
+            return stored;
+          }
         }
         const primary = branchList.find((b) => b.isPrimary) || branchList[0];
         if (primary && typeof window !== 'undefined') {
@@ -243,6 +267,8 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     user?.isSuperAdmin === true ||
     permissions.includes('*');
 
+  isOwnerRef.current = isOwner;
+
   const isOwnerOrAdmin = isOwner;
 
   const assignedBranchIds: string[] = React.useMemo(() => {
@@ -300,11 +326,16 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     if (!isLoading && branches.length > 0 && !isOwner) {
       if (allowedBranches.length > 0) {
         if (!selectedBranchId || !allowedBranches.some((b) => b.id === selectedBranchId)) {
-          setSelectedBranchId(allowedBranches[0]?.id || null);
+          const fallback = allowedBranches[0]?.id || null;
+          setSelectedBranchIdState(fallback);
+          if (fallback && typeof window !== 'undefined') {
+            localStorage.setItem('pixelcraft_selected_branch', fallback);
+            localStorage.setItem('pixelcraft_active_branch_id', fallback);
+          }
         }
       }
     }
-  }, [isOwner, isLoading, branches.length, allowedBranches, selectedBranchId, setSelectedBranchId]);
+  }, [isOwner, isLoading, branches.length, allowedBranches, selectedBranchId]);
 
   const canCreateGrn = React.useMemo(() => {
     if (isOwner) return true;

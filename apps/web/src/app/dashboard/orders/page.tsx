@@ -477,22 +477,54 @@ export default function SalesOrdersPage() {
   }, [reportCompleted]);
 
   const cashierAuditBreakdown = useMemo(() => {
-    const map = new Map<string, { count: number; gross: number; cash: number; card: number; voidCount: number }>();
+    const map = new Map<
+      string,
+      {
+        cashierName: string;
+        branchName: string;
+        branchId: string;
+        count: number;
+        gross: number;
+        cash: number;
+        card: number;
+        voidCount: number;
+      }
+    >();
     for (const s of reportSales) {
       const cName = s.cashier?.fullName || s.cashierName || 'Staff';
-      const entry = map.get(cName) || { count: 0, gross: 0, cash: 0, card: 0, voidCount: 0 };
+      const bId = s.branchId || '';
+      const bName =
+        s.branchName ||
+        (bId ? BRANCH_MAP[bId] || branches.find((b) => b.id === bId)?.name || 'Main Store' : 'Main Store');
+      const key = `${cName}__${bId}`;
+      const entry = map.get(key) || {
+        cashierName: cName,
+        branchName: bName,
+        branchId: bId,
+        count: 0,
+        gross: 0,
+        cash: 0,
+        card: 0,
+        voidCount: 0,
+      };
       if (s.status === 'COMPLETED') {
         entry.count++;
         entry.gross += Number(s.totalAmount || 0);
-        entry.cash += s.payments?.filter((p) => p.paymentMethod === 'CASH').reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
-        entry.card += s.payments?.filter((p) => p.paymentMethod === 'CARD').reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+        entry.cash +=
+          s.payments
+            ?.filter((p) => p.paymentMethod === 'CASH')
+            .reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
+        entry.card +=
+          s.payments
+            ?.filter((p) => p.paymentMethod === 'CARD')
+            .reduce((acc, p) => acc + Number(p.amount || 0), 0) || 0;
       } else if (s.status === 'VOIDED') {
         entry.voidCount++;
       }
-      map.set(cName, entry);
+      map.set(key, entry);
     }
-    return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
-  }, [reportSales]);
+    return Array.from(map.values());
+  }, [reportSales, branches]);
 
   // Active Branch Label Helper
   const getBranchLabel = (id?: string) => {
@@ -1144,21 +1176,26 @@ export default function SalesOrdersPage() {
                       <div>{sale.customerName || 'Walk-in Customer'}</div>
                     </td>
 
-                    {/* Cashier with 1-Click Quick Filter */}
+                    {/* Cashier with 1-Click Quick Filter & Branch Badge */}
                     <td className="py-3.5 px-4 text-slate-600">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
-                          setSelectedCashier(cName);
-                          setCurrentPage(1);
-                        }}
-                        title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
-                      >
-                        <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
-                        <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
-                      </button>
+                      <div className="flex flex-col gap-1 items-start">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
+                            setSelectedCashier(cName);
+                            setCurrentPage(1);
+                          }}
+                          title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
+                        >
+                          <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
+                          <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
+                        </button>
+                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded">
+                          {getBranchLabel(sale.branchId)}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Items */}
@@ -1545,7 +1582,8 @@ export default function SalesOrdersPage() {
                       <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
                         <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                           <tr>
-                            <th className="py-2 px-3">Cashier Name</th>
+                            <th className="py-2 px-3">Cashier</th>
+                            <th className="py-2 px-3">Branch</th>
                             <th className="py-2 px-3 text-center">Bills Count</th>
                             <th className="py-2 px-3 text-right">Cash Total</th>
                             <th className="py-2 px-3 text-right">Card Total</th>
@@ -1554,8 +1592,13 @@ export default function SalesOrdersPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {cashierAuditBreakdown.map((row) => (
-                            <tr key={row.name} className="hover:bg-slate-50">
-                              <td className="py-2 px-3 font-semibold text-slate-900">{row.name}</td>
+                            <tr key={`${row.cashierName}__${row.branchId}`} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 font-semibold text-slate-900">{row.cashierName}</td>
+                              <td className="py-2 px-3 font-medium text-slate-700">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {row.branchName}
+                                </span>
+                              </td>
                               <td className="py-2 px-3 text-center font-mono">{row.count}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(row.cash)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(row.card)}</td>

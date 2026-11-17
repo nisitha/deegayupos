@@ -29,7 +29,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isPosPage = pathname === '/dashboard/pos';
   const [authChecked, setAuthChecked] = useState(false);
-  const { isOwner, grnBranchIds, isLoading: isTenantLoading } = useTenantBranch();
+  const {
+    isOwner,
+    grnBranchIds,
+    selectedBranchId,
+    assignedBranchIds,
+    isLoading: isTenantLoading,
+  } = useTenantBranch();
 
   // Authentication Guard: Redirect to /login if no active session
   useEffect(() => {
@@ -49,6 +55,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  // Ensure multi-branch staff has an active branch locked
+  useEffect(() => {
+    if (authChecked && !isTenantLoading && !isOwner) {
+      if (assignedBranchIds && assignedBranchIds.length > 1 && !selectedBranchId) {
+        console.warn('[RouteGuard] Multi-branch staff has no active branch selected. Redirecting to login.');
+        router.push('/login');
+      }
+    }
+  }, [authChecked, isTenantLoading, isOwner, assignedBranchIds, selectedBranchId, router]);
+
   // Determine if active route is restricted for current staff session
   const isRestrictedForStaff = useMemo(() => {
     if (!authChecked || isTenantLoading || isOwner) {
@@ -61,13 +77,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     );
     if (isOwnerRoute) return true;
 
-    // Purchases & GRN is allowed for staff ONLY if authorized with grnBranchIds (e.g. Shashini, Tharindu, Kumari)
+    // Purchases & GRN is allowed for staff ONLY if authorized for the currently active branch (e.g. Dambadeniya for Tharindu)
     if (pathname === '/dashboard/purchases' || pathname.startsWith('/dashboard/purchases/')) {
-      return !grnBranchIds || grnBranchIds.length === 0;
+      const canAccessActiveBranchGrn =
+        isOwner ||
+        (Boolean(selectedBranchId) &&
+          Array.isArray(grnBranchIds) &&
+          grnBranchIds.includes(selectedBranchId!));
+      return !canAccessActiveBranchGrn;
     }
 
     return false;
-  }, [authChecked, isTenantLoading, isOwner, grnBranchIds, pathname]);
+  }, [authChecked, isTenantLoading, isOwner, grnBranchIds, selectedBranchId, pathname]);
 
   // Enforce Route Guard: redirect unauthorized staff to /dashboard/pos
   useEffect(() => {

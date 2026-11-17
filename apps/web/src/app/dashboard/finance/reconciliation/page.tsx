@@ -1630,7 +1630,12 @@ export default function CashReconciliationPage() {
                           {item.branch_name}
                         </td>
                         <td className="py-3 px-4 font-bold text-slate-100 whitespace-nowrap">
-                          {item.cashier_name}
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.cashier_name}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                              {item.branch_name}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-right font-black text-rose-400 font-mono text-sm whitespace-nowrap">
                           LKR {Number(item.amount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
@@ -1833,29 +1838,14 @@ export default function CashReconciliationPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Branch Select */}
-              {allowedBranches.length <= 1 && !isOwner ? (
+              {/* Branch Select: Locked for staff to prevent cross-branch mutation */}
+              {!isOwner ? (
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 select-none text-xs">
                   <Building2 className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="font-semibold text-slate-200">{currentBranchName}</span>
-                </div>
-              ) : !isOwner ? (
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <select
-                    value={effectiveBranchId}
-                    onChange={(e) => {
-                      setSelectedBranchId(e.target.value);
-                      setStaffEditingSubmitted(false);
-                    }}
-                    className="bg-transparent text-slate-200 outline-none cursor-pointer"
-                  >
-                    {allowedBranches.map((b) => (
-                      <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
+                    Active Branch
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">

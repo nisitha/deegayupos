@@ -31,6 +31,7 @@ import {
   Check,
   Pencil,
   RotateCcw,
+  MapPin,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -104,6 +105,7 @@ interface CartItem {
 
 export default function ConfidencyPosPage() {
   const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
+  const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
 
   // Live ticking clock locked to Sri Lanka time (Asia/Colombo, UTC+05:30)
   const [liveClockStr, setLiveClockStr] = useState<string>('');
@@ -1189,6 +1191,10 @@ export default function ConfidencyPosPage() {
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
               <span>POS Terminal</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-xs font-bold text-[#5B46F6]">
+              <MapPin className="w-3 h-3 text-[#5B46F6]" />
+              <span className="truncate max-w-[120px]">{currentBranchName}</span>
             </div>
             <span className="text-slate-300">|</span>
             <button

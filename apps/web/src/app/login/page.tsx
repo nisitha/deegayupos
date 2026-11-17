@@ -12,6 +12,8 @@ import {
   Store,
   AlertCircle,
   KeyRound,
+  MapPin,
+  Check,
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
@@ -81,6 +83,47 @@ const PRESET_STAFF = [
   },
 ];
 
+interface PendingGateUser {
+  userRecord?: any;
+  email: string;
+  name: string;
+  role: string;
+  assignedBranchIds: string[];
+  grnBranchIds: string[];
+  tenantId: string;
+}
+
+const MULTI_BRANCH_OPTIONS = [
+  {
+    id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+    name: 'Alawwa Branch',
+    nameSi: 'ඇලව්ව ශාඛාව',
+    code: 'ALW-01',
+    address: 'Deegayu Weda Madura, Alawwa Road, Alawwa',
+    phone: '037-2241088',
+    rolesBadge: 'POS Billing & Daily Cash Reconciliation',
+    rolesBadgeSi: 'POS බිල්පත් සහ දෛනික මුදල් සමථකරණය',
+    canGrn: false,
+    colorScheme: 'from-blue-600 to-indigo-700',
+    borderHover: 'hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  {
+    id: 'fa68e4a0-a515-44c8-a082-5b5590366658',
+    name: 'Dambadeniya Branch',
+    nameSi: 'දඹදෙණිය ශාඛාව',
+    code: 'DMB-01',
+    address: 'Deegayu Weda Madura, Kurunegala Road, Dambadeniya',
+    phone: '037-2287411',
+    rolesBadge: 'POS Billing, Cash Reconciliation & Supplier GRN Officer',
+    rolesBadgeSi: 'POS බිල්පත්, දෛනික මුදල් සමථකරණය සහ සැපයුම්කරු GRN නිලධාරී',
+    canGrn: true,
+    colorScheme: 'from-emerald-600 to-teal-700',
+    borderHover: 'hover:border-emerald-500 hover:ring-2 hover:ring-emerald-500/20',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+];
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -91,8 +134,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingGateUser, setPendingGateUser] = useState<PendingGateUser | null>(null);
 
-  const persistSession = (userRecord?: any, explicitEmail?: string) => {
+  const persistSession = (
+    userRecord?: any,
+    explicitEmail?: string,
+    explicitBranchId?: string,
+    explicitBranchName?: string
+  ) => {
     const tenantId =
       userRecord?.tenant_id ||
       userRecord?.tenantId ||
@@ -118,7 +167,7 @@ export default function LoginPage() {
 
     const isOwner = role === 'OWNER' || role === 'ADMIN';
 
-    const assignedBranchIds: string[] = Array.isArray(userRecord?.assigned_branches)
+    let assignedBranchIds: string[] = Array.isArray(userRecord?.assigned_branches)
       ? userRecord.assigned_branches
       : Array.isArray(userRecord?.assignedBranches)
       ? userRecord.assignedBranches
@@ -126,7 +175,7 @@ export default function LoginPage() {
       ? ALL_BRANCH_IDS
       : [];
 
-    const grnBranchIds: string[] = Array.isArray(userRecord?.grn_branches)
+    let grnBranchIds: string[] = Array.isArray(userRecord?.grn_branches)
       ? userRecord.grn_branches
       : Array.isArray(userRecord?.grnBranches)
       ? userRecord.grnBranches
@@ -134,21 +183,60 @@ export default function LoginPage() {
       ? ALL_BRANCH_IDS
       : [];
 
+    const lowerEmail = userEmail.toLowerCase();
+    const lowerName = name.toLowerCase();
+
+    if (lowerEmail.includes('tharindu') || lowerName.includes('tharindu')) {
+      assignedBranchIds = [
+        '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+        'fa68e4a0-a515-44c8-a082-5b5590366658',
+      ];
+      grnBranchIds = ['fa68e4a0-a515-44c8-a082-5b5590366658'];
+    } else if (lowerEmail.includes('shashini') || lowerName.includes('shashini')) {
+      assignedBranchIds = ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'];
+      grnBranchIds = ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'];
+    } else if (lowerEmail.includes('anusha') || lowerName.includes('anusha')) {
+      assignedBranchIds = ['fa68e4a0-a515-44c8-a082-5b5590366658'];
+      grnBranchIds = [];
+    } else if (lowerEmail.includes('kumari') || lowerName.includes('kumari')) {
+      assignedBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+      grnBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+    } else if (lowerEmail.includes('gindika') || lowerName.includes('gindika')) {
+      assignedBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+      grnBranchIds = [];
+    }
+
     const branchId =
+      explicitBranchId ||
       (assignedBranchIds.length > 0 ? assignedBranchIds[0] : null) ||
       userRecord?.branch_id ||
       userRecord?.branchId ||
       userRecord?.memberships?.[0]?.default_branch_id ||
       '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
 
+    const branchName =
+      explicitBranchName ||
+      (branchId === '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'
+        ? 'Alawwa'
+        : branchId === 'fa68e4a0-a515-44c8-a082-5b5590366658'
+        ? 'Dambadeniya'
+        : branchId === '197693d6-4247-48df-b614-6fcde9e34f7d'
+        ? 'Giriulla'
+        : 'Main Branch');
+
+    const canCreateGrn = isOwner || grnBranchIds.includes(branchId);
+
     const sessionObj = {
-      id: userRecord?.id || (isOwner ? '96b2747b-9d22-4266-94ce-b035fadef498' : '99999999-9999-9999-9999-999999999999'),
+      id: userRecord?.id || (isOwner ? '96b2747b-9d22-4266-94ce-b035fadef498' : '0f1d46e2-e943-4f24-b69e-f1ba5278a750'),
       name,
       email: userEmail,
       role,
       tenantId,
       tenantSlug: 'deegayu',
       branchId,
+      activeBranchId: branchId,
+      activeBranchName: branchName,
+      isBranchLocked: !isOwner,
       assignedBranchIds,
       grnBranchIds,
       authenticated: true,
@@ -181,7 +269,12 @@ export default function LoginPage() {
       localStorage.setItem('pixelcraft_tenant', JSON.stringify(tenantObj));
       localStorage.setItem('pixelcraft_tenant_id', tenantId);
       localStorage.setItem('pixelcraft_selected_branch', branchId);
-      localStorage.setItem('pixelcraft_permissions', JSON.stringify(isOwner ? ['*'] : ['pos:*', 'cashier:*']));
+      localStorage.setItem('pixelcraft_active_branch_id', branchId);
+      localStorage.setItem('pixelcraft_active_branch_name', branchName);
+      localStorage.setItem(
+        'pixelcraft_permissions',
+        JSON.stringify(isOwner ? ['*'] : ['pos:*', 'cashier:*', ...(canCreateGrn ? ['grn:*'] : [])])
+      );
       localStorage.setItem(
         'pixelcraft_active_cashier',
         JSON.stringify({
@@ -204,6 +297,103 @@ export default function LoginPage() {
     }
   };
 
+  const selectBranchAndProceed = (branchId: string, branchName: string) => {
+    if (!pendingGateUser) return;
+    setLoading(true);
+
+    persistSession(
+      pendingGateUser.userRecord,
+      pendingGateUser.email,
+      branchId,
+      branchName
+    );
+    router.push('/dashboard/pos/');
+  };
+
+  const evaluateLoginAndRoute = (userRecord?: any, explicitEmail?: string) => {
+    const tenantId =
+      userRecord?.tenant_id ||
+      userRecord?.tenantId ||
+      userRecord?.memberships?.[0]?.tenant_id ||
+      userRecord?.memberships?.[0]?.tenantId ||
+      '0fef1423-5d89-4147-8af8-17c7e641c88a';
+
+    const role =
+      userRecord?.role ||
+      userRecord?.memberships?.[0]?.role?.code ||
+      (explicitEmail === 'owner@deegayu.pixelcraftlk.com' ? 'OWNER' : 'STAFF');
+
+    const name =
+      userRecord?.full_name ||
+      userRecord?.fullName ||
+      userRecord?.name ||
+      (role === 'OWNER' ? 'Dr. Deegayu (Owner)' : 'Staff User');
+
+    const userEmail =
+      userRecord?.email ||
+      explicitEmail ||
+      'owner@deegayu.pixelcraftlk.com';
+
+    const isOwner = role === 'OWNER' || role === 'ADMIN';
+
+    let assignedBranchIds: string[] = Array.isArray(userRecord?.assigned_branches)
+      ? userRecord.assigned_branches
+      : Array.isArray(userRecord?.assignedBranches)
+      ? userRecord.assignedBranches
+      : isOwner
+      ? ALL_BRANCH_IDS
+      : [];
+
+    let grnBranchIds: string[] = Array.isArray(userRecord?.grn_branches)
+      ? userRecord.grn_branches
+      : Array.isArray(userRecord?.grnBranches)
+      ? userRecord.grnBranches
+      : isOwner
+      ? ALL_BRANCH_IDS
+      : [];
+
+    const lowerEmail = userEmail.toLowerCase();
+    const lowerName = name.toLowerCase();
+
+    if (lowerEmail.includes('tharindu') || lowerName.includes('tharindu')) {
+      assignedBranchIds = [
+        '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+        'fa68e4a0-a515-44c8-a082-5b5590366658',
+      ];
+      grnBranchIds = ['fa68e4a0-a515-44c8-a082-5b5590366658'];
+    } else if (lowerEmail.includes('shashini') || lowerName.includes('shashini')) {
+      assignedBranchIds = ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'];
+      grnBranchIds = ['00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'];
+    } else if (lowerEmail.includes('anusha') || lowerName.includes('anusha')) {
+      assignedBranchIds = ['fa68e4a0-a515-44c8-a082-5b5590366658'];
+      grnBranchIds = [];
+    } else if (lowerEmail.includes('kumari') || lowerName.includes('kumari')) {
+      assignedBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+      grnBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+    } else if (lowerEmail.includes('gindika') || lowerName.includes('gindika')) {
+      assignedBranchIds = ['197693d6-4247-48df-b614-6fcde9e34f7d'];
+      grnBranchIds = [];
+    }
+
+    // Mandatory Branch Selection Gate for Multi-Branch Staff (Tharindu)
+    if (!isOwner && assignedBranchIds.length > 1) {
+      setPendingGateUser({
+        userRecord,
+        email: userEmail,
+        name,
+        role,
+        assignedBranchIds,
+        grnBranchIds,
+        tenantId,
+      });
+      return;
+    }
+
+    // Single branch staff or Owner: proceed directly to POS
+    persistSession(userRecord, userEmail);
+    router.push('/dashboard/pos/');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -223,12 +413,30 @@ export default function LoginPage() {
           cleanEmail === 'owner@deegayu.pixelcraftlk.com' &&
           cleanPassword === 'Deegayu@2026'
         ) {
-          persistSession(undefined, cleanEmail);
-          router.push('/dashboard/pos/');
+          evaluateLoginAndRoute(undefined, cleanEmail);
           return;
         }
 
-        // 1. Query Supabase directly from 'users' table (mapped from Prisma @@map("users"))
+        // Preset staff fast matching
+        const matchedPreset = PRESET_STAFF.find(
+          (p) => p.email.toLowerCase() === cleanEmail && p.password === cleanPassword
+        );
+        if (matchedPreset) {
+          evaluateLoginAndRoute(
+            {
+              id: matchedPreset.name.includes('Tharindu')
+                ? '0f1d46e2-e943-4f24-b69e-f1ba5278a750'
+                : '99999999-9999-9999-9999-999999999999',
+              full_name: matchedPreset.name,
+              email: matchedPreset.email,
+              role: matchedPreset.role,
+            },
+            cleanEmail
+          );
+          return;
+        }
+
+        // 1. Query Supabase directly from 'users' table
         let userRecord: any = null;
 
         try {
@@ -264,8 +472,7 @@ export default function LoginPage() {
             throw new Error('Invalid email or password.');
           }
 
-          persistSession(userRecord, cleanEmail);
-          router.push('/dashboard/pos/');
+          evaluateLoginAndRoute(userRecord, cleanEmail);
           return;
         }
 
@@ -278,13 +485,15 @@ export default function LoginPage() {
             });
 
           if (!authErr && authData?.user) {
-            persistSession({
-              id: authData.user.id,
-              email: authData.user.email,
-              name: authData.user.user_metadata?.full_name || 'Staff User',
-              role: authData.user.user_metadata?.role || 'CASHIER',
-            }, cleanEmail);
-            router.push('/dashboard/pos/');
+            evaluateLoginAndRoute(
+              {
+                id: authData.user.id,
+                email: authData.user.email,
+                name: authData.user.user_metadata?.full_name || 'Staff User',
+                role: authData.user.user_metadata?.role || 'CASHIER',
+              },
+              cleanEmail
+            );
             return;
           }
         } catch {
@@ -301,8 +510,24 @@ export default function LoginPage() {
 
         // Demo seed master PIN
         if (cleanPin === '2026' || cleanPin === '1234') {
-          persistSession(undefined, 'owner@deegayu.pixelcraftlk.com');
-          router.push('/dashboard/pos/');
+          evaluateLoginAndRoute(undefined, 'owner@deegayu.pixelcraftlk.com');
+          return;
+        }
+
+        // Preset staff PIN match
+        const matchedPinPreset = PRESET_STAFF.find((p) => p.pin === cleanPin);
+        if (matchedPinPreset) {
+          evaluateLoginAndRoute(
+            {
+              id: matchedPinPreset.name.includes('Tharindu')
+                ? '0f1d46e2-e943-4f24-b69e-f1ba5278a750'
+                : '99999999-9999-9999-9999-999999999999',
+              full_name: matchedPinPreset.name,
+              email: matchedPinPreset.email,
+              role: matchedPinPreset.role,
+            },
+            matchedPinPreset.email
+          );
           return;
         }
 
@@ -332,8 +557,7 @@ export default function LoginPage() {
         }
 
         if (matchedUser) {
-          persistSession(matchedUser);
-          router.push('/dashboard/pos/');
+          evaluateLoginAndRoute(matchedUser, matchedUser.email);
           return;
         }
 
@@ -367,221 +591,340 @@ export default function LoginPage() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-blue-100/60 blur-[100px] rounded-full" />
       </div>
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#005BD3] text-white shadow-lg shadow-blue-500/25 mb-3 group hover:scale-105 transition-transform">
-            <Grid className="w-6 h-6" />
+      {pendingGateUser ? (
+        <div className="w-full max-w-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
+          {/* Brand Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#005BD3] text-white shadow-lg shadow-blue-500/25 mb-3 group hover:scale-105 transition-transform">
+              <Grid className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              PixelCraft <span className="text-[#005BD3]">POS</span>
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Multi-Branch Cashier Decision Terminal
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            PixelCraft <span className="text-[#005BD3]">POS</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Enterprise Cloud Point-of-Sale Terminal
-          </p>
-        </div>
 
-        {/* Main Login Card */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.05)] p-6 sm:p-8">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Terminal Sign In</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Authorized Cashier & Admin Access
+          {/* Decision Gate Card */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08)] p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 mb-2">
+                <Store className="w-3.5 h-3.5" />
+                <span>Multi-Branch Authorization Gate</span>
+              </div>
+              <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
+                Select Active Shop / Branch
+              </h2>
+              <p className="text-sm font-bold text-[#005BD3] mt-0.5">
+                ක්‍රියාකාරී ශාඛාව තෝරන්න
+              </p>
+              <p className="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
+                Welcome back, <strong className="text-slate-900 font-bold">{pendingGateUser.name}</strong>. You are authorized to operate at 2 branches. Please select the shop you are operating today:
               </p>
             </div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60">
-              <Store className="w-3 h-3" />
-              Deegayu
-            </span>
-          </div>
 
-          {/* Mode Tabs: Password vs PIN */}
-          <div className="flex items-center p-1 bg-slate-100/80 rounded-xl mb-5">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('password');
-                setError(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                authMode === 'password'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Lock className="w-3.5 h-3.5" />
-              Staff Password
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('pin');
-                setError(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                authMode === 'pin'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              Terminal PIN
-            </button>
-          </div>
+            {/* 2 Interactive Branch Selection Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              {MULTI_BRANCH_OPTIONS.map((opt) => (
+                <div
+                  key={opt.id}
+                  onClick={() => selectBranchAndProceed(opt.id, opt.name)}
+                  className="group relative flex flex-col justify-between p-5 rounded-2xl border-2 border-slate-200 hover:border-[#005BD3] bg-slate-50/60 hover:bg-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer text-left"
+                >
+                  <div>
+                    {/* Top row: badge & code */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 shadow-2xs">
+                        {opt.code}
+                      </span>
+                      {opt.canGrn ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          GRN Officer
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                          Billing Cashier
+                        </span>
+                      )}
+                    </div>
 
-          {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-              <span>{error}</span>
-            </div>
-          )}
+                    {/* Branch Title & Sinhala */}
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
+                      {opt.name}
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                      {opt.nameSi}
+                    </p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            {authMode === 'password' ? (
-              <>
-                {/* Email Field */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Staff Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@business.lk"
-                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
-                    />
+                    {/* Address */}
+                    <div className="mt-3 text-[11px] text-slate-500 flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">{opt.address}</span>
+                    </div>
+
+                    {/* Roles Badge */}
+                    <div className="mt-4 pt-3 border-t border-slate-200/80">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Assigned Authorizations:
+                      </div>
+                      <div className="text-xs font-semibold text-slate-700 leading-snug">
+                        {opt.rolesBadge}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {opt.rolesBadgeSi}
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Password Field */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
-                    />
+                  {/* Action CTA Button */}
+                  <div className="mt-5">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                      disabled={loading}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-slate-900 group-hover:bg-[#005BD3] text-white shadow-sm transition-all"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
+                      <span>Enter {opt.name.replace(' Branch', '')}</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 </div>
-              </>
-            ) : (
-              /* PIN Code Field */
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  4-Digit Terminal PIN Code
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="password"
-                    maxLength={6}
-                    required
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="••••"
-                    className="w-full pl-10 pr-4 py-3 text-center tracking-widest text-lg font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-400 text-center mt-1.5">
-                  Enter your registered cashier PIN (Demo: 2026 or 1234)
-                </p>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-3 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                <>
-                  <span>
-                    {authMode === 'password'
-                      ? 'Sign In to Terminal'
-                      : 'Unlock POS with PIN'}
-                  </span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Quick Staff Team 1-Click Selectors */}
-          <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Authorized Branch Team
-              </span>
-              <span className="text-[10px] text-slate-400">
-                {authMode === 'password' ? 'Click to fill credentials' : 'Click to fill 4-digit PIN'}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
-              {PRESET_STAFF.map((staff) => (
-                <button
-                  key={staff.email}
-                  type="button"
-                  onClick={() => handleFillPreset(staff)}
-                  className="w-full py-2 px-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-left transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 group-hover:border-blue-400">
-                      {staff.name[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors truncate">
-                        {staff.name}
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">
-                        {staff.branchLabel}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-semibold">
-                      {authMode === 'password' ? staff.email.split('@')[0] : `PIN: ${staff.pin}`}
-                    </span>
-                  </div>
-                </button>
               ))}
+            </div>
+
+            {/* Back to Login / Change User */}
+            <div className="text-center pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setPendingGateUser(null)}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer py-1.5 px-3 rounded-lg hover:bg-slate-100"
+              >
+                <span>&larr; Switch User / Re-login</span>
+              </button>
+              <span className="text-[11px] text-slate-400 font-mono">
+                Session locked upon selection
+              </span>
             </div>
           </div>
         </div>
+      ) : (
+        <div className="w-full max-w-md relative z-10">
+          {/* Brand Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#005BD3] text-white shadow-lg shadow-blue-500/25 mb-3 group hover:scale-105 transition-transform">
+              <Grid className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              PixelCraft <span className="text-[#005BD3]">POS</span>
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Enterprise Cloud Point-of-Sale Terminal
+            </p>
+          </div>
 
-        {/* Footer Notice */}
-        <div className="text-center mt-6 text-xs text-slate-400 font-mono">
-          <span>Protected by Row Level Security (RLS) • Multi-Tenant Partition</span>
+          {/* Main Login Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.05)] p-6 sm:p-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Terminal Sign In</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Authorized Cashier & Admin Access
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60">
+                <Store className="w-3 h-3" />
+                Deegayu
+              </span>
+            </div>
+
+            {/* Mode Tabs: Password vs PIN */}
+            <div className="flex items-center p-1 bg-slate-100/80 rounded-xl mb-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('password');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  authMode === 'password'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Staff Password
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('pin');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  authMode === 'pin'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                Terminal PIN
+              </button>
+            </div>
+
+            {error && (
+              <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              {authMode === 'password' ? (
+                <>
+                  {/* Email Field */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Staff Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@business.lk"
+                        className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password Field */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* PIN Code Field */
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    4-Digit Terminal PIN Code
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="password"
+                      maxLength={6}
+                      required
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                      placeholder="••••"
+                      className="w-full pl-10 pr-4 py-3 text-center tracking-widest text-lg font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 text-center mt-1.5">
+                    Enter your registered cashier PIN (Demo: 2026 or 1234)
+                  </p>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 py-3 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {authMode === 'password'
+                        ? 'Sign In to Terminal'
+                        : 'Unlock POS with PIN'}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Quick Staff Team 1-Click Selectors */}
+            <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Authorized Branch Team
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {authMode === 'password' ? 'Click to fill credentials' : 'Click to fill 4-digit PIN'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                {PRESET_STAFF.map((staff) => (
+                  <button
+                    key={staff.email}
+                    type="button"
+                    onClick={() => handleFillPreset(staff)}
+                    className="w-full py-2 px-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-left transition-all flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 group-hover:border-blue-400">
+                        {staff.name[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors truncate">
+                          {staff.name}
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate">
+                          {staff.branchLabel}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-semibold">
+                        {authMode === 'password' ? staff.email.split('@')[0] : `PIN: ${staff.pin}`}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Notice */}
+          <div className="text-center mt-6 text-xs text-slate-400 font-mono">
+            <span>Protected by Row Level Security (RLS) • Multi-Tenant Partition</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -90,8 +90,40 @@ export function Header() {
       localStorage.removeItem('pixelcraft_tenant');
       localStorage.removeItem('pixelcraft_tenant_id');
       localStorage.removeItem('pixelcraft_permissions');
+      localStorage.removeItem('pixelcraft_pos_session');
+      localStorage.removeItem('pixelcraft_selected_branch');
+      localStorage.removeItem('pixelcraft_active_branch_id');
+      localStorage.removeItem('pixelcraft_active_branch_name');
+      localStorage.removeItem('pixelcraft_active_cashier');
+      sessionStorage.clear();
+      if (typeof document !== 'undefined') {
+        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
+      }
     }
     setProfileDropdownOpen(false);
+    router.push('/login');
+  };
+
+  const handleSwitchShopLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('pixelcraft_access_token');
+      localStorage.removeItem('pixelcraft_refresh_token');
+      localStorage.removeItem('pixelcraft_user');
+      localStorage.removeItem('pixelcraft_tenant');
+      localStorage.removeItem('pixelcraft_tenant_id');
+      localStorage.removeItem('pixelcraft_permissions');
+      localStorage.removeItem('pixelcraft_pos_session');
+      localStorage.removeItem('pixelcraft_selected_branch');
+      localStorage.removeItem('pixelcraft_active_branch_id');
+      localStorage.removeItem('pixelcraft_active_branch_name');
+      localStorage.removeItem('pixelcraft_active_cashier');
+      sessionStorage.clear();
+      if (typeof document !== 'undefined') {
+        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
+      }
+    }
     router.push('/login');
   };
 
@@ -154,24 +186,37 @@ export function Header() {
             </Link>
           )}
 
-          {/* Interactive Multi-Branch Switcher Dropdown */}
+          {/* Branch Section: Locked Session for Staff, Switcher for Owner */}
           <div className="relative" ref={branchRef}>
-            {allowedBranches.length <= 1 && !isOwner ? (
-              /* Single-branch staff: Locked Badge with MapPin */
-              <div
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 select-none"
-                title={`Branch Assigned: ${currentBranchName}`}
-              >
-                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate max-w-[120px] font-bold text-slate-800">
-                  {currentBranchName}
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-200/80 text-slate-600">
-                  Assigned
-                </span>
+            {!isOwner ? (
+              /* Non-owner staff: Locked Branch Badge + Switch Shop (Logout) Button */
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs font-semibold text-slate-800 select-none shadow-2xs"
+                  title={`Branch Session Locked: ${currentBranchName}`}
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
+                  <span className="truncate max-w-[110px] sm:max-w-[140px] font-bold text-slate-900">
+                    {currentBranchName}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 shrink-0">
+                    Locked Session
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSwitchShopLogout}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  title="Switch branch by terminating session and logging in"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="hidden sm:inline">Switch Shop</span>
+                  <span className="text-[10px] text-rose-500 font-mono hidden md:inline">(Logout)</span>
+                </button>
               </div>
             ) : (
-              /* Multi-branch staff or Owner: Switcher Button */
+              /* Owner: Full Multi-Branch Switcher Button */
               <button
                 type="button"
                 onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
@@ -190,8 +235,8 @@ export function Header() {
               </button>
             )}
 
-            {/* Branch Switcher Flyout */}
-            {branchDropdownOpen && (allowedBranches.length > 1 || isOwner) && (
+            {/* Branch Switcher Flyout (Owner Only) */}
+            {branchDropdownOpen && isOwner && (
               <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-slate-200/90 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.14)] p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-3 py-2 border-b border-slate-100 mb-1 flex items-center justify-between">
                   <div>

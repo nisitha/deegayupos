@@ -82,7 +82,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
 export function PosSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, tenant, business, isOwner, grnBranchIds } = useTenantBranch();
+  const { user, tenant, business, isOwner, grnBranchIds, selectedBranchId } = useTenantBranch();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,6 +107,16 @@ export function PosSidebar() {
       localStorage.removeItem('pixelcraft_tenant');
       localStorage.removeItem('pixelcraft_tenant_id');
       localStorage.removeItem('pixelcraft_permissions');
+      localStorage.removeItem('pixelcraft_pos_session');
+      localStorage.removeItem('pixelcraft_selected_branch');
+      localStorage.removeItem('pixelcraft_active_branch_id');
+      localStorage.removeItem('pixelcraft_active_branch_name');
+      localStorage.removeItem('pixelcraft_active_cashier');
+      sessionStorage.clear();
+      if (typeof document !== 'undefined') {
+        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
+      }
     }
     router.push('/login');
   };
@@ -123,7 +133,11 @@ export function PosSidebar() {
   const displayName = user?.fullName || 'Dr. Deegayu';
   const userEmail = user?.email || 'owner@deegayu.pixelcraftlk.com';
 
-  const hasGrnAccess = isOwner || (Array.isArray(grnBranchIds) && grnBranchIds.length > 0);
+  const hasGrnAccess =
+    isOwner ||
+    (Boolean(selectedBranchId) &&
+      Array.isArray(grnBranchIds) &&
+      grnBranchIds.includes(selectedBranchId!));
 
   // Strict Role-Based Navigation Sections
   // OWNER sees 100% of sections (COMMAND, COMMERCE, FINANCE & REPORTS, PLATFORM).

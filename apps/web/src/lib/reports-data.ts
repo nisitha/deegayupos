@@ -209,7 +209,7 @@ export const HISTORICAL_MONTHLY_DATA: MonthlyTrendItem[] = [
 
 export const HISTORICAL_CASHIER_DATA: CashierSummaryItem[] = [
   { cashierName: 'Sale Alawwa', billsCount: 7475, unitsSold: 205427, revenue: 8624116.38, cost: 4958201.59, profit: 3665914.79, margin: 42.51, averageBill: 1153.73 },
-  { cashierName: 'Sale Dabadeniya', billsCount: 5798, unitsSold: 214256, revenue: 10528070.99, cost: 5858432.75, profit: 4669638.24, margin: 44.35, averageBill: 1815.81 },
+  { cashierName: 'Sale Dambadeniya', billsCount: 5798, unitsSold: 214256, revenue: 10528070.99, cost: 5858432.75, profit: 4669638.24, margin: 44.35, averageBill: 1815.81 },
   { cashierName: 'Sale Admin', billsCount: 994, unitsSold: 119513, revenue: 6868442.11, cost: 3584409.35, profit: 3284032.76, margin: 47.81, averageBill: 6910.0 },
   { cashierName: 'User User1', billsCount: 811, unitsSold: 16687, revenue: 803104.72, cost: 432477.22, profit: 370627.5, margin: 46.15, averageBill: 990.26 },
   { cashierName: 'Sale Giriulla', billsCount: 485, unitsSold: 32232, revenue: 6668433.9, cost: 3543359.32, profit: 3125074.58, margin: 46.86, averageBill: 13749.35 },
@@ -221,7 +221,7 @@ export const HISTORICAL_CASHIER_DATA: CashierSummaryItem[] = [
 ];
 
 export const HISTORICAL_BRANCH_VALUATION: InventoryBranchValuation[] = [
-  { branchId: 'fa68e4a0-a515-44c8-a082-5b5590366658', branchName: 'Dabadeniya', productsCount: 3115, totalUnits: 320450, wholesaleValue: 3012450.0, retailValue: 5450200.0, potentialProfit: 2437750.0, margin: 44.73 },
+  { branchId: 'fa68e4a0-a515-44c8-a082-5b5590366658', branchName: 'Dambadeniya', productsCount: 3115, totalUnits: 320450, wholesaleValue: 3012450.0, retailValue: 5450200.0, potentialProfit: 2437750.0, margin: 44.73 },
   { branchId: '133eeaec-5726-4702-a819-8423750db203', branchName: 'Main store', productsCount: 3120, totalUnits: 485120, wholesaleValue: 4620180.35, retailValue: 8352100.0, potentialProfit: 3731919.65, margin: 44.68 },
   { branchId: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54', branchName: 'Alawwa', productsCount: 3110, totalUnits: 265890, wholesaleValue: 2415391.0, retailValue: 4368145.05, potentialProfit: 1952754.05, margin: 44.7 },
   { branchId: '197693d6-4247-48df-b614-6fcde9e34f7d', branchName: 'Giriulla', productsCount: 3117, totalUnits: 194237.15, wholesaleValue: 1767200.0, retailValue: 3208250.0, potentialProfit: 1441050.0, margin: 44.91 },
@@ -488,7 +488,7 @@ export async function fetchDetailedSales(params: {
     }
 
     const branchNameMap: Record<string, string> = {
-      'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dabadeniya',
+      'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dambadeniya',
       '133eeaec-5726-4702-a819-8423750db203': 'Main store',
       '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': 'Alawwa',
       '197693d6-4247-48df-b614-6fcde9e34f7d': 'Giriulla',
@@ -703,7 +703,7 @@ export async function fetchLowStockAlerts(_branchId?: string): Promise<LowStockI
         name: prod.name || 'Ayurvedic Item',
         sku: prod.sku || 'N/A',
         category: 'Ayurvedic Medicine',
-        branchName: warehouseMap.get(s.warehouse_id) || 'Dabadeniya',
+        branchName: warehouseMap.get(s.warehouse_id) || 'Dambadeniya',
         quantityOnHand: qty,
         reorderPoint: reorder,
         costPrice: cost,
@@ -720,11 +720,11 @@ export async function fetchLowStockAlerts(_branchId?: string): Promise<LowStockI
 
 function getFallbackLowStock(): LowStockItem[] {
   return [
-    { id: 'ls-1', name: 'Siddhalepa Balm 50g', sku: 'SID50G', category: 'Balms', branchName: 'Dabadeniya', quantityOnHand: 0, reorderPoint: 25, costPrice: 280.0, retailPrice: 420.0, status: 'OUT_OF_STOCK', replenishCost: 7000.0 },
+    { id: 'ls-1', name: 'Siddhalepa Balm 50g', sku: 'SID50G', category: 'Balms', branchName: 'Dambadeniya', quantityOnHand: 0, reorderPoint: 25, costPrice: 280.0, retailPrice: 420.0, status: 'OUT_OF_STOCK', replenishCost: 7000.0 },
     { id: 'ls-2', name: 'Suwanda Warga Special Churna', sku: 'SWC002', category: 'Churna', branchName: 'Alawwa', quantityOnHand: 2, reorderPoint: 30, costPrice: 450.0, retailPrice: 750.0, status: 'CRITICAL', replenishCost: 12600.0 },
     { id: 'ls-3', name: 'Pinda Thailaya 375ml', sku: 'PINDA375', category: 'Oil', branchName: 'Main store', quantityOnHand: 4, reorderPoint: 40, costPrice: 820.0, retailPrice: 1250.0, status: 'CRITICAL', replenishCost: 29520.0 },
     { id: 'ls-4', name: 'Nawa Rathna Kalka 100g', sku: 'NRK100', category: 'Kalka', branchName: 'Giriulla', quantityOnHand: 5, reorderPoint: 20, costPrice: 320.0, retailPrice: 550.0, status: 'CRITICAL', replenishCost: 4800.0 },
-    { id: 'ls-5', name: 'Dasamoolarishta 750ml', sku: 'DASAM750', category: 'Arishta', branchName: 'Dabadeniya', quantityOnHand: 8, reorderPoint: 50, costPrice: 650.0, retailPrice: 1050.0, status: 'LOW_STOCK', replenishCost: 27300.0 },
+    { id: 'ls-5', name: 'Dasamoolarishta 750ml', sku: 'DASAM750', category: 'Arishta', branchName: 'Dambadeniya', quantityOnHand: 8, reorderPoint: 50, costPrice: 650.0, retailPrice: 1050.0, status: 'LOW_STOCK', replenishCost: 27300.0 },
     { id: 'ls-6', name: 'Neelyadi Thailaya 750ml', sku: 'NEEL750', category: 'Oil', branchName: 'Alawwa', quantityOnHand: 9, reorderPoint: 35, costPrice: 1100.0, retailPrice: 1750.0, status: 'LOW_STOCK', replenishCost: 28600.0 },
   ];
 }
