@@ -50,7 +50,13 @@ type TabView =
   | 'bank_accounts';
 
 export default function CashReconciliationPage() {
-  const { business, branches, allowedBranches, selectedBranchId, setSelectedBranchId, user, isOwner } = useTenantBranch();
+  const { business, branches, allowedBranches, selectedBranchId, setSelectedBranchId, user, activeCashier, isOwner } = useTenantBranch();
+
+  const loggedInCashierName =
+    activeCashier?.fullName ||
+    user?.fullName ||
+    (user?.email ? user.email.split('@')[0] : 'Branch Cashier');
+  const loggedInCashierId = activeCashier?.id || user?.id;
 
   const tenantId = business?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a';
   const effectiveBranchId =
@@ -195,9 +201,20 @@ export default function CashReconciliationPage() {
   };
 
   // ==========================================
+  // COUNTING MODE (Already Banked vs Before Banking)
+  // ==========================================
+  // Option A (Default): 'after_banking' — Cashier has already banked cash today (E).
+  // Denomination counter = F (cash remaining in drawer for tomorrow).
+  // Total cash accounted C = F + E.
+  // Option B: 'before_banking' — Cashier counts entire drawer before banking.
+  // Denomination counter = C (total cash before banking).
+  // Cash remaining for tomorrow F = C - E.
+  const [countMode, setCountMode] = useState<'after_banking' | 'before_banking'>('after_banking');
+
+  // ==========================================
   // CALCULATIONS (Formulas A, B, C, D, E, F, Variance)
   // ==========================================
-  const physicalCashC = useMemo(() => {
+  const countedDenominationsTotal = useMemo(() => {
     return SRI_LANKA_DENOMINATIONS.reduce((sum, denom) => {
       const count = denominations[denom] || 0;
       return sum + denom * count;
@@ -208,13 +225,23 @@ export default function CashReconciliationPage() {
     return bankDeposits.reduce((sum, dep) => sum + (Number(dep.amount) || 0), 0);
   }, [bankDeposits]);
 
+  const physicalCashC = useMemo(() => {
+    if (countMode === 'after_banking') {
+      return countedDenominationsTotal + totalBankDepositsE;
+    }
+    return countedDenominationsTotal;
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE]);
+
+  const closingCashF = useMemo(() => {
+    if (countMode === 'after_banking') {
+      return countedDenominationsTotal;
+    }
+    return countedDenominationsTotal - totalBankDepositsE;
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE]);
+
   const actualNetIncomeD = useMemo(() => {
     return physicalCashC + (Number(cashExpensesB) || 0) - (Number(openingFloatA) || 0);
   }, [physicalCashC, cashExpensesB, openingFloatA]);
-
-  const closingCashF = useMemo(() => {
-    return physicalCashC - totalBankDepositsE;
-  }, [physicalCashC, totalBankDepositsE]);
 
   const varianceAmount = useMemo(() => {
     return Number((systemCashSales - actualNetIncomeD).toFixed(2));
@@ -477,12 +504,13 @@ export default function CashReconciliationPage() {
         }
         setShortageSplit(split);
       } else {
-        setShortageSplit({ unassigned: varianceAmount });
+        const fallbackId = loggedInCashierId || 'submitting_cashier';
+        setShortageSplit({ [fallbackId]: varianceAmount });
       }
     } else {
       setShortageSplit({});
     }
-  }, [varianceAmount, varianceStatus, cashierSummaries]);
+  }, [varianceAmount, varianceStatus, cashierSummaries, loggedInCashierId]);
 
   // ==========================================
   // HANDLERS
@@ -554,9 +582,12 @@ export default function CashReconciliationPage() {
         Object.entries(shortageSplit).forEach(([cId, amt]) => {
           if (amt > 0) {
             const cashier = cashierSummaries.find((c) => c.cashier_id === cId);
+            const isFallback = cId === 'unassigned' || cId === 'submitting_cashier' || cId === loggedInCashierId;
+            const cashierName = (cashier ? cashier.cashier_name : loggedInCashierName) || 'Branch Cashier';
+            const cashierId = isFallback ? loggedInCashierId : cId;
             shortageAttributions.push({
-              cashier_id: cId !== 'unassigned' ? cId : undefined,
-              cashier_name: cashier ? cashier.cashier_name : 'Staff Member',
+              cashier_id: cashierId,
+              cashier_name: cashierName,
               amount: amt,
             });
           }
@@ -2069,16 +2100,18 @@ export default function CashReconciliationPage() {
               <div className="text-[11px] text-slate-500 mt-2">Tea, supplies, courier etc.</div>
             </div>
 
-            {/* Card C: Physical Cash in Drawer */}
+            {/* Card C: Physical Cash Accounted */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-                <span className="font-semibold text-slate-300">C. Cash in Drawer</span>
+                <span className="font-semibold text-slate-300">C. Cash Accounted</span>
                 <Coins className="w-3.5 h-3.5 text-amber-400" />
               </div>
               <div className="text-xl font-bold text-amber-400">
                 LKR {physicalCashC.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[11px] text-slate-500 mt-2">Live from denomination count</div>
+              <div className="text-[11px] text-slate-500 mt-2">
+                {countMode === 'after_banking' ? 'Drawer (F) + Banked (E)' : 'Live physical drawer count'}
+              </div>
             </div>
 
             {/* Card D: Actual Net Cash Income */}
@@ -2114,7 +2147,9 @@ export default function CashReconciliationPage() {
               <div className="text-xl font-black text-purple-300">
                 LKR {closingCashF.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-purple-400/80 mt-2">Remains in drawer (C - E)</div>
+              <div className="text-[10px] text-purple-400/80 mt-2">
+                {countMode === 'after_banking' ? 'Counted in drawer (F)' : 'Remains in drawer (C - E)'}
+              </div>
             </div>
           </div>
 
@@ -2212,7 +2247,7 @@ export default function CashReconciliationPage() {
                   </div>
                 ) : (
                   <div className="p-3 bg-slate-900/80 border border-rose-900/30 rounded-lg text-xs text-slate-300 flex items-center justify-between">
-                    <span>No specific cashier tagged to sales today. Attributing to General Terminal Cashier:</span>
+                    <span>Zero terminal sales today. Shortage attributed to submitting cashier ({loggedInCashierName}):</span>
                     <span className="font-bold text-rose-400">
                       LKR {varianceAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                     </span>
@@ -2227,10 +2262,21 @@ export default function CashReconciliationPage() {
             {/* LEFT COLUMN: PHYSICAL CASH DENOMINATION COUNTER */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-800">
                   <div className="flex items-center gap-2">
                     <Coins className="w-5 h-5 text-amber-400" />
-                    <h2 className="text-base font-bold text-slate-100">Physical Cash Denomination Counter (C)</h2>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-100">
+                        {countMode === 'after_banking'
+                          ? 'Physical Cash Denomination Counter — Drawer Remaining (F)'
+                          : 'Physical Cash Denomination Counter — All Cash (C)'}
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        {countMode === 'after_banking'
+                          ? 'Count notes & coins left in drawer for tomorrow’s opening float'
+                          : 'Count all physical cash before dispatching bank deposits'}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -2239,10 +2285,78 @@ export default function CashReconciliationPage() {
                       SRI_LANKA_DENOMINATIONS.forEach((d) => (reset[d] = 0));
                       setDenominations(reset);
                     }}
-                    className="text-xs text-slate-400 hover:text-slate-200 transition"
+                    className="text-xs text-slate-400 hover:text-slate-200 transition cursor-pointer"
                   >
                     Reset All
                   </button>
+                </div>
+
+                {/* 2-Option Counting Mode Switcher */}
+                <div className="mb-4 p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>When are you counting the drawer?</span>
+                    <span className="text-[10px] text-amber-400 font-semibold">
+                      {countMode === 'after_banking' ? 'Already Banked' : 'Before Banking'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCountMode('after_banking')}
+                      className={`text-left p-2.5 rounded-lg border text-xs transition cursor-pointer ${
+                        countMode === 'after_banking'
+                          ? 'bg-amber-500/10 border-amber-500/50 text-slate-100 shadow-sm'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold">
+                        <div
+                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            countMode === 'after_banking'
+                              ? 'border-amber-400 bg-amber-400'
+                              : 'border-slate-600 bg-transparent'
+                          }`}
+                        >
+                          {countMode === 'after_banking' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                        </div>
+                        <span className={countMode === 'after_banking' ? 'text-amber-300' : 'text-slate-300'}>
+                          Already Banked
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 pl-5.5 leading-snug">
+                        Count <strong>ONLY</strong> cash remaining in drawer (F). Banked today (E) is automatically added to total C.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCountMode('before_banking')}
+                      className={`text-left p-2.5 rounded-lg border text-xs transition cursor-pointer ${
+                        countMode === 'before_banking'
+                          ? 'bg-amber-500/10 border-amber-500/50 text-slate-100 shadow-sm'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold">
+                        <div
+                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            countMode === 'before_banking'
+                              ? 'border-amber-400 bg-amber-400'
+                              : 'border-slate-600 bg-transparent'
+                          }`}
+                        >
+                          {countMode === 'before_banking' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                        </div>
+                        <span className={countMode === 'before_banking' ? 'text-amber-300' : 'text-slate-300'}>
+                          Before Banking
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 pl-5.5 leading-snug">
+                        Count <strong>ALL</strong> cash in drawer (C) before dispatching bank deposits. Tomorrow float F = C - E.
+                      </p>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -2309,11 +2423,29 @@ export default function CashReconciliationPage() {
               </div>
 
               {/* Total Physical Cash Summary */}
-              <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <span className="text-sm font-bold text-slate-300">Total Drawer Cash (C):</span>
-                <span className="text-xl font-black text-amber-400">
-                  LKR {physicalCashC.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-                </span>
+              <div className="mt-4 pt-4 border-t border-slate-800 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">
+                    {countMode === 'after_banking' ? 'Counted in Drawer for Tomorrow (F):' : 'Physical Cash Counted (C):'}
+                  </span>
+                  <span className="font-bold text-slate-200">
+                    LKR {countedDenominationsTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {countMode === 'after_banking' && (
+                  <div className="flex items-center justify-between text-xs text-indigo-400 pt-1 border-t border-slate-800/60">
+                    <span>+ Dispatched Bank Deposits (E):</span>
+                    <span className="font-semibold">+ LKR {totalBankDepositsE.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                  <span className="text-sm font-bold text-slate-200">Total Cash Accounted (C):</span>
+                  <span className="text-xl font-black text-amber-400">
+                    LKR {physicalCashC.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -2693,7 +2825,13 @@ export default function CashReconciliationPage() {
                 </span>
               </div>
               <div className="flex justify-between text-slate-400">
-                <span>C. Physical Cash in Drawer:</span>
+                <span>{countMode === 'after_banking' ? 'Counted in Drawer (F):' : 'Physical Cash Counted (C):'}</span>
+                <span className="font-mono text-slate-200">
+                  LKR {countedDenominationsTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>C. Total Cash Accounted:</span>
                 <span className="font-mono text-amber-400 font-bold">
                   LKR {physicalCashC.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                 </span>
@@ -2872,7 +3010,7 @@ export default function CashReconciliationPage() {
                 <strong>LKR {cashExpensesB.toFixed(2)}</strong>
               </div>
               <div className="flex justify-between">
-                <span>C. Physical Cash in Drawer:</span>
+                <span>C. Total Cash Accounted:</span>
                 <strong>LKR {physicalCashC.toFixed(2)}</strong>
               </div>
               <div className="flex justify-between border-t pt-1">
@@ -2884,7 +3022,7 @@ export default function CashReconciliationPage() {
                 <strong>LKR {totalBankDepositsE.toFixed(2)}</strong>
               </div>
               <div className="flex justify-between">
-                <span>F. Tomorrow’s Drawer Float (C-E):</span>
+                <span>F. Tomorrow’s Drawer Float:</span>
                 <strong>LKR {closingCashF.toFixed(2)}</strong>
               </div>
               <div className="flex justify-between border-t pt-1 font-bold">
