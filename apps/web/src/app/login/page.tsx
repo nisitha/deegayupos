@@ -416,45 +416,74 @@ export default function LoginPage() {
           throw new Error('Please enter both email and password.');
         }
 
-        // Authenticate with Supabase Auth
+        let authUserRecord: any = null;
+
+        // 1. Primary: Authenticate with Supabase Auth GoTrue
         const { data: authData, error: authErr } =
           await supabase.auth.signInWithPassword({
             email: cleanEmail,
             password: cleanPassword,
           });
 
-        if (authErr || !authData?.user) {
-          const nextFailed = failedAttempts + 1;
-          setFailedAttempts(nextFailed);
-          if (nextFailed >= 5) {
-            setLockoutTimer(30);
-            throw new Error('Too many failed login attempts. Terminal locked for 30 seconds.');
+        if (!authErr && authData?.user) {
+          // Fetch user profile with RLS active
+          try {
+            const { data: uData } = await supabase
+              .from('users')
+              .select('id, full_name, email, role, assigned_branches, grn_branches, is_active')
+              .eq('id', authData.user.id)
+              .maybeSingle();
+            if (uData) authUserRecord = uData;
+          } catch {}
+
+          if (!authUserRecord) {
+            authUserRecord = {
+              id: authData.user.id,
+              email: authData.user.email,
+              full_name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+              role: authData.user.user_metadata?.role || (cleanEmail.includes('owner') ? 'OWNER' : 'STAFF'),
+            };
           }
-          throw new Error('Invalid email or password.');
+        } else {
+          // If GoTrue returned genuine invalid credentials
+          if (authErr && authErr.message === 'Invalid login credentials') {
+            const nextFailed = failedAttempts + 1;
+            setFailedAttempts(nextFailed);
+            if (nextFailed >= 5) {
+              setLockoutTimer(30);
+              throw new Error('Too many failed login attempts. Terminal locked for 30 seconds.');
+            }
+            throw new Error('Invalid email or password.');
+          }
+
+          // Resilient Fallback: Verify via secure PostgreSQL RPC verify_staff_password
+          try {
+            const { data: rpcUsers, error: rpcErr } = await supabase.rpc('verify_staff_password', {
+              p_email: cleanEmail,
+              p_password: cleanPassword,
+            });
+
+            if (!rpcErr && rpcUsers && rpcUsers.length > 0) {
+              authUserRecord = rpcUsers[0];
+            }
+          } catch {}
+
+          if (!authUserRecord) {
+            const nextFailed = failedAttempts + 1;
+            setFailedAttempts(nextFailed);
+            if (nextFailed >= 5) {
+              setLockoutTimer(30);
+              throw new Error('Too many failed login attempts. Terminal locked for 30 seconds.');
+            }
+            if (authErr?.message?.toLowerCase().includes('api key')) {
+              throw new Error('Authentication gateway error: Invalid or missing Supabase API key.');
+            }
+            throw new Error('Invalid email or password.');
+          }
         }
 
         setFailedAttempts(0);
-
-        // Fetch user profile from Supabase with RLS active
-        let userRecord: any = null;
-        try {
-          const { data: uData } = await supabase
-            .from('users')
-            .select('id, full_name, email, role, assigned_branches, grn_branches, is_active')
-            .eq('id', authData.user.id)
-            .maybeSingle();
-          if (uData) userRecord = uData;
-        } catch {}
-
-        evaluateLoginAndRoute(
-          userRecord || {
-            id: authData.user.id,
-            email: authData.user.email,
-            full_name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-            role: authData.user.user_metadata?.role || (cleanEmail.includes('owner') ? 'OWNER' : 'STAFF'),
-          },
-          cleanEmail
-        );
+        evaluateLoginAndRoute(authUserRecord, cleanEmail);
         return;
       } else {
         // PIN Auth Mode
@@ -480,18 +509,6 @@ export default function LoginPage() {
 
         setFailedAttempts(0);
         const verifiedUser = rpcUsers[0];
-
-        // Background Supabase Auth session creation if auth_token is provided
-        if (verifiedUser.auth_token && verifiedUser.email) {
-          try {
-            await supabase.auth.signInWithPassword({
-              email: verifiedUser.email,
-              password: verifiedUser.auth_token,
-            });
-          } catch {
-            // Non-blocking fallback
-          }
-        }
 
         evaluateLoginAndRoute(verifiedUser, verifiedUser.email);
         return;
