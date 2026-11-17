@@ -599,7 +599,7 @@ export const productsApi = {
     let items: ProductDto[] = [];
     try {
       const { data: sbProds } = await supabase
-        .from('products')
+        .from('products_pos_view')
         .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
         .limit(100);
 
@@ -637,7 +637,7 @@ export const productsApi = {
   getById: async (id: string): Promise<ApiResponse<ProductDto>> => {
     try {
       const { data: p } = await supabase
-        .from('products')
+        .from('products_pos_view')
         .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
         .eq('id', id)
         .maybeSingle();
@@ -672,7 +672,7 @@ export const productsApi = {
     sku?: string;
   }): Promise<ApiResponse<ProductLookupResult>> => {
     try {
-      let query = supabase.from('products').select('*');
+      let query = supabase.from('products_pos_view').select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at');
       if (params.barcode) query = query.eq('barcode', params.barcode);
       else if (params.sku) query = query.eq('sku', params.sku);
       const { data } = await query.maybeSingle();
@@ -2638,7 +2638,7 @@ export const staffApi = {
     try {
       const { data: sbUsers, error: uErr } = await supabase
         .from('users')
-        .select('*')
+        .select('id, full_name, email, phone, role, is_active, assigned_branches, grn_branches')
         .eq('is_active', true)
         .neq('role', 'ARCHIVED');
 
@@ -2652,8 +2652,7 @@ export const staffApi = {
           roleName: u.role === 'OWNER' ? 'Owner / Admin' : 'Branch Staff',
           roleId: u.role_id || 'role-staff',
           isActive: u.is_active ?? true,
-          hasPin: !!(u.pin_code || u.pinCode),
-          pinCode: u.pin_code || u.pinCode,
+          hasPin: true,
           assignedBranches: u.assigned_branches || [],
           grnBranches: u.grn_branches || [],
           createdAt: u.created_at || new Date().toISOString(),
@@ -2837,89 +2836,61 @@ export const staffApi = {
   },
   verifyPin: async (pinCode: string): Promise<ApiResponse<StaffUserDto | null>> => {
     const cleanPin = pinCode.trim();
-    if (cleanPin === '2026') {
-      return {
-        success: true,
-        data: {
-          id: '96b2747b-9d22-4266-94ce-b035fadef498',
-          fullName: 'Dr. Deegayu (Owner)',
-          email: 'owner@deegayu.pixelcraftlk.com',
-          role: 'OWNER',
-          roleName: 'Owner / Admin',
-          roleId: 'role-owner',
-          isActive: true,
-          hasPin: true,
-          assignedBranches: [
-            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-            '133eeaec-5726-4702-a819-8423750db203',
-            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-            'fa68e4a0-a515-44c8-a082-5b5590366658',
-            '197693d6-4247-48df-b614-6fcde9e34f7d',
-          ],
-          grnBranches: [
-            '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-            '133eeaec-5726-4702-a819-8423750db203',
-            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-            'fa68e4a0-a515-44c8-a082-5b5590366658',
-            '197693d6-4247-48df-b614-6fcde9e34f7d',
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      };
+    if (!cleanPin) {
+      return { success: false, data: null, error: { code: 'INVALID_PIN', message: 'PIN code is required', statusCode: 400 } };
     }
 
     try {
-      const { data: users } = await supabase
-        .from('users')
-        .select('*')
-        .eq('is_active', true)
-        .neq('role', 'ARCHIVED');
-
-      if (users && users.length > 0) {
-        const found = users.find((u: any) => {
-          const pin = u.pin_code || u.pinCode;
-          return pin === cleanPin;
-        });
-
-        if (found) {
-          const role = found.role || 'STAFF';
-          const isOwner = role === 'OWNER';
-          return {
-            success: true,
-            data: {
-              id: found.id,
-              fullName: found.full_name || found.fullName,
-              email: found.email,
-              phone: found.phone,
-              role,
-              roleName: isOwner ? 'Owner / Admin' : 'Branch Staff',
-              roleId: 'role-staff',
-              isActive: true,
-              hasPin: true,
-              assignedBranches: found.assigned_branches || (isOwner ? [
-                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-                '133eeaec-5726-4702-a819-8423750db203',
-                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-                'fa68e4a0-a515-44c8-a082-5b5590366658',
-                '197693d6-4247-48df-b614-6fcde9e34f7d',
-              ] : []),
-              grnBranches: found.grn_branches || (isOwner ? [
-                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-                '133eeaec-5726-4702-a819-8423750db203',
-                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-                'fa68e4a0-a515-44c8-a082-5b5590366658',
-                '197693d6-4247-48df-b614-6fcde9e34f7d',
-              ] : []),
-              createdAt: found.created_at || new Date().toISOString(),
-              updatedAt: found.updated_at || new Date().toISOString(),
-            },
-          };
-        }
+      const { data, error } = await supabase.rpc('verify_staff_pin', { p_pin: cleanPin });
+      if (error) {
+        return { success: false, data: null, error: { code: 'RPC_ERROR', message: error.message, statusCode: 500 } };
       }
-    } catch {}
 
-    return { success: false, data: null, error: { code: 'INVALID_PIN', message: 'Invalid PIN', statusCode: 400 } };
+      if (data && data.length > 0) {
+        const found = data[0];
+        const role = found.role || 'STAFF';
+        const isOwner = role === 'OWNER';
+        return {
+          success: true,
+          data: {
+            id: found.id,
+            fullName: found.full_name,
+            email: found.email,
+            phone: '',
+            role,
+            roleName: isOwner ? 'Owner / Admin' : 'Branch Staff',
+            roleId: isOwner ? 'role-owner' : 'role-staff',
+            isActive: found.is_active,
+            hasPin: true,
+            assignedBranches: Array.isArray(found.assigned_branches)
+              ? found.assigned_branches
+              : (isOwner ? [
+                  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                  '133eeaec-5726-4702-a819-8423750db203',
+                  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                  'fa68e4a0-a515-44c8-a082-5b5590366658',
+                  '197693d6-4247-48df-b614-6fcde9e34f7d',
+                ] : []),
+            grnBranches: Array.isArray(found.grn_branches)
+              ? found.grn_branches
+              : (isOwner ? [
+                  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                  '133eeaec-5726-4702-a819-8423750db203',
+                  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                  'fa68e4a0-a515-44c8-a082-5b5590366658',
+                  '197693d6-4247-48df-b614-6fcde9e34f7d',
+                ] : []),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'PIN verification failed';
+      return { success: false, data: null, error: { code: 'VERIFICATION_ERROR', message: msg, statusCode: 500 } };
+    }
+
+    return { success: false, data: null, error: { code: 'INVALID_PIN', message: 'Invalid PIN code', statusCode: 400 } };
   },
 };
 

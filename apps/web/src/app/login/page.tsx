@@ -15,7 +15,6 @@ import {
   MapPin,
   Check,
 } from 'lucide-react';
-import bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
 
 const ALL_BRANCH_IDS = [
@@ -30,8 +29,6 @@ const PRESET_STAFF = [
   {
     name: 'Dr. Deegayu (Owner)',
     email: 'owner@deegayu.pixelcraftlk.com',
-    password: 'Deegayu@2026',
-    pin: '2026',
     role: 'OWNER',
     branchLabel: 'All Branches • Full Admin',
     badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -39,8 +36,6 @@ const PRESET_STAFF = [
   {
     name: 'Shashini',
     email: 'shashini@deegayu.pixelcraftlk.com',
-    password: 'Shashini@2026',
-    pin: '1111',
     role: 'STAFF',
     branchLabel: 'Alawwa (Stock & GRN Officer)',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -48,8 +43,6 @@ const PRESET_STAFF = [
   {
     name: 'Tharindu',
     email: 'tharindu@deegayu.pixelcraftlk.com',
-    password: 'Tharindu@2026',
-    pin: '2222',
     role: 'STAFF',
     branchLabel: 'Alawwa & Dambadeniya (GRN Dambadeniya)',
     badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -57,8 +50,6 @@ const PRESET_STAFF = [
   {
     name: 'Anusha',
     email: 'anusha@deegayu.pixelcraftlk.com',
-    password: 'Anusha@2026',
-    pin: '3333',
     role: 'STAFF',
     branchLabel: 'Dambadeniya (Staff Cashier)',
     badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
@@ -66,8 +57,6 @@ const PRESET_STAFF = [
   {
     name: 'Kumari',
     email: 'kumari@deegayu.pixelcraftlk.com',
-    password: 'Kumari@2026',
-    pin: '4444',
     role: 'STAFF',
     branchLabel: 'Giriulla (Stock & GRN Officer)',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -75,8 +64,6 @@ const PRESET_STAFF = [
   {
     name: 'Gindika',
     email: 'gindika@deegayu.pixelcraftlk.com',
-    password: 'Gindika@2026',
-    pin: '5555',
     role: 'STAFF',
     branchLabel: 'Giriulla (Staff Cashier)',
     badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
@@ -129,12 +116,28 @@ export default function LoginPage() {
 
   const [authMode, setAuthMode] = useState<'password' | 'pin'>('password');
   const [email, setEmail] = useState('owner@deegayu.pixelcraftlk.com');
-  const [password, setPassword] = useState('Deegayu@2026');
+  const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingGateUser, setPendingGateUser] = useState<PendingGateUser | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
+
+  React.useEffect(() => {
+    if (lockoutTimer <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
 
   const persistSession = (
     userRecord?: any,
@@ -399,6 +402,11 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    if (lockoutTimer > 0) {
+      setError(`Terminal is temporarily locked due to multiple failed attempts. Please wait ${lockoutTimer}s.`);
+      return;
+    }
+
     try {
       if (authMode === 'password') {
         const cleanEmail = email.trim().toLowerCase();
@@ -408,99 +416,46 @@ export default function LoginPage() {
           throw new Error('Please enter both email and password.');
         }
 
-        // Demo seed super admin bypass
-        if (
-          cleanEmail === 'owner@deegayu.pixelcraftlk.com' &&
-          cleanPassword === 'Deegayu@2026'
-        ) {
-          evaluateLoginAndRoute(undefined, cleanEmail);
-          return;
+        // Authenticate with Supabase Auth
+        const { data: authData, error: authErr } =
+          await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: cleanPassword,
+          });
+
+        if (authErr || !authData?.user) {
+          const nextFailed = failedAttempts + 1;
+          setFailedAttempts(nextFailed);
+          if (nextFailed >= 5) {
+            setLockoutTimer(30);
+            throw new Error('Too many failed login attempts. Terminal locked for 30 seconds.');
+          }
+          throw new Error('Invalid email or password.');
         }
 
-        // Preset staff fast matching
-        const matchedPreset = PRESET_STAFF.find(
-          (p) => p.email.toLowerCase() === cleanEmail && p.password === cleanPassword
-        );
-        if (matchedPreset) {
-          evaluateLoginAndRoute(
-            {
-              id: matchedPreset.name.includes('Tharindu')
-                ? '0f1d46e2-e943-4f24-b69e-f1ba5278a750'
-                : '99999999-9999-9999-9999-999999999999',
-              full_name: matchedPreset.name,
-              email: matchedPreset.email,
-              role: matchedPreset.role,
-            },
-            cleanEmail
-          );
-          return;
-        }
+        setFailedAttempts(0);
 
-        // 1. Query Supabase directly from 'users' table
+        // Fetch user profile from Supabase with RLS active
         let userRecord: any = null;
-
         try {
-          const { data: uData, error: uErr } = await supabase
+          const { data: uData } = await supabase
             .from('users')
-            .select('*')
-            .eq('email', cleanEmail)
+            .select('id, full_name, email, role, assigned_branches, grn_branches, is_active')
+            .eq('id', authData.user.id)
             .maybeSingle();
+          if (uData) userRecord = uData;
+        } catch {}
 
-          if (!uErr && uData) {
-            userRecord = uData;
-          }
-        } catch {
-          // Ignore
-        }
-
-        // 2. Validate Password
-        if (userRecord) {
-          const hash = userRecord.password_hash || userRecord.passwordHash;
-          let isValid = false;
-
-          if (hash) {
-            try {
-              isValid = bcrypt.compareSync(cleanPassword, hash);
-            } catch {
-              isValid = hash === cleanPassword;
-            }
-          } else {
-            isValid = cleanPassword === 'Deegayu@2026';
-          }
-
-          if (!isValid) {
-            throw new Error('Invalid email or password.');
-          }
-
-          evaluateLoginAndRoute(userRecord, cleanEmail);
-          return;
-        }
-
-        // Try Supabase Auth as final fallback
-        try {
-          const { data: authData, error: authErr } =
-            await supabase.auth.signInWithPassword({
-              email: cleanEmail,
-              password: cleanPassword,
-            });
-
-          if (!authErr && authData?.user) {
-            evaluateLoginAndRoute(
-              {
-                id: authData.user.id,
-                email: authData.user.email,
-                name: authData.user.user_metadata?.full_name || 'Staff User',
-                role: authData.user.user_metadata?.role || 'CASHIER',
-              },
-              cleanEmail
-            );
-            return;
-          }
-        } catch {
-          // Ignore
-        }
-
-        throw new Error('Invalid email or password.');
+        evaluateLoginAndRoute(
+          userRecord || {
+            id: authData.user.id,
+            email: authData.user.email,
+            full_name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+            role: authData.user.user_metadata?.role || (cleanEmail.includes('owner') ? 'OWNER' : 'STAFF'),
+          },
+          cleanEmail
+        );
+        return;
       } else {
         // PIN Auth Mode
         const cleanPin = pin.trim();
@@ -508,60 +463,38 @@ export default function LoginPage() {
           throw new Error('Please enter a valid 4-digit PIN.');
         }
 
-        // Demo seed master PIN
-        if (cleanPin === '2026' || cleanPin === '1234') {
-          evaluateLoginAndRoute(undefined, 'owner@deegayu.pixelcraftlk.com');
-          return;
-        }
+        // Call secure PostgreSQL RPC verify_staff_pin (SECURITY DEFINER in DB)
+        const { data: rpcUsers, error: rpcErr } = await supabase.rpc('verify_staff_pin', {
+          p_pin: cleanPin,
+        });
 
-        // Preset staff PIN match
-        const matchedPinPreset = PRESET_STAFF.find((p) => p.pin === cleanPin);
-        if (matchedPinPreset) {
-          evaluateLoginAndRoute(
-            {
-              id: matchedPinPreset.name.includes('Tharindu')
-                ? '0f1d46e2-e943-4f24-b69e-f1ba5278a750'
-                : '99999999-9999-9999-9999-999999999999',
-              full_name: matchedPinPreset.name,
-              email: matchedPinPreset.email,
-              role: matchedPinPreset.role,
-            },
-            matchedPinPreset.email
-          );
-          return;
-        }
-
-        // Check PIN against Supabase users
-        let matchedUser: any = null;
-        try {
-          const { data: usersWithPin } = await supabase
-            .from('users')
-            .select('*')
-            .eq('is_active', true)
-            .limit(50);
-
-          if (usersWithPin && usersWithPin.length > 0) {
-            matchedUser = usersWithPin.find((u: any) => {
-              const uPin = u.pin_code || u.pinCode;
-              if (!uPin) return false;
-              if (uPin === cleanPin) return true;
-              try {
-                return bcrypt.compareSync(cleanPin, uPin);
-              } catch {
-                return false;
-              }
-            });
+        if (rpcErr || !rpcUsers || rpcUsers.length === 0) {
+          const nextFailed = failedAttempts + 1;
+          setFailedAttempts(nextFailed);
+          if (nextFailed >= 5) {
+            setLockoutTimer(30);
+            throw new Error('Too many failed PIN attempts. Terminal locked for 30 seconds.');
           }
-        } catch {
-          // Ignore
+          throw new Error('Invalid terminal PIN code.');
         }
 
-        if (matchedUser) {
-          evaluateLoginAndRoute(matchedUser, matchedUser.email);
-          return;
+        setFailedAttempts(0);
+        const verifiedUser = rpcUsers[0];
+
+        // Background Supabase Auth session creation if auth_token is provided
+        if (verifiedUser.auth_token && verifiedUser.email) {
+          try {
+            await supabase.auth.signInWithPassword({
+              email: verifiedUser.email,
+              password: verifiedUser.auth_token,
+            });
+          } catch {
+            // Non-blocking fallback
+          }
         }
 
-        throw new Error('Invalid terminal PIN code.');
+        evaluateLoginAndRoute(verifiedUser, verifiedUser.email);
+        return;
       }
     } catch (err: unknown) {
       const message =
@@ -575,12 +508,9 @@ export default function LoginPage() {
   };
 
   const handleFillPreset = (staff: typeof PRESET_STAFF[0]) => {
-    if (authMode === 'password') {
-      setEmail(staff.email);
-      setPassword(staff.password);
-    } else {
-      setPin(staff.pin);
-    }
+    setEmail(staff.email);
+    setPassword('');
+    setPin('');
     setError(null);
   };
 
@@ -772,6 +702,15 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {lockoutTimer > 0 && (
+              <div className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>
+                  Terminal locked due to excessive failed attempts. Please try again in <strong>{lockoutTimer}s</strong>.
+                </span>
+              </div>
+            )}
+
             {error && (
               <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
@@ -848,7 +787,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 text-center mt-1.5">
-                    Enter your registered cashier PIN (Demo: 2026 or 1234)
+                    Enter your registered 4-digit terminal PIN code
                   </p>
                 </div>
               )}
@@ -856,10 +795,12 @@ export default function LoginPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || lockoutTimer > 0}
                 className="w-full mt-2 py-3 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
               >
-                {loading ? (
+                {lockoutTimer > 0 ? (
+                  <span>Terminal Locked ({lockoutTimer}s)</span>
+                ) : loading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Authenticating...</span>
@@ -884,7 +825,7 @@ export default function LoginPage() {
                   Authorized Branch Team
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  {authMode === 'password' ? 'Click to fill credentials' : 'Click to fill 4-digit PIN'}
+                  Select staff account
                 </span>
               </div>
               <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
@@ -910,7 +851,7 @@ export default function LoginPage() {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-semibold">
-                        {authMode === 'password' ? staff.email.split('@')[0] : `PIN: ${staff.pin}`}
+                        {staff.role}
                       </span>
                     </div>
                   </button>

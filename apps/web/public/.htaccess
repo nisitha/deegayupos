@@ -1,16 +1,52 @@
 # =========================================================================
 # PIXELCRAFT POS — PRODUCTION APACHE / LITESPEED CPANEL CONFIGURATION
 # Tenant: Deegayu Weda Madura (pos.pixelcraftlk.com)
+# Security Standard: OWASP Top 10 Enterprise Hardened
 # =========================================================================
 
 # 1. Strictly Prevent Directory Browsing ("Index of /")
 Options -Indexes
 
-# 2. Directory Index Priority:
+# 2. Block direct web access to dotfiles and sensitive configurations
+<FilesMatch "(^\.|\.(env.*|git.*|sql|log|bak|json|ts|tsx|md|config.*)$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# 3. Directory Index Priority:
 # If index.html is temporarily absent mid-deployment, fallback directly to maintenance.html!
 DirectoryIndex index.html maintenance.html
 
-# 3. Disable caching for maintenance assets & flag
+# 4. Enterprise HTTP Security Headers (OWASP Hardening)
+<IfModule mod_headers.c>
+  # Enforce HTTPS HSTS for 1 year with subdomains and preload
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+  # Prevent Clickjacking via iFrames
+  Header always set X-Frame-Options "DENY"
+
+  # Prevent MIME-type Sniffing
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Referrer Policy
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Restrict Browser Capabilities (Camera, Mic, Geo, Payment)
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+  # Content Security Policy (CSP)
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+
+  # X-XSS-Protection
+  Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# 5. Disable caching for maintenance assets & flag
 <FilesMatch "^(maintenance\.html|maintenance\.flag)$">
   <IfModule mod_headers.c>
     Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
@@ -19,7 +55,7 @@ DirectoryIndex index.html maintenance.html
   </IfModule>
 </FilesMatch>
 
-# 4. URL Rewriting & Maintenance Mode Engine
+# 6. URL Rewriting & Maintenance Mode Engine
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
@@ -51,7 +87,7 @@ DirectoryIndex index.html maintenance.html
   RewriteRule ^verify/ /receipt/index.html [L]
 </IfModule>
 
-# 5. Cache static Next.js assets aggressively
+# 7. Cache static Next.js assets aggressively
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"

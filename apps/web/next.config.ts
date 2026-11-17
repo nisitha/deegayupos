@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   output: 'export',
   basePath: '',
   trailingSlash: true,
+  productionBrowserSourceMaps: false,
   images: {
     unoptimized: true,
     remotePatterns: [
