@@ -131,6 +131,8 @@ export default function CashReconciliationPage() {
     systemCreditSales: 0,
     totalGrossSales: 0,
     totalCompletedBills: 0,
+    modakaSalesTotal: 0,
+    modakaUnitsTotal: 0,
     autoCashExpenses: 0,
     cashierBreakdown: [],
     shifts: [],
@@ -296,39 +298,47 @@ export default function CashReconciliationPage() {
     return bankDeposits.reduce((sum, dep) => sum + (Number(dep.amount) || 0), 0);
   }, [bankDeposits]);
 
+  const modakaSalesTotal = useMemo(() => {
+    return Number(worksheetData.modakaSalesTotal || 0);
+  }, [worksheetData.modakaSalesTotal]);
+
+  const totalExpectedSalesCash = useMemo(() => {
+    return Number((systemCashSales + modakaSalesTotal).toFixed(2));
+  }, [systemCashSales, modakaSalesTotal]);
+
   const physicalCashC = useMemo(() => {
     if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
-      return systemCashSales;
+      return totalExpectedSalesCash;
     }
     if (countMode === 'after_banking') {
       return countedDenominationsTotal + totalBankDepositsE;
     }
     return countedDenominationsTotal;
-  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, systemCashSales]);
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, totalExpectedSalesCash]);
 
   const closingCashF = useMemo(() => {
     if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
-      return Math.max(0, systemCashSales - totalBankDepositsE);
+      return Math.max(0, totalExpectedSalesCash - totalBankDepositsE);
     }
     if (countMode === 'after_banking') {
       return countedDenominationsTotal;
     }
     return countedDenominationsTotal - totalBankDepositsE;
-  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, systemCashSales]);
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, totalExpectedSalesCash]);
 
   const actualNetIncomeD = useMemo(() => {
     if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
-      return systemCashSales;
+      return totalExpectedSalesCash;
     }
     return physicalCashC + (Number(cashExpensesB) || 0) - (Number(openingFloatA) || 0);
-  }, [physicalCashC, cashExpensesB, openingFloatA, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal, systemCashSales]);
+  }, [physicalCashC, cashExpensesB, openingFloatA, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal, totalExpectedSalesCash]);
 
   const varianceAmount = useMemo(() => {
     if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
       return 0;
     }
-    return Number((systemCashSales - actualNetIncomeD).toFixed(2));
-  }, [systemCashSales, actualNetIncomeD, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal]);
+    return Number((totalExpectedSalesCash - actualNetIncomeD).toFixed(2));
+  }, [totalExpectedSalesCash, actualNetIncomeD, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal]);
 
   const varianceStatus = useMemo((): 'balanced' | 'shortage' | 'overage' => {
     if (Math.abs(varianceAmount) < 0.01) return 'balanced';
@@ -698,9 +708,16 @@ export default function CashReconciliationPage() {
         });
       }
 
+      const targetBranchId = activeBranchFilter !== 'ALL' ? activeBranchFilter : effectiveBranchId;
+      if (!targetBranchId) {
+        alert('Please select a specific branch before posting reconciliation.');
+        setSubmitting(false);
+        return;
+      }
+
       await reconciliationApi.submitReconciliation({
         tenantId,
-        branchId: effectiveBranchId,
+        branchId: targetBranchId,
         reconciliationDate: selectedDate,
         openingFloatA,
         cashExpensesB,
@@ -709,7 +726,7 @@ export default function CashReconciliationPage() {
         actualNetIncomeD,
         totalBankDepositsE,
         closingCashF,
-        systemCashSales,
+        systemCashSales: totalExpectedSalesCash,
         varianceAmount,
         status: varianceStatus,
         notes: generalNotes,
@@ -2108,11 +2125,20 @@ export default function CashReconciliationPage() {
               <div className="text-[10px] text-slate-500 mt-0.5">All payment modes</div>
             </div>
             <div className="p-3 bg-slate-900 border border-amber-500/30 bg-amber-950/10 rounded-xl">
-              <div className="text-[11px] font-bold text-amber-400">Cash Sales</div>
+              <div className="text-[11px] font-bold text-amber-400">POS Cash Sales</div>
               <div className="text-lg font-black text-amber-300 mt-1 font-mono">
                 LKR {worksheetData.systemCashSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-amber-400/70 mt-0.5">System drawer target</div>
+              <div className="text-[10px] text-amber-400/70 mt-0.5">Live register collections</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-purple-500/30 bg-purple-950/10 rounded-xl">
+              <div className="text-[11px] font-bold text-purple-300">Modaka Sales</div>
+              <div className="text-lg font-black text-purple-200 mt-1 font-mono">
+                LKR {modakaSalesTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-purple-300/70 mt-0.5">
+                {worksheetData.modakaUnitsTotal || 0} units (Shift Ledger)
+              </div>
             </div>
             <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
               <div className="text-[11px] font-medium text-slate-400">Card Payments</div>
@@ -2127,13 +2153,6 @@ export default function CashReconciliationPage() {
                 LKR {worksheetData.systemQrSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
               <div className="text-[10px] text-slate-500 mt-0.5">LANKAQR digital</div>
-            </div>
-            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
-              <div className="text-[11px] font-medium text-slate-400">Credit / Khata</div>
-              <div className="text-lg font-bold text-amber-500 mt-1 font-mono">
-                LKR {worksheetData.systemCreditSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Customer receivables</div>
             </div>
           </div>
 
@@ -2197,9 +2216,15 @@ export default function CashReconciliationPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[11px]">
                         <div>
-                          <span className="text-slate-500">Shift Sales:</span>
+                          <span className="text-slate-500">POS Sales:</span>
                           <div className="font-bold text-slate-200">
                             LKR {shiftSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Modaka Sales:</span>
+                          <div className="font-bold text-purple-300">
+                            LKR {(s.modaka_total_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                           </div>
                         </div>
                         <div>
@@ -2214,7 +2239,7 @@ export default function CashReconciliationPage() {
                             LKR {shiftExpenses.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                           </div>
                         </div>
-                        <div>
+                        <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-800/60">
                           <span className="text-slate-500">Shift Variance:</span>
                           <div className={`font-bold ${Math.abs(shiftVar) < 0.01 ? 'text-emerald-400' : shiftVar < 0 ? 'text-rose-400' : 'text-cyan-400'}`}>
                             {Math.abs(shiftVar) < 0.01 ? 'Balanced' : `LKR ${shiftVar.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`}
@@ -2545,11 +2570,25 @@ export default function CashReconciliationPage() {
                 <div className="text-xs uppercase font-bold tracking-wider text-slate-400">
                   Zero-Variance Cash Reconciliation Check
                 </div>
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex flex-wrap items-center gap-4 text-sm">
                   <div>
-                    <span className="text-slate-400">System Cash Sales: </span>
+                    <span className="text-slate-400">System POS Cash Sales: </span>
                     <strong className="text-slate-200">
                       LKR {systemCashSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                  {modakaSalesTotal > 0 && (
+                    <div className="px-2.5 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                      <span className="text-purple-300 font-medium">Modaka Sales (Shift Ledger): </span>
+                      <strong className="text-purple-200">
+                        +LKR {modakaSalesTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-slate-400">Total Expected Cash: </span>
+                    <strong className="text-amber-300">
+                      LKR {totalExpectedSalesCash.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                     </strong>
                   </div>
                   <div>

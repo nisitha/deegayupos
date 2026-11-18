@@ -220,6 +220,9 @@ export function ShiftEndModal({
     return { sumA, sumB, sumC, sumD, sumE, sumF };
   }, [modakaRows]);
 
+  const modakaUnitsTotal = modakaTotals.sumD;
+  const modakaSalesTotal = modakaTotals.sumF;
+
   // Denominations Total
   const countedDrawerCash = useMemo(() => {
     return DENOMINATIONS.reduce((acc, d) => acc + d * (counts[d] || 0), 0);
@@ -227,8 +230,8 @@ export function ShiftEndModal({
 
   // Expense Summary calculations
   const totalCashAvailable = useMemo(() => {
-    return openingFloat + declaredShiftSale;
-  }, [openingFloat, declaredShiftSale]);
+    return openingFloat + declaredShiftSale + modakaSalesTotal;
+  }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
   const expectedCashBeforeBank = useMemo(() => {
     return totalCashAvailable - goodsPurchasedPaid - otherExpenses;
@@ -716,6 +719,21 @@ export function ShiftEndModal({
                           className="w-28 px-2 py-1 text-right font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-purple-500 focus:outline-none"
                         />
                       </div>
+                    </div>
+
+                    {/* Modaka Sales (Auto-calculated from Modaka Ledger) */}
+                    <div className="flex items-center justify-between pt-2.5 bg-purple-50/70 p-2.5 rounded-xl border border-purple-200/80">
+                      <div>
+                        <span className="font-bold text-purple-950 block">
+                          Modaka Sales
+                        </span>
+                        <span className="text-[11px] text-purple-700 font-medium">
+                          Auto-calculated from Modaka Ledger ({modakaUnitsTotal} units)
+                        </span>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-purple-900">
+                        + LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
 
                     {/* Total Cash Available */}

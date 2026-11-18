@@ -3719,7 +3719,7 @@ export const shiftsApi = {
       // 3. Cash & Expense Summary calculations
       const openingFloat = Number(payload.openingFloat || 0);
       const declaredShiftSale = Number(payload.declaredShiftSale || 0);
-      const totalCashAvailable = openingFloat + declaredShiftSale;
+      const totalCashAvailable = openingFloat + declaredShiftSale + modakaTotalAmount;
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
       const expectedCashBeforeBank = totalCashAvailable - goodsPurchasedPaid - otherExpenses;

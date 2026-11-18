@@ -82,6 +82,8 @@ export interface ShiftHandoverSummary {
   pos_qr_sales: number;
   pos_credit_sales: number;
   pos_gross_sales: number;
+  modaka_total_sold_qty?: number;
+  modaka_total_amount?: number;
   opening_float: number;
   declared_shift_sale: number;
   total_cash_available: number;
@@ -106,6 +108,8 @@ export interface ReconciliationWorksheetData {
   systemCreditSales: number;
   totalGrossSales: number;
   totalCompletedBills: number;
+  modakaSalesTotal: number;
+  modakaUnitsTotal: number;
   autoCashExpenses: number;
   cashierBreakdown: CashierSalesSummary[];
   shifts: ShiftHandoverSummary[];
@@ -473,6 +477,8 @@ export const reconciliationApi = {
         pos_qr_sales: Number(sh.pos_qr_sales) || 0,
         pos_credit_sales: Number(sh.pos_credit_sales) || 0,
         pos_gross_sales: Number(sh.pos_gross_sales) || 0,
+        modaka_total_sold_qty: Number(sh.modaka_total_sold_qty) || 0,
+        modaka_total_amount: Number(sh.modaka_total_amount) || 0,
         opening_float: Number(sh.opening_float) || 0,
         declared_shift_sale: Number(sh.declared_shift_sale) || 0,
         total_cash_available: Number(sh.total_cash_available) || 0,
@@ -487,7 +493,45 @@ export const reconciliationApi = {
         handover_notes: sh.handover_notes || null,
       }));
 
-      // 7. Auto cash expenses (drawer events)
+      // 7. Modaka Sales Aggregation across shifts & shift_modaka_entries
+      let modakaSalesTotal = shifts.reduce((acc, sh) => acc + (sh.modaka_total_amount || 0), 0);
+      let modakaUnitsTotal = shifts.reduce((acc, sh) => acc + (sh.modaka_total_sold_qty || 0), 0);
+
+      if (modakaSalesTotal === 0 && shifts.length > 0) {
+        try {
+          const shiftIds = shifts.map((s) => s.id);
+          const { data: sme } = await supabase
+            .from('shift_modaka_entries')
+            .select('sold_qty, total_amount')
+            .in('shift_id', shiftIds);
+          if (sme && sme.length > 0) {
+            modakaUnitsTotal = sme.reduce((sum: number, r: any) => sum + Number(r.sold_qty || 0), 0);
+            modakaSalesTotal = sme.reduce((sum: number, r: any) => sum + Number(r.total_amount || 0), 0);
+          }
+        } catch (e) {
+          console.warn('[ReconciliationApi] shift_modaka_entries error:', e);
+        }
+      } else if (modakaSalesTotal === 0) {
+        try {
+          let smeQuery = supabase
+            .from('shift_modaka_entries')
+            .select('sold_qty, total_amount')
+            .gte('created_at', start)
+            .lte('created_at', end);
+          if (!isAllBranches) {
+            smeQuery = smeQuery.eq('branch_id', branchId);
+          }
+          const { data: sme } = await smeQuery;
+          if (sme && sme.length > 0) {
+            modakaUnitsTotal = sme.reduce((sum: number, r: any) => sum + Number(r.sold_qty || 0), 0);
+            modakaSalesTotal = sme.reduce((sum: number, r: any) => sum + Number(r.total_amount || 0), 0);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // 8. Auto cash expenses (drawer events)
       let autoCashExpenses = 0;
       try {
         let drawerEventsQuery = supabase
@@ -527,6 +571,8 @@ export const reconciliationApi = {
         systemCreditSales,
         totalGrossSales,
         totalCompletedBills,
+        modakaSalesTotal,
+        modakaUnitsTotal,
         autoCashExpenses,
         cashierBreakdown: Array.from(cashierMap.values()),
         shifts,
@@ -544,6 +590,8 @@ export const reconciliationApi = {
         systemCreditSales: 0,
         totalGrossSales: 0,
         totalCompletedBills: 0,
+        modakaSalesTotal: 0,
+        modakaUnitsTotal: 0,
         autoCashExpenses: 0,
         cashierBreakdown: [],
         shifts: [],
