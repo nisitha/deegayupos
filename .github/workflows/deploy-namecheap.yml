@@ -4,16 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      action:
-        description: 'Deployment Action'
-        required: false
-        default: 'deploy'
-        type: choice
-        options:
-          - 'deploy'
-          - 'disable-maintenance-only'
-          - 'enable-maintenance-only'
 
 jobs:
   build-and-deploy:
@@ -32,11 +22,9 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
         run: pnpm install --frozen-lockfile
 
       - name: Build static Next.js app
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
         env:
           NEXT_PUBLIC_SITE_URL: 'https://pos.pixelcraftlk.com'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -45,40 +33,7 @@ jobs:
           pnpm --filter @pixelcraft/types build
           pnpm --filter @pixelcraft/web build
 
-      - name: Stage 1 — Enable Maintenance Mode via curl
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' }}"
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          SERVER_HOST="${FTP_SERVER#ftp://}"
-          SERVER_HOST="${SERVER_HOST%/}"
-
-          echo "DEPLOY_ACTIVE_$(date -u +%Y%m%d_%H%M%S)" > ./maintenance.flag
-
-          echo "Uploading maintenance assets and flag via FTPS curl (non-destructive)..."
-          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T apps/web/public/.htaccess "ftp://${SERVER_HOST}/.htaccess"
-          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T apps/web/public/maintenance.html "ftp://${SERVER_HOST}/maintenance.html"
-          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T ./maintenance.flag "ftp://${SERVER_HOST}/maintenance.flag"
-          echo "✓ Maintenance Mode is active."
-
-      - name: Stage 2 — Clear Remote Sync State
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          SERVER_HOST="${FTP_SERVER#ftp://}"
-          SERVER_HOST="${SERVER_HOST%/}"
-
-          echo "Deleting any corrupted .ftp-deploy-sync-state.json from remote root..."
-          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" "ftp://${SERVER_HOST}/" -Q "-DELE .ftp-deploy-sync-state.json" -o /dev/null || true
-          echo "✓ Remote sync state cleared for clean full sync."
-
-      - name: Stage 2 — Full Static Site Sync (apps/web/out/)
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
+      - name: Deploy build output to Namecheap cPanel via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -93,44 +48,31 @@ jobs:
             **/node_modules/**
             maintenance.flag
 
-      - name: Stage 3 — Disable Maintenance Mode & Verify Live Site
-        if: "always() && github.event.inputs.action != 'enable-maintenance-only'"
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      - name: Verify Live Endpoints
         run: |
-          SERVER_HOST="${FTP_SERVER#ftp://}"
-          SERVER_HOST="${SERVER_HOST%/}"
-
-          echo "Deleting maintenance.flag from remote root via FTPS curl..."
-          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" "ftp://${SERVER_HOST}/" -Q "-DELE maintenance.flag" -o /dev/null || true
-          echo "✓ Deleted maintenance.flag."
-
           echo "Waiting 5 seconds for web server and edge caches to update..."
           sleep 5
 
-          echo "Verifying live endpoints on pos.pixelcraftlk.com..."
-          TS=$(date +%s)
-          FLAG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/maintenance.flag?t=$TS")
-          echo "maintenance.flag check: HTTP $FLAG_STATUS (expected 404)"
-
+          echo "Verifying live endpoints on pos.pixelcraftlk.com via HTTPS..."
           PASSED=false
-          for i in {1..6}; do
+          for i in {1..8}; do
             TS=$(date +%s)
-            ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/?t=$TS")
-            LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/login/?t=$TS")
-            echo "Attempt $i: Root: $ROOT_STATUS, Login: $LOGIN_STATUS"
+            ROOT_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/?v=$TS")
+            POS_RES=$(curl -sL -w "\n%{http_code}" "https://pos.pixelcraftlk.com/dashboard/pos/?v=$TS")
+            POS_CODE=$(echo "$POS_RES" | tail -n 1)
 
-            if [ "$ROOT_STATUS" = "200" ] && [ "$LOGIN_STATUS" = "200" ]; then
+            echo "Attempt $i: Root HTTP $ROOT_CODE, POS HTTP $POS_CODE"
+
+            if [ "$ROOT_CODE" = "200" ] && [ "$POS_CODE" = "200" ]; then
               PASSED=true
+              echo "✓ Both Root and POS endpoints responded with HTTP 200."
               break
             fi
-            sleep 3
+            sleep 4
           done
 
           if [ "$PASSED" != "true" ]; then
-            echo "ERROR: Live health check failed after multiple attempts (Root: $ROOT_STATUS, Login: $LOGIN_STATUS)"
+            echo "ERROR: Live health check failed (Root: $ROOT_CODE, POS: $POS_CODE)"
             exit 1
           fi
 
