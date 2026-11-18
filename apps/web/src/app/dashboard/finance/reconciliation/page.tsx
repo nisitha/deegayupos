@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Banknote,
   Building2,
@@ -25,6 +25,12 @@ import {
   ShieldCheck,
   Wallet,
   CreditCard,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  User,
+  Clock,
+  Layers,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import {
@@ -39,6 +45,8 @@ import {
   type ConsolidatedBankDepositRow,
   type CashierShortageRow,
   type ConsolidatedLedgerRow,
+  type ReconciliationWorksheetData,
+  type ShiftHandoverSummary,
 } from '../../../../lib/reconciliation-api';
 
 type TabView =
@@ -59,9 +67,16 @@ export default function CashReconciliationPage() {
   const loggedInCashierId = activeCashier?.id || user?.id;
 
   const tenantId = business?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a';
+
+  // Active branch selector synced with global top navigation bar
+  const activeBranchFilter = isOwner
+    ? (selectedBranchId || 'ALL')
+    : (selectedBranchId || (allowedBranches.length > 0 && allowedBranches[0] ? allowedBranches[0].id : (branches.length > 0 && branches[0] ? branches[0].id : '')));
+
   const effectiveBranchId =
-    selectedBranchId ||
-    (allowedBranches.length > 0 && allowedBranches[0] ? allowedBranches[0].id : (branches.length > 0 && branches[0] ? branches[0].id : ''));
+    activeBranchFilter !== 'ALL'
+      ? activeBranchFilter
+      : (allowedBranches.length > 0 && allowedBranches[0] ? allowedBranches[0].id : (branches.length > 0 && branches[0] ? branches[0].id : ''));
 
   // Get current date in Sri Lanka (UTC+5:30)
   const getTodaySriLanka = (): string => {
@@ -103,6 +118,62 @@ export default function CashReconciliationPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const fetchIdRef = useRef(0);
+
+  // Full day breakdown across sales, shifts & historical ledger
+  const [worksheetData, setWorksheetData] = useState<ReconciliationWorksheetData>({
+    existingRec: null,
+    existingDeposits: [],
+    previousClosingF: null,
+    systemCashSales: 0,
+    systemCardSales: 0,
+    systemQrSales: 0,
+    systemCreditSales: 0,
+    totalGrossSales: 0,
+    totalCompletedBills: 0,
+    autoCashExpenses: 0,
+    cashierBreakdown: [],
+    shifts: [],
+    isHistorical: false,
+  });
+
+  // Synced branch switcher handler (updates global layout context + all local tabs)
+  const handleBranchChange = (newBranchId: string) => {
+    if (!isOwner) return; // Strict lock for staff
+    setLoading(true);
+    setSelectedBranchId(newBranchId === 'ALL' ? null : newBranchId);
+    setSummaryBranchId(newBranchId);
+    setBankFilterBranch(newBranchId);
+    setShortageBranchFilter(newBranchId);
+    setLedgerBranchFilter(newBranchId);
+  };
+
+  // Sync when top header branch dropdown changes
+  useEffect(() => {
+    if (isOwner) {
+      const bId = selectedBranchId || 'ALL';
+      setSummaryBranchId(bId);
+      setBankFilterBranch(bId);
+      setShortageBranchFilter(bId);
+      setLedgerBranchFilter(bId);
+    }
+  }, [selectedBranchId, isOwner]);
+
+  // Date navigation handlers with immediate 0ms loading state
+  const handleDateChange = (newDate: string) => {
+    if (!isOwner && newDate !== getTodaySriLanka()) return; // Staff locked to today
+    setLoading(true);
+    setSelectedDate(newDate);
+  };
+
+  const handleDateStep = (days: number) => {
+    if (!isOwner) return; // Staff locked to today
+    setLoading(true);
+    const d = new Date(`${selectedDate}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    const dateStr = d.toISOString().split('T')[0] || selectedDate;
+    setSelectedDate(dateStr);
+  };
 
   // ==========================================
   // TAB 1: ADMIN MULTI-BRANCH SUMMARY STATE
@@ -110,7 +181,7 @@ export default function CashReconciliationPage() {
   const [summaryPreset, setSummaryPreset] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'>('all');
   const [summaryStartDate, setSummaryStartDate] = useState<string>('');
   const [summaryEndDate, setSummaryEndDate] = useState<string>('');
-  const [summaryBranchId, setSummaryBranchId] = useState<string>('ALL');
+  const [summaryBranchId, setSummaryBranchId] = useState<string>(activeBranchFilter);
   const [summaryStatus, setSummaryStatus] = useState<string>('all');
   const [consolidatedSummaries, setConsolidatedSummaries] = useState<ConsolidatedReconciliationRow[]>([]);
   const [selectedRecForDenoms, setSelectedRecForDenoms] = useState<ConsolidatedReconciliationRow | null>(null);
@@ -119,7 +190,7 @@ export default function CashReconciliationPage() {
   // TAB 2: BANK DEPOSIT REGISTER STATE
   // ==========================================
   const [bankFilterBank, setBankFilterBank] = useState<string>('ALL');
-  const [bankFilterBranch, setBankFilterBranch] = useState<string>('ALL');
+  const [bankFilterBranch, setBankFilterBranch] = useState<string>(activeBranchFilter);
   const [bankSearch, setBankSearch] = useState<string>('');
   const [consolidatedBankDeposits, setConsolidatedBankDeposits] = useState<ConsolidatedBankDepositRow[]>([]);
 
@@ -127,14 +198,14 @@ export default function CashReconciliationPage() {
   // TAB 3: CASHIER SHORTAGES STATE
   // ==========================================
   const [shortageCashierFilter, setShortageCashierFilter] = useState<string>('ALL');
-  const [shortageBranchFilter, setShortageBranchFilter] = useState<string>('ALL');
+  const [shortageBranchFilter, setShortageBranchFilter] = useState<string>(activeBranchFilter);
   const [shortageStatusFilter, setShortageStatusFilter] = useState<'all' | 'pending_payroll' | 'deducted'>('all');
   const [consolidatedShortages, setConsolidatedShortages] = useState<CashierShortageRow[]>([]);
 
   // ==========================================
   // TAB 4: DAILY ACCOUNTS LEDGER STATE
   // ==========================================
-  const [ledgerBranchFilter, setLedgerBranchFilter] = useState<string>('ALL');
+  const [ledgerBranchFilter, setLedgerBranchFilter] = useState<string>(activeBranchFilter);
   const [consolidatedLedger, setConsolidatedLedger] = useState<ConsolidatedLedgerRow[]>([]);
 
   // ==========================================
@@ -226,26 +297,38 @@ export default function CashReconciliationPage() {
   }, [bankDeposits]);
 
   const physicalCashC = useMemo(() => {
+    if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
+      return systemCashSales;
+    }
     if (countMode === 'after_banking') {
       return countedDenominationsTotal + totalBankDepositsE;
     }
     return countedDenominationsTotal;
-  }, [countMode, countedDenominationsTotal, totalBankDepositsE]);
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, systemCashSales]);
 
   const closingCashF = useMemo(() => {
+    if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
+      return Math.max(0, systemCashSales - totalBankDepositsE);
+    }
     if (countMode === 'after_banking') {
       return countedDenominationsTotal;
     }
     return countedDenominationsTotal - totalBankDepositsE;
-  }, [countMode, countedDenominationsTotal, totalBankDepositsE]);
+  }, [countMode, countedDenominationsTotal, totalBankDepositsE, worksheetData?.isHistorical, existingRecord, systemCashSales]);
 
   const actualNetIncomeD = useMemo(() => {
+    if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
+      return systemCashSales;
+    }
     return physicalCashC + (Number(cashExpensesB) || 0) - (Number(openingFloatA) || 0);
-  }, [physicalCashC, cashExpensesB, openingFloatA]);
+  }, [physicalCashC, cashExpensesB, openingFloatA, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal, systemCashSales]);
 
   const varianceAmount = useMemo(() => {
+    if (worksheetData?.isHistorical && !existingRecord && countedDenominationsTotal === 0) {
+      return 0;
+    }
     return Number((systemCashSales - actualNetIncomeD).toFixed(2));
-  }, [systemCashSales, actualNetIncomeD]);
+  }, [systemCashSales, actualNetIncomeD, worksheetData?.isHistorical, existingRecord, countedDenominationsTotal]);
 
   const varianceStatus = useMemo((): 'balanced' | 'shortage' | 'overage' => {
     if (Math.abs(varianceAmount) < 0.01) return 'balanced';
@@ -256,6 +339,7 @@ export default function CashReconciliationPage() {
   // DATA LOADING ENGINE
   // ==========================================
   const loadAllData = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     setSaveSuccessMsg(null);
 
@@ -270,10 +354,13 @@ export default function CashReconciliationPage() {
 
         // Fetch company bank accounts for the deposit dropdown
         const bankAccs = await reconciliationApi.getBankAccounts(tenantId);
+        if (fetchId !== fetchIdRef.current) return;
         setCompanyBankAccounts(bankAccs);
 
         if (effectiveBranchId) {
           const worksheet = await reconciliationApi.loadReconciliationWorksheet(effectiveBranchId, todayStr);
+          if (fetchId !== fetchIdRef.current) return;
+          setWorksheetData(worksheet);
           setSystemCashSales(worksheet.systemCashSales);
           setCashierSummaries(worksheet.cashierBreakdown);
 
@@ -362,6 +449,7 @@ export default function CashReconciliationPage() {
 
       // 1. Fetch Company Bank Accounts
       const bankAccs = await reconciliationApi.getBankAccounts(tenantId);
+      if (fetchId !== fetchIdRef.current) return;
       setCompanyBankAccounts(bankAccs);
 
       // 2. Fetch Multi-Branch Reconciliations
@@ -371,6 +459,7 @@ export default function CashReconciliationPage() {
         endDate: eDate,
         status: summaryStatus !== 'all' ? summaryStatus : undefined,
       });
+      if (fetchId !== fetchIdRef.current) return;
       setConsolidatedSummaries(recHistory);
 
       // 3. Fetch Consolidated Bank Deposits
@@ -380,6 +469,7 @@ export default function CashReconciliationPage() {
         startDate: sDate,
         endDate: eDate,
       });
+      if (fetchId !== fetchIdRef.current) return;
       setConsolidatedBankDeposits(depositsReport);
 
       // 4. Fetch Consolidated Shortages
@@ -390,6 +480,7 @@ export default function CashReconciliationPage() {
         startDate: sDate,
         endDate: eDate,
       });
+      if (fetchId !== fetchIdRef.current) return;
       setConsolidatedShortages(shortagesReport);
 
       // 5. Fetch Consolidated Ledger
@@ -399,51 +490,61 @@ export default function CashReconciliationPage() {
         endDate: eDate,
         limit: 50,
       });
+      if (fetchId !== fetchIdRef.current) return;
       setConsolidatedLedger(ledgerReport);
 
-      // 6. If on worksheet tab or effective branch selected, load worksheet
-      if (effectiveBranchId) {
-        const worksheet = await reconciliationApi.loadReconciliationWorksheet(effectiveBranchId, selectedDate);
-        setSystemCashSales(worksheet.systemCashSales);
-        setCashierSummaries(worksheet.cashierBreakdown);
+      // 6. Load Worksheet for the selected date & branch
+      const branchParam = activeBranchFilter || 'ALL';
+      const worksheet = await reconciliationApi.loadReconciliationWorksheet(branchParam, selectedDate);
+      if (fetchId !== fetchIdRef.current) return;
+      setWorksheetData(worksheet);
+      setSystemCashSales(worksheet.systemCashSales);
+      setCashierSummaries(worksheet.cashierBreakdown);
 
-        if (worksheet.existingRec) {
-          const rec = worksheet.existingRec;
-          setExistingRecord(rec);
-          setOpeningFloatA(Number(rec.opening_float_a) || 0);
-          setCashExpensesB(Number(rec.cash_expenses_b) || 0);
-          setGeneralNotes(rec.notes || '');
+      if (worksheet.existingRec) {
+        const rec = worksheet.existingRec;
+        setExistingRecord(rec);
+        setOpeningFloatA(Number(rec.opening_float_a) || 0);
+        setCashExpensesB(Number(rec.cash_expenses_b) || 0);
+        setGeneralNotes(rec.notes || '');
 
-          if (rec.denominations && typeof rec.denominations === 'object') {
-            const loadedDenoms: Record<number, number> = {};
-            SRI_LANKA_DENOMINATIONS.forEach((d) => {
-              loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
-            });
-            setDenominations(loadedDenoms);
-          }
-
-          if (worksheet.existingDeposits.length > 0) {
-            setBankDeposits(worksheet.existingDeposits);
-          }
-          setIsFloatLocked(true);
-        } else {
-          setExistingRecord(null);
-          if (worksheet.previousClosingF !== null) {
-            setOpeningFloatA(worksheet.previousClosingF);
-            setIsFloatLocked(true);
-          } else {
-            setOpeningFloatA(0);
-            setIsFloatLocked(false);
-          }
-
-          setCashExpensesB(worksheet.autoCashExpenses);
-
-          const initialDenoms: Record<number, number> = {};
+        if (rec.denominations && typeof rec.denominations === 'object') {
+          const loadedDenoms: Record<number, number> = {};
           SRI_LANKA_DENOMINATIONS.forEach((d) => {
-            initialDenoms[d] = 0;
+            loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
           });
-          setDenominations(initialDenoms);
+          setDenominations(loadedDenoms);
+        }
 
+        if (worksheet.existingDeposits.length > 0) {
+          setBankDeposits(worksheet.existingDeposits);
+        }
+        setIsFloatLocked(true);
+      } else {
+        setExistingRecord(null);
+        if (worksheet.isHistorical) {
+          setOpeningFloatA(0);
+          setIsFloatLocked(true);
+          setCashExpensesB(worksheet.autoCashExpenses);
+        } else if (worksheet.previousClosingF !== null) {
+          setOpeningFloatA(worksheet.previousClosingF);
+          setIsFloatLocked(true);
+          setCashExpensesB(worksheet.autoCashExpenses);
+        } else {
+          setOpeningFloatA(0);
+          setIsFloatLocked(false);
+          setCashExpensesB(worksheet.autoCashExpenses);
+        }
+
+        const initialDenoms: Record<number, number> = {};
+        SRI_LANKA_DENOMINATIONS.forEach((d) => {
+          initialDenoms[d] = 0;
+        });
+        setDenominations(initialDenoms);
+
+        if (worksheet.existingDeposits.length > 0) {
+          setBankDeposits(worksheet.existingDeposits);
+        } else {
           const firstAcc = bankAccs[0];
           if (firstAcc) {
             setBankDeposits([
@@ -460,12 +561,15 @@ export default function CashReconciliationPage() {
     } catch (err) {
       console.error('Error loading consolidated reconciliation data:', err);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [
     isOwner,
     tenantId,
     effectiveBranchId,
+    activeBranchFilter,
     selectedDate,
     summaryPreset,
     summaryStartDate,
@@ -659,7 +763,10 @@ export default function CashReconciliationPage() {
     }
   };
 
-  const currentBranchName = branches.find((b) => b.id === effectiveBranchId)?.name || 'Main Branch';
+  const currentBranchName =
+    activeBranchFilter === 'ALL'
+      ? 'All Outlets (සියල්ල)'
+      : branches.find((b) => b.id === effectiveBranchId)?.name || 'Main Branch';
 
   // Bank register calculations
   const filteredBankDeposits = useMemo(() => {
@@ -770,6 +877,68 @@ export default function CashReconciliationPage() {
 
         {/* Global Action Bar */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Synced Branch Selector - Executive Admin Only */}
+          {isOwner && (
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-amber-400" />
+              <select
+                value={activeBranchFilter}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer"
+              >
+                <option value="ALL" className="bg-slate-900 text-slate-200">
+                  All Branches (සියල්ල)
+                </option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Date Stepper & Picker - Executive Admin Only */}
+          {isOwner && (
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => handleDateStep(-1)}
+                title="Previous Day"
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-950/60 text-slate-200">
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className="bg-transparent text-slate-200 font-mono font-semibold outline-none cursor-pointer text-xs"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDateStep(1)}
+                title="Next Day"
+                disabled={selectedDate >= getTodaySriLanka()}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              {selectedDate !== getTodaySriLanka() && (
+                <button
+                  type="button"
+                  onClick={() => handleDateChange(getTodaySriLanka())}
+                  className="px-2 py-1 text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition border-l border-slate-800 cursor-pointer"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Refresh Button */}
           <button
             onClick={() => loadAllData()}
@@ -1056,7 +1225,7 @@ export default function CashReconciliationPage() {
                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
                 <select
                   value={summaryBranchId}
-                  onChange={(e) => setSummaryBranchId(e.target.value)}
+                  onChange={(e) => handleBranchChange(e.target.value)}
                   className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
                 >
                   <option value="ALL">All Branches</option>
@@ -1348,7 +1517,7 @@ export default function CashReconciliationPage() {
                 <span className="text-slate-400">Branch:</span>
                 <select
                   value={bankFilterBranch}
-                  onChange={(e) => setBankFilterBranch(e.target.value)}
+                  onChange={(e) => handleBranchChange(e.target.value)}
                   className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
                 >
                   <option value="ALL">All Branches</option>
@@ -1562,7 +1731,7 @@ export default function CashReconciliationPage() {
                   <span className="text-slate-400">Branch:</span>
                   <select
                     value={shortageBranchFilter}
-                    onChange={(e) => setShortageBranchFilter(e.target.value)}
+                    onChange={(e) => handleBranchChange(e.target.value)}
                     className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
                   >
                     <option value="ALL">All Branches</option>
@@ -1697,7 +1866,7 @@ export default function CashReconciliationPage() {
                 <span className="text-slate-400">Branch:</span>
                 <select
                   value={ledgerBranchFilter}
-                  onChange={(e) => setLedgerBranchFilter(e.target.value)}
+                  onChange={(e) => handleBranchChange(e.target.value)}
                   className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
                 >
                   <option value="ALL">All Branches</option>
@@ -1851,10 +2020,13 @@ export default function CashReconciliationPage() {
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
                   <Building2 className="w-3.5 h-3.5 text-slate-400" />
                   <select
-                    value={effectiveBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="bg-transparent text-slate-200 outline-none cursor-pointer"
+                    value={activeBranchFilter}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    className="bg-transparent text-slate-200 outline-none cursor-pointer font-semibold"
                   >
+                    <option value="ALL" className="bg-slate-900 text-slate-200">
+                      All Branches (සියල්ල)
+                    </option>
                     {branches.map((b) => (
                       <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
                         {b.name}
@@ -1864,25 +2036,248 @@ export default function CashReconciliationPage() {
                 </div>
               )}
 
-              {/* Date Display / Picker */}
+              {/* Date Display / Stepper */}
               {!isOwner ? (
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 select-none text-xs">
                   <Calendar className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="font-semibold text-slate-200">{selectedDate} (Today)</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent text-slate-200 outline-none cursor-pointer"
-                  />
+                <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg overflow-hidden text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleDateStep(-1)}
+                    title="Previous Day"
+                    className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center gap-1.5 px-2 py-1 text-slate-200">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      className="bg-transparent text-slate-200 font-mono font-semibold outline-none cursor-pointer text-xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDateStep(1)}
+                    title="Next Day"
+                    disabled={selectedDate >= getTodaySriLanka()}
+                    className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  {selectedDate !== getTodaySriLanka() && (
+                    <button
+                      type="button"
+                      onClick={() => handleDateChange(getTodaySriLanka())}
+                      className="px-2 py-1 text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition border-l border-slate-800 cursor-pointer"
+                    >
+                      Today
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Shimmer loading bar */}
+          {loading && (
+            <div className="w-full bg-slate-900 h-1 overflow-hidden rounded-full">
+              <div className="bg-amber-400 h-full w-1/3 animate-pulse rounded-full" />
+            </div>
+          )}
+
+          {/* 6-Card System Sales Summary Row */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
+              <div className="text-[11px] font-medium text-slate-400">Settled Bills</div>
+              <div className="text-lg font-bold text-slate-100 mt-1 font-mono">
+                {worksheetData.totalCompletedBills.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Completed bills</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
+              <div className="text-[11px] font-medium text-slate-400">Gross Sales</div>
+              <div className="text-lg font-bold text-slate-100 mt-1 font-mono">
+                LKR {worksheetData.totalGrossSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">All payment modes</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-amber-500/30 bg-amber-950/10 rounded-xl">
+              <div className="text-[11px] font-bold text-amber-400">Cash Sales</div>
+              <div className="text-lg font-black text-amber-300 mt-1 font-mono">
+                LKR {worksheetData.systemCashSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-amber-400/70 mt-0.5">System drawer target</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
+              <div className="text-[11px] font-medium text-slate-400">Card Payments</div>
+              <div className="text-lg font-bold text-blue-400 mt-1 font-mono">
+                LKR {worksheetData.systemCardSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Direct merchant A/C</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
+              <div className="text-[11px] font-medium text-slate-400">QR Payments</div>
+              <div className="text-lg font-bold text-indigo-400 mt-1 font-mono">
+                LKR {worksheetData.systemQrSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">LANKAQR digital</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
+              <div className="text-[11px] font-medium text-slate-400">Credit / Khata</div>
+              <div className="text-lg font-bold text-amber-500 mt-1 font-mono">
+                LKR {worksheetData.systemCreditSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Customer receivables</div>
+            </div>
+          </div>
+
+          {/* Historical Archive Banner */}
+          {worksheetData.isHistorical && (
+            <div className="p-4 bg-purple-950/30 border border-purple-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-purple-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-purple-100">
+                    Historical System Ledger (Legacy Records)
+                  </div>
+                  <div className="text-purple-300/80 mt-0.5">
+                    Showing aggregated sales ledger from POS records on {selectedDate}. Net income and physical cash are balanced to system cash sales (LKR {worksheetData.systemCashSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}).
+                  </div>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 self-start sm:self-auto">
+                Historical Archive
+              </span>
+            </div>
+          )}
+
+          {/* Shift Handover Sheets Recorded Today */}
+          {worksheetData.shifts.length > 0 && (
+            <div className="p-4 bg-slate-900 border border-indigo-500/30 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Shift Handover Sheets Recorded On This Date ({worksheetData.shifts.length})
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  From Shift Off digitized handover sheets
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {worksheetData.shifts.map((s: ShiftHandoverSummary) => {
+                  const shiftExpenses = (s.goods_purchased_paid || 0) + (s.other_expenses || 0);
+                  const shiftSales = s.pos_gross_sales || s.declared_shift_sale || 0;
+                  const shiftVar = s.cash_variance || 0;
+                  return (
+                    <div key={s.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="font-bold text-xs text-slate-200">{s.cashier_name}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          Shift {s.shift_number}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        {s.started_at ? new Date(s.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        {' - '}
+                        {s.ended_at ? new Date(s.ended_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active'}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[11px]">
+                        <div>
+                          <span className="text-slate-500">Shift Sales:</span>
+                          <div className="font-bold text-slate-200">
+                            LKR {shiftSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Drawer Cash:</span>
+                          <div className="font-bold text-amber-400">
+                            LKR {s.counted_drawer_cash.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Expenses:</span>
+                          <div className="font-bold text-slate-300">
+                            LKR {shiftExpenses.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Shift Variance:</span>
+                          <div className={`font-bold ${Math.abs(shiftVar) < 0.01 ? 'text-emerald-400' : shiftVar < 0 ? 'text-rose-400' : 'text-cyan-400'}`}>
+                            {Math.abs(shiftVar) < 0.01 ? 'Balanced' : `LKR ${shiftVar.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Cashier Register Breakdown Table */}
+          {worksheetData.cashierBreakdown.length > 0 && (
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Cashier Register Breakdown ({worksheetData.cashierBreakdown.length})
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  Individual terminal collections for {selectedDate}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="text-slate-400 border-b border-slate-800">
+                      <th className="py-2">Cashier Name</th>
+                      <th className="py-2 text-center">Settled Bills</th>
+                      <th className="py-2 text-right">Cash Sales (LKR)</th>
+                      <th className="py-2 text-right">Card Sales (LKR)</th>
+                      <th className="py-2 text-right">QR / Credit (LKR)</th>
+                      <th className="py-2 text-right">Total Billed (LKR)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {worksheetData.cashierBreakdown.map((c) => (
+                      <tr key={c.cashier_id} className="hover:bg-slate-800/40 transition">
+                        <td className="py-2.5 font-bold text-slate-200">{c.cashier_name}</td>
+                        <td className="py-2.5 text-center text-slate-300 font-mono">{c.bill_count}</td>
+                        <td className="py-2.5 text-right font-bold text-amber-400 font-mono">
+                          {c.cash_sales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 text-right text-blue-400 font-mono">
+                          {(c.card_sales || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 text-right text-indigo-400 font-mono">
+                          {((c.qr_sales || 0) + (c.credit_sales || 0)).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 text-right font-black text-slate-100 font-mono">
+                          {(c.total_sales || c.cash_sales).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Status banner for existing record (Admin View) */}
           {existingRecord && isOwner && (

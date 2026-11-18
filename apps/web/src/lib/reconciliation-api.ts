@@ -58,7 +58,58 @@ export interface CashierSalesSummary {
   cashier_id: string;
   cashier_name: string;
   cash_sales: number;
+  card_sales?: number;
+  qr_sales?: number;
+  credit_sales?: number;
+  total_sales?: number;
   bill_count: number;
+}
+
+export interface ShiftHandoverSummary {
+  id: string;
+  shift_number: number;
+  shift_date: string;
+  cashier_id: string;
+  cashier_name: string;
+  branch_id: string;
+  branch_name: string;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+  pos_total_bills: number;
+  pos_cash_sales: number;
+  pos_card_sales: number;
+  pos_qr_sales: number;
+  pos_credit_sales: number;
+  pos_gross_sales: number;
+  opening_float: number;
+  declared_shift_sale: number;
+  total_cash_available: number;
+  goods_purchased_paid: number;
+  other_expenses: number;
+  expected_cash_before_bank: number;
+  counted_drawer_cash: number;
+  banked_amount: number;
+  closing_drawer_float: number;
+  cash_variance: number;
+  denominations_json: Record<string, number>;
+  handover_notes: string | null;
+}
+
+export interface ReconciliationWorksheetData {
+  existingRec: DailyCashReconciliationRecord | null;
+  existingDeposits: BankDepositItem[];
+  previousClosingF: number | null;
+  systemCashSales: number;
+  systemCardSales: number;
+  systemQrSales: number;
+  systemCreditSales: number;
+  totalGrossSales: number;
+  totalCompletedBills: number;
+  autoCashExpenses: number;
+  cashierBreakdown: CashierSalesSummary[];
+  shifts: ShiftHandoverSummary[];
+  isHistorical: boolean;
 }
 
 export interface CashierShortageItem {
@@ -248,26 +299,43 @@ export const reconciliationApi = {
   /**
    * Load existing reconciliation (if already saved) and calculate live daily cash sales
    * plus yesterday's closing cash for opening float A.
+   * Aggregates live & historical sales across payment methods (Cash, Card, QR, Credit)
+   * and queries shift handovers (cashier_shifts) for the selected date and branch.
    */
-  async loadReconciliationWorksheet(branchId: string, dateStr: string) {
+  async loadReconciliationWorksheet(branchId: string, dateStr: string): Promise<ReconciliationWorksheetData> {
     const { start, end } = getSriLankaDateBounds(dateStr);
+    const isAllBranches = !branchId || branchId === 'ALL';
 
     try {
-      // 1. Check if reconciliation already exists for this branch and date
-      const { data: existingRec } = await supabase
+      // 1. Fetch branches & users for enrichment
+      const [{ data: branchesData }, { data: usersData }] = await Promise.all([
+        supabase.from('branches').select('id, name'),
+        supabase.from('users').select('id, full_name, email'),
+      ]);
+      const branchMap = new Map<string, string>();
+      (branchesData || []).forEach((b: any) => branchMap.set(b.id, b.name));
+      const userMap = new Map<string, string>();
+      (usersData || []).forEach((u: any) => userMap.set(u.id, u.full_name || u.email || 'Staff Cashier'));
+
+      // 2. Check if reconciliation already exists for this branch/all and date
+      let recQuery = supabase
         .from('daily_cash_reconciliations')
         .select('*')
-        .eq('branch_id', branchId)
-        .eq('reconciliation_date', dateStr)
-        .maybeSingle();
+        .eq('reconciliation_date', dateStr);
+      if (!isAllBranches) {
+        recQuery = recQuery.eq('branch_id', branchId);
+      }
+      const { data: recList } = await recQuery;
+      const existingRec = recList && recList.length > 0 ? (recList[0] as DailyCashReconciliationRecord) : null;
 
-      // 2. Fetch existing bank deposits if reconciliation exists
+      // 3. Fetch existing bank deposits if reconciliation exists
       let existingDeposits: BankDepositItem[] = [];
-      if (existingRec) {
+      if (recList && recList.length > 0) {
+        const recIds = recList.map((r: any) => r.id);
         const { data: depData } = await supabase
           .from('daily_bank_deposits')
           .select('*')
-          .eq('reconciliation_id', existingRec.id);
+          .in('reconciliation_id', recIds);
         if (depData) {
           existingDeposits = depData.map((d: any) => ({
             id: d.id,
@@ -281,96 +349,188 @@ export const reconciliationApi = {
         }
       }
 
-      // 3. Find previous day's closing cash (Float F) to serve as Float A
+      // 4. Find previous day's closing cash (Float F) to serve as Float A
       let previousClosingF: number | null = null;
-      const { data: prevRec } = await supabase
+      let prevRecQuery = supabase
         .from('daily_cash_reconciliations')
         .select('closing_cash_f, reconciliation_date')
-        .eq('branch_id', branchId)
         .lt('reconciliation_date', dateStr)
         .order('reconciliation_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
+        .limit(1);
+      if (!isAllBranches) {
+        prevRecQuery = prevRecQuery.eq('branch_id', branchId);
+      }
+      const { data: prevRec } = await prevRecQuery.maybeSingle();
       if (prevRec && prevRec.closing_cash_f !== undefined && prevRec.closing_cash_f !== null) {
         previousClosingF = Number(prevRec.closing_cash_f);
       }
 
-      // 4. Query sales completed on this day to compute System Cash Sales and Cashier breakdown
-      const { data: salesData, error: salesErr } = await supabase
+      // 5. Query live & historical sales for that date + branch (using sold_at index)
+      let salesQuery = supabase
         .from('sales')
-        .select('id, total_amount, cashier_id, cashier_name, status, created_at, sale_payments(payment_method, amount)')
-        .eq('branch_id', branchId)
-        .gte('created_at', start)
-        .lte('created_at', end)
+        .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, status, sold_at, created_at, sale_payments(payment_method, amount)')
+        .gte('sold_at', start)
+        .lte('sold_at', end)
         .neq('status', 'VOIDED');
+      if (!isAllBranches) {
+        salesQuery = salesQuery.eq('branch_id', branchId);
+      }
 
+      const { data: salesData, error: salesErr } = await salesQuery;
       if (salesErr) {
         console.warn('[ReconciliationApi] sales query error:', salesErr.message);
       }
 
+      let totalCompletedBills = 0;
+      let totalGrossSales = 0;
       let systemCashSales = 0;
+      let systemCardSales = 0;
+      let systemQrSales = 0;
+      let systemCreditSales = 0;
       const cashierMap = new Map<string, CashierSalesSummary>();
 
       if (salesData && salesData.length > 0) {
         for (const s of salesData) {
+          totalCompletedBills++;
+          const tot = Number(s.total_amount) || 0;
+          totalGrossSales += tot;
+
           const payments = (s as any).sale_payments || [];
-          let saleCashAmt = 0;
+          let saleCash = 0;
+          let saleCard = 0;
+          let saleQr = 0;
+          let saleCredit = 0;
 
           if (payments.length > 0) {
             for (const p of payments) {
               const pm = (p.payment_method || '').toUpperCase();
-              if (pm.includes('CASH') || pm === 'CASH') {
-                saleCashAmt += Number(p.amount) || 0;
-              }
+              const pAmt = Number(p.amount) || 0;
+              if (pm === 'CASH') saleCash += pAmt;
+              else if (pm === 'CARD') saleCard += pAmt;
+              else if (pm === 'QR_PAYMENT') saleQr += pAmt;
+              else if (pm === 'CUSTOMER_CREDIT' || pm === 'STORE_CREDIT') saleCredit += pAmt;
+              else saleCash += pAmt;
             }
           } else {
-            // Default: if no separate payments row, assume cash
-            saleCashAmt = Number(s.total_amount) || 0;
+            saleCash = tot;
           }
 
-          if (saleCashAmt > 0) {
-            systemCashSales += saleCashAmt;
+          systemCashSales += saleCash;
+          systemCardSales += saleCard;
+          systemQrSales += saleQr;
+          systemCreditSales += saleCredit;
 
-            const cId = s.cashier_id || 'unassigned';
-            const cName = s.cashier_name || 'Terminal Cashier';
-            const existing = cashierMap.get(cId) || {
-              cashier_id: cId,
-              cashier_name: cName,
-              cash_sales: 0,
-              bill_count: 0,
-            };
-            existing.cash_sales += saleCashAmt;
-            existing.bill_count += 1;
-            cashierMap.set(cId, existing);
-          }
+          const cId = s.cashier_id || 'unassigned';
+          const cName = s.cashier_name || userMap.get(cId) || 'Terminal Cashier';
+          const existing = cashierMap.get(cId) || {
+            cashier_id: cId,
+            cashier_name: cName,
+            cash_sales: 0,
+            card_sales: 0,
+            qr_sales: 0,
+            credit_sales: 0,
+            total_sales: 0,
+            bill_count: 0,
+          };
+          existing.cash_sales += saleCash;
+          existing.card_sales = (existing.card_sales || 0) + saleCard;
+          existing.qr_sales = (existing.qr_sales || 0) + saleQr;
+          existing.credit_sales = (existing.credit_sales || 0) + saleCredit;
+          existing.total_sales = (existing.total_sales || 0) + tot;
+          existing.bill_count += 1;
+          cashierMap.set(cId, existing);
         }
       }
 
-      // 5. Query any recorded cash drawer pay-outs / cash expenses
+      // 6. Query cashier_shifts for that date + branch
+      let shiftQuery = supabase
+        .from('cashier_shifts')
+        .select('*')
+        .eq('shift_date', dateStr)
+        .order('shift_number', { ascending: true });
+      if (!isAllBranches) {
+        shiftQuery = shiftQuery.eq('branch_id', branchId);
+      }
+      const { data: shiftRows, error: shiftErr } = await shiftQuery;
+      if (shiftErr) {
+        console.warn('[ReconciliationApi] cashier_shifts error:', shiftErr.message);
+      }
+
+      const shifts: ShiftHandoverSummary[] = (shiftRows || []).map((sh: any) => ({
+        id: sh.id,
+        shift_number: Number(sh.shift_number) || 1,
+        shift_date: sh.shift_date,
+        cashier_id: sh.cashier_id,
+        cashier_name: userMap.get(sh.cashier_id) || sh.cashier_name || 'Staff Cashier',
+        branch_id: sh.branch_id,
+        branch_name: branchMap.get(sh.branch_id) || 'Main Branch',
+        status: sh.status || 'open',
+        started_at: sh.started_at,
+        ended_at: sh.ended_at,
+        pos_total_bills: Number(sh.pos_total_bills) || 0,
+        pos_cash_sales: Number(sh.pos_cash_sales) || 0,
+        pos_card_sales: Number(sh.pos_card_sales) || 0,
+        pos_qr_sales: Number(sh.pos_qr_sales) || 0,
+        pos_credit_sales: Number(sh.pos_credit_sales) || 0,
+        pos_gross_sales: Number(sh.pos_gross_sales) || 0,
+        opening_float: Number(sh.opening_float) || 0,
+        declared_shift_sale: Number(sh.declared_shift_sale) || 0,
+        total_cash_available: Number(sh.total_cash_available) || 0,
+        goods_purchased_paid: Number(sh.goods_purchased_paid) || 0,
+        other_expenses: Number(sh.other_expenses) || 0,
+        expected_cash_before_bank: Number(sh.expected_cash_before_bank) || 0,
+        counted_drawer_cash: Number(sh.counted_drawer_cash) || 0,
+        banked_amount: Number(sh.banked_amount) || 0,
+        closing_drawer_float: Number(sh.closing_drawer_float) || 0,
+        cash_variance: Number(sh.cash_variance) || 0,
+        denominations_json: (sh.denominations_json || {}) as Record<string, number>,
+        handover_notes: sh.handover_notes || null,
+      }));
+
+      // 7. Auto cash expenses (drawer events)
       let autoCashExpenses = 0;
       try {
-        const { data: drawerEvents } = await supabase
+        let drawerEventsQuery = supabase
           .from('cash_drawer_events')
           .select('amount, event_type, created_at')
           .eq('event_type', 'PAY_OUT')
           .gte('created_at', start)
           .lte('created_at', end);
-
+        if (!isAllBranches) {
+          drawerEventsQuery = drawerEventsQuery.eq('branch_id', branchId);
+        }
+        const { data: drawerEvents } = await drawerEventsQuery;
         if (drawerEvents && drawerEvents.length > 0) {
-          autoCashExpenses = drawerEvents.reduce((acc, ev) => acc + (Number(ev.amount) || 0), 0);
+          autoCashExpenses = drawerEvents.reduce((acc: number, ev: any) => acc + (Number(ev.amount) || 0), 0);
         }
       } catch (err) {
         console.warn('[ReconciliationApi] cash_drawer_events error:', err);
       }
 
+      // If shifts have other_expenses or goods_purchased_paid, combine them
+      if (shifts.length > 0) {
+        const shiftExpenses = shifts.reduce((acc, sh) => acc + sh.other_expenses + sh.goods_purchased_paid, 0);
+        if (shiftExpenses > autoCashExpenses) {
+          autoCashExpenses = shiftExpenses;
+        }
+      }
+
+      const isHistorical = !existingRec && shifts.length === 0 && totalCompletedBills > 0;
+
       return {
-        existingRec: existingRec as DailyCashReconciliationRecord | null,
+        existingRec,
         existingDeposits,
         previousClosingF,
         systemCashSales,
+        systemCardSales,
+        systemQrSales,
+        systemCreditSales,
+        totalGrossSales,
+        totalCompletedBills,
         autoCashExpenses,
         cashierBreakdown: Array.from(cashierMap.values()),
+        shifts,
+        isHistorical,
       };
     } catch (err) {
       console.error('[ReconciliationApi] loadReconciliationWorksheet error:', err);
@@ -379,8 +539,15 @@ export const reconciliationApi = {
         existingDeposits: [],
         previousClosingF: null,
         systemCashSales: 0,
+        systemCardSales: 0,
+        systemQrSales: 0,
+        systemCreditSales: 0,
+        totalGrossSales: 0,
+        totalCompletedBills: 0,
         autoCashExpenses: 0,
         cashierBreakdown: [],
+        shifts: [],
+        isHistorical: false,
       };
     }
   },
@@ -651,10 +818,7 @@ export const reconciliationApi = {
       const { data: recs, error } = await query;
       if (error) {
         console.warn('[ReconciliationApi] getReconciliationHistory error:', error.message);
-        return [];
       }
-
-      if (!recs || recs.length === 0) return [];
 
       // Fetch branches, users, and deposits for complete enrichment
       const [{ data: branches }, { data: users }, { data: deposits }] = await Promise.all([
@@ -684,7 +848,7 @@ export const reconciliationApi = {
         depositsMap.set(d.reconciliation_id, list);
       });
 
-      return recs.map((r: any) => ({
+      const existingRows: ConsolidatedReconciliationRow[] = (recs || []).map((r: any) => ({
         id: r.id,
         tenant_id: r.tenant_id,
         branch_id: r.branch_id,
@@ -707,6 +871,76 @@ export const reconciliationApi = {
         updated_at: r.updated_at,
         bank_deposits: depositsMap.get(r.id) || [],
       }));
+
+      // Check dates already present in existingRows
+      const existingDateBranchKeys = new Set(existingRows.map((r) => `${r.reconciliation_date}_${r.branch_id}`));
+
+      // Synthesize historical days from completed sales
+      let salesQuery = supabase
+        .from('sales')
+        .select('branch_id, total_amount, sold_at')
+        .neq('status', 'VOIDED');
+      if (params?.branchId && params.branchId !== 'ALL') {
+        salesQuery = salesQuery.eq('branch_id', params.branchId);
+      }
+      if (params?.startDate) {
+        salesQuery = salesQuery.gte('sold_at', `${params.startDate}T00:00:00+05:30`);
+      }
+      if (params?.endDate) {
+        salesQuery = salesQuery.lte('sold_at', `${params.endDate}T23:59:59.999+05:30`);
+      }
+      salesQuery = salesQuery.order('sold_at', { ascending: false }).limit(2000);
+
+      const { data: salesRows } = await salesQuery;
+
+      if (salesRows && salesRows.length > 0) {
+        const histMap = new Map<string, { date: string; branchId: string; totalCash: number; count: number }>();
+        for (const s of salesRows) {
+          const sDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Colombo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date(s.sold_at));
+
+          const bId = s.branch_id;
+          const key = `${sDate}_${bId}`;
+          if (existingDateBranchKeys.has(key)) continue;
+
+          const entry = histMap.get(key) || { date: sDate, branchId: bId, totalCash: 0, count: 0 };
+          entry.totalCash += Number(s.total_amount || 0);
+          entry.count += 1;
+          histMap.set(key, entry);
+        }
+
+        for (const [key, val] of histMap.entries()) {
+          existingRows.push({
+            id: `hist_${key}`,
+            tenant_id: '0fef1423-5d89-4147-8af8-17c7e641c88a',
+            branch_id: val.branchId,
+            branch_name: branchMap.get(val.branchId) || 'Main Branch',
+            reconciliation_date: val.date,
+            opening_float_a: 0,
+            cash_expenses_b: 0,
+            denominations: {},
+            physical_cash_c: val.totalCash,
+            actual_net_income_d: val.totalCash,
+            total_bank_deposits_e: 0,
+            closing_cash_f: val.totalCash,
+            system_cash_sales: val.totalCash,
+            variance_amount: 0,
+            status: 'balanced',
+            notes: `Historical System Ledger (${val.count} bills)`,
+            submitted_by: null,
+            submitter_name: 'Historical System Ledger',
+            created_at: `${val.date}T23:59:59Z`,
+            updated_at: `${val.date}T23:59:59Z`,
+            bank_deposits: [],
+          });
+        }
+      }
+
+      return existingRows.sort((a, b) => b.reconciliation_date.localeCompare(a.reconciliation_date));
     } catch (err) {
       console.error('[ReconciliationApi] getReconciliationHistory fatal:', err);
       return [];
