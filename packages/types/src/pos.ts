@@ -96,6 +96,7 @@ export interface CheckoutPayload {
   branchId: string;
   branchName?: string;
   registerId?: string;
+  shiftId?: string;
   cashierId?: string;
   cashierName?: string;
   customerId?: string;

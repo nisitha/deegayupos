@@ -32,15 +32,18 @@ import {
   Pencil,
   RotateCcw,
   MapPin,
+  PackageCheck,
+  LogOut,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi } from '../../../lib/api-client';
+import { posApi, shiftsApi, type CashierShiftDto } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
+import { ModakaStockInModal } from '../../../components/pos/modaka-stock-in-modal';
 import { DiscountPickerModal } from '../../../components/pos/discount-picker-modal';
 import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
 import { CashierSwitcherModal } from '../../../components/pos/cashier-switcher-modal';
@@ -150,6 +153,8 @@ export default function ConfidencyPosPage() {
   const [completedSale, setCompletedSale] = useState<SaleDto | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
+  const [isModakaStockInModalOpen, setIsModakaStockInModalOpen] = useState(false);
+  const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
 
   // Checkout & Payment Confirmation Modal State
@@ -182,7 +187,30 @@ export default function ConfidencyPosPage() {
   const cashierId = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
   const cashierName = activeCashier?.fullName || user?.fullName || 'Dr. Deegayu (Owner)';
   const registerCode = 'REG-01';
-  const openingFloat = 15000.0;
+  const [openingFloat, setOpeningFloat] = useState<number>(15000.0);
+
+  // Active Cashier Shift Lifecycle
+  const refreshActiveShift = useCallback(async () => {
+    if (!selectedBranchId) return;
+    const currentCashierId = activeCashier?.id || user?.id;
+    if (!currentCashierId) return;
+
+    try {
+      const res = await shiftsApi.getOrCreateActiveShift(selectedBranchId, currentCashierId, cashierName);
+      if (res.success && res.data) {
+        setActiveShift(res.data);
+        if (res.data.openingFloat > 0) {
+          setOpeningFloat(res.data.openingFloat);
+        }
+      }
+    } catch (err) {
+      console.warn('[POS] refreshActiveShift error:', err);
+    }
+  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName]);
+
+  useEffect(() => {
+    refreshActiveShift();
+  }, [refreshActiveShift]);
 
   // Instant 0ms Hydration via IndexedDB (< 15ms) + Decoupled Flat Background Sync
   const initCatalog = useCallback(async () => {
@@ -939,6 +967,7 @@ export default function ConfidencyPosPage() {
 
         const payload: CheckoutPayload = {
           branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+          shiftId: activeShift?.id || undefined,
           cashierId,
           cashierName,
           customerId: selectedCustomer?.id || undefined,
@@ -1202,7 +1231,10 @@ export default function ConfidencyPosPage() {
             </button>
             <div className="hidden xl:flex text-xs text-slate-500 font-medium whitespace-nowrap items-center shrink-0">
               <span>| Reg: {registerCode}</span>
-              <span className="hidden 2xl:inline"> | Shift: 8:30 AM</span>
+              <span className="hidden 2xl:inline">
+                {' '}
+                | Shift: {activeShift ? `Shift ${activeShift.shiftNumber}` : '8:30 AM'}
+              </span>
               <span className="hidden 2xl:inline">
                 {' '}
                 | Drawer: LKR {openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -1244,12 +1276,32 @@ export default function ConfidencyPosPage() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Catalog Ready</span>
             </div>
+
+            {/* Quick Modaka Stock In (B) Button */}
+            <button
+              type="button"
+              onClick={() => setIsModakaStockInModalOpen(true)}
+              className="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1.5"
+              title="Record incoming Modaka stock (B) received during this shift"
+            >
+              <PackageCheck className="w-3.5 h-3.5 text-amber-700" />
+              <span>Modaka Stock In (B)</span>
+            </button>
+
+            {/* End Shift (Shift Off) Button */}
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="border border-slate-200 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1.5"
+              title="Close shift, complete Modaka ledger, count cash, and hand over to next employee"
             >
-              End Shift
+              <LogOut className="w-3.5 h-3.5 text-purple-300" />
+              <span>End Shift</span>
+              {activeShift && (
+                <span className="bg-purple-500/40 text-purple-200 text-[10px] px-1.5 py-0.2 rounded-md font-mono">
+                  S{activeShift.shiftNumber}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -2447,16 +2499,28 @@ export default function ConfidencyPosPage() {
         />
       )}
 
+      {/* Modaka Stock In (B) Modal */}
+      <ModakaStockInModal
+        isOpen={isModakaStockInModalOpen}
+        onClose={() => setIsModakaStockInModalOpen(false)}
+        activeShift={activeShift}
+        onSuccess={() => {
+          refreshActiveShift();
+          setScanFeedback('Modaka incoming stock (B) updated.');
+          setTimeout(() => setScanFeedback(null), 3000);
+        }}
+      />
+
       {/* 2. End Shift Modal */}
       <ShiftEndModal
         isOpen={isEndShiftModalOpen}
         onClose={() => setIsEndShiftModalOpen(false)}
+        activeShift={activeShift}
+        branchName={currentBranchName}
         cashierName={cashierName}
-        registerCode={registerCode}
-        openingFloat={openingFloat}
-        totalSalesToday={totalAmount}
         onConfirmEndShift={() => {
-          setScanFeedback('Z-Report generated & Shift Ended.');
+          refreshActiveShift();
+          setScanFeedback('Shift Ended & Handover Completed.');
           setTimeout(() => setScanFeedback(null), 3000);
         }}
       />

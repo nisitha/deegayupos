@@ -230,31 +230,28 @@ export default function DashboardPage() {
           <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
             <button
               onClick={() => setPeriod('today')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                period === 'today'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${period === 'today'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900'
+                }`}
             >
               Today
             </button>
             <button
               onClick={() => setPeriod('week')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                period === 'week'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${period === 'week'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900'
+                }`}
             >
               7 Days
             </button>
             <button
               onClick={() => setPeriod('month')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                period === 'month'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${period === 'month'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900'
+                }`}
             >
               30 Days
             </button>
@@ -383,8 +380,8 @@ export default function DashboardPage() {
                 {period === 'today'
                   ? "Today's hourly revenue and net profit performance (07:00 - 22:00 Asia/Colombo)"
                   : period === 'week'
-                  ? '7-Day daily gross revenue and net profit performance (Asia/Colombo)'
-                  : '30-Day daily gross revenue and net profit performance (Asia/Colombo)'}
+                    ? '7-Day daily gross revenue and net profit performance (Asia/Colombo)'
+                    : '30-Day daily gross revenue and net profit performance (Asia/Colombo)'}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -399,10 +396,10 @@ export default function DashboardPage() {
 
           <div className="h-[290px] w-full mt-4">
             {isMounted &&
-            analytics &&
-            (analytics.billCount > 0 || (analytics.dailyTrend && analytics.dailyTrend.some((d) => d.sales > 0 || d.count > 0))) &&
-            analytics.dailyTrend &&
-            analytics.dailyTrend.length > 0 ? (
+              analytics &&
+              (analytics.billCount > 0 || (analytics.dailyTrend && analytics.dailyTrend.some((d) => d.sales > 0 || d.count > 0))) &&
+              analytics.dailyTrend &&
+              analytics.dailyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={analytics.dailyTrend}
@@ -815,9 +812,9 @@ export default function DashboardPage() {
                           <span className="font-mono text-[10px] text-slate-400">
                             {isMounted
                               ? new Date(act.createdAt).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
                               : '--:--'}
                           </span>
                         </div>

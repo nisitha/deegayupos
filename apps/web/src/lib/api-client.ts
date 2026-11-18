@@ -1083,6 +1083,7 @@ export const posApi = {
       .insert({
         tenant_id: tenantId,
         branch_id: branchId,
+        shift_id: isValidUuid(data.shiftId) ? data.shiftId : null,
         cashier_id: cashierId,
         cashier_name: cashierName,
         customer_id: validCustomerId,
@@ -3106,5 +3107,841 @@ export const incentivesApi = {
     }
   },
 };
+
+// ==========================================
+// 15. MULTI-SHIFT HANDOVER & MODAKA LEDGER API
+// ==========================================
+
+export interface ModakaItemConfigDto {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  sortOrder: number;
+  customRate: number;
+  isActive: boolean;
+  updatedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiftModakaEntryDto {
+  id?: string;
+  shiftId: string;
+  branchId: string;
+  productId: string;
+  productName?: string;
+  productSku?: string;
+  openingQty: number; // A
+  inQty: number; // B
+  totalAvailableQty: number; // C = A + B
+  soldQty: number; // D
+  closingQty: number; // E = C - D
+  appliedRate: number;
+  totalAmount: number; // F = D * appliedRate
+}
+
+export interface CashierShiftDto {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  branchName?: string;
+  cashierId: string;
+  cashierName?: string;
+  shiftDate: string; // YYYY-MM-DD
+  shiftNumber: number; // 1 or 2
+  startedAt: string;
+  endedAt?: string | null;
+  status: 'open' | 'closed';
+  posTotalBills: number;
+  posVoidedBills: number;
+  posCashSales: number;
+  posCardSales: number;
+  posQrSales: number;
+  posCreditSales: number;
+  posGrossSales: number;
+  modakaTotalSoldQty: number;
+  modakaTotalAmount: number;
+  openingFloat: number;
+  declaredShiftSale: number;
+  totalCashAvailable: number;
+  goodsPurchasedPaid: number;
+  otherExpenses: number;
+  expectedCashBeforeBank: number;
+  countedDrawerCash: number;
+  denominationsJson: Record<string, number>;
+  bankedAmount: number;
+  closingDrawerFloat: number;
+  cashVariance: number;
+  handoverNotes?: string | null;
+  modakaEntries?: ShiftModakaEntryDto[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EndShiftPayload {
+  shiftId: string;
+  branchId: string;
+  cashierId: string;
+  openingFloat: number;
+  declaredShiftSale: number;
+  goodsPurchasedPaid: number;
+  otherExpenses: number;
+  countedDrawerCash: number;
+  denominationsJson: Record<string, number>;
+  bankedAmount: number;
+  bankAccountDetails?: string;
+  closingDrawerFloat: number;
+  handoverNotes?: string;
+  modakaEntries: {
+    productId: string;
+    openingQty: number;
+    inQty: number;
+    soldQty: number;
+    appliedRate: number;
+  }[];
+}
+
+function getSriLankaDateStr(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Colombo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+export const shiftsApi = {
+  getModakaConfigs: async (): Promise<ApiResponse<ModakaItemConfigDto[]>> => {
+    try {
+      const { data, error } = await supabase
+        .from('modaka_item_configs')
+        .select(`
+          id,
+          tenant_id,
+          product_id,
+          sort_order,
+          custom_rate,
+          is_active,
+          updated_by,
+          created_at,
+          updated_at,
+          products (id, name, sku)
+        `)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.warn('[shiftsApi] getModakaConfigs error:', error.message);
+        return { success: false, data: [] };
+      }
+
+      const list: ModakaItemConfigDto[] = (data || []).map((row: any) => ({
+        id: row.id,
+        tenantId: row.tenant_id,
+        productId: row.product_id,
+        productName: row.products?.name || 'Modaka Item',
+        productSku: row.products?.sku || '',
+        sortOrder: row.sort_order,
+        customRate: Number(row.custom_rate || 250),
+        isActive: row.is_active ?? true,
+        updatedBy: row.updated_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+      return { success: true, data: list };
+    } catch (err: any) {
+      console.error('[shiftsApi] getModakaConfigs fatal:', err);
+      return { success: false, data: [] };
+    }
+  },
+
+  updateModakaConfigs: async (
+    configs: { id?: string; productId: string; sortOrder: number; customRate: number; isActive?: boolean }[]
+  ): Promise<ApiResponse<boolean>> => {
+    try {
+      for (const cfg of configs) {
+        if (cfg.id) {
+          await supabase
+            .from('modaka_item_configs')
+            .update({
+              custom_rate: cfg.customRate,
+              sort_order: cfg.sortOrder,
+              is_active: cfg.isActive ?? true,
+              product_id: cfg.productId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', cfg.id);
+        } else {
+          await supabase
+            .from('modaka_item_configs')
+            .insert({
+              product_id: cfg.productId,
+              sort_order: cfg.sortOrder,
+              custom_rate: cfg.customRate,
+              is_active: cfg.isActive ?? true,
+            });
+        }
+      }
+      return { success: true, data: true };
+    } catch (err: any) {
+      return { success: false, data: false, error: { code: 'UPDATE_ERROR', message: err.message, statusCode: 500 } };
+    }
+  },
+
+  getActiveShift: async (
+    branchId: string,
+    cashierId: string,
+    cashierName?: string
+  ): Promise<ApiResponse<CashierShiftDto | null>> => {
+    try {
+      if (!isValidUuid(branchId) || !isValidUuid(cashierId)) {
+        return { success: false, data: null };
+      }
+
+      const { data: openShift, error: findErr } = await supabase
+        .from('cashier_shifts')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('cashier_id', cashierId)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (findErr || !openShift) {
+        return { success: true, data: null };
+      }
+
+      // Fetch configs
+      const configsRes = await shiftsApi.getModakaConfigs();
+      const activeConfigs = (configsRes.data || []).filter((c) => c.isActive);
+
+      // Fetch existing entries
+      const { data: entries } = await supabase
+        .from('shift_modaka_entries')
+        .select('*, products(name, sku)')
+        .eq('shift_id', openShift.id);
+
+      const entryMap = new Map<string, any>();
+      (entries || []).forEach((e: any) => entryMap.set(e.product_id, e));
+
+      const finalEntries: ShiftModakaEntryDto[] = [];
+      const missingEntries: any[] = [];
+
+      for (const cfg of activeConfigs) {
+        const existing = entryMap.get(cfg.productId);
+        if (existing) {
+          finalEntries.push({
+            id: existing.id,
+            shiftId: openShift.id,
+            branchId: openShift.branch_id,
+            productId: existing.product_id,
+            productName: existing.products?.name || cfg.productName,
+            productSku: existing.products?.sku || cfg.productSku,
+            openingQty: Number(existing.opening_qty || 0),
+            inQty: Number(existing.in_qty || 0),
+            totalAvailableQty: Number(existing.total_available_qty || 0),
+            soldQty: Number(existing.sold_qty || 0),
+            closingQty: Number(existing.closing_qty || 0),
+            appliedRate: Number(existing.applied_rate || cfg.customRate),
+            totalAmount: Number(existing.total_amount || 0),
+          });
+        } else {
+          const newRow = {
+            tenant_id: openShift.tenant_id,
+            shift_id: openShift.id,
+            branch_id: openShift.branch_id,
+            product_id: cfg.productId,
+            opening_qty: 0,
+            in_qty: 0,
+            total_available_qty: 0,
+            sold_qty: 0,
+            closing_qty: 0,
+            applied_rate: cfg.customRate,
+            total_amount: 0,
+          };
+          missingEntries.push(newRow);
+          finalEntries.push({
+            shiftId: openShift.id,
+            branchId: openShift.branch_id,
+            productId: cfg.productId,
+            productName: cfg.productName,
+            productSku: cfg.productSku,
+            openingQty: 0,
+            inQty: 0,
+            totalAvailableQty: 0,
+            soldQty: 0,
+            closingQty: 0,
+            appliedRate: cfg.customRate,
+            totalAmount: 0,
+          });
+        }
+      }
+
+      if (missingEntries.length > 0) {
+        await supabase.from('shift_modaka_entries').insert(missingEntries);
+      }
+
+      // Live POS sales calculation
+      const { data: shiftSales } = await supabase
+        .from('sales')
+        .select('id, total_amount, paid_amount, status, sale_payments(payment_method, amount)')
+        .or(`shift_id.eq.${openShift.id},and(branch_id.eq.${branchId},cashier_id.eq.${cashierId},created_at.gte.${openShift.started_at})`);
+
+      let posBills = 0;
+      let posGross = 0;
+      let posCash = 0;
+      let posCard = 0;
+      let posQr = 0;
+      let posCredit = 0;
+
+      (shiftSales || []).forEach((s: any) => {
+        if (s.status === 'COMPLETED') {
+          posBills += 1;
+          posGross += Number(s.total_amount || 0);
+          if (s.sale_payments && s.sale_payments.length > 0) {
+            s.sale_payments.forEach((p: any) => {
+              const amt = Number(p.amount || 0);
+              if (p.payment_method === 'CASH') posCash += amt;
+              else if (p.payment_method === 'CARD') posCard += amt;
+              else if (p.payment_method === 'QR_PAYMENT') posQr += amt;
+              else if (p.payment_method === 'STORE_CREDIT' || p.payment_method === 'CUSTOMER_CREDIT') posCredit += amt;
+              else posCash += amt;
+            });
+          } else {
+            posCash += Number(s.paid_amount || s.total_amount || 0);
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          id: openShift.id,
+          tenantId: openShift.tenant_id,
+          branchId: openShift.branch_id,
+          cashierId: openShift.cashier_id,
+          cashierName,
+          shiftDate: openShift.shift_date,
+          shiftNumber: openShift.shift_number || 1,
+          startedAt: openShift.started_at,
+          endedAt: openShift.ended_at,
+          status: 'open',
+          posTotalBills: posBills,
+          posVoidedBills: openShift.pos_voided_bills || 0,
+          posCashSales: posCash,
+          posCardSales: posCard,
+          posQrSales: posQr,
+          posCreditSales: posCredit,
+          posGrossSales: posGross,
+          modakaTotalSoldQty: Number(openShift.modaka_total_sold_qty || 0),
+          modakaTotalAmount: Number(openShift.modaka_total_amount || 0),
+          openingFloat: Number(openShift.opening_float || 0),
+          declaredShiftSale: Number(openShift.declared_shift_sale || posCash),
+          totalCashAvailable: Number(openShift.total_cash_available || (Number(openShift.opening_float || 0) + posCash)),
+          goodsPurchasedPaid: Number(openShift.goods_purchased_paid || 0),
+          otherExpenses: Number(openShift.other_expenses || 0),
+          expectedCashBeforeBank: Number(openShift.expected_cash_before_bank || 0),
+          countedDrawerCash: Number(openShift.counted_drawer_cash || 0),
+          denominationsJson: openShift.denominations_json || {},
+          bankedAmount: Number(openShift.banked_amount || 0),
+          closingDrawerFloat: Number(openShift.closing_drawer_float || 0),
+          cashVariance: Number(openShift.cash_variance || 0),
+          handoverNotes: openShift.handover_notes,
+          modakaEntries: finalEntries,
+          createdAt: openShift.created_at,
+        },
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] getActiveShift fatal:', err);
+      return { success: false, data: null };
+    }
+  },
+
+  getOrCreateActiveShift: async (
+    branchId: string,
+    cashierId: string,
+    cashierName?: string
+  ): Promise<ApiResponse<CashierShiftDto>> => {
+    try {
+      // 1. Try get active shift
+      const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName);
+      if (active.success && active.data) {
+        return { success: true, data: active.data };
+      }
+
+      // 2. Start a new shift
+      const todayDate = getSriLankaDateStr();
+
+      // Check how many shifts exist today for this branch
+      const { count } = await supabase
+        .from('cashier_shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('branch_id', branchId)
+        .eq('shift_date', todayDate);
+
+      const shiftNumber = (count || 0) + 1;
+
+      // Find previous closed shift for this branch
+      const { data: prevShift } = await supabase
+        .from('cashier_shifts')
+        .select('id, closing_drawer_float')
+        .eq('branch_id', branchId)
+        .eq('status', 'closed')
+        .order('ended_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const carriedOpeningFloat = Number(prevShift?.closing_drawer_float || 0);
+
+      // Previous shift's modaka closing stock
+      const prevClosingMap = new Map<string, number>();
+      if (prevShift?.id) {
+        const { data: prevEntries } = await supabase
+          .from('shift_modaka_entries')
+          .select('product_id, closing_qty')
+          .eq('shift_id', prevShift.id);
+        (prevEntries || []).forEach((e: any) => {
+          prevClosingMap.set(e.product_id, Number(e.closing_qty || 0));
+        });
+      }
+
+      let tenantId = DEEGAYU_TENANT_ID;
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('pixelcraft_tenant_id');
+        if (isValidUuid(stored)) tenantId = stored!;
+      }
+
+      const { data: newShift, error: createErr } = await supabase
+        .from('cashier_shifts')
+        .insert({
+          tenant_id: tenantId,
+          branch_id: branchId,
+          cashier_id: cashierId,
+          shift_date: todayDate,
+          shift_number: shiftNumber,
+          started_at: new Date().toISOString(),
+          status: 'open',
+          opening_float: carriedOpeningFloat,
+        })
+        .select()
+        .single();
+
+      if (createErr || !newShift) {
+        console.error('[shiftsApi] create shift failed:', createErr);
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INSERT_ERROR', message: createErr?.message || 'Failed to create shift', statusCode: 500 },
+        };
+      }
+
+      // Seed Modaka entries
+      const configsRes = await shiftsApi.getModakaConfigs();
+      const activeConfigs = (configsRes.data || []).filter((c) => c.isActive);
+
+      const entriesToInsert = activeConfigs.map((cfg) => {
+        const opening = prevClosingMap.get(cfg.productId) || 0;
+        return {
+          tenant_id: tenantId,
+          shift_id: newShift.id,
+          branch_id: branchId,
+          product_id: cfg.productId,
+          opening_qty: opening,
+          in_qty: 0,
+          total_available_qty: opening,
+          sold_qty: 0,
+          closing_qty: opening,
+          applied_rate: cfg.customRate,
+          total_amount: 0,
+        };
+      });
+
+      if (entriesToInsert.length > 0) {
+        await supabase.from('shift_modaka_entries').insert(entriesToInsert);
+      }
+
+      const formattedEntries: ShiftModakaEntryDto[] = activeConfigs.map((cfg) => {
+        const opening = prevClosingMap.get(cfg.productId) || 0;
+        return {
+          shiftId: newShift.id,
+          branchId,
+          productId: cfg.productId,
+          productName: cfg.productName,
+          productSku: cfg.productSku,
+          openingQty: opening,
+          inQty: 0,
+          totalAvailableQty: opening,
+          soldQty: 0,
+          closingQty: opening,
+          appliedRate: cfg.customRate,
+          totalAmount: 0,
+        };
+      });
+
+      return {
+        success: true,
+        data: {
+          id: newShift.id,
+          tenantId: newShift.tenant_id,
+          branchId: newShift.branch_id,
+          cashierId: newShift.cashier_id,
+          cashierName,
+          shiftDate: newShift.shift_date,
+          shiftNumber: newShift.shift_number,
+          startedAt: newShift.started_at,
+          status: 'open',
+          posTotalBills: 0,
+          posVoidedBills: 0,
+          posCashSales: 0,
+          posCardSales: 0,
+          posQrSales: 0,
+          posCreditSales: 0,
+          posGrossSales: 0,
+          modakaTotalSoldQty: 0,
+          modakaTotalAmount: 0,
+          openingFloat: carriedOpeningFloat,
+          declaredShiftSale: 0,
+          totalCashAvailable: carriedOpeningFloat,
+          goodsPurchasedPaid: 0,
+          otherExpenses: 0,
+          expectedCashBeforeBank: carriedOpeningFloat,
+          countedDrawerCash: 0,
+          denominationsJson: {},
+          bankedAmount: 0,
+          closingDrawerFloat: 0,
+          cashVariance: 0,
+          modakaEntries: formattedEntries,
+          createdAt: newShift.created_at,
+        },
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] getOrCreateActiveShift fatal:', err);
+      return {
+        success: false,
+        data: null as any,
+        error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
+  recordModakaStockIn: async (
+    shiftId: string,
+    entries: { productId: string; inQty: number }[]
+  ): Promise<ApiResponse<boolean>> => {
+    try {
+      for (const e of entries) {
+        if (Number(e.inQty) <= 0) continue;
+        const { data: current } = await supabase
+          .from('shift_modaka_entries')
+          .select('opening_qty, in_qty, sold_qty, applied_rate')
+          .eq('shift_id', shiftId)
+          .eq('product_id', e.productId)
+          .maybeSingle();
+
+        const open = Number(current?.opening_qty || 0);
+        const newIn = Number(current?.in_qty || 0) + Number(e.inQty || 0);
+        const totalAvail = open + newIn;
+        const sold = Number(current?.sold_qty || 0);
+        const closing = totalAvail - sold;
+        const rate = Number(current?.applied_rate || 250);
+        const amt = sold * rate;
+
+        await supabase
+          .from('shift_modaka_entries')
+          .update({
+            in_qty: newIn,
+            total_available_qty: totalAvail,
+            closing_qty: closing,
+            total_amount: amt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('shift_id', shiftId)
+          .eq('product_id', e.productId);
+      }
+      return { success: true, data: true };
+    } catch (err: any) {
+      return { success: false, data: false, error: { code: 'UPDATE_ERROR', message: err.message, statusCode: 500 } };
+    }
+  },
+
+  closeShiftHandover: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
+    try {
+      // 1. Fetch live sales for this shift
+      const { data: shiftSales } = await supabase
+        .from('sales')
+        .select('id, total_amount, paid_amount, status, sale_payments(payment_method, amount)')
+        .eq('shift_id', payload.shiftId);
+
+      let posBills = 0;
+      let posVoided = 0;
+      let posGross = 0;
+      let posCash = 0;
+      let posCard = 0;
+      let posQr = 0;
+      let posCredit = 0;
+
+      (shiftSales || []).forEach((s: any) => {
+        if (s.status === 'COMPLETED') {
+          posBills += 1;
+          posGross += Number(s.total_amount || 0);
+          if (s.sale_payments && s.sale_payments.length > 0) {
+            s.sale_payments.forEach((p: any) => {
+              const amt = Number(p.amount || 0);
+              if (p.payment_method === 'CASH') posCash += amt;
+              else if (p.payment_method === 'CARD') posCard += amt;
+              else if (p.payment_method === 'QR_PAYMENT') posQr += amt;
+              else if (p.payment_method === 'STORE_CREDIT' || p.payment_method === 'CUSTOMER_CREDIT') posCredit += amt;
+              else posCash += amt;
+            });
+          } else {
+            posCash += Number(s.paid_amount || s.total_amount || 0);
+          }
+        } else if (s.status === 'VOIDED') {
+          posVoided += 1;
+        }
+      });
+
+      // 2. Modaka calculations
+      let modakaTotalSoldQty = 0;
+      let modakaTotalAmount = 0;
+
+      for (const item of payload.modakaEntries) {
+        const open = Number(item.openingQty || 0);
+        const inQ = Number(item.inQty || 0);
+        const totalAvail = open + inQ;
+        const sold = Number(item.soldQty || 0);
+        const closing = totalAvail - sold;
+        const rate = Number(item.appliedRate || 0);
+        const amt = sold * rate;
+
+        modakaTotalSoldQty += sold;
+        modakaTotalAmount += amt;
+
+        await supabase
+          .from('shift_modaka_entries')
+          .upsert({
+            shift_id: payload.shiftId,
+            branch_id: payload.branchId,
+            product_id: item.productId,
+            opening_qty: open,
+            in_qty: inQ,
+            total_available_qty: totalAvail,
+            sold_qty: sold,
+            closing_qty: closing,
+            applied_rate: rate,
+            total_amount: amt,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'shift_id,product_id' });
+      }
+
+      // 3. Cash & Expense Summary calculations
+      const openingFloat = Number(payload.openingFloat || 0);
+      const declaredShiftSale = Number(payload.declaredShiftSale || 0);
+      const totalCashAvailable = openingFloat + declaredShiftSale;
+      const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
+      const otherExpenses = Number(payload.otherExpenses || 0);
+      const expectedCashBeforeBank = totalCashAvailable - goodsPurchasedPaid - otherExpenses;
+      const countedDrawerCash = Number(payload.countedDrawerCash || 0);
+      const cashVariance = countedDrawerCash - expectedCashBeforeBank;
+      const bankedAmount = Number(payload.bankedAmount || 0);
+      const closingDrawerFloat = countedDrawerCash - bankedAmount;
+
+      const formattedNotes = [
+        payload.handoverNotes?.trim(),
+        payload.bankAccountDetails && bankedAmount > 0
+          ? `[Bank Deposit: LKR ${bankedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} deposited to ${payload.bankAccountDetails}]`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const { data: updatedShift, error: updateErr } = await supabase
+        .from('cashier_shifts')
+        .update({
+          status: 'closed',
+          ended_at: new Date().toISOString(),
+          pos_total_bills: posBills,
+          pos_voided_bills: posVoided,
+          pos_cash_sales: posCash,
+          pos_card_sales: posCard,
+          pos_qr_sales: posQr,
+          pos_credit_sales: posCredit,
+          pos_gross_sales: posGross,
+          modaka_total_sold_qty: modakaTotalSoldQty,
+          modaka_total_amount: modakaTotalAmount,
+          opening_float: openingFloat,
+          declared_shift_sale: declaredShiftSale,
+          total_cash_available: totalCashAvailable,
+          goods_purchased_paid: goodsPurchasedPaid,
+          other_expenses: otherExpenses,
+          expected_cash_before_bank: expectedCashBeforeBank,
+          counted_drawer_cash: countedDrawerCash,
+          denominations_json: payload.denominationsJson || {},
+          banked_amount: bankedAmount,
+          closing_drawer_float: closingDrawerFloat,
+          cash_variance: cashVariance,
+          handover_notes: formattedNotes || null,
+        })
+        .eq('id', payload.shiftId)
+        .select()
+        .single();
+
+      if (updateErr) {
+        console.error('[shiftsApi] update cashier_shifts error:', updateErr);
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'UPDATE_ERROR', message: updateErr.message, statusCode: 500 },
+        };
+      }
+
+      return {
+        success: true,
+        data: updatedShift,
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] closeShiftHandover fatal:', err);
+      return {
+        success: false,
+        data: null as any,
+        error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
+  getShiftLedgers: async (params?: {
+    branchId?: string;
+    shiftDate?: string;
+    cashierId?: string;
+  }): Promise<ApiResponse<CashierShiftDto[]>> => {
+    try {
+      let query = supabase
+        .from('cashier_shifts')
+        .select(`
+          *,
+          branches (id, name, code)
+        `)
+        .order('shift_date', { ascending: false })
+        .order('shift_number', { ascending: true });
+
+      if (params?.branchId && params.branchId !== 'all') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params?.shiftDate) {
+        query = query.eq('shift_date', params.shiftDate);
+      }
+      if (params?.cashierId && params.cashierId !== 'all') {
+        query = query.eq('cashier_id', params.cashierId);
+      }
+
+      const [{ data: shifts, error: shiftsErr }, { data: users }, { data: allModakaEntries }] = await Promise.all([
+        query,
+        supabase.from('users').select('id, full_name, email'),
+        supabase.from('shift_modaka_entries').select('*, products(name, sku)'),
+      ]);
+
+      if (shiftsErr) {
+        console.warn('[shiftsApi] getShiftLedgers error:', shiftsErr.message);
+        return { success: false, data: [] };
+      }
+
+      const userMap = new Map<string, string>();
+      (users || []).forEach((u: any) => userMap.set(u.id, u.full_name || u.email));
+
+      const entriesByShiftId = new Map<string, ShiftModakaEntryDto[]>();
+      (allModakaEntries || []).forEach((e: any) => {
+        const list = entriesByShiftId.get(e.shift_id) || [];
+        list.push({
+          id: e.id,
+          shiftId: e.shift_id,
+          branchId: e.branch_id,
+          productId: e.product_id,
+          productName: e.products?.name || 'Modaka Item',
+          productSku: e.products?.sku || '',
+          openingQty: Number(e.opening_qty || 0),
+          inQty: Number(e.in_qty || 0),
+          totalAvailableQty: Number(e.total_available_qty || 0),
+          soldQty: Number(e.sold_qty || 0),
+          closingQty: Number(e.closing_qty || 0),
+          appliedRate: Number(e.applied_rate || 250),
+          totalAmount: Number(e.total_amount || 0),
+        });
+        entriesByShiftId.set(e.shift_id, list);
+      });
+
+      const result: CashierShiftDto[] = (shifts || []).map((s: any) => ({
+        id: s.id,
+        tenantId: s.tenant_id,
+        branchId: s.branch_id,
+        branchName: s.branches?.name || 'Branch',
+        cashierId: s.cashier_id,
+        cashierName: userMap.get(s.cashier_id) || 'Staff Cashier',
+        shiftDate: s.shift_date,
+        shiftNumber: s.shift_number || 1,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+        status: s.status as 'open' | 'closed',
+        posTotalBills: s.pos_total_bills || 0,
+        posVoidedBills: s.pos_voided_bills || 0,
+        posCashSales: Number(s.pos_cash_sales || 0),
+        posCardSales: Number(s.pos_card_sales || 0),
+        posQrSales: Number(s.pos_qr_sales || 0),
+        posCreditSales: Number(s.pos_credit_sales || 0),
+        posGrossSales: Number(s.pos_gross_sales || 0),
+        modakaTotalSoldQty: Number(s.modaka_total_sold_qty || 0),
+        modakaTotalAmount: Number(s.modaka_total_amount || 0),
+        openingFloat: Number(s.opening_float || 0),
+        declaredShiftSale: Number(s.declared_shift_sale || 0),
+        totalCashAvailable: Number(s.total_cash_available || 0),
+        goodsPurchasedPaid: Number(s.goods_purchased_paid || 0),
+        otherExpenses: Number(s.other_expenses || 0),
+        expectedCashBeforeBank: Number(s.expected_cash_before_bank || 0),
+        countedDrawerCash: Number(s.counted_drawer_cash || 0),
+        denominationsJson: s.denominations_json || {},
+        bankedAmount: Number(s.banked_amount || 0),
+        closingDrawerFloat: Number(s.closing_drawer_float || 0),
+        cashVariance: Number(s.cash_variance || 0),
+        handoverNotes: s.handover_notes,
+        modakaEntries: entriesByShiftId.get(s.id) || [],
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+      }));
+
+      return { success: true, data: result };
+    } catch (err: any) {
+      console.error('[shiftsApi] getShiftLedgers fatal:', err);
+      return { success: false, data: [] };
+    }
+  },
+
+  getCompanyBankAccounts: async (): Promise<ApiResponse<{ id: string; bankName: string; accountNumber: string; accountName: string; branchName?: string }[]>> => {
+    try {
+      const { data, error } = await supabase
+        .from('company_bank_accounts')
+        .select('id, bank_name, account_number, account_name, branch_name')
+        .eq('is_active', true);
+
+      if (error) {
+        return { success: false, data: [] };
+      }
+
+      const list = (data || []).map((b: any) => ({
+        id: b.id,
+        bankName: b.bank_name,
+        accountNumber: b.account_number,
+        accountName: b.account_name,
+        branchName: b.branch_name,
+      }));
+
+      return { success: true, data: list };
+    } catch {
+      return { success: false, data: [] };
+    }
+  },
+};
+
 
 

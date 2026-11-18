@@ -266,6 +266,9 @@ model Business {
   dailyAccountsLedgers     DailyAccountsLedger[]
   companyBankAccounts      CompanyBankAccount[]
   staffIncentives          StaffIncentive[]
+  modakaItemConfigs        ModakaItemConfig[]
+  cashierShifts            CashierShift[]
+  shiftModakaEntries       ShiftModakaEntry[]
 
   @@index([slug])
   @@index([status])
@@ -361,6 +364,8 @@ model Branch {
   cashierShortages         CashierShortage[]
   dailyAccountsLedgers     DailyAccountsLedger[]
   staffIncentives          StaffIncentive[]
+  cashierShifts            CashierShift[]
+  shiftModakaEntries       ShiftModakaEntry[]
 
   @@unique([tenantId, code])
   @@index([tenantId, id])
@@ -451,6 +456,7 @@ model User {
   cashierShortages         CashierShortage[]
   staffIncentives          StaffIncentive[]          @relation("UserStaffIncentives")
   createdIncentives        StaffIncentive[]          @relation("UserCreatedIncentives")
+  posCashierShifts         CashierShift[]
 
   @@index([email])
   @@map("users")
@@ -727,6 +733,8 @@ model Product {
   stockTransferItems   StockTransferItem[]
   purchaseOrderItems   PurchaseOrderItem[]
   grnItems             GoodsReceivedNoteItem[]
+  modakaItemConfig     ModakaItemConfig?
+  shiftModakaEntries   ShiftModakaEntry[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -1468,6 +1476,99 @@ model StaffIncentive {
   @@index([incentiveDate])
   @@index([status])
   @@map("staff_incentives")
+}
+
+// ==========================================
+// 12. MULTI-SHIFT HANDOVER & MODAKA LEDGER
+// ==========================================
+
+model ModakaItemConfig {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @default("0fef1423-5d89-4147-8af8-17c7e641c88a") @map("tenant_id") @db.Uuid
+  productId  String   @unique @map("product_id") @db.Uuid
+  sortOrder  Int      @default(1) @map("sort_order")
+  customRate Decimal  @default(250.00) @map("custom_rate") @db.Decimal(12, 2)
+  isActive   Boolean  @default(true) @map("is_active")
+  updatedBy  String?  @map("updated_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  business Business @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sortOrder])
+  @@map("modaka_item_configs")
+}
+
+model CashierShift {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tenantId               String    @default("0fef1423-5d89-4147-8af8-17c7e641c88a") @map("tenant_id") @db.Uuid
+  branchId               String    @map("branch_id") @db.Uuid
+  cashierId              String    @map("cashier_id") @db.Uuid
+  shiftDate              DateTime  @default(now()) @map("shift_date") @db.Date
+  shiftNumber            Int       @default(1) @map("shift_number")
+  startedAt              DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  endedAt                DateTime? @map("ended_at") @db.Timestamptz
+  status                 String    @default("open")
+  posTotalBills          Int       @default(0) @map("pos_total_bills")
+  posVoidedBills         Int       @default(0) @map("pos_voided_bills")
+  posCashSales           Decimal   @default(0.00) @map("pos_cash_sales") @db.Decimal(12, 2)
+  posCardSales           Decimal   @default(0.00) @map("pos_card_sales") @db.Decimal(12, 2)
+  posQrSales             Decimal   @default(0.00) @map("pos_qr_sales") @db.Decimal(12, 2)
+  posCreditSales         Decimal   @default(0.00) @map("pos_credit_sales") @db.Decimal(12, 2)
+  posGrossSales          Decimal   @default(0.00) @map("pos_gross_sales") @db.Decimal(12, 2)
+  modakaTotalSoldQty     Decimal   @default(0.00) @map("modaka_total_sold_qty") @db.Decimal(12, 2)
+  modakaTotalAmount      Decimal   @default(0.00) @map("modaka_total_amount") @db.Decimal(12, 2)
+  openingFloat           Decimal   @default(0.00) @map("opening_float") @db.Decimal(12, 2)
+  declaredShiftSale      Decimal   @default(0.00) @map("declared_shift_sale") @db.Decimal(12, 2)
+  totalCashAvailable     Decimal   @default(0.00) @map("total_cash_available") @db.Decimal(12, 2)
+  goodsPurchasedPaid     Decimal   @default(0.00) @map("goods_purchased_paid") @db.Decimal(12, 2)
+  otherExpenses          Decimal   @default(0.00) @map("other_expenses") @db.Decimal(12, 2)
+  expectedCashBeforeBank Decimal   @default(0.00) @map("expected_cash_before_bank") @db.Decimal(12, 2)
+  countedDrawerCash      Decimal   @default(0.00) @map("counted_drawer_cash") @db.Decimal(12, 2)
+  denominationsJson      Json      @default("{}") @map("denominations_json") @db.JsonB
+  bankedAmount           Decimal   @default(0.00) @map("banked_amount") @db.Decimal(12, 2)
+  closingDrawerFloat     Decimal   @default(0.00) @map("closing_drawer_float") @db.Decimal(12, 2)
+  cashVariance           Decimal   @default(0.00) @map("cash_variance") @db.Decimal(12, 2)
+  handoverNotes          String?   @map("handover_notes") @db.Text
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  business      Business           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  cashier       User               @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  modakaEntries ShiftModakaEntry[]
+
+  @@index([tenantId, branchId, shiftDate])
+  @@index([tenantId, cashierId, status])
+  @@map("cashier_shifts")
+}
+
+model ShiftModakaEntry {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @default("0fef1423-5d89-4147-8af8-17c7e641c88a") @map("tenant_id") @db.Uuid
+  shiftId           String   @map("shift_id") @db.Uuid
+  branchId          String   @map("branch_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  openingQty        Decimal  @default(0.00) @map("opening_qty") @db.Decimal(12, 2)
+  inQty             Decimal  @default(0.00) @map("in_qty") @db.Decimal(12, 2)
+  totalAvailableQty Decimal  @default(0.00) @map("total_available_qty") @db.Decimal(12, 2)
+  soldQty           Decimal  @default(0.00) @map("sold_qty") @db.Decimal(12, 2)
+  closingQty        Decimal  @default(0.00) @map("closing_qty") @db.Decimal(12, 2)
+  appliedRate       Decimal  @default(250.00) @map("applied_rate") @db.Decimal(12, 2)
+  totalAmount       Decimal  @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  business Business     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shift    CashierShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  branch   Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product  Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, productId])
+  @@index([tenantId, shiftId])
+  @@index([tenantId, branchId, productId])
+  @@map("shift_modaka_entries")
 }
 
 
