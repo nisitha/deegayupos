@@ -1098,6 +1098,7 @@ export const posApi = {
         paid_amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
         change_due: Number(data.changeDue || 0),
         notes: data.notes || null,
+        sold_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -1609,66 +1610,22 @@ export const posApi = {
         }
       }
 
-      // 1. Fast Summary Query (calculates accurate KPIs across ALL matching records)
-      let summaryQuery = supabase.from('sales').select('status, total_amount');
-      if (bounds.from) summaryQuery = summaryQuery.gte('created_at', bounds.from);
-      if (bounds.to) summaryQuery = summaryQuery.lte('created_at', bounds.to);
-      if (params.branchId && params.branchId !== 'ALL') {
-        summaryQuery = summaryQuery.eq('branch_id', params.branchId);
-      }
-      if (params.status && params.status !== 'ALL') {
-        summaryQuery = summaryQuery.eq('status', params.status);
-      }
-      if (params.cashierId && params.cashierId !== 'ALL') {
-        summaryQuery = summaryQuery.eq('cashier_id', params.cashierId);
-      } else if (params.cashierName && params.cashierName !== 'ALL') {
-        summaryQuery = summaryQuery.eq('cashier_name', params.cashierName);
-      }
-      if (params.search && params.search.trim()) {
-        const term = params.search.trim();
-        summaryQuery = summaryQuery.or(
-          `invoice_number.ilike.%${term}%,customer_name.ilike.%${term}%,cashier_name.ilike.%${term}%`
-        );
-      }
-      if (matchingSaleIds !== null) {
-        if (matchingSaleIds.length > 0) {
-          summaryQuery = summaryQuery.in('id', matchingSaleIds);
-        } else {
-          summaryQuery = summaryQuery.eq('id', '00000000-0000-0000-0000-000000000000');
-        }
-      }
-
-      const { data: summaryRows, error: summaryErr } = await summaryQuery;
-      if (!summaryErr && summaryRows) {
-        let gross = 0;
-        let compCnt = 0;
-        let voidCnt = 0;
-        let voidAmt = 0;
-        for (const row of summaryRows) {
-          const amt = Number(row.total_amount || 0);
-          if (row.status === 'COMPLETED') {
-            compCnt++;
-            gross += amt;
-          } else if (row.status === 'VOIDED') {
-            voidCnt++;
-            voidAmt += amt;
-          }
-        }
-        totalCount = summaryRows.length;
-        summary = {
-          totalGross: gross,
-          completedCount: compCnt,
-          voidedCount: voidCnt,
-          totalVoidedAmount: voidAmt,
-          avgTicket: compCnt > 0 ? gross / compCnt : 0,
-          totalBills: totalCount,
-        };
-      }
+      // Fast Server-Side KPI Summary RPC + Fast Paginated Data Query
+      const rpcParams: Record<string, any> = {
+        p_start: bounds.from || null,
+        p_end: bounds.to || null,
+        p_branch_id: params.branchId && params.branchId !== 'ALL' ? params.branchId : null,
+        p_cashier_id: params.cashierId && params.cashierId !== 'ALL' ? params.cashierId : null,
+        p_cashier_name: params.cashierName && params.cashierName !== 'ALL' ? params.cashierName : null,
+        p_status: params.status && params.status !== 'ALL' ? params.status : null,
+        p_method: params.paymentMethod && params.paymentMethod !== 'ALL' ? params.paymentMethod : null,
+        p_search: params.search && params.search.trim() ? params.search.trim() : null,
+      };
 
       // 2. Paginated Data Query
       let query = supabase.from('sales').select('*');
-      if (bounds.from) query = query.gte('created_at', bounds.from);
-      if (bounds.to) query = query.lte('created_at', bounds.to);
+      if (bounds.from) query = query.gte('sold_at', bounds.from);
+      if (bounds.to) query = query.lte('sold_at', bounds.to);
       if (params.branchId && params.branchId !== 'ALL') {
         query = query.eq('branch_id', params.branchId);
       }
@@ -1695,19 +1652,41 @@ export const posApi = {
       }
 
       // Sorting
-      const sortByCol = params.sortBy || 'created_at';
+      const sortByCol = !params.sortBy || params.sortBy === 'created_at' ? 'sold_at' : params.sortBy;
       const isAsc = params.sortOrder === 'asc';
       query = query.order(sortByCol, { ascending: isAsc });
 
-      // Range Pagination
+      // Range Pagination (50 bills)
       query = query.range(offset, offset + limit - 1);
 
-      const { data: sbSales, error: sbErr } = await query;
-      if (sbErr) {
-        console.warn('[Sales API] Query error:', sbErr.message);
+      // Execute RPC KPI aggregation and paginated query in parallel (< 50ms)
+      const [rpcRes, dataRes] = await Promise.all([
+        supabase.rpc('get_sales_register_summary', rpcParams),
+        query,
+      ]);
+
+      if (!rpcRes.error && rpcRes.data) {
+        const d = rpcRes.data as any;
+        summary = {
+          totalGross: Number(d.gross_sales || 0),
+          completedCount: Number(d.completed_bills || 0),
+          voidedCount: Number(d.voided_bills || 0),
+          totalVoidedAmount: Number(d.voided_amount || 0),
+          avgTicket: Number(d.average_ticket || 0),
+          totalBills: Number(d.total_matching || 0),
+        };
+        totalCount = Number(d.total_matching || 0);
+      } else if (rpcRes.error) {
+        console.warn('[Sales API] get_sales_register_summary RPC note:', rpcRes.error.message);
       }
 
-      if (!sbErr && sbSales && sbSales.length > 0) {
+      const sbSales = dataRes.data;
+      if (dataRes.error) {
+        console.warn('[Sales API] Query error:', dataRes.error.message);
+      }
+
+      if (sbSales && sbSales.length > 0) {
+        if (totalCount === 0) totalCount = sbSales.length;
         const saleIds = sbSales.map((s: any) => s.id);
         const itemsBySaleId = new Map<string, any[]>();
         const paymentsBySaleId = new Map<string, any[]>();
@@ -1759,7 +1738,7 @@ export const posApi = {
             totalAmount: Number(s.total_amount || 0),
             paidAmount: Number(s.paid_amount || 0),
             changeDue: Number(s.change_due || 0),
-            createdAt: s.created_at,
+            createdAt: s.sold_at || s.created_at,
             updatedAt: s.updated_at,
             items: sItems.map((i: any) => ({
               id: i.id,
@@ -1853,8 +1832,8 @@ export const posApi = {
 
       while (true) {
         let query = supabase.from('sales').select('*');
-        if (bounds.from) query = query.gte('created_at', bounds.from);
-        if (bounds.to) query = query.lte('created_at', bounds.to);
+        if (bounds.from) query = query.gte('sold_at', bounds.from);
+        if (bounds.to) query = query.lte('sold_at', bounds.to);
         if (params.branchId && params.branchId !== 'ALL') {
           query = query.eq('branch_id', params.branchId);
         }
@@ -1880,7 +1859,7 @@ export const posApi = {
           }
         }
 
-        const sortByCol = params.sortBy || 'created_at';
+        const sortByCol = !params.sortBy || params.sortBy === 'created_at' ? 'sold_at' : params.sortBy;
         const isAsc = params.sortOrder === 'asc';
         query = query.order(sortByCol, { ascending: isAsc });
         query = query.range(offset, offset + chunkSize - 1);
@@ -1937,7 +1916,7 @@ export const posApi = {
             totalAmount: Number(s.total_amount || 0),
             paidAmount: Number(s.paid_amount || 0),
             changeDue: Number(s.change_due || 0),
-            createdAt: s.created_at,
+            createdAt: s.sold_at || s.created_at,
             updatedAt: s.updated_at,
             items: [],
             payments: sPayments.length > 0 ? sPayments.map((p: any) => ({

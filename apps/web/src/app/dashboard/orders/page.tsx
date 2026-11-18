@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Receipt,
@@ -69,13 +69,14 @@ function getColomboTodayDateString(): string {
 }
 
 export default function SalesOrdersPage() {
-  const { currency, selectedBranchId, branches } = useTenantBranch();
+  const { currency, selectedBranchId, branches, isOwnerOrAdmin } = useTenantBranch();
 
   // Primary Data State
   const [sales, setSales] = useState<SaleDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const fetchIdRef = useRef(0);
 
   // Filters State
   const [period, setPeriod] = useState<PeriodFilter>('today');
@@ -132,12 +133,12 @@ export default function SalesOrdersPage() {
     setIsMounted(true);
   }, []);
 
-  // Sync initial branch from context
+  // Sync initial branch from context: only lock for staff, keep Owner on ALL
   useEffect(() => {
-    if (selectedBranchId && selectedBranchId !== 'ALL') {
+    if (!isOwnerOrAdmin && selectedBranchId && selectedBranchId !== 'ALL') {
       setSelectedBranch(selectedBranchId);
     }
-  }, [selectedBranchId]);
+  }, [isOwnerOrAdmin, selectedBranchId]);
 
   // Load Cashiers List
   useEffect(() => {
@@ -148,9 +149,10 @@ export default function SalesOrdersPage() {
     });
   }, []);
 
-  // Fetch Sales Data reactively based on active filters
+  // Fetch Sales Data reactively based on active filters with Request Sequence Guard
   const fetchSales = useCallback(
     async (isManualRefresh = false) => {
+      const fetchId = ++fetchIdRef.current;
       try {
         if (isManualRefresh) {
           setIsRefreshing(true);
@@ -173,6 +175,9 @@ export default function SalesOrdersPage() {
           sortOrder,
         });
 
+        // Guard against stale response overwrites
+        if (fetchId !== fetchIdRef.current) return;
+
         if (res.data) {
           setSales(res.data.items || []);
           setTotalCount(res.data.total || 0);
@@ -182,10 +187,14 @@ export default function SalesOrdersPage() {
           }
         }
       } catch (err) {
-        console.error('Failed to load sales register:', err);
+        if (fetchId === fetchIdRef.current) {
+          console.error('Failed to load sales register:', err);
+        }
       } finally {
-        setLoading(false);
-        setIsRefreshing(false);
+        if (fetchId === fetchIdRef.current) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
     [
@@ -206,6 +215,43 @@ export default function SalesOrdersPage() {
   useEffect(() => {
     fetchSales();
   }, [fetchSales]);
+
+  // Instant 0ms Filter Handlers
+  const handlePeriodChange = (newPeriod: PeriodFilter) => {
+    if (period === newPeriod) return;
+    setLoading(true);
+    setPeriod(newPeriod);
+    setCurrentPage(1);
+  };
+
+  const handleBranchChange = (newBranch: string) => {
+    setLoading(true);
+    setSelectedBranch(newBranch);
+    setCurrentPage(1);
+  };
+
+  const handleCashierChange = (newCashier: string) => {
+    setLoading(true);
+    setSelectedCashier(newCashier);
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (newStatus: string) => {
+    setLoading(true);
+    setSelectedStatus(newStatus);
+    setCurrentPage(1);
+  };
+
+  const handleMethodChange = (newMethod: string) => {
+    setLoading(true);
+    setSelectedMethod(newMethod);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setLoading(true);
+    setCurrentPage(newPage);
+  };
 
   // Handle Void Bill Submission
   const handleConfirmVoid = async () => {
@@ -653,10 +699,7 @@ export default function SalesOrdersPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200/80 pb-3">
         <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl">
           <button
-            onClick={() => {
-              setPeriod('today');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('today')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'today'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -666,10 +709,7 @@ export default function SalesOrdersPage() {
             Today&apos;s Bills (අද)
           </button>
           <button
-            onClick={() => {
-              setPeriod('yesterday');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('yesterday')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'yesterday'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -679,10 +719,7 @@ export default function SalesOrdersPage() {
             Yesterday (ඊයේ)
           </button>
           <button
-            onClick={() => {
-              setPeriod('week');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('week')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'week'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -692,10 +729,7 @@ export default function SalesOrdersPage() {
             This Week (මෙම සතිය)
           </button>
           <button
-            onClick={() => {
-              setPeriod('month');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('month')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'month'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -705,10 +739,7 @@ export default function SalesOrdersPage() {
             This Month (මෙම මාසය)
           </button>
           <button
-            onClick={() => {
-              setPeriod('last_month');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('last_month')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'last_month'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -718,10 +749,7 @@ export default function SalesOrdersPage() {
             Last Month (පසුගිය මාසය)
           </button>
           <button
-            onClick={() => {
-              setPeriod('all');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               period === 'all'
                 ? 'bg-white text-slate-900 shadow-2xs'
@@ -731,10 +759,7 @@ export default function SalesOrdersPage() {
             All Bills (සියල්ල)
           </button>
           <button
-            onClick={() => {
-              setPeriod('custom');
-              setCurrentPage(1);
-            }}
+            onClick={() => handlePeriodChange('custom')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
               period === 'custom'
                 ? 'bg-[#005BD3] text-white shadow-2xs'
@@ -810,9 +835,13 @@ export default function SalesOrdersPage() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(kpiSummary.totalGross)}
-            </div>
+            {loading ? (
+              <div className="h-8 w-36 bg-slate-200 animate-pulse rounded-lg my-0.5" />
+            ) : (
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                {formatCurrency(kpiSummary.totalGross)}
+              </div>
+            )}
             <div className="mt-1 text-xs text-slate-500">
               Settled payments across {kpiSummary.completedCount.toLocaleString()} bill(s)
             </div>
@@ -828,9 +857,13 @@ export default function SalesOrdersPage() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {kpiSummary.completedCount.toLocaleString()}
-            </div>
+            {loading ? (
+              <div className="h-8 w-20 bg-slate-200 animate-pulse rounded-lg my-0.5" />
+            ) : (
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                {kpiSummary.completedCount.toLocaleString()}
+              </div>
+            )}
             <div className="mt-1 text-xs text-slate-500">Fulfilled retail transactions</div>
           </div>
         </div>
@@ -844,9 +877,13 @@ export default function SalesOrdersPage() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatCurrency(kpiSummary.avgTicket)}
-            </div>
+            {loading ? (
+              <div className="h-8 w-28 bg-slate-200 animate-pulse rounded-lg my-0.5" />
+            ) : (
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                {formatCurrency(kpiSummary.avgTicket)}
+              </div>
+            )}
             <div className="mt-1 text-xs text-slate-500">Per customer checkout</div>
           </div>
         </div>
@@ -860,9 +897,13 @@ export default function SalesOrdersPage() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {kpiSummary.voidedCount.toLocaleString()}
-            </div>
+            {loading ? (
+              <div className="h-8 w-16 bg-slate-200 animate-pulse rounded-lg my-0.5" />
+            ) : (
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                {kpiSummary.voidedCount.toLocaleString()}
+              </div>
+            )}
             <div className="mt-1 text-xs text-slate-500">
               {formatCurrency(kpiSummary.totalVoidedAmount)} reversed
             </div>
@@ -872,6 +913,15 @@ export default function SalesOrdersPage() {
 
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-pos-card overflow-hidden">
+        {/* Shimmer loading progress bar */}
+        <div className="h-1 w-full bg-slate-100 overflow-hidden">
+          <div
+            className={`h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 transition-all duration-300 ${
+              loading ? 'w-full animate-pulse' : 'w-0'
+            }`}
+          />
+        </div>
+
         {/* Table Filters & Search Bar */}
         <div className="p-4 border-b border-slate-200/80 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 bg-slate-50/50">
           {/* Keyword Search */}
@@ -881,6 +931,7 @@ export default function SalesOrdersPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => {
+                setLoading(true);
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
@@ -890,6 +941,7 @@ export default function SalesOrdersPage() {
             {searchQuery && (
               <button
                 onClick={() => {
+                  setLoading(true);
                   setSearchQuery('');
                   setCurrentPage(1);
                 }}
@@ -908,18 +960,23 @@ export default function SalesOrdersPage() {
               <span>Branch:</span>
               <select
                 value={selectedBranch}
-                onChange={(e) => {
-                  setSelectedBranch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
+                disabled={!isOwnerOrAdmin}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className={`bg-white border text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3] ${
+                  !isOwnerOrAdmin ? 'opacity-70 bg-slate-100 cursor-not-allowed' : 'border-slate-200'
+                }`}
               >
-                <option value="ALL">All Branches (සියල්ල)</option>
+                {isOwnerOrAdmin && <option value="ALL">All Branches (සියල්ල)</option>}
                 <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa (අලව්ව)</option>
                 <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya (දඹදෙණිය)</option>
                 <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla (ගිරිඋල්ල)</option>
                 <option value="133eeaec-5726-4702-a819-8423750db203">Main Store (ප්‍රධාන)</option>
               </select>
+              {!isOwnerOrAdmin && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                  Locked (Staff)
+                </span>
+              )}
             </div>
 
             {/* Cashier Filter (Bills දාපු කෙනා) */}
@@ -929,10 +986,7 @@ export default function SalesOrdersPage() {
               <div className="relative flex items-center">
                 <select
                   value={selectedCashier}
-                  onChange={(e) => {
-                    setSelectedCashier(e.target.value);
-                    setCurrentPage(1);
-                  }}
+                  onChange={(e) => handleCashierChange(e.target.value)}
                   className={`bg-white border text-xs rounded-lg pl-2.5 pr-7 py-1.5 font-medium focus:outline-none focus:border-[#005BD3] ${
                     selectedCashier !== 'ALL'
                       ? 'border-blue-400 text-blue-700 bg-blue-50/50 font-bold'
@@ -966,10 +1020,7 @@ export default function SalesOrdersPage() {
 
                 {selectedCashier !== 'ALL' && (
                   <button
-                    onClick={() => {
-                      setSelectedCashier('ALL');
-                      setCurrentPage(1);
-                    }}
+                    onClick={() => handleCashierChange('ALL')}
                     title="Clear Cashier Filter"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                   >
@@ -985,10 +1036,7 @@ export default function SalesOrdersPage() {
               <span>Status:</span>
               <select
                 value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
               >
                 <option value="ALL">All Statuses</option>
@@ -1002,10 +1050,7 @@ export default function SalesOrdersPage() {
               <span>Method:</span>
               <select
                 value={selectedMethod}
-                onChange={(e) => {
-                  setSelectedMethod(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => handleMethodChange(e.target.value)}
                 className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
               >
                 <option value="ALL">All Methods</option>
@@ -1024,6 +1069,7 @@ export default function SalesOrdersPage() {
                 value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [f, o] = e.target.value.split('-') as [SortField, 'asc' | 'desc'];
+                  setLoading(true);
                   setSortBy(f);
                   setSortOrder(o);
                   setCurrentPage(1);
@@ -1114,13 +1160,40 @@ export default function SalesOrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && sales.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-14 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 mx-auto mb-2 text-blue-600 animate-spin" />
-                    <p className="font-medium text-slate-600 text-xs">Loading sales register...</p>
-                  </td>
-                </tr>
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`} className="animate-pulse">
+                    <td className="py-3.5 px-4">
+                      <div className="h-4 w-28 bg-slate-200 rounded mb-1.5" />
+                      <div className="h-3 w-20 bg-slate-100 rounded" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-5 w-20 bg-slate-200 rounded-full" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-4 w-28 bg-slate-200 rounded" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-4 w-24 bg-slate-200 rounded mb-1" />
+                      <div className="h-3 w-16 bg-slate-100 rounded" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-4 w-12 bg-slate-200 rounded" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="h-5 w-20 bg-slate-200 rounded-full" />
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="h-4 w-24 bg-slate-200 rounded ml-auto" />
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="h-6 w-14 bg-slate-200 rounded mx-auto" />
+                    </td>
+                  </tr>
+                ))
               ) : sales.length > 0 ? (
                 sales.map((sale) => (
                   <tr
@@ -1183,8 +1256,7 @@ export default function SalesOrdersPage() {
                           type="button"
                           onClick={() => {
                             const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
-                            setSelectedCashier(cName);
-                            setCurrentPage(1);
+                            handleCashierChange(cName);
                           }}
                           title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
@@ -1288,7 +1360,7 @@ export default function SalesOrdersPage() {
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage <= 1 || loading}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
               >
@@ -1298,7 +1370,7 @@ export default function SalesOrdersPage() {
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage >= totalPages || loading}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
               >
