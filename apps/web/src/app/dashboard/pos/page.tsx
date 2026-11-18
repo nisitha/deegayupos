@@ -64,7 +64,6 @@ import {
   calculateBaseQuantity,
   formatQuantityWithUnit,
 } from '../../../lib/unit-utils';
-import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 
 // =========================================================================
 // "CONFIDENCY OS" DESIGN SYSTEM SPECIFICATION
@@ -106,16 +105,6 @@ interface CartItem {
 export default function ConfidencyPosPage() {
   const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
   const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
-
-  // Live ticking clock locked to Sri Lanka time (Asia/Colombo, UTC+05:30)
-  const [liveClockStr, setLiveClockStr] = useState<string>('');
-  useEffect(() => {
-    setLiveClockStr(formatSriLankaHeaderClock(new Date()));
-    const timer = setInterval(() => {
-      setLiveClockStr(formatSriLankaHeaderClock(new Date()));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
@@ -1182,64 +1171,53 @@ export default function ConfidencyPosPage() {
       ===================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#E6EAF2] min-w-0">
         {/* 1. Top Terminal Status Bar */}
-        <div className="h-14 px-5 border-b border-slate-200/90 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md shadow-2xs">
+        <div className="h-14 px-4 lg:px-5 border-b border-slate-200/90 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md shadow-2xs gap-3 overflow-x-auto no-scrollbar">
           {/* Left: Breadcrumb & Cashier Metadata */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center font-bold text-xs shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
               <Layers className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 whitespace-nowrap shrink-0">
               <span>POS Terminal</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-xs font-bold text-[#5B46F6]">
-              <MapPin className="w-3 h-3 text-[#5B46F6]" />
-              <span className="truncate max-w-[120px]">{currentBranchName}</span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/80 text-xs font-bold text-[#5B46F6] whitespace-nowrap shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
+              <span className="truncate max-w-[140px]">{currentBranchName}</span>
             </div>
-            <span className="text-slate-300">|</span>
+            <span className="text-slate-300 shrink-0">|</span>
             <button
               type="button"
               onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1.5 hover:bg-purple-50 px-2 py-1 rounded-lg transition-colors cursor-pointer text-xs group"
+              className="flex items-center gap-1.5 hover:bg-indigo-50/70 px-2 py-1 rounded-lg transition-colors cursor-pointer text-xs group shrink-0 whitespace-nowrap"
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="font-bold text-slate-900 group-hover:text-[#5B46F6] transition-colors">
+              <span className="font-bold text-slate-900 group-hover:text-[#5B46F6] transition-colors whitespace-nowrap">
                 Cashier: {cashierName}
               </span>
-              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors">
+              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors shrink-0">
                 PIN Switch
               </span>
             </button>
-            <div className="hidden sm:flex text-xs text-slate-500 font-medium truncate items-center">
+            <div className="hidden xl:flex text-xs text-slate-500 font-medium whitespace-nowrap items-center shrink-0">
               <span>| Reg: {registerCode}</span>
-              <span className="hidden md:inline"> | Shift: 8:30 AM</span>
-              <span className="hidden lg:inline">
+              <span className="hidden 2xl:inline"> | Shift: 8:30 AM</span>
+              <span className="hidden 2xl:inline">
                 {' '}
                 | Drawer: LKR {openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
-          {/* Center: Live Sri Lanka Ticking Clock Badge (Asia/Colombo, tabular-nums) */}
-          {liveClockStr && (
-            <div
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/70 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] font-mono tabular-nums shadow-2xs select-none shrink-0"
-              title="Sri Lanka Standard Time (Asia/Colombo, UTC+05:30)"
-            >
-              <Clock className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
-              <span>{liveClockStr}</span>
-            </div>
-          )}
-
           {/* Right: Qty Popup Mode Pill Switcher, Catalog Ready & End Shift Button */}
-          <div className="flex items-center gap-2.5 shrink-0 ml-2">
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* Pill Toggle for Qty Popup */}
-            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/90 text-xs shadow-2xs">
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/90 text-xs shadow-2xs shrink-0 whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'ALL'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1251,7 +1229,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'WEIGHT_LIQUID'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1262,49 +1240,48 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
 
-            <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-500 font-mono shrink-0 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Catalog Ready</span>
             </div>
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="border border-slate-200 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+              className="border border-slate-200 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 transition-colors shadow-2xs active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
             >
               End Shift
             </button>
           </div>
         </div>
 
-        {/* 2. Compact Elevated Action Bar (h-11, 4-column responsive grid, reclaiming ~55px of vertical space) */}
-        <div className="px-5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {/* Tab 1: Apply Discount */}
+        {/* 2. Vibrant Tactile Action Cards (h-16, 4-column responsive grid) */}
+        <div className="px-4 lg:px-5 py-3.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3.5">
+            {/* Card 1: Apply Discount */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none ${
-                discountType !== 'NONE' ? 'ring-1 ring-emerald-500/30 border-emerald-300' : ''
+              className={`relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/20 select-none ${
+                discountType !== 'NONE' ? 'ring-2 ring-emerald-300/70' : ''
               }`}
-              title="Apply order discount (Percent or Flat)"
+              title="Apply order discount (Percent or Flat) [F6]"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    discountType !== 'NONE'
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-50 text-emerald-600'
-                  }`}
-                >
-                  <Percent className="w-3.5 h-3.5 stroke-[2.5]" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <Percent className="w-5 h-5 text-white stroke-[2.5]" />
                 </div>
-                <span className="truncate text-xs font-semibold text-slate-700">
-                  {discountType === 'PERCENT'
-                    ? `${discountPercent}% Off`
-                    : discountType === 'FLAT'
-                    ? `LKR ${discountFlat} Off`
-                    : 'Apply Discount'}
-                </span>
+                <div className="min-w-0 flex flex-col text-left">
+                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
+                    Apply Discount
+                  </span>
+                  <span className="text-xs text-white/85 font-medium truncate">
+                    {discountType === 'PERCENT'
+                      ? `${discountPercent}% Off Total`
+                      : discountType === 'FLAT'
+                      ? `LKR ${discountFlat} Off Total`
+                      : 'Bill or % off'}
+                  </span>
+                </div>
               </div>
               {discountType !== 'NONE' ? (
                 <span
@@ -1312,38 +1289,39 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     resetDiscount();
                   }}
-                  className="hover:bg-slate-100 p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors"
+                  className="w-7 h-7 rounded-lg bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   title="Remove discount"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </span>
               ) : (
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                  %
+                <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
+                  [F6]
                 </span>
               )}
             </button>
 
-            {/* Tab 2: Add Customer */}
+            {/* Card 2: Customer */}
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none ${
-                selectedCustomer ? 'ring-1 ring-sky-500/30 border-sky-300' : ''
+              className={`relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-500/20 select-none ${
+                selectedCustomer ? 'ring-2 ring-blue-300/70' : ''
               }`}
-              title="Select customer for billing and credit"
+              title="Select customer for billing and credit [F3]"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    selectedCustomer ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-600'
-                  }`}
-                >
-                  <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <UserPlus className="w-5 h-5 text-white stroke-[2.5]" />
                 </div>
-                <span className="truncate text-xs font-semibold text-slate-700">
-                  {selectedCustomer ? selectedCustomer.name : 'Customer (Walk-in)'}
-                </span>
+                <div className="min-w-0 flex flex-col text-left">
+                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
+                    Customer
+                  </span>
+                  <span className="text-xs text-white/85 font-medium truncate max-w-[130px]">
+                    {selectedCustomer ? selectedCustomer.name : 'Walk-in Customer'}
+                  </span>
+                </div>
               </div>
               {selectedCustomer ? (
                 <span
@@ -1351,59 +1329,75 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     setSelectedCustomer(null);
                   }}
-                  className="hover:bg-slate-100 p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors"
+                  className="w-7 h-7 rounded-lg bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   title="Remove customer"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </span>
               ) : (
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                  Find
+                <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
+                  [F3]
                 </span>
               )}
             </button>
 
-            {/* Tab 3: Hold Ticket [F4] */}
+            {/* Card 3: Hold Ticket */}
             <button
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50 disabled:pointer-events-none"
+              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/20 select-none disabled:opacity-50 disabled:pointer-events-none"
               title="Park current order ticket [F4]"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <PauseCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <PauseCircle className="w-5 h-5 text-white stroke-[2.5]" />
                 </div>
-                <span className="truncate text-xs font-semibold text-slate-700">Hold Ticket</span>
+                <div className="min-w-0 flex flex-col text-left">
+                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
+                    Hold Ticket
+                  </span>
+                  <span className="text-xs text-white/85 font-medium truncate">
+                    {heldTickets.length > 0 ? `${heldTickets.length} Parked` : 'Park Current Bill'}
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded">
-                F4
+              <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
+                [F4]
               </span>
             </button>
 
-            {/* Tab 4: Custom Sale Item */}
+            {/* Card 4: Custom Sale Item */}
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="h-11 bg-white border border-slate-200/90 hover:border-indigo-400 hover:shadow-xs rounded-xl px-3 flex items-center justify-between gap-2 active:scale-[0.98] transition-all cursor-pointer select-none"
+              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-violet-600 to-purple-700 shadow-violet-500/20 select-none"
               title="Add non-catalog or custom priced item"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-[#5B46F6] flex items-center justify-center shrink-0">
-                  <Tag className="w-3.5 h-3.5 stroke-[2.5]" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <Tag className="w-5 h-5 text-white stroke-[2.5]" />
                 </div>
-                <span className="truncate text-xs font-semibold text-slate-700">+ Custom Item</span>
+                <div className="min-w-0 flex flex-col text-left">
+                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
+                    Custom Item
+                  </span>
+                  <span className="text-xs text-white/85 font-medium truncate">
+                    Quick Entry / Misc
+                  </span>
+                </div>
               </div>
-              <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <div className="w-7 h-7 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0 border border-white/25">
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </div>
             </button>
           </div>
 
           {/* Held Tickets Banner (if tickets are held) */}
           {heldTickets.length > 0 && (
-            <div className="mt-2 flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs shadow-2xs">
+            <div className="mt-3 flex items-center justify-between px-4 py-2 rounded-xl bg-amber-50 border border-amber-200/90 text-amber-900 text-xs shadow-xs">
               <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                 <span className="font-semibold">
                   {heldTickets.length} ticket{heldTickets.length > 1 ? 's' : ''} currently on hold
                 </span>
@@ -1411,7 +1405,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setIsHeldTicketsModalOpen(true)}
-                className="font-bold underline hover:text-amber-950 cursor-pointer"
+                className="font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
               >
                 View & Resume &rarr;
               </button>
