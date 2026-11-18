@@ -225,9 +225,8 @@ export function ShiftEndModal({
     if (bankedAmount > 0) {
       const foundBank = bankAccounts.find((b) => b.id === selectedBankId);
       if (foundBank) {
-        selectedBankStr = `${foundBank.bankName} (${foundBank.accountNumber} - ${foundBank.accountName}${
-          foundBank.branchName ? ` • ${foundBank.branchName}` : ''
-        })`;
+        selectedBankStr = `${foundBank.bankName} (${foundBank.accountNumber} - ${foundBank.accountName}${foundBank.branchName ? ` • ${foundBank.branchName}` : ''
+          })`;
       } else if (customBankDetails.trim()) {
         selectedBankStr = customBankDetails.trim();
       }
@@ -314,11 +313,10 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('MODAKA')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'MODAKA'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'MODAKA'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+              }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>1. Modaka Ledger (A–E)</span>
@@ -326,20 +324,18 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('DENOMINATIONS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'DENOMINATIONS'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'DENOMINATIONS'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+              }`}
           >
             <Banknote className="w-3.5 h-3.5" />
             <span>2. Denominations</span>
             <span
-              className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${
-                activeTab === 'DENOMINATIONS'
-                  ? 'bg-purple-800 text-purple-200'
-                  : 'bg-slate-100 text-slate-600'
-              }`}
+              className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${activeTab === 'DENOMINATIONS'
+                ? 'bg-purple-800 text-purple-200'
+                : 'bg-slate-100 text-slate-600'
+                }`}
             >
               LKR {countedDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 0 })}
             </span>
@@ -347,19 +343,17 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('SUMMARY')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === 'SUMMARY'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'SUMMARY'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+              }`}
           >
             <Receipt className="w-3.5 h-3.5" />
             <span>3. දවසේ වියදම් විස්තරය</span>
             {cashVariance !== 0 && (
               <span
-                className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] font-bold ${
-                  cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                }`}
+                className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] font-bold ${cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}
               >
                 {cashVariance > 0 ? `+${cashVariance.toFixed(0)}` : cashVariance.toFixed(0)}
               </span>
@@ -534,13 +528,12 @@ export function ShiftEndModal({
                         >
                           <div className="flex items-center gap-2.5">
                             <span
-                              className={`w-14 text-center py-1 rounded-lg text-xs font-mono font-black ${
-                                d >= 500
-                                  ? 'bg-purple-100 text-purple-900'
-                                  : d >= 20
+                              className={`w-14 text-center py-1 rounded-lg text-xs font-mono font-black ${d >= 500
+                                ? 'bg-purple-100 text-purple-900'
+                                : d >= 20
                                   ? 'bg-amber-100 text-amber-900'
                                   : 'bg-slate-100 text-slate-800'
-                              }`}
+                                }`}
                             >
                               {d.toLocaleString()}
                             </span>
@@ -745,21 +738,20 @@ export function ShiftEndModal({
 
                     {/* Variance Display */}
                     <div
-                      className={`flex items-center justify-between p-2.5 rounded-xl font-bold ${
-                        cashVariance === 0
-                          ? 'bg-slate-100 text-slate-800'
-                          : cashVariance > 0
+                      className={`flex items-center justify-between p-2.5 rounded-xl font-bold ${cashVariance === 0
+                        ? 'bg-slate-100 text-slate-800'
+                        : cashVariance > 0
                           ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                           : 'bg-rose-100 text-rose-900 border border-rose-300'
-                      }`}
+                        }`}
                     >
                       <span>
                         Cash Variance (වෙනස):{' '}
                         {cashVariance === 0
                           ? 'Balanced'
                           : cashVariance > 0
-                          ? 'Excess / Over (+)'
-                          : 'Shortage / Deficit (-)'}
+                            ? 'Excess / Over (+)'
+                            : 'Shortage / Deficit (-)'}
                       </span>
                       <span className="font-mono text-sm">
                         {cashVariance > 0 ? '+' : ''}

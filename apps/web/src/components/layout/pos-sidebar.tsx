@@ -56,6 +56,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
+      { name: 'Modaka & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
       { name: 'Pricing Engine', href: '/dashboard/pricing', icon: Tag },
       { name: 'Customers', href: '/dashboard/customers', icon: Users },
     ],
@@ -185,6 +186,12 @@ export function PosSidebar() {
                 },
               ]
             : []),
+          {
+            name: 'Modaka & Shift Off',
+            href: '/dashboard/pos?action=shift-handover',
+            icon: FileSpreadsheet,
+            badge: 'Shift',
+          },
         ],
       },
     ];
@@ -199,12 +206,18 @@ export function PosSidebar() {
   const isItemActive = useCallback(
     (href: string) => {
       if (!href || href === '#') return false;
+      const cleanHref = href.split('?')[0];
+
       // Exact match for the dashboard root
-      if (href === '/dashboard') {
+      if (cleanHref === '/dashboard') {
         return pathname === '/dashboard';
       }
+      // If href is a query action shortcut like shift-handover, don't override base POS tab
+      if (href.includes('?')) {
+        return false;
+      }
       // Exact match
-      if (pathname === href) {
+      if (pathname === cleanHref) {
         return true;
       }
       // If another menu item matches pathname exactly, don't greedily match parent
@@ -212,7 +225,7 @@ export function PosSidebar() {
         return false;
       }
       // Exact match or sub-route match with strict trailing slash boundary
-      return pathname.startsWith(`${href}/`);
+      return pathname.startsWith(`${cleanHref}/`);
     },
     [pathname, allVisibleHrefs],
   );
@@ -312,6 +325,11 @@ export function PosSidebar() {
                     key={item.name}
                     href={item.href}
                     prefetch={false}
+                    onClick={() => {
+                      if (item.href.includes('action=shift-handover') && typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('open-shift-handover'));
+                      }
+                    }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all group ${
                       isActive
                         ? 'bg-gradient-to-r from-[#5B46F6] to-[#4F46E5] text-white font-medium shadow-md shadow-indigo-950/50'
