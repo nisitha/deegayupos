@@ -32,6 +32,7 @@ import {
   Pencil,
   RotateCcw,
   LogOut,
+  PackagePlus,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -1172,9 +1173,13 @@ export default function ConfidencyPosPage() {
       } else if (e.key === 'F4') {
         e.preventDefault();
         if (cart.length > 0) handleHoldTicket();
+      } else if (e.key === 'F7') {
+        e.preventDefault();
+        setIsModakaStockInModalOpen(true);
       } else if (e.key === 'Escape') {
         setIsSearchDropdownOpen(false);
         setIsEndShiftModalOpen(false);
+        setIsModakaStockInModalOpen(false);
         setIsMobileCartOpen(false);
         setIsDiscountModalOpen(false);
         setIsCustomerModalOpen(false);
@@ -1273,10 +1278,10 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
-              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-              title="Record incoming Modaka stock (B) received during this shift"
+              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              title="Record incoming Modaka stock (B) received during this shift [F7]"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <PackagePlus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>+ Modaka In (B)</span>
             </button>
 
@@ -1284,7 +1289,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
               title="Close shift, complete Modaka ledger, count cash, and hand over to next employee"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -1298,9 +1303,9 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Vibrant Tactile Action Cards (h-16, 4-column responsive grid) */}
+        {/* 2. Vibrant Tactile Action Cards (h-16, 5-column responsive grid) */}
         <div className="px-4 lg:px-5 py-3.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
             {/* Card 1: Apply Discount */}
             <button
               type="button"
@@ -1434,6 +1439,31 @@ export default function ConfidencyPosPage() {
               <div className="w-7 h-7 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0 border border-white/25">
                 <Plus className="w-4 h-4 stroke-[2.5]" />
               </div>
+            </button>
+
+            {/* Card 5: Modaka In (B) */}
+            <button
+              type="button"
+              onClick={() => setIsModakaStockInModalOpen(true)}
+              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-rose-500 to-pink-600 shadow-rose-500/25 select-none"
+              title="Record incoming Modaka stock (B) [F7]"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+                  <PackagePlus className="w-5 h-5 text-white stroke-[2.5]" />
+                </div>
+                <div className="min-w-0 flex flex-col text-left">
+                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
+                    Modaka In (B)
+                  </span>
+                  <span className="text-xs text-white/85 font-medium truncate">
+                    ගෙනත් දුන් මෝදක
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
+                [F7]
+              </span>
             </button>
           </div>
 
@@ -2496,6 +2526,9 @@ export default function ConfidencyPosPage() {
         isOpen={isModakaStockInModalOpen}
         onClose={() => setIsModakaStockInModalOpen(false)}
         activeShift={activeShift}
+        branchId={selectedBranchId}
+        cashierId={cashierId}
+        cashierName={cashierName}
         onSuccess={() => {
           refreshActiveShift();
           setScanFeedback('Modaka incoming stock (B) updated.');
@@ -2508,6 +2541,8 @@ export default function ConfidencyPosPage() {
         isOpen={isEndShiftModalOpen}
         onClose={() => setIsEndShiftModalOpen(false)}
         activeShift={activeShift}
+        branchId={selectedBranchId}
+        cashierId={cashierId}
         branchName={currentBranchName}
         cashierName={cashierName}
         onConfirmEndShift={() => {

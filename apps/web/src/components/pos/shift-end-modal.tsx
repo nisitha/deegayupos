@@ -28,6 +28,8 @@ interface ShiftEndModalProps {
   branchName: string;
   cashierName: string;
   onConfirmEndShift: (closedShift: CashierShiftDto) => void;
+  branchId?: string | null;
+  cashierId?: string | null;
 }
 
 const DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const;
@@ -39,8 +41,12 @@ export function ShiftEndModal({
   branchName,
   cashierName,
   onConfirmEndShift,
+  branchId,
+  cashierId,
 }: ShiftEndModalProps) {
   const [activeTab, setActiveTab] = useState<'MODAKA' | 'DENOMINATIONS' | 'SUMMARY'>('MODAKA');
+  const [localShift, setLocalShift] = useState<CashierShiftDto | null>(activeShift);
+  const [isLoadingShift, setIsLoadingShift] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -86,68 +92,106 @@ export function ShiftEndModal({
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
 
+  useEffect(() => {
+    if (activeShift) {
+      setLocalShift(activeShift);
+    }
+  }, [activeShift]);
+
   // Initialize data on modal open
   useEffect(() => {
-    if (!isOpen || !activeShift) return;
+    if (!isOpen) return;
 
     setActiveTab('MODAKA');
     setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMessage(null);
 
-    // Initialize Modaka rows
-    const rows = (activeShift.modakaEntries || []).map((e) => ({
-      productId: e.productId,
-      productName: e.productName || 'Modaka Variety',
-      openingQty: Number(e.openingQty || 0),
-      inQty: Number(e.inQty || 0),
-      soldQty: Number(e.soldQty || 0),
-      appliedRate: Number(e.appliedRate || 250),
-    }));
-    setModakaRows(rows);
+    const initShift = async () => {
+      let shift = activeShift;
+      if (!shift) {
+        setIsLoadingShift(true);
+        const effectiveBranchId =
+          branchId ||
+          (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
+        const effectiveCashierId =
+          cashierId ||
+          (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
 
-    // Initialize denominations from JSON or 0
-    const initialCounts: Record<number, number> = {
-      5000: 0,
-      1000: 0,
-      500: 0,
-      100: 0,
-      50: 0,
-      20: 0,
-      10: 0,
-      5: 0,
-      2: 0,
-      1: 0,
-    };
-    if (activeShift.denominationsJson && typeof activeShift.denominationsJson === 'object') {
-      DENOMINATIONS.forEach((d) => {
-        if (d in (activeShift.denominationsJson as any)) {
-          initialCounts[d] = Number((activeShift.denominationsJson as any)[d] || 0);
+        if (effectiveBranchId && effectiveCashierId) {
+          const shiftRes = await shiftsApi.getOrCreateActiveShift(
+            effectiveBranchId,
+            effectiveCashierId,
+            cashierName
+          );
+          if (shiftRes.success && shiftRes.data) {
+            shift = shiftRes.data;
+            setLocalShift(shift);
+          }
+        }
+        setIsLoadingShift(false);
+      } else {
+        setLocalShift(shift);
+      }
+
+      if (shift) {
+        // Initialize Modaka rows
+        const rows = (shift.modakaEntries || []).map((e) => ({
+          productId: e.productId,
+          productName: e.productName || 'Modaka Variety',
+          openingQty: Number(e.openingQty || 0),
+          inQty: Number(e.inQty || 0),
+          soldQty: Number(e.soldQty || 0),
+          appliedRate: Number(e.appliedRate || 250),
+        }));
+        setModakaRows(rows);
+
+        // Initialize denominations from JSON or 0
+        const initialCounts: Record<number, number> = {
+          5000: 0,
+          1000: 0,
+          500: 0,
+          100: 0,
+          50: 0,
+          20: 0,
+          10: 0,
+          5: 0,
+          2: 0,
+          1: 0,
+        };
+        if (shift.denominationsJson && typeof shift.denominationsJson === 'object') {
+          DENOMINATIONS.forEach((d) => {
+            if (d in (shift.denominationsJson as any)) {
+              initialCounts[d] = Number((shift.denominationsJson as any)[d] || 0);
+            }
+          });
+        }
+        setCounts(initialCounts);
+
+        // Initialize expenses & float
+        setOpeningFloat(Number(shift.openingFloat || 0));
+        setDeclaredShiftSale(
+          Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
+        );
+        setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
+        setOtherExpenses(Number(shift.otherExpenses || 0));
+        setBankedAmount(Number(shift.bankedAmount || 0));
+        setHandoverNotes(shift.handoverNotes || '');
+      }
+
+      // Fetch company bank accounts
+      shiftsApi.getCompanyBankAccounts().then((res) => {
+        if (res.success && res.data && res.data.length > 0) {
+          setBankAccounts(res.data);
+          if (res.data[0]?.id) {
+            setSelectedBankId(res.data[0].id);
+          }
         }
       });
-    }
-    setCounts(initialCounts);
+    };
 
-    // Initialize expenses & float
-    setOpeningFloat(Number(activeShift.openingFloat || 0));
-    setDeclaredShiftSale(
-      Number(activeShift.declaredShiftSale > 0 ? activeShift.declaredShiftSale : activeShift.posCashSales)
-    );
-    setGoodsPurchasedPaid(Number(activeShift.goodsPurchasedPaid || 0));
-    setOtherExpenses(Number(activeShift.otherExpenses || 0));
-    setBankedAmount(Number(activeShift.bankedAmount || 0));
-    setHandoverNotes(activeShift.handoverNotes || '');
-
-    // Fetch company bank accounts
-    shiftsApi.getCompanyBankAccounts().then((res) => {
-      if (res.success && res.data && res.data.length > 0) {
-        setBankAccounts(res.data);
-        if (res.data[0]?.id) {
-          setSelectedBankId(res.data[0].id);
-        }
-      }
-    });
-  }, [isOpen, activeShift]);
+    initShift();
+  }, [isOpen, activeShift, branchId, cashierId, cashierName]);
 
   // Modaka calculations
   const modakaTotals = useMemo(() => {
@@ -196,7 +240,8 @@ export function ShiftEndModal({
     return Math.max(0, countedDrawerCash - bankedAmount);
   }, [countedDrawerCash, bankedAmount]);
 
-  if (!isOpen || !activeShift) return null;
+  if (!isOpen) return null;
+  const currentShift = activeShift || localShift;
 
   // Handlers
   const handleModakaChange = (index: number, field: 'inQty' | 'soldQty', valueStr: string) => {
@@ -221,6 +266,13 @@ export function ShiftEndModal({
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const targetShift = activeShift || localShift;
+    if (!targetShift) {
+      setErrorMessage('No active shift found to complete handover.');
+      setIsSubmitting(false);
+      return;
+    }
+
     let selectedBankStr = '';
     if (bankedAmount > 0) {
       const foundBank = bankAccounts.find((b) => b.id === selectedBankId);
@@ -233,9 +285,9 @@ export function ShiftEndModal({
     }
 
     const payload: EndShiftPayload = {
-      shiftId: activeShift.id,
-      branchId: activeShift.branchId,
-      cashierId: activeShift.cashierId,
+      shiftId: targetShift.id,
+      branchId: targetShift.branchId,
+      cashierId: targetShift.cashierId,
       openingFloat,
       declaredShiftSale,
       goodsPurchasedPaid,
@@ -277,7 +329,7 @@ export function ShiftEndModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white flex items-center justify-between shrink-0 shadow-sm">
@@ -291,7 +343,7 @@ export function ShiftEndModal({
                   End Shift Handover (Shift Off)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/30 text-purple-200 border border-purple-400/30">
-                  Shift {activeShift.shiftNumber}
+                  Shift {currentShift?.shiftNumber || 1}
                 </span>
               </div>
               <p className="text-xs text-slate-300 font-medium">
@@ -370,12 +422,17 @@ export function ShiftEndModal({
             </div>
           )}
 
-          {isSuccess ? (
+          {isLoadingShift || !currentShift ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
+              <span className="text-sm font-semibold text-slate-600">Loading active shift information...</span>
+            </div>
+          ) : isSuccess ? (
             <div className="py-12 text-center space-y-3">
               <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto animate-bounce" />
               <h4 className="text-lg font-black text-slate-900">Shift Handover Completed!</h4>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Shift {activeShift.shiftNumber} has been officially closed and verified. Signing out cashier{' '}
+                Shift {currentShift.shiftNumber} has been officially closed and verified. Signing out cashier{' '}
                 <strong>{cashierName}</strong> to allow the next shift cashier to sign in...
               </p>
             </div>
@@ -640,7 +697,7 @@ export function ShiftEndModal({
                           2. Shift Sale / Cash Sales (දවසේ විකිණුම්)
                         </span>
                         <span className="text-[11px] text-purple-600 font-mono">
-                          POS Live Cash Sales: LKR {activeShift.posCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          POS Live Cash Sales: LKR {currentShift ? currentShift.posCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -828,7 +885,7 @@ export function ShiftEndModal({
                             Closing Drawer Float for Next Shift (ඉදිරියට ගෙන යන කාසි/මුදල්)
                           </span>
                           <span className="text-[10px] text-emerald-100 font-medium">
-                            Auto carries forward as Shift {activeShift.shiftNumber === 1 ? '2' : '1'} Opening Float
+                            Auto carries forward as Shift {currentShift?.shiftNumber === 1 ? '2' : '1'} Opening Float
                           </span>
                         </div>
                         <span className="text-xl font-black font-mono">
