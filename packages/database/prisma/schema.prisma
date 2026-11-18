@@ -1573,6 +1573,38 @@ model ShiftModakaEntry {
   @@map("shift_modaka_entries")
 }
 
+model LegacySyncConfig {
+  id                    Int       @id @default(1)
+  isEnabled             Boolean   @default(true) @map("is_enabled")
+  lastSyncedSaleId      Int       @default(0) @map("last_synced_sale_id")
+  lastSyncedReceivingId Int       @default(0) @map("last_synced_receiving_id")
+  lastRunAt             DateTime? @map("last_run_at") @db.Timestamptz
+  lastStatus            String    @default("idle") @map("last_status")
+  lastSummary           Json      @default("{}") @map("last_summary") @db.JsonB
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("legacy_sync_config")
+}
+
+model LegacySyncLog {
+  id             String    @id @default(uuid()) @db.Uuid
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz
+  triggerSource  String    @default("cron") @map("trigger_source")
+  status         String    @default("success")
+  newSalesCount  Int       @default(0) @map("new_sales_count")
+  newGrnsCount   Int       @default(0) @map("new_grns_count")
+  productsSynced Int       @default(0) @map("products_synced")
+  stocksUpdated  Int       @default(0) @map("stocks_updated")
+  errorMessage   String?   @map("error_message") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([startedAt(sort: Desc)])
+  @@map("legacy_sync_logs")
+}
+
+
 
 
 

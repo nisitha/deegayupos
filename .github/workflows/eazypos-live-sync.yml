@@ -1,0 +1,52 @@
+name: Legacy POS Automated Live Watcher (5-Min Sync)
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force sync even if paused (true/false)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: eazypos-live-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-agent:
+    name: Legacy OSPOS Continuous Watcher
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Database Client
+        run: pnpm --filter @pixelcraft/database generate
+
+      - name: Execute Live Catch-Up Watcher
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          EAZYPOS_URL: ${{ secrets.EAZYPOS_URL || 'https://totalwebcarepospos.website/eazypos99/public' }}
+          EAZYPOS_USER: ${{ secrets.EAZYPOS_USER || 'admin' }}
+          EAZYPOS_PASS: ${{ secrets.EAZYPOS_PASS || secrets.EAZYPOS_PWD || '123456789' }}
+          TRIGGER_SOURCE: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'cron' }}
+          FORCE_SYNC: ${{ github.event.inputs.force || 'false' }}
+        run: node scripts/eazypos-live-watcher.mjs

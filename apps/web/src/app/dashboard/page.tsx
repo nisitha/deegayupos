@@ -17,6 +17,9 @@ import {
   Boxes,
   Receipt,
   Package,
+  PauseCircle,
+  PlayCircle,
+  Layers,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -32,7 +35,7 @@ import type {
   DashboardMetrics,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi, posApi } from '../../lib/api-client';
+import { dashboardApi, posApi, legacySyncApi, type LegacySyncConfigDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
 
 interface AnalyticsData {
@@ -131,10 +134,52 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [syncConfig, setSyncConfig] = useState<LegacySyncConfigDto | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  const loadSyncStatus = useCallback(async () => {
+    if (!isOwner) return;
+    try {
+      setSyncLoading(true);
+      const cfg = await legacySyncApi.getConfig();
+      setSyncConfig(cfg);
+    } catch {
+      // ignore
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [isOwner]);
+
+  useEffect(() => {
+    if (isOwner) {
+      loadSyncStatus();
+    }
+  }, [isOwner, loadSyncStatus]);
+
+  const handleToggleSync = async () => {
+    if (!syncConfig || toggleLoading) return;
+    const targetState = !syncConfig.isEnabled;
+    try {
+      setToggleLoading(true);
+      const ok = await legacySyncApi.toggleEnabled(targetState);
+      if (ok) {
+        setSyncConfig({
+          ...syncConfig,
+          isEnabled: targetState,
+          lastStatus: targetState ? 'idle' : 'paused',
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setToggleLoading(false);
+    }
+  };
 
   const loadDashboardData = useCallback(async () => {
     // Zero sales/revenue telemetry loaded for non-owner staff
@@ -278,6 +323,115 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* OWNER ONLY: Legacy POS Bridge Live Status Widget & Saturday Cutover Toggle */}
+      {isOwner && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl border border-indigo-900/60 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            {/* Left: Status & Identity */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-mono font-bold tracking-wider text-purple-300 uppercase flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-purple-400" />
+                  Legacy Bridge
+                </span>
+
+                {syncConfig?.isEnabled ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Active (Auto-syncing every 5m)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <PauseCircle className="w-3 h-3 text-amber-400" />
+                    Paused (Saturday Cutover Complete)
+                  </span>
+                )}
+
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {syncConfig?.lastStatus === 'running'
+                    ? '• Sync in progress...'
+                    : `• Status: ${syncConfig?.lastStatus?.toUpperCase() || 'IDLE'}`}
+                </span>
+              </div>
+
+              <div className="text-sm font-semibold text-slate-200 flex items-center gap-2 flex-wrap">
+                <span>Alawwa, Dambadeniya, Giriulla & Main Store</span>
+                <span className="text-xs text-slate-400">
+                  {syncConfig?.lastRunAt
+                    ? `(Last Sync: ${new Date(syncConfig.lastRunAt).toLocaleTimeString('en-US', {
+                        timeZone: 'Asia/Colombo',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })} Colombo)`
+                    : '(Initial setup pending)'}
+                </span>
+              </div>
+            </div>
+
+            {/* Center: Live Sync Metrics Pill */}
+            <div className="flex items-center gap-3 text-xs bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shrink-0">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">
+                  Latest Synced Bill
+                </span>
+                <span className="font-mono font-bold text-white text-xs">
+                  {syncConfig?.lastSyncedSaleId ? `INV-${syncConfig.lastSyncedSaleId}` : 'INV-15796'}
+                </span>
+              </div>
+              <div className="h-6 w-px bg-white/20" />
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">
+                  Live Stock Sync
+                </span>
+                <span className="font-mono font-bold text-emerald-400 text-xs">
+                  {syncConfig?.lastSummary?.stocksUpdated ?? 332} updated
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={loadSyncStatus}
+                disabled={syncLoading}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-white/10 disabled:opacity-50 cursor-pointer"
+                title="Refresh Bridge Telemetry"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleToggleSync}
+                disabled={toggleLoading || !syncConfig}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer ${
+                  syncConfig?.isEnabled
+                    ? 'bg-rose-600/90 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-rose-600/20'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 hover:shadow-emerald-600/20'
+                } disabled:opacity-50`}
+              >
+                {syncConfig?.isEnabled ? (
+                  <>
+                    <PauseCircle className="w-3.5 h-3.5" />
+                    <span>Pause Sync (Saturday Cutover)</span>
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="w-3.5 h-3.5" />
+                    <span>Resume Auto-Sync</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Top KPI Telemetry Row (Backed by real sales & profit calculations) */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>

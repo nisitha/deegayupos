@@ -3922,5 +3922,68 @@ export const shiftsApi = {
   },
 };
 
+export interface LegacySyncConfigDto {
+  id: number;
+  isEnabled: boolean;
+  lastSyncedSaleId: number;
+  lastSyncedReceivingId: number;
+  lastRunAt: string | null;
+  lastStatus: 'idle' | 'running' | 'success' | 'error' | 'paused';
+  lastSummary: {
+    durationSeconds?: number;
+    newSalesCount?: number;
+    newGrnsCount?: number;
+    productsSynced?: number;
+    stocksUpdated?: number;
+    maxSaleId?: number;
+    maxGrnId?: number;
+    triggerSource?: string;
+    finishedAt?: string;
+  };
+}
+
+export const legacySyncApi = {
+  async getConfig(): Promise<LegacySyncConfigDto | null> {
+    try {
+      const { data, error } = await supabase
+        .from('legacy_sync_config')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return {
+        id: data.id,
+        isEnabled: Boolean(data.is_enabled),
+        lastSyncedSaleId: Number(data.last_synced_sale_id || 0),
+        lastSyncedReceivingId: Number(data.last_synced_receiving_id || 0),
+        lastRunAt: data.last_run_at,
+        lastStatus: data.last_status || 'idle',
+        lastSummary: data.last_summary || {},
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async toggleEnabled(isEnabled: boolean): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('legacy_sync_config')
+        .update({
+          is_enabled: isEnabled,
+          last_status: isEnabled ? 'idle' : 'paused',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1);
+
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+};
+
+
 
 
