@@ -33,7 +33,28 @@ jobs:
           pnpm --filter @pixelcraft/types build
           pnpm --filter @pixelcraft/web build
 
+      - name: Cooldown pause for cPanel FTPS session slot
+        run: sleep 5
+
       - name: Deploy build output to Namecheap cPanel via FTPS
+        id: ftp_deploy_primary
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./apps/web/out/
+          server-dir: ./
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            maintenance.flag
+
+      - name: Retry FTPS deployment on transient connection timeout
+        if: steps.ftp_deploy_primary.outcome == 'failure'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
