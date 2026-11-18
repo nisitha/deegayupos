@@ -377,6 +377,14 @@ export function ShiftEndModal({
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>1. Modaka Ledger</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${activeTab === 'MODAKA'
+                ? 'bg-purple-800 text-purple-200'
+                : 'bg-slate-100 text-slate-600'
+                }`}
+            >
+              {modakaUnitsTotal} units • LKR {modakaSalesTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
           </button>
           <button
             type="button"

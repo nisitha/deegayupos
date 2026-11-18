@@ -53,6 +53,10 @@ jobs:
             **/node_modules/**
             maintenance.flag
 
+      - name: Cooldown pause before FTPS retry
+        if: steps.ftp_deploy_primary.outcome == 'failure'
+        run: sleep 15
+
       - name: Retry FTPS deployment on transient connection timeout
         if: steps.ftp_deploy_primary.outcome == 'failure'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -96,6 +100,9 @@ jobs:
             echo "ERROR: Live health check failed (Root: $ROOT_CODE, POS: $POS_CODE)"
             exit 1
           fi
+
+          echo "Verifying Cache-Control headers on HTML..."
+          curl -sI "https://pos.pixelcraftlk.com/dashboard/pos/?v=$(date +%s)" | grep -i "cache-control" || true
 
           echo "=========================================================="
           echo "✓ PixelCraft POS is LIVE and HEALTHY at https://pos.pixelcraftlk.com"

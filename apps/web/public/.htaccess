@@ -46,7 +46,14 @@ ErrorDocument 404 /404.html
   Header always set X-XSS-Protection "1; mode=block"
 </IfModule>
 
-# 5. Disable caching for maintenance assets & flag
+# 5. Disable caching for HTML documents & maintenance flag
+<FilesMatch "\.(html|htm)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </IfModule>
+</FilesMatch>
 <FilesMatch "^(maintenance\.html|maintenance\.flag)$">
   <IfModule mod_headers.c>
     Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
@@ -95,4 +102,11 @@ ErrorDocument 404 /404.html
   ExpiresByType image/webp "access plus 1 year"
   ExpiresByType image/png "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 1 year"
+</IfModule>
+
+<IfModule mod_setenvif.c>
+  SetEnvIf Request_URI "^/_next/static/" IMMUTABLE_CHUNK=1
+</IfModule>
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable" env=IMMUTABLE_CHUNK
 </IfModule>
