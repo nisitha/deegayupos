@@ -1457,7 +1457,7 @@ export default function ConfidencyPosPage() {
                     Modaka In (B)
                   </span>
                   <span className="text-xs text-white/85 font-medium truncate">
-                    ගෙනත් දුන් මෝදක
+                    Add Received Stock
                   </span>
                 </div>
               </div>

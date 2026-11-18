@@ -61,6 +61,7 @@ export function ShiftEndModal({
     {
       productId: string;
       productName: string;
+      productSku?: string;
       openingQty: number;
       inQty: number;
       soldQty: number;
@@ -139,6 +140,7 @@ export function ShiftEndModal({
         const rows = (shift.modakaEntries || []).map((e) => ({
           productId: e.productId,
           productName: e.productName || 'Modaka Variety',
+          productSku: e.productSku || '',
           openingQty: Number(e.openingQty || 0),
           inQty: Number(e.inQty || 0),
           soldQty: Number(e.soldQty || 0),
@@ -371,7 +373,7 @@ export function ShiftEndModal({
               }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>1. Modaka Ledger (A–E)</span>
+            <span>1. Modaka Ledger</span>
           </button>
           <button
             type="button"
@@ -401,7 +403,7 @@ export function ShiftEndModal({
               }`}
           >
             <Receipt className="w-3.5 h-3.5" />
-            <span>3. දවසේ වියදම් විස්තරය</span>
+            <span>3. Cash & Expenses</span>
             {cashVariance !== 0 && (
               <span
                 className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] font-bold ${cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
@@ -444,7 +446,7 @@ export function ShiftEndModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-black text-slate-900">
-                        මෝදක ශේෂ විස්තරය (Modaka 7-Variety Stock & Sales)
+                        Modaka Stock & Sales Summary
                       </h4>
                       <p className="text-xs text-slate-500">
                         Opening stock carries forward automatically from previous closed shift. Enter incoming stock (B) and shift sales (D).
@@ -463,17 +465,18 @@ export function ShiftEndModal({
                       <thead className="bg-slate-100/80 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                         <tr>
                           <th className="py-2.5 px-3 w-8 text-center">#</th>
-                          <th className="py-2.5 px-3 min-w-[200px]">Modaka Variety / විස්තරය</th>
-                          <th className="py-2.5 px-2 text-center w-20">A: Opening</th>
+                          <th className="py-2.5 px-3 w-24">Item Code</th>
+                          <th className="py-2.5 px-3 min-w-[180px]">Modaka Variety</th>
+                          <th className="py-2.5 px-2 text-center w-20">A (Opening)</th>
                           <th className="py-2.5 px-2 text-center w-24 bg-amber-50/70 text-amber-900">
-                            + B: In (ලද)
+                            B (In)
                           </th>
-                          <th className="py-2.5 px-2 text-center w-20 bg-slate-50">C: Total (A+B)</th>
+                          <th className="py-2.5 px-2 text-center w-20 bg-slate-50">C (Balance)</th>
                           <th className="py-2.5 px-2 text-center w-24 bg-purple-50/70 text-purple-900">
-                            - D: Sold (විකිණුම්)
+                            D (Shift Sale)
                           </th>
                           <th className="py-2.5 px-2 text-center w-20 bg-emerald-50/70 text-emerald-900 font-bold">
-                            E: Closing
+                            E (Closing)
                           </th>
                         </tr>
                       </thead>
@@ -485,6 +488,9 @@ export function ShiftEndModal({
                             <tr key={row.productId} className="hover:bg-slate-50/60 transition-colors">
                               <td className="py-2.5 px-3 text-center font-bold text-slate-400">
                                 {idx + 1}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-[11px] font-semibold text-slate-500">
+                                {row.productSku || `MOD-0${idx + 1}`}
                               </td>
                               <td className="py-2.5 px-3">
                                 <span className="font-bold text-slate-800 block text-xs">
@@ -526,8 +532,8 @@ export function ShiftEndModal({
                       </tbody>
                       <tfoot className="bg-slate-100/90 font-mono font-bold text-slate-800 text-xs border-t-2 border-slate-300">
                         <tr>
-                          <td colSpan={2} className="py-2 px-3 uppercase text-[10px] tracking-wider text-slate-600">
-                            Column Totals (මුළු එකතුව)
+                          <td colSpan={3} className="py-2 px-3 uppercase text-[10px] tracking-wider text-slate-600">
+                            Total Units
                           </td>
                           <td className="py-2 px-2 text-center">{modakaTotals.sumA}</td>
                           <td className="py-2 px-2 text-center text-amber-800">+{modakaTotals.sumB}</td>
@@ -558,7 +564,7 @@ export function ShiftEndModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-black text-slate-900">
-                        කාසි සහ නෝට්ටු ගණන් කිරීම (Drawer Cash Denomination Counter)
+                        Drawer Cash Denomination Counter
                       </h4>
                       <p className="text-xs text-slate-500">
                         Count each note & coin in the cash drawer. Total cash automatically links to Shift Summary.
@@ -621,7 +627,7 @@ export function ShiftEndModal({
                       <Coins className="w-6 h-6 text-emerald-600" />
                       <div>
                         <h5 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                          Counted Drawer Cash (ගණන් කළ මුදල)
+                          Counted Drawer Cash
                         </h5>
                         <p className="text-[11px] text-emerald-700">
                           Total value of all notes and coins counted in drawer
@@ -659,7 +665,7 @@ export function ShiftEndModal({
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-black text-slate-900">
-                      දවසේ වියදම් විස්තරය (Shift Cash & Expense Summary)
+                      Shift Cash & Expense Summary
                     </h4>
                     <p className="text-xs text-slate-500">
                       Reconcile cash inflows, supplier purchases paid from drawer, and specify banked amount.
@@ -672,7 +678,7 @@ export function ShiftEndModal({
                     <div className="flex items-center justify-between pt-1">
                       <div>
                         <span className="font-bold text-slate-800 block">
-                          1. Opening Drawer Float (ආරම්භක මුදල)
+                          Opening Float
                         </span>
                         <span className="text-[11px] text-slate-400">
                           Auto carried from previous shift closing float
@@ -694,7 +700,7 @@ export function ShiftEndModal({
                     <div className="flex items-center justify-between pt-2.5">
                       <div>
                         <span className="font-bold text-slate-800 block">
-                          2. Shift Sale / Cash Sales (දවසේ විකිණුම්)
+                          Shift Sale Amount
                         </span>
                         <span className="text-[11px] text-purple-600 font-mono">
                           POS Live Cash Sales: LKR {currentShift ? currentShift.posCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
@@ -715,7 +721,7 @@ export function ShiftEndModal({
                     {/* Total Cash Available */}
                     <div className="flex items-center justify-between pt-2.5 font-bold bg-slate-50/70 p-2 rounded-xl">
                       <span className="text-slate-900">
-                        Total Cash Available (මුළු එකතුව = 1 + 2):
+                        Total Cash:
                       </span>
                       <span className="font-mono text-sm text-slate-900">
                         LKR {totalCashAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -726,7 +732,7 @@ export function ShiftEndModal({
                     <div className="flex items-center justify-between pt-2.5">
                       <div>
                         <span className="font-bold text-rose-700 block">
-                          3. Less: Goods Purchased Paid (බඩු ගත් මුදල්)
+                          Goods Purchased Paid Out
                         </span>
                         <span className="text-[11px] text-slate-400">
                           Cash paid out to suppliers or incoming stock
@@ -749,7 +755,7 @@ export function ShiftEndModal({
                     <div className="flex items-center justify-between pt-2.5">
                       <div>
                         <span className="font-bold text-rose-700 block">
-                          4. Less: Other Expenses (වෙනත් වියදම්)
+                          Other Expenses
                         </span>
                         <span className="text-[11px] text-slate-400">
                           Petty cash, meals, transport, branch maintenance
@@ -771,7 +777,7 @@ export function ShiftEndModal({
                     {/* Expected Cash Before Bank */}
                     <div className="flex items-center justify-between pt-2.5 font-bold bg-amber-50/60 p-2 rounded-xl">
                       <span className="text-amber-950">
-                        Expected Cash Before Bank (වියදම් හැර ඉතිරි මුදල):
+                        Net Cash Before Bank:
                       </span>
                       <span className="font-mono text-sm text-amber-900 font-black">
                         LKR {expectedCashBeforeBank.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -782,7 +788,7 @@ export function ShiftEndModal({
                     <div className="flex items-center justify-between pt-2.5">
                       <div>
                         <span className="font-bold text-emerald-800 block">
-                          Actual Counted Drawer Cash (ගණන් කළ මුදල)
+                          Counted Drawer Cash
                         </span>
                         <span className="text-[11px] text-emerald-600">
                           Calculated from Denominations Counter
@@ -803,7 +809,7 @@ export function ShiftEndModal({
                         }`}
                     >
                       <span>
-                        Cash Variance (වෙනස):{' '}
+                        Cash Variance:{' '}
                         {cashVariance === 0
                           ? 'Balanced'
                           : cashVariance > 0
@@ -821,7 +827,7 @@ export function ShiftEndModal({
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="font-bold text-slate-800 block">
-                            5. Banked Amount (බැංකු කළ මුදල)
+                            Banked Amount
                           </span>
                           <span className="text-[11px] text-slate-400">
                             Cash taken out from drawer to deposit into company bank
@@ -882,7 +888,7 @@ export function ShiftEndModal({
                       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between shadow-xs">
                         <div>
                           <span className="text-xs font-bold uppercase tracking-wider block">
-                            Closing Drawer Float for Next Shift (ඉදිරියට ගෙන යන කාසි/මුදල්)
+                            Closing Drawer Float
                           </span>
                           <span className="text-[10px] text-emerald-100 font-medium">
                             Auto carries forward as Shift {currentShift?.shiftNumber === 1 ? '2' : '1'} Opening Float
@@ -897,7 +903,7 @@ export function ShiftEndModal({
                     {/* Handover Notes */}
                     <div className="pt-3">
                       <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Handover Notes / Remarks (සටහන්)
+                        Handover Notes / Remarks
                       </label>
                       <textarea
                         rows={2}

@@ -202,7 +202,7 @@ export function ModakaStockInModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black tracking-tight">
-                  Modaka Stock In (ලද ප්‍රමාණය - B)
+                  Modaka Stock In (B)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/20">
                   {activeShift ? `Shift ${activeShift.shiftNumber}` : 'Active Shift'}
@@ -232,14 +232,6 @@ export function ModakaStockInModal({
               </div>
             )}
 
-            <div className="p-3.5 bg-rose-50/70 border border-rose-200/70 rounded-2xl text-xs text-rose-950 leading-relaxed flex items-center gap-2.5">
-              <span className="text-base">💡</span>
-              <div>
-                <strong>ගෙනත් දුන් මෝදක (Mid-Shift Stock In):</strong> Entering stock received here adds directly to column{' '}
-                <strong>B (In)</strong> and immediately recalculates available stock (<strong>C = A + B</strong>) without ending your shift.
-              </div>
-            </div>
-
             {isLoading ? (
               <div className="py-16 text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-rose-600 mx-auto" />
@@ -256,12 +248,12 @@ export function ModakaStockInModal({
                   <thead className="bg-slate-100/90 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3 w-8 text-center">#</th>
-                      <th className="py-2.5 px-3">Modaka Variety / විස්තරය</th>
-                      <th className="py-2.5 px-2 text-center w-20">A: Opening</th>
+                      <th className="py-2.5 px-3">Modaka Variety</th>
+                      <th className="py-2.5 px-2 text-center w-24">Opening (A)</th>
                       <th className="py-2.5 px-3 text-center w-28 bg-rose-100/70 text-rose-950 font-black">
-                        + B: Receive Now
+                        Add In (B)
                       </th>
-                      <th className="py-2.5 px-2 text-center w-24">C: New Total</th>
+                      <th className="py-2.5 px-2 text-center w-24">Balance (C)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
