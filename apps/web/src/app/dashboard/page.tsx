@@ -29,7 +29,6 @@ import {
 } from 'recharts';
 import type {
   DashboardActivityItem,
-  DashboardChartsData,
   DashboardMetrics,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
@@ -58,6 +57,7 @@ interface AnalyticsData {
   dailyTrend: Array<{
     date: string;
     label: string;
+    fullDate?: string;
     sales: number;
     profit: number;
     count: number;
@@ -74,13 +74,59 @@ interface AnalyticsData {
 
 type Period = 'today' | 'week' | 'month';
 
+interface CustomTimelineTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+  currency: string;
+}
+
+function CustomTimelineTooltip({ active, payload, label, currency }: CustomTimelineTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const dataPoint = payload[0]?.payload;
+  const salesVal = Number(dataPoint?.sales || 0);
+  const profitVal = Number(dataPoint?.profit || 0);
+  const countVal = Number(dataPoint?.count || 0);
+  const title = dataPoint?.fullDate || dataPoint?.date || label;
+
+  const fmt = (val: number) =>
+    `${currency} ${val.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  return (
+    <div className="bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl p-3 shadow-xl text-xs space-y-1.5 min-w-[210px]">
+      <div className="font-bold text-slate-800 pb-1.5 border-b border-slate-100 flex items-center justify-between gap-2">
+        <span className="truncate">{title}</span>
+        <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-mono shrink-0">
+          {countVal} {countVal === 1 ? 'settled bill' : 'settled bills'}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3 text-blue-600 font-semibold">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+          Gross Revenue
+        </span>
+        <span className="font-mono font-bold">{fmt(salesVal)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3 text-emerald-600 font-semibold">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+          Net Profit
+        </span>
+        <span className="font-mono font-bold">{fmt(profitVal)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { selectedBranchId, currency, isOwner, grnBranchIds, isLoading: isTenantLoading } = useTenantBranch();
   const hasGrnAccess = isOwner || (Array.isArray(grnBranchIds) && grnBranchIds.length > 0);
 
   const [period, setPeriod] = useState<Period>('week');
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [charts, setCharts] = useState<DashboardChartsData | null>(null);
   const [activity, setActivity] = useState<DashboardActivityItem[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +142,8 @@ export default function DashboardPage() {
 
     try {
       setLoading(true);
-      const [metricsRes, chartsRes, activityRes, analyticsRes] = await Promise.all([
+      const [metricsRes, activityRes, analyticsRes] = await Promise.all([
         dashboardApi.getMetrics(selectedBranchId || undefined),
-        dashboardApi.getCharts(7, selectedBranchId || undefined),
         dashboardApi.getActivity(10, selectedBranchId || undefined),
         posApi.getAnalytics<AnalyticsData>({
           period,
@@ -107,7 +152,6 @@ export default function DashboardPage() {
       ]);
 
       if (metricsRes.data) setMetrics(metricsRes.data);
-      if (chartsRes.data) setCharts(chartsRes.data);
       if (activityRes.data) setActivity(activityRes.data);
       if (analyticsRes?.data) setAnalytics(analyticsRes.data);
     } catch (err) {
@@ -332,25 +376,33 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sales & Profit Timeline (2 Cols) */}
         <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-sm font-bold text-slate-900">Sales & Profit Timeline</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Daily gross revenue and net profit performance
+                {period === 'today'
+                  ? "Today's hourly revenue and net profit performance (07:00 - 22:00 Asia/Colombo)"
+                  : period === 'week'
+                  ? '7-Day daily gross revenue and net profit performance (Asia/Colombo)'
+                  : '30-Day daily gross revenue and net profit performance (Asia/Colombo)'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#005BD3]" /> Revenue
+                <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" /> Revenue
               </span>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Net Profit
+                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> Net Profit
               </span>
             </div>
           </div>
 
-          <div className="w-full h-72 mt-2">
-            {isMounted && analytics?.dailyTrend && analytics.dailyTrend.length > 0 ? (
+          <div className="h-[290px] w-full mt-4">
+            {isMounted &&
+            analytics &&
+            (analytics.billCount > 0 || (analytics.dailyTrend && analytics.dailyTrend.some((d) => d.sales > 0 || d.count > 0))) &&
+            analytics.dailyTrend &&
+            analytics.dailyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={analytics.dailyTrend}
@@ -358,11 +410,11 @@ export default function DashboardPage() {
                 >
                   <defs>
                     <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#005BD3" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#005BD3" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
                       <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
@@ -379,26 +431,17 @@ export default function DashboardPage() {
                     fontSize={11}
                     tickLine={false}
                     axisLine={{ stroke: '#E2E8F0' }}
-                    tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#E2E8F0',
-                      borderRadius: '12px',
-                      color: '#0F172A',
-                      fontSize: '12px',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
+                    tickFormatter={(v: number) => {
+                      if (v >= 1000000) return `LKR ${(v / 1000000).toFixed(1)}M`;
+                      if (v >= 1000) return `LKR ${(v / 1000).toFixed(0)}k`;
+                      return `LKR ${v}`;
                     }}
-                    formatter={(value: unknown, name: unknown) => [
-                      formatCurrency(Number(value) || 0),
-                      name === 'sales' ? 'Revenue' : 'Net Profit',
-                    ]}
                   />
+                  <Tooltip content={<CustomTimelineTooltip currency={currency} />} />
                   <Area
                     type="monotone"
                     dataKey="sales"
-                    stroke="#005BD3"
+                    stroke="#2563EB"
                     strokeWidth={2.5}
                     fillOpacity={1}
                     fill="url(#revenueGrad)"
@@ -415,57 +458,6 @@ export default function DashboardPage() {
                       name="profit"
                     />
                   )}
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : isMounted && charts?.timeline && charts.timeline.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={charts.timeline}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="revenueGrad2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#005BD3" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#005BD3" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#94A3B8"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={{ stroke: '#E2E8F0' }}
-                  />
-                  <YAxis
-                    stroke="#94A3B8"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={{ stroke: '#E2E8F0' }}
-                    tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : `${v}`)}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#E2E8F0',
-                      borderRadius: '12px',
-                      color: '#0F172A',
-                      fontSize: '12px',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
-                    }}
-                    formatter={(value: unknown) => [
-                      formatCurrency(Number(value) || 0),
-                      'Revenue',
-                    ]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#005BD3"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#revenueGrad2)"
-                  />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (

@@ -72,6 +72,7 @@ import type {
   CreateStaffIncentiveDto,
   CashierShortageDto,
 } from '@pixelcraft/types';
+import { buildColomboTimeline, calculateSaleProfit } from './sales-timeline';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -981,22 +982,22 @@ export function getColomboDateBounds(
     };
   }
 
-  if (period === 'week') {
-    const currentColomboDate = new Date(`${todayStr}T12:00:00+05:30`);
-    const dayOfWeek = currentColomboDate.getDay();
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const monday = new Date(Date.UTC(yearNum, monthNum - 1, dayNum - diffToMonday));
-    const mStr = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+  if (period === 'week' || period === '7d' || period === '7days') {
+    // 7 consecutive calendar dates ending today (Asia/Colombo)
+    const d7 = new Date(Date.UTC(yearNum, monthNum - 1, dayNum - 6));
+    const s7 = `${d7.getUTCFullYear()}-${String(d7.getUTCMonth() + 1).padStart(2, '0')}-${String(d7.getUTCDate()).padStart(2, '0')}`;
     return {
-      from: `${mStr}T00:00:00.000+05:30`,
+      from: `${s7}T00:00:00.000+05:30`,
       to: `${todayStr}T23:59:59.999+05:30`,
     };
   }
 
-  if (period === 'month') {
-    const mStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+  if (period === 'month' || period === '30d' || period === '30days') {
+    // 30 consecutive calendar dates ending today (Asia/Colombo)
+    const d30 = new Date(Date.UTC(yearNum, monthNum - 1, dayNum - 29));
+    const s30 = `${d30.getUTCFullYear()}-${String(d30.getUTCMonth() + 1).padStart(2, '0')}-${String(d30.getUTCDate()).padStart(2, '0')}`;
     return {
-      from: `${mStr}T00:00:00.000+05:30`,
+      from: `${s30}T00:00:00.000+05:30`,
       to: `${todayStr}T23:59:59.999+05:30`,
     };
   }
@@ -1766,6 +1767,7 @@ export const posApi = {
               productName: i.product_name,
               sku: i.sku,
               unitPrice: Number(i.unit_price || 0),
+              costPrice: Number(i.cost_price || 0),
               quantity: Number(i.quantity || 1),
               discountAmount: Number(i.discount_amount || 0),
               taxAmount: Number(i.tax_amount || 0),
@@ -1995,16 +1997,25 @@ export const posApi = {
   getAnalytics: async <T = Record<string, unknown>>(
     params?: Record<string, unknown>
   ): Promise<ApiResponse<T>> => {
-    const salesRes = await posApi.getSales(params);
+    const salesRes = await posApi.getSales({
+      ...params,
+      limit: 2000,
+    });
     const items = salesRes.data.items || [];
-    const completed = items.filter((s) => s.status !== 'VOIDED');
-    const voided = items.filter((s) => s.status === 'VOIDED');
+    const completed = items.filter((s) => s.status !== 'VOIDED' && (s as any).status !== 'voided');
+    const voided = items.filter((s) => s.status === 'VOIDED' || (s as any).status === 'voided');
     const totalRevenue = completed.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
     const totalBills = completed.length;
     const voidedBillCount = voided.length;
-    const estimatedCost = totalRevenue * 0.65;
-    const grossProfit = totalRevenue - estimatedCost;
-    const profitMargin = totalRevenue > 0 ? Number(((grossProfit / totalRevenue) * 100).toFixed(1)) : 0;
+
+    // Item-level profit calculation with fallback
+    let netProfit = 0;
+    for (const sale of completed) {
+      netProfit += calculateSaleProfit(sale);
+    }
+    netProfit = Math.round(netProfit * 100) / 100;
+    const estimatedCost = Math.round((totalRevenue - netProfit) * 100) / 100;
+    const profitMargin = totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(1)) : 0;
     const avgOrder = totalBills > 0 ? Math.round(totalRevenue / totalBills) : 0;
 
     // Aggregate payment breakdown from actual sale records
@@ -2040,30 +2051,33 @@ export const posApi = {
       other: Math.round(otherPay),
     };
 
+    const periodStr = (params?.period as string) || 'week';
+    const timelineData = buildColomboTimeline(completed, periodStr);
+
     return {
       success: true,
       data: {
-        period: (params?.period as string) || 'week',
+        period: periodStr,
         grossSales: totalRevenue,
         netSales: totalRevenue,
         totalRevenue,
         totalDiscount: 0,
         totalTax: 0,
         totalCost: estimatedCost,
-        netProfit: grossProfit,
-        grossProfit,
+        netProfit,
+        grossProfit: netProfit,
         profitMargin,
         billCount: totalBills,
         totalBills,
         voidedBillCount,
         averageOrderValue: avgOrder,
         todayRevenue: totalRevenue,
-        todayProfit: grossProfit,
+        todayProfit: netProfit,
         todayBills: totalBills,
         paymentBreakdown,
         methodBreakdown: { CASH: cashPay, CARD: cardPay, QR: qrPay, CREDIT: creditPay },
-        dailyTrend: [],
-        hourlyTrend: [],
+        dailyTrend: timelineData,
+        timeline: timelineData,
         topProducts: [],
       } as T,
     };
