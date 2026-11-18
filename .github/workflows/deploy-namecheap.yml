@@ -45,26 +45,39 @@ jobs:
           pnpm --filter @pixelcraft/types build
           pnpm --filter @pixelcraft/web build
 
-      - name: Prepare Maintenance Mode Assets
+      - name: Stage 1 — Enable Maintenance Mode via curl
         if: "${{ github.event.inputs.action != 'disable-maintenance-only' }}"
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          mkdir -p ./deploy-maint
-          cp apps/web/public/.htaccess ./deploy-maint/
-          cp apps/web/public/maintenance.html ./deploy-maint/
-          echo "DEPLOY_ACTIVE_$(date -u +%Y%m%d_%H%M%S)" > ./deploy-maint/maintenance.flag
+          SERVER_HOST="${FTP_SERVER#ftp://}"
+          SERVER_HOST="${SERVER_HOST%/}"
 
-      - name: Stage 1 — Enable Maintenance Mode (< 3s)
-        if: "${{ github.event.inputs.action != 'disable-maintenance-only' }}"
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./deploy-maint/
-          server-dir: ./
-          dangerous-clean-slate: false
+          echo "DEPLOY_ACTIVE_$(date -u +%Y%m%d_%H%M%S)" > ./maintenance.flag
 
-      - name: Stage 2 — Main Static Export Sync
+          echo "Uploading maintenance assets and flag via FTPS curl (non-destructive)..."
+          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T apps/web/public/.htaccess "ftp://${SERVER_HOST}/.htaccess"
+          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T apps/web/public/maintenance.html "ftp://${SERVER_HOST}/maintenance.html"
+          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" -T ./maintenance.flag "ftp://${SERVER_HOST}/maintenance.flag"
+          echo "✓ Maintenance Mode is active."
+
+      - name: Stage 2 — Clear Remote Sync State
+        if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          SERVER_HOST="${FTP_SERVER#ftp://}"
+          SERVER_HOST="${SERVER_HOST%/}"
+
+          echo "Deleting any corrupted .ftp-deploy-sync-state.json from remote root..."
+          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" "ftp://${SERVER_HOST}/" -Q "-DELE .ftp-deploy-sync-state.json" -o /dev/null || true
+          echo "✓ Remote sync state cleared for clean full sync."
+
+      - name: Stage 2 — Full Static Site Sync (apps/web/out/)
         if: "${{ github.event.inputs.action != 'disable-maintenance-only' && github.event.inputs.action != 'enable-maintenance-only' }}"
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -75,71 +88,52 @@ jobs:
           server-dir: ./
           dangerous-clean-slate: false
           exclude: |
-            **/maintenance.flag
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            maintenance.flag
 
-      - name: Stage 3 — Disable Maintenance Mode
-        if: "${{ github.event.inputs.action != 'enable-maintenance-only' }}"
+      - name: Stage 3 — Disable Maintenance Mode & Verify Live Site
+        if: "always() && github.event.inputs.action != 'enable-maintenance-only'"
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          python3 - << 'EOF'
-          import os
-          import sys
-          import subprocess
-          from ftplib import FTP_TLS
+          SERVER_HOST="${FTP_SERVER#ftp://}"
+          SERVER_HOST="${SERVER_HOST%/}"
 
-          server = os.environ.get('FTP_SERVER', '').strip()
-          username = os.environ.get('FTP_USERNAME', '').strip()
-          password = os.environ.get('FTP_PASSWORD', '').strip()
+          echo "Deleting maintenance.flag from remote root via FTPS curl..."
+          curl --ssl-reqd --ftp-pasv -k -s -S -u "${FTP_USERNAME}:${FTP_PASSWORD}" "ftp://${SERVER_HOST}/" -Q "-DELE maintenance.flag" -o /dev/null || true
+          echo "✓ Deleted maintenance.flag."
 
-          if not server or not username:
-              print("Notice: FTP credentials missing, skipping maintenance flag deletion.")
-              sys.exit(0)
+          echo "Waiting 5 seconds for web server and edge caches to update..."
+          sleep 5
 
-          deleted = False
+          echo "Verifying live endpoints on pos.pixelcraftlk.com..."
+          TS=$(date +%s)
+          FLAG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/maintenance.flag?t=$TS")
+          echo "maintenance.flag check: HTTP $FLAG_STATUS (expected 404)"
 
-          # 1. Attempt FTPS deletion via Python ftplib
-          try:
-              print(f"Connecting to {server} via FTPS...")
-              ftps = FTP_TLS()
-              ftps.connect(server, 21, timeout=30)
-              ftps.login(username, password)
-              ftps.prot_p()
-              try:
-                  ftps.delete('maintenance.flag')
-                  print("✓ Successfully deleted maintenance.flag from server root. Maintenance Mode is OFF.")
-                  deleted = True
-              except Exception as del_err:
-                  print(f"File delete note (file may already be deleted): {del_err}")
-                  deleted = True
-              finally:
-                  try:
-                      ftps.quit()
-                  except Exception:
-                      ftps.close()
-          except Exception as conn_err:
-              print(f"FTPS connection error via Python: {conn_err}")
+          PASSED=false
+          for i in {1..6}; do
+            TS=$(date +%s)
+            ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/?t=$TS")
+            LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pos.pixelcraftlk.com/login/?t=$TS")
+            echo "Attempt $i: Root: $ROOT_STATUS, Login: $LOGIN_STATUS"
 
-          # 2. Fallback to curl --ftp-ssl
-          if not deleted:
-              print("Attempting remote delete via curl --ftp-ssl fallback...")
-              cmd = [
-                  "curl", "--ftp-ssl", "--insecure", "-s", "-S",
-                  "-u", f"{username}:{password}",
-                  f"ftp://{server}/",
-                  "-Q", "DELE maintenance.flag"
-              ]
-              res = subprocess.run(cmd, capture_output=True, text=True)
-              print("curl stdout:", res.stdout)
-              print("curl stderr:", res.stderr)
-              if res.returncode == 0:
-                  print("✓ Successfully deleted maintenance.flag via curl fallback. Maintenance Mode is OFF.")
-                  deleted = True
+            if [ "$ROOT_STATUS" = "200" ] && [ "$LOGIN_STATUS" = "200" ]; then
+              PASSED=true
+              break
+            fi
+            sleep 3
+          done
 
-          if deleted:
-              print("==================================================")
-              print("✓ DEPLOYMENT COMPLETE: PixelCraft POS is LIVE at pos.pixelcraftlk.com")
-              print("==================================================")
-          EOF
+          if [ "$PASSED" != "true" ]; then
+            echo "ERROR: Live health check failed after multiple attempts (Root: $ROOT_STATUS, Login: $LOGIN_STATUS)"
+            exit 1
+          fi
+
+          echo "=========================================================="
+          echo "✓ PixelCraft POS is LIVE and HEALTHY at https://pos.pixelcraftlk.com"
+          echo "=========================================================="

@@ -8,7 +8,7 @@
 Options -Indexes
 
 # 2. Block direct web access to dotfiles and sensitive configurations
-<FilesMatch "(^\.|\.(env.*|git.*|sql|log|bak|json|ts|tsx|md|config.*)$)">
+<FilesMatch "(^\.|\.(env.*|git.*|sql|log|bak|ts|tsx|md|config.*)$)">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -18,9 +18,9 @@ Options -Indexes
   </IfModule>
 </FilesMatch>
 
-# 3. Directory Index Priority:
-# If index.html is temporarily absent mid-deployment, fallback directly to maintenance.html!
+# 3. Directory Index & Error Documents
 DirectoryIndex index.html maintenance.html
+ErrorDocument 404 /404.html
 
 # 4. Enterprise HTTP Security Headers (OWASP Hardening)
 <IfModule mod_headers.c>
@@ -71,9 +71,9 @@ DirectoryIndex index.html maintenance.html
   RewriteCond %{DOCUMENT_ROOT}/maintenance.flag -f
   RewriteRule ^ /maintenance.html [L]
 
-  # Handle clean URLs without trailing slash if directory exists (ignore files with extensions)
+  # Handle clean URLs without trailing slash (e.g. /login -> /login/ or /dashboard/pos -> /dashboard/pos/)
+  # Redirect requests without a file extension and without a trailing slash to trailing slash
   RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{2,5}$
   RewriteCond %{REQUEST_URI} !(.*)/$
   RewriteRule ^(.*)$ /$1/ [L,R=301]
