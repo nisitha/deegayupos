@@ -214,6 +214,11 @@ export default function StaffManagementPage() {
   // Filtered staff list
   const filteredStaff = useMemo(() => {
     return staffList.filter((staff) => {
+      // Strictly show active current employees (exclude legacy archived placeholders)
+      if (staff.role === 'ARCHIVED' || !staff.isActive) return false;
+      const lower = staff.fullName.toLowerCase();
+      if (lower.startsWith('sale ') || lower.startsWith('cashier ') || lower.startsWith('user ') || lower.startsWith('system ')) return false;
+
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const matchName = staff.fullName.toLowerCase().includes(query);

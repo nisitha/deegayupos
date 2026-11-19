@@ -1097,8 +1097,8 @@ export default function CashReconciliationPage() {
     return { totalC, totalD, totalE, totalF, totalVariance, totalSales };
   }, [consolidatedSummaries]);
 
-  // Staff members list for quick pills
-  const KNOWN_STAFF = ['Shashini', 'Tharindu', 'Anusha', 'Kumari', 'Gindika'];
+  // Staff members list for quick pills (Strictly current active team members)
+  const KNOWN_STAFF = ['Dr. Deegayu (Owner)', 'Anusha', 'Gindika', 'Kumari', 'Shashini', 'Tharindu'];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">

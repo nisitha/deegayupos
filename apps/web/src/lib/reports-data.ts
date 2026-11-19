@@ -207,17 +207,22 @@ export const HISTORICAL_MONTHLY_DATA: MonthlyTrendItem[] = [
   { month: '2026-11', label: 'Nov 2026', bills: 498, sales: 1442961.31, cost: 809378.69, profit: 633582.62, margin: 43.91 },
 ];
 
+export const ACTIVE_STAFF_MEMBERS: { cashierName: string; role: string }[] = [
+  { cashierName: 'Dr. Deegayu (Owner)', role: 'OWNER' },
+  { cashierName: 'Anusha', role: 'STAFF' },
+  { cashierName: 'Gindika', role: 'STAFF' },
+  { cashierName: 'Kumari', role: 'STAFF' },
+  { cashierName: 'Shashini', role: 'STAFF' },
+  { cashierName: 'Tharindu', role: 'STAFF' },
+];
+
 export const HISTORICAL_CASHIER_DATA: CashierSummaryItem[] = [
-  { cashierName: 'Sale Alawwa', billsCount: 7475, unitsSold: 205427, revenue: 8624116.38, cost: 4958201.59, profit: 3665914.79, margin: 42.51, averageBill: 1153.73 },
-  { cashierName: 'Sale Dambadeniya', billsCount: 5798, unitsSold: 214256, revenue: 10528070.99, cost: 5858432.75, profit: 4669638.24, margin: 44.35, averageBill: 1815.81 },
-  { cashierName: 'Sale Admin', billsCount: 994, unitsSold: 119513, revenue: 6868442.11, cost: 3584409.35, profit: 3284032.76, margin: 47.81, averageBill: 6910.0 },
-  { cashierName: 'User User1', billsCount: 811, unitsSold: 16687, revenue: 803104.72, cost: 432477.22, profit: 370627.5, margin: 46.15, averageBill: 990.26 },
-  { cashierName: 'Sale Giriulla', billsCount: 485, unitsSold: 32232, revenue: 6668433.9, cost: 3543359.32, profit: 3125074.58, margin: 46.86, averageBill: 13749.35 },
-  { cashierName: 'Sale Sale', billsCount: 21, unitsSold: 93, revenue: 16445.0, cost: 9846.16, profit: 6598.84, margin: 40.13, averageBill: 783.1 },
-  { cashierName: 'System Administrator', billsCount: 9, unitsSold: 10, revenue: 10053.2, cost: 6551.6, profit: 3501.6, margin: 34.83, averageBill: 1117.02 },
-  { cashierName: 'Cashier 01 Rikas', billsCount: 5, unitsSold: 6, revenue: 2350.0, cost: 1540.0, profit: 810.0, margin: 34.47, averageBill: 470.0 },
-  { cashierName: 'Sale Naranwala', billsCount: 1, unitsSold: 28, revenue: 6400.0, cost: 3192.0, profit: 3208.0, margin: 50.13, averageBill: 6400.0 },
-  { cashierName: 'Cashier 02 Sales 2', billsCount: 1, unitsSold: 10, revenue: 7000.0, cost: 2900.0, profit: 4100.0, margin: 58.57, averageBill: 7000.0 },
+  { cashierName: 'Dr. Deegayu (Owner)', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
+  { cashierName: 'Anusha', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
+  { cashierName: 'Gindika', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
+  { cashierName: 'Kumari', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
+  { cashierName: 'Shashini', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
+  { cashierName: 'Tharindu', billsCount: 0, unitsSold: 0, revenue: 0, cost: 0, profit: 0, margin: 45.0, averageBill: 0 },
 ];
 
 export const HISTORICAL_BRANCH_VALUATION: InventoryBranchValuation[] = [

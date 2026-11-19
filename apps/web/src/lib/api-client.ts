@@ -1974,29 +1974,31 @@ export const posApi = {
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, role')
+        .eq('is_active', true)
+        .neq('role', 'ARCHIVED')
         .order('full_name');
       if (!error && data && data.length > 0) {
-        return data.map((u: any) => ({
-          id: u.id,
-          fullName: u.full_name,
-          role: u.role,
-        }));
+        return data
+          .filter((u: any) => {
+            const name = String(u.full_name || '').toLowerCase();
+            return !name.startsWith('sale ') && !name.startsWith('cashier ') && !name.startsWith('user ') && !name.startsWith('system ');
+          })
+          .map((u: any) => ({
+            id: u.id,
+            fullName: u.full_name,
+            role: u.role,
+          }));
       }
     } catch (err) {
       console.warn('[getCashiers] error:', err);
     }
     return [
       { id: '96b2747b-9d22-4266-94ce-b035fadef498', fullName: 'Dr. Deegayu (Owner)', role: 'OWNER' },
+      { id: '1de49278-b4aa-466a-8493-d88c0c4d56de', fullName: 'Anusha', role: 'STAFF' },
+      { id: '192f7833-4465-4814-ab57-201cedd5f237', fullName: 'Gindika', role: 'STAFF' },
+      { id: '1b50a131-4b75-4b22-86ee-bdd74665aeab', fullName: 'Kumari', role: 'STAFF' },
       { id: '41363aeb-ba28-44b7-8822-983f1de593c0', fullName: 'Shashini', role: 'STAFF' },
       { id: '0f1d46e2-e943-4f24-b69e-f1ba5278a750', fullName: 'Tharindu', role: 'STAFF' },
-      { id: '1de49278-b4aa-466a-8493-d88c0c4d56de', fullName: 'Anusha', role: 'STAFF' },
-      { id: '1b50a131-4b75-4b22-86ee-bdd74665aeab', fullName: 'Kumari', role: 'STAFF' },
-      { id: '192f7833-4465-4814-ab57-201cedd5f237', fullName: 'Gindika', role: 'STAFF' },
-      { id: '219891d1-6264-4271-95a1-8781e5e5a7b1', fullName: 'Sale Alawwa', role: 'ARCHIVED' },
-      { id: '97e9b65f-1e57-4061-ad98-b79136359f07', fullName: 'Sale  Dabadeniya', role: 'ARCHIVED' },
-      { id: '97e9b65f-1e57-4061-ad98-b79136359f07', fullName: 'Sale Admin', role: 'ARCHIVED' },
-      { id: '23fed607-537b-41c8-9d29-2396d82e7cb8', fullName: 'User User1', role: 'ARCHIVED' },
-      { id: '057b87b9-2aa7-4c64-a17e-2be8ec9723ac', fullName: 'Sale Giriulla', role: 'ARCHIVED' },
     ];
   },
   getAnalytics: async <T = Record<string, unknown>>(

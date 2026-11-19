@@ -474,13 +474,17 @@ export default function SalesOrdersPage() {
     );
   };
 
-  // Group Cashiers: Active Staff vs Legacy / Historical
+  // Active Staff Cashiers (Strictly Current Active Team Members)
   const activeStaff = useMemo(
-    () => cashiers.filter((c) => c.role === 'OWNER' || c.role === 'STAFF'),
-    [cashiers],
-  );
-  const legacyCashiers = useMemo(
-    () => cashiers.filter((c) => c.role !== 'OWNER' && c.role !== 'STAFF'),
+    () =>
+      cashiers.filter(
+        (c) =>
+          (c.role === 'OWNER' || c.role === 'STAFF') &&
+          !c.fullName.toLowerCase().startsWith('sale') &&
+          !c.fullName.toLowerCase().startsWith('cashier') &&
+          !c.fullName.toLowerCase().startsWith('user') &&
+          !c.fullName.toLowerCase().startsWith('system')
+      ),
     [cashiers],
   );
 
@@ -998,28 +1002,18 @@ export default function SalesOrdersPage() {
                   }`}
                 >
                   <option value="ALL">All Cashiers</option>
-
-                  {/* Active Staff */}
-                  {activeStaff.length > 0 && (
-                    <optgroup label="Active Staff">
-                      {activeStaff.map((c) => (
-                        <option key={c.id} value={c.fullName}>
-                          {c.fullName} {c.role === 'OWNER' ? '★ (Owner)' : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-
-                  {/* Legacy Cashiers */}
-                  {legacyCashiers.length > 0 && (
-                    <optgroup label="Historical Cashiers">
-                      {legacyCashiers.map((c) => (
-                        <option key={c.id} value={c.fullName}>
-                          {c.fullName}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  {activeStaff.map((c) => {
+                    const label = c.fullName.includes('(Owner)')
+                      ? c.fullName
+                      : c.role === 'OWNER'
+                        ? `${c.fullName} (Owner)`
+                        : c.fullName;
+                    return (
+                      <option key={c.id} value={c.fullName}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {selectedCashier !== 'ALL' && (

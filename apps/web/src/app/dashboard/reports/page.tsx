@@ -61,6 +61,7 @@ import {
   PaymentSummaryItem,
   SupplierSummaryItem,
   ReceivingItemRow,
+  ACTIVE_STAFF_MEMBERS,
   HISTORICAL_MONTHLY_DATA,
   HISTORICAL_CASHIER_DATA,
   HISTORICAL_BRANCH_VALUATION,
@@ -500,7 +501,7 @@ export default function ReportsSuitePage() {
               className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
             >
               <option value="ALL" className="bg-slate-900 text-white">All Staff Cashiers</option>
-              {HISTORICAL_CASHIER_DATA.map((c) => (
+              {ACTIVE_STAFF_MEMBERS.map((c) => (
                 <option key={c.cashierName} value={c.cashierName} className="bg-slate-900 text-white">
                   {c.cashierName}
                 </option>
@@ -1426,7 +1427,7 @@ export default function ReportsSuitePage() {
                     <UserCheck className="w-4 h-4 text-emerald-400" />
                     <span>Cashier Attribution & Staff Performance (Report #8)</span>
                   </h3>
-                  <p className="text-xs text-slate-400">All 10 staff cashiers ranked by revenue generated and completed bills</p>
+                  <p className="text-xs text-slate-400">All 6 current staff cashiers ranked by revenue generated and completed bills</p>
                 </div>
                 <span className="text-xs text-slate-400">Click any cashier row to view shift metrics</span>
               </div>
