@@ -473,69 +473,67 @@ export function ReceiptModal({
                     </div>
                   )}
                   <div>
-                    <h1 className="text-xl font-black text-slate-950 uppercase tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-black uppercase tracking-tight">
                       {businessName}
                     </h1>
-                    <div className="text-xs font-bold text-indigo-700">දීගායු වෙද මැදුර සහ ආයුර්වේද ඖෂධාලය</div>
-                    <div className="text-xs font-bold text-slate-900 mt-1 flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <div className="text-sm font-bold text-black mt-1 flex items-center gap-1">
+                      <Building2 className="w-4 h-4 text-black shrink-0" />
                       <span>Outlet: {branchName}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 max-w-xs leading-snug">
+                    <div className="text-xs sm:text-sm text-black font-medium mt-0.5 max-w-sm leading-snug">
                       {branchAddress}
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">Tel: {branchPhone}</div>
-                    <div className="text-[11px] font-bold text-slate-800 mt-0.5">
+                    <div className="text-xs sm:text-sm text-black font-mono font-bold">Tel: {branchPhone}</div>
+                    <div className="text-xs sm:text-sm font-bold text-black mt-0.5">
                       VAT / Tax Reg ID: {taxNumber}
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-lg font-black text-indigo-900 uppercase tracking-wider">
+                  <div className="text-2xl sm:text-3xl font-extrabold text-black uppercase tracking-wider">
                     TAX INVOICE
                   </div>
-                  <div className="text-xs text-slate-500 font-semibold">වාණිජ බදු ඉන්වොයිසිය</div>
-                  <div className="mt-2 text-xs font-mono font-bold text-slate-900">
+                  <div className="mt-2 text-sm sm:text-base font-mono font-bold text-black">
                     #{invoiceNumber}
                   </div>
-                  <div className="text-[11px] text-slate-700 font-mono font-bold">
+                  <div className="text-xs sm:text-sm text-black font-mono font-bold">
                     Date: {billDate}
                   </div>
-                  <div className="text-[11px] text-slate-700 font-mono font-bold">
+                  <div className="text-xs sm:text-sm text-black font-mono font-bold">
                     Time: {billTime}
                   </div>
                 </div>
               </div>
 
               {/* Billed To / Client Section */}
-              <div className="grid grid-cols-2 gap-4 my-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+              <div className="grid grid-cols-2 gap-4 my-4 p-4 bg-slate-50 rounded-2xl border-2 border-black text-xs sm:text-sm text-black font-medium">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  <span className="text-xs uppercase font-extrabold text-black block tracking-wider">
                     Billed To / Customer
                   </span>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
+                  <div className="font-extrabold text-black text-base sm:text-lg mt-0.5">
                     {effectiveSale?.customerName || 'General Wholesale / Retail Client'}
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                  <div className="text-xs sm:text-sm text-black font-mono font-bold mt-0.5">
                     Account Status: Verified Customer
                   </div>
                 </div>
-                <div className="text-right font-mono text-[11px] text-slate-600">
-                  <div>Outlet: <span className="font-bold text-slate-800">{branchName}</span></div>
+                <div className="text-right font-mono text-xs sm:text-sm text-black font-bold">
+                  <div>Outlet: <span className="font-extrabold text-black">{branchName}</span></div>
                   <div>Station: REG-01</div>
-                  <div>Dispensed By: <span className="font-bold text-slate-800">{cashierName}</span></div>
-                  <div className="text-indigo-700 font-bold">Original Customer Copy</div>
+                  <div>Dispensed By: <span className="font-extrabold text-black">{cashierName}</span></div>
+                  <div className="text-black font-extrabold">Original Customer Copy</div>
                 </div>
               </div>
 
               {/* Wholesale Itemized Table */}
-              <div className="my-4 overflow-hidden rounded-2xl border border-slate-200">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
+              <div className="my-4 overflow-hidden rounded-2xl border-2 border-black">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead className="bg-slate-100 text-black font-extrabold uppercase border-b-2 border-black">
                     <tr>
                       <th className="py-2.5 px-3">#</th>
-                      <th className="py-2.5 px-3">Ayurvedic Formulation / Item</th>
+                      <th className="py-2.5 px-3">Item Description</th>
                       <th className="py-2.5 px-3">SKU</th>
                       <th className="py-2.5 px-3 text-right">Price ({currency})</th>
                       <th className="py-2.5 px-3 text-center">Qty</th>
@@ -543,22 +541,22 @@ export function ReceiptModal({
                       <th className="py-2.5 px-3 text-right">Total ({currency})</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                  <tbody className="divide-y divide-black/30 font-mono text-xs sm:text-[13px]">
                     {(effectiveSale?.items || []).map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
-                        <td className="py-2 px-3 font-sans font-semibold text-slate-900">
+                        <td className="py-2.5 px-3 text-black font-bold">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-sans font-bold text-black">
                           {item.productName}
                         </td>
-                        <td className="py-2 px-3 text-slate-500">{item.sku || 'N/A'}</td>
-                        <td className="py-2 px-3 text-right">{Number(item.unitPrice).toFixed(2)}</td>
-                        <td className="py-2 px-3 text-center font-bold">{formatReceiptQuantity(item.productName, item.quantity)}</td>
-                        <td className="py-2 px-3 text-right text-emerald-700">
+                        <td className="py-2.5 px-3 text-black font-semibold">{item.sku || 'N/A'}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-black">{Number(item.unitPrice).toFixed(2)}</td>
+                        <td className="py-2.5 px-3 text-center font-extrabold text-black">{formatReceiptQuantity(item.productName, item.quantity)}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-black">
                           {item.discountAmount && Number(item.discountAmount) > 0
                             ? `-${Number(item.discountAmount).toFixed(2)}`
                             : '-'}
                         </td>
-                        <td className="py-2 px-3 text-right font-bold text-slate-900">
+                        <td className="py-2.5 px-3 text-right font-extrabold text-black">
                           {Number(item.subtotal).toFixed(2)}
                         </td>
                       </tr>
@@ -570,19 +568,19 @@ export function ReceiptModal({
               {/* Financial Totals & Signatures */}
               <div className="grid grid-cols-2 gap-6 mt-4 pt-2">
                 <div className="space-y-4">
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <span className="font-bold text-slate-700 block">Payment Method</span>
+                  <div className="text-xs sm:text-sm text-black space-y-1 font-bold">
+                    <span className="font-extrabold text-black block">Payment Method</span>
                     {(effectiveSale?.payments || []).map((p, idx) => (
-                      <div key={idx} className="text-slate-800 font-mono">
-                        • {p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT' ? 'Store Credit (ණය)' : p.paymentMethod}: {currency} {Number(p.amount).toFixed(2)}
+                      <div key={idx} className="text-black font-mono">
+                        • {p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT' ? 'Store Credit' : p.paymentMethod}: {currency} {Number(p.amount).toFixed(2)}
                       </div>
                     ))}
                   </div>
 
                   {qrCodeUrl && (
                     <div className="flex items-center gap-3 pt-2">
-                      <img src={qrCodeUrl} alt="Verify QR" className="w-16 h-16 border rounded-lg p-0.5" />
-                      <div className="text-[10px] text-slate-400 font-mono leading-tight">
+                      <img src={qrCodeUrl} alt="Verify QR" className="w-16 h-16 border-2 border-black rounded-lg p-0.5" />
+                      <div className="text-[11px] text-black font-mono font-bold leading-tight">
                         Authentic Digital Receipt<br />
                         Scan QR code to verify tax certificate & batch validity.
                       </div>
@@ -590,26 +588,26 @@ export function ReceiptModal({
                   )}
                 </div>
 
-                <div className="space-y-1.5 font-mono text-xs text-right">
-                  <div className="flex justify-between text-slate-500">
+                <div className="space-y-1.5 font-mono text-sm sm:text-base text-right text-black font-bold">
+                  <div className="flex justify-between text-black">
                     <span>Subtotal:</span>
                     <span>{formatCurrency(Number(effectiveSale?.subtotal || 0))}</span>
                   </div>
                   {Number(effectiveSale?.discountAmount || 0) > 0 && (
-                    <div className="flex justify-between text-emerald-700 font-bold">
+                    <div className="flex justify-between text-black font-extrabold">
                       <span>Total Savings / Discount:</span>
                       <span>-{formatCurrency(Number(effectiveSale?.discountAmount))}</span>
                     </div>
                   )}
                   {Number(effectiveSale?.taxAmount || 0) > 0 && (
-                    <div className="flex justify-between text-slate-500">
+                    <div className="flex justify-between text-black">
                       <span>VAT (18%):</span>
                       <span>{formatCurrency(Number(effectiveSale?.taxAmount))}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-base font-black text-slate-950 pt-2 border-t-2 border-slate-900">
+                  <div className="flex justify-between text-lg sm:text-2xl font-extrabold text-black pt-2 border-t-2 border-black">
                     <span>NET TOTAL PAYABLE:</span>
-                    <span className="text-indigo-900">{formatCurrency(Number(effectiveSale?.totalAmount || 0))}</span>
+                    <span className="text-black">{formatCurrency(Number(effectiveSale?.totalAmount || 0))}</span>
                   </div>
                 </div>
               </div>
@@ -655,57 +653,56 @@ export function ReceiptModal({
                     </div>
                   </div>
                 )}
-                <div className="text-base font-black tracking-tight text-slate-950 uppercase">
+                <div className="text-lg sm:text-xl font-extrabold tracking-tight text-black uppercase">
                   {businessName}
                 </div>
-                <div className="text-[11px] font-bold text-indigo-700">දීගායු වෙද මැදුර</div>
-                <div className="text-[11px] font-bold text-slate-900 font-sans flex items-center justify-center gap-1 mt-0.5">
-                  <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <div className="text-xs sm:text-[13px] font-bold text-black font-sans flex items-center justify-center gap-1 mt-0.5">
+                  <Building2 className="w-3.5 h-3.5 text-black shrink-0" />
                   <span>Outlet: {branchName}</span>
                 </div>
                 {branchAddress && (
-                  <div className="text-[10px] text-slate-500 font-sans max-w-[240px] mx-auto leading-tight">
+                  <div className="text-xs font-bold text-black font-sans max-w-[260px] mx-auto leading-tight">
                     {branchAddress}
                   </div>
                 )}
                 {branchPhone && (
-                  <div className="text-[10px] text-slate-500 flex items-center justify-center gap-1">
-                    <Phone className="w-3 h-3 text-slate-400" />
+                  <div className="text-xs font-bold text-black flex items-center justify-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-black" />
                     <span>{branchPhone}</span>
                   </div>
                 )}
                 {showTax && taxNumber && (
-                  <div className="text-[10px] font-bold text-slate-700 pt-0.5">
+                  <div className="text-xs font-bold text-black pt-0.5">
                     VAT / Tax Reg: {taxNumber}
                   </div>
                 )}
               </div>
 
               {receiptHeader && (
-                <div className="py-1 text-center text-[10px] italic text-slate-600 border-t border-dotted border-slate-200">
+                <div className="py-1 text-center text-xs font-bold text-black border-t border-dotted border-black">
                   {receiptHeader}
                 </div>
               )}
 
-              <div className="border-t border-dashed border-slate-300 my-2" />
+              <div className="border-t-2 border-black my-2" />
 
               {/* Transaction Metadata */}
-              <div className="space-y-0.5 text-[10px] text-slate-600">
+              <div className="space-y-1 text-xs sm:text-[12.5px] font-bold text-black">
                 <div className="flex justify-between">
                   <span>Invoice #:</span>
-                  <span className="font-bold text-slate-900">{invoiceNumber}</span>
+                  <span className="font-extrabold text-black">#{invoiceNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Date:</span>
-                  <span className="font-semibold text-slate-900">{billDate}</span>
+                  <span className="font-bold text-black">{billDate}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Time:</span>
-                  <span className="font-semibold text-slate-900">{billTime}</span>
+                  <span className="font-bold text-black">{billTime}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Outlet:</span>
-                  <span className="font-semibold text-slate-900">{branchName}</span>
+                  <span className="font-bold text-black">{branchName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Station:</span>
@@ -713,34 +710,38 @@ export function ReceiptModal({
                 </div>
                 <div className="flex justify-between">
                   <span>Cashier:</span>
-                  <span className="font-bold text-slate-900">{cashierName}</span>
+                  <span className="font-extrabold text-black">{cashierName}</span>
                 </div>
                 {effectiveSale?.customerName && (
                   <div className="flex justify-between">
                     <span>Customer:</span>
-                    <span className="font-semibold text-slate-800">{effectiveSale.customerName}</span>
+                    <span className="font-extrabold text-black">{effectiveSale.customerName}</span>
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-dashed border-slate-300 my-2" />
+              <div className="border-t-2 border-black my-2" />
 
               {/* Itemized Table */}
-              <div className="space-y-1.5">
+              <div className="flex justify-between text-xs sm:text-[13px] font-extrabold uppercase text-black border-b border-dashed border-black pb-1 mb-1.5">
+                <span>Item Description</span>
+                <span>Total ({currency})</span>
+              </div>
+              <div className="space-y-2">
                 {(effectiveSale?.items || []).map((item, idx) => (
-                  <div key={idx} className="text-[11px]">
+                  <div key={idx} className="text-xs sm:text-[13.5px]">
                     <div className="flex justify-between">
-                      <span className="font-medium text-slate-900 truncate max-w-[200px]">
+                      <span className="font-bold text-black truncate max-w-[200px]">
                         {item.productName}
                       </span>
-                      <span className="font-bold text-slate-900">
+                      <span className="font-extrabold text-black">
                         {formatCurrency(Number(item.subtotal))}
                       </span>
                     </div>
-                    <div className="flex justify-between text-[10px] text-slate-500">
+                    <div className="flex justify-between text-xs font-bold text-black">
                       <span>{formatReceiptQuantity(item.productName, item.quantity)} x {formatCurrency(Number(item.unitPrice))}</span>
                       {item.discountAmount && Number(item.discountAmount) > 0 && (
-                        <span className="text-emerald-700 font-semibold text-[9px]">
+                        <span className="text-black font-extrabold text-[11px]">
                           (Disc: -{formatCurrency(Number(item.discountAmount))})
                         </span>
                       )}
@@ -749,51 +750,51 @@ export function ReceiptModal({
                 ))}
               </div>
 
-              <div className="border-t border-dashed border-slate-300 my-2.5" />
+              <div className="border-t border-dashed border-black my-2.5" />
 
               {/* Financial Breakdown */}
-              <div className="space-y-1 text-[11px]">
-                <div className="flex justify-between text-slate-600">
+              <div className="space-y-1 text-xs sm:text-[13.5px] font-bold text-black">
+                <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>{formatCurrency(Number(effectiveSale?.subtotal || 0))}</span>
                 </div>
 
                 {Number(effectiveSale?.discountAmount || 0) > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-bold">
+                  <div className="flex justify-between text-black font-extrabold">
                     <span>Discount</span>
                     <span>-{formatCurrency(Number(effectiveSale?.discountAmount))}</span>
                   </div>
                 )}
 
                 {showTax && Number(effectiveSale?.taxAmount || 0) > 0 && (
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between">
                     <span>Sales Tax (VAT)</span>
                     <span>{formatCurrency(Number(effectiveSale?.taxAmount))}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between font-black text-sm pt-1.5 border-t border-slate-900 text-slate-950">
+                <div className="flex justify-between font-extrabold text-lg sm:text-xl py-1.5 border-y-2 border-black text-black">
                   <span>NET TOTAL</span>
-                  <span className="text-base font-mono">
+                  <span className="font-mono">
                     {formatCurrency(Number(effectiveSale?.totalAmount || 0))}
                   </span>
                 </div>
 
                 {/* Tender Breakdown */}
-                <div className="pt-1.5 space-y-0.5 text-[10px] text-slate-600 border-t border-slate-100">
+                <div className="pt-1.5 space-y-1 text-xs sm:text-[12.5px] font-bold text-black border-t border-black/30">
                   {(effectiveSale?.payments || []).map((p, idx) => (
                     <div key={idx} className="flex justify-between">
                       <span>
-                        Paid ({p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT' ? 'Store Credit / ණය' : p.paymentMethod}):
+                        Paid ({p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT' ? 'Store Credit' : p.paymentMethod}):
                       </span>
-                      <span className="font-medium text-slate-800">
+                      <span className="font-extrabold text-black">
                         {formatCurrency(Number(p.amount))}
                       </span>
                     </div>
                   ))}
 
                   {Number(effectiveSale?.changeDue || 0) > 0 && (
-                    <div className="flex justify-between text-emerald-800 font-bold">
+                    <div className="flex justify-between text-black font-extrabold text-xs sm:text-sm">
                       <span>Change Given:</span>
                       <span>{formatCurrency(Number(effectiveSale?.changeDue))}</span>
                     </div>
@@ -812,18 +813,18 @@ export function ReceiptModal({
               />
 
               {/* Footer Note & Return Policy */}
-              <div className="pt-2 text-center space-y-1 border-t border-dotted border-slate-200 mt-2 font-sans">
+              <div className="pt-2 text-center space-y-1 border-t border-dotted border-black mt-2 font-sans">
                 {receiptFooter && (
-                  <div className="text-[10px] font-semibold text-slate-700">
+                  <div className="text-xs font-semibold text-black">
                     {receiptFooter}
                   </div>
                 )}
                 {returnPolicy && (
-                  <div className="text-[9px] text-slate-400 italic max-w-[260px] mx-auto leading-tight">
+                  <div className="text-[11px] text-black font-medium italic max-w-[260px] mx-auto leading-tight">
                     {returnPolicy}
                   </div>
                 )}
-                <div className="text-[8px] text-slate-300 tracking-wider uppercase pt-1">
+                <div className="text-[9px] text-black font-bold tracking-wider uppercase pt-1">
                   Powered by PixelCraft POS • pos.pixelcraftlk.com
                 </div>
               </div>

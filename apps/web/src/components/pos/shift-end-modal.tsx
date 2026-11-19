@@ -139,7 +139,7 @@ export function ShiftEndModal({
         // Initialize Modaka rows
         const rows = (shift.modakaEntries || []).map((e) => ({
           productId: e.productId,
-          productName: e.productName || 'Modaka Variety',
+          productName: e.productName || 'Special Item',
           productSku: e.productSku || '',
           openingQty: Number(e.openingQty || 0),
           inQty: Number(e.inQty || 0),
@@ -376,7 +376,7 @@ export function ShiftEndModal({
               }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>1. Modaka Ledger</span>
+            <span>1. Special Stock</span>
             <span
               className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${activeTab === 'MODAKA'
                 ? 'bg-purple-800 text-purple-200'
@@ -457,7 +457,7 @@ export function ShiftEndModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-black text-slate-900">
-                        Modaka Stock & Sales Summary
+                        Special Stock & Sales Summary
                       </h4>
                       <p className="text-xs text-slate-500">
                         Opening stock carries forward automatically from previous closed shift. Enter incoming stock (B) and shift sales (D).
@@ -477,7 +477,7 @@ export function ShiftEndModal({
                         <tr>
                           <th className="py-2.5 px-3 w-8 text-center">#</th>
                           <th className="py-2.5 px-3 w-24">Item Code</th>
-                          <th className="py-2.5 px-3 min-w-[180px]">Modaka Variety</th>
+                          <th className="py-2.5 px-3 min-w-[180px]">Special Item</th>
                           <th className="py-2.5 px-2 text-center w-20">A (Opening)</th>
                           <th className="py-2.5 px-2 text-center w-24 bg-amber-50/70 text-amber-900">
                             B (In)
@@ -657,7 +657,7 @@ export function ShiftEndModal({
                       className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      <span>Back to Modaka</span>
+                      <span>Back to Special Stock</span>
                     </button>
                     <button
                       type="button"
@@ -729,14 +729,14 @@ export function ShiftEndModal({
                       </div>
                     </div>
 
-                    {/* Modaka Sales (Auto-calculated from Modaka Ledger) */}
+                    {/* Special Sales (Auto-calculated from Special Stock Summary) */}
                     <div className="flex items-center justify-between pt-2.5 bg-purple-50/70 p-2.5 rounded-xl border border-purple-200/80">
                       <div>
                         <span className="font-bold text-purple-950 block">
-                          Modaka Sales
+                          Special Sales
                         </span>
                         <span className="text-[11px] text-purple-700 font-medium">
-                          Auto-calculated from Modaka Ledger ({modakaUnitsTotal} units)
+                          Auto-calculated from Special Stock Summary ({modakaUnitsTotal} units)
                         </span>
                       </div>
                       <span className="font-mono text-xs font-bold text-purple-900">

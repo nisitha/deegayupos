@@ -156,7 +156,7 @@ export default function ModakaLedgerPage() {
     setIsSavingConfigs(false);
 
     if (res.success) {
-      setConfigSuccessMsg('Modaka rates & variety configs saved successfully.');
+      setConfigSuccessMsg('Special rates & variety configs saved successfully.');
       setTimeout(() => {
         setIsConfigModalOpen(false);
         loadData();
@@ -203,8 +203,8 @@ export default function ModakaLedgerPage() {
       'Shift Number',
       'Cashier',
       'Status',
-      'Modaka Item #',
-      'Modaka Item Name',
+      'Special Item #',
+      'Special Item Name',
       'Opening (A)',
       'In (B)',
       'Total Available (C)',
@@ -297,7 +297,7 @@ export default function ModakaLedgerPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `deegayu_modaka_ledger_${selectedDate}.csv`);
+    link.setAttribute('download', `deegayu_special_stock_ledger_${selectedDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -318,7 +318,7 @@ export default function ModakaLedgerPage() {
           </div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Restricted Access</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            The <strong>Shift & Modaka Ledger (A–F)</strong> is confidential and strictly accessible to the
+            The <strong>Shift & Special Stock Ledger</strong> is confidential and strictly accessible to the
             Owner & General Management.
           </p>
           <div className="pt-2">
@@ -346,10 +346,10 @@ export default function ModakaLedgerPage() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Shift & Modaka Ledger (A–F)
+                Special Sales & Stock Summary
               </h1>
               <p className="text-xs text-slate-500 font-medium">
-                Multi-shift handover records, Modaka 7-variety sales ledger, drawer cash & expense breakdown
+                Multi-shift handover records, Special Stock sales ledger, drawer cash & expense breakdown
               </p>
             </div>
           </div>
@@ -363,7 +363,7 @@ export default function ModakaLedgerPage() {
             className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
           >
             <Edit3 className="w-3.5 h-3.5 text-purple-600" />
-            <span>Edit Modaka Rates & Items</span>
+            <span>Edit Special Items & Rates</span>
           </button>
           <button
             type="button"
@@ -494,18 +494,18 @@ export default function ModakaLedgerPage() {
         {/* Metric 2 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block">
-            Modaka Units Sold
+            Special Units Sold
           </span>
           <span className="text-xl font-black font-mono text-purple-700 mt-1 block">
             {metrics.totalModakaUnits} units
           </span>
-          <span className="text-[10px] text-slate-500">Across 7 varieties</span>
+          <span className="text-[10px] text-slate-500">Across active special varieties</span>
         </div>
 
         {/* Metric 3 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block">
-            Modaka Sales Value
+            Special Sales Value
           </span>
           <span className="text-xl font-black font-mono text-purple-700 mt-1 block">
             LKR {metrics.totalModakaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -578,7 +578,7 @@ export default function ModakaLedgerPage() {
           Deegayu Weda Madura (Pvt) Ltd
         </h2>
         <p className="text-sm font-bold text-slate-700">
-          Daily Shift Handover & Modaka Sales Ledger (A–F)
+          Daily Shift Handover & Special Sales Summary
         </p>
         <p className="text-xs text-slate-500 font-mono mt-1">
           Date: {selectedDate} • Generated: {new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' })}
@@ -589,7 +589,7 @@ export default function ModakaLedgerPage() {
       {isLoading ? (
         <div className="py-20 text-center space-y-3">
           <Loader2 className="w-10 h-10 animate-spin text-purple-600 mx-auto" />
-          <h4 className="text-sm font-bold text-slate-700">Loading Shift & Modaka Ledgers...</h4>
+          <h4 className="text-sm font-bold text-slate-700">Loading Shift & Special Stock Ledgers...</h4>
           <p className="text-xs text-slate-400">Fetching records for {selectedDate}</p>
         </div>
       ) : shifts.length === 0 ? (
@@ -661,7 +661,7 @@ export default function ModakaLedgerPage() {
                       <strong>LKR {shift.posGrossSales.toFixed(2)}</strong> ({shift.posTotalBills} bills)
                     </div>
                     <div className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-400/30 text-xs font-mono text-purple-200">
-                      <span className="text-[10px] text-purple-300 uppercase mr-1">Modaka Total:</span>
+                      <span className="text-[10px] text-purple-300 uppercase mr-1">Special Sales Total:</span>
                       <strong>LKR {totalModakaValue.toFixed(2)}</strong>
                     </div>
                   </div>
@@ -669,12 +669,12 @@ export default function ModakaLedgerPage() {
 
                 {/* 2-Column Ledger Layout matching Owner's Manual Book */}
                 <div className="grid grid-cols-1 xl:grid-cols-12 divide-y xl:divide-y-0 xl:divide-x divide-slate-200">
-                  {/* LEFT COLUMN: MODAKA 7-VARIETY A-F TABLE (Span 7) */}
+                  {/* LEFT COLUMN: SPECIAL STOCK TABLE (Span 7) */}
                   <div className="xl:col-span-7 p-5 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                         <FileSpreadsheet className="w-4 h-4 text-purple-600" />
-                        <span>මෝදක ශේෂ විස්තරය (Modaka 7-Variety Ledger A–F)</span>
+                        <span>Special Stock & Sales Summary</span>
                       </h4>
                       <span className="text-xs font-mono font-bold text-purple-700">
                         Sold: {shift.modakaTotalSoldQty} units
@@ -686,7 +686,7 @@ export default function ModakaLedgerPage() {
                         <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                           <tr>
                             <th className="py-2 px-2 text-center w-7">#</th>
-                            <th className="py-2 px-2.5">Modaka Variety / විස්තරය</th>
+                            <th className="py-2 px-2.5">Special Item</th>
                             <th className="py-2 px-1.5 text-center w-12">A: Open</th>
                             <th className="py-2 px-1.5 text-center w-12 bg-amber-50 text-amber-900">+ B</th>
                             <th className="py-2 px-1.5 text-center w-12 bg-slate-50">= C</th>
@@ -736,7 +736,7 @@ export default function ModakaLedgerPage() {
                         <tfoot className="bg-slate-100 font-mono font-bold text-slate-900 text-xs border-t-2 border-slate-300">
                           <tr>
                             <td colSpan={2} className="py-2 px-2.5 uppercase text-[10px] text-slate-600">
-                              Totals (මුළු එකතුව)
+                              Totals
                             </td>
                             <td className="py-2 px-1.5 text-center">
                               {entries.reduce((acc, e) => acc + e.openingQty, 0)}
@@ -762,16 +762,16 @@ export default function ModakaLedgerPage() {
                       </table>
                     </div>
 
-                    {/* Bottom Modaka Sales Value Callout */}
+                    {/* Bottom Special Sales Value Callout */}
                     <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Coins className="w-5 h-5 text-purple-600" />
                         <div>
                           <span className="text-xs font-bold text-purple-950 uppercase tracking-wide block">
-                            Modaka Sales Balance (මෝදක එකතුව)
+                            Special Sales Balance
                           </span>
                           <span className="text-[10px] text-purple-700">
-                            Calculated value of Modaka units sold during Shift {shift.shiftNumber}
+                            Calculated value of special units sold during Shift {shift.shiftNumber}
                           </span>
                         </div>
                       </div>
@@ -781,19 +781,19 @@ export default function ModakaLedgerPage() {
                     </div>
                   </div>
 
-                  {/* RIGHT COLUMN: EXPENSE SUMMARY "දවසේ වියදම් විස්තරය" (Span 5) */}
+                  {/* RIGHT COLUMN: EXPENSE SUMMARY (Span 5) */}
                   <div className="xl:col-span-5 p-5 space-y-3.5 bg-slate-50/50">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                         <Receipt className="w-4 h-4 text-indigo-600" />
-                        <span>දවසේ වියදම් විස්තරය (Shift Expense & Cash Reconcile)</span>
+                        <span>Shift Expense & Cash Reconciliation</span>
                       </h4>
                     </div>
 
                     <div className="bg-white rounded-2xl border border-slate-200 p-3.5 space-y-2.5 divide-y divide-slate-100 text-xs">
                       {/* 1. Opening Float */}
                       <div className="flex items-center justify-between pt-0.5">
-                        <span className="text-slate-600">1. Opening Drawer Float (ආරම්භක මුදල)</span>
+                        <span className="text-slate-600">1. Opening Drawer Float</span>
                         <span className="font-mono font-bold text-slate-800">
                           LKR {shift.openingFloat.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -802,7 +802,7 @@ export default function ModakaLedgerPage() {
                       {/* 2. Declared Shift Sale */}
                       <div className="flex items-center justify-between pt-2">
                         <div>
-                          <span className="text-slate-600 block">2. Shift Sale (දවසේ විකිණුම්)</span>
+                          <span className="text-slate-600 block">2. Shift Sale Amount</span>
                           <span className="text-[10px] text-purple-600 font-mono">
                             POS Cash: LKR {shift.posCashSales.toFixed(2)}
                           </span>
@@ -814,7 +814,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Total Cash Available */}
                       <div className="flex items-center justify-between pt-2 font-bold bg-slate-50/80 p-2 rounded-xl">
-                        <span className="text-slate-800">Total Cash Available (මුළු එකතුව = 1+2)</span>
+                        <span className="text-slate-800">Total Cash Available</span>
                         <span className="font-mono text-slate-950 font-black">
                           LKR {shift.totalCashAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -822,7 +822,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Less: Goods Purchased */}
                       <div className="flex items-center justify-between pt-2 text-rose-700">
-                        <span>3. Less: Goods Purchased Paid (බඩු ගත් මුදල්)</span>
+                        <span>3. Less: Goods Purchased Paid</span>
                         <span className="font-mono font-bold">
                           - LKR {shift.goodsPurchasedPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -830,7 +830,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Less: Other Expenses */}
                       <div className="flex items-center justify-between pt-2 text-rose-700">
-                        <span>4. Less: Other Expenses (වෙනත් වියදම්)</span>
+                        <span>4. Less: Other Expenses</span>
                         <span className="font-mono font-bold">
                           - LKR {shift.otherExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -838,7 +838,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Expected Cash */}
                       <div className="flex items-center justify-between pt-2 font-bold bg-amber-50/70 p-2 rounded-xl text-amber-950">
-                        <span>Expected Cash Before Bank (වියදම් හැර ඉතිරි)</span>
+                        <span>Expected Cash Before Bank</span>
                         <span className="font-mono font-black text-amber-900">
                           LKR {shift.expectedCashBeforeBank.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -846,7 +846,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Counted Cash */}
                       <div className="flex items-center justify-between pt-2 text-emerald-800 font-bold">
-                        <span>Actual Counted Drawer Cash (ගණන් කළ මුදල)</span>
+                        <span>Actual Counted Drawer Cash</span>
                         <span className="font-mono font-black text-emerald-700 text-sm">
                           LKR {shift.countedDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -863,7 +863,7 @@ export default function ModakaLedgerPage() {
                         }`}
                       >
                         <span>
-                          Cash Variance (වෙනස):{' '}
+                          Cash Variance:{' '}
                           {shift.cashVariance === 0
                             ? 'Balanced'
                             : shift.cashVariance > 0
@@ -878,7 +878,7 @@ export default function ModakaLedgerPage() {
 
                       {/* Banked Amount */}
                       <div className="flex items-center justify-between pt-2">
-                        <span className="text-slate-600">5. Banked Amount (බැංකු කළ මුදල)</span>
+                        <span className="text-slate-600">5. Banked Amount</span>
                         <span className="font-mono font-bold text-indigo-700">
                           LKR {shift.bankedAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
@@ -891,7 +891,7 @@ export default function ModakaLedgerPage() {
                             Closing Drawer Float for Next Shift
                           </span>
                           <span className="text-[9px] text-emerald-100">
-                            ඉදිරියට ගෙන යන කාසි/මුදල් (Carries forward as S{shift.shiftNumber === 1 ? '2' : '1'} Float)
+                            Carries forward as Shift {shift.shiftNumber === 1 ? '2' : '1'} Opening Float
                           </span>
                         </div>
                         <span className="text-base font-black font-mono">
@@ -903,7 +903,7 @@ export default function ModakaLedgerPage() {
                       {shift.denominationsJson && Object.keys(shift.denominationsJson).length > 0 && (
                         <div className="pt-2">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                            Counted Denominations (කාසි සහ නෝට්ටු)
+                            Counted Denominations
                           </span>
                           <div className="flex flex-wrap gap-1">
                             {Object.entries(shift.denominationsJson).map(([denom, cnt]) => {
@@ -953,10 +953,10 @@ export default function ModakaLedgerPage() {
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-black tracking-tight">
-                    Edit Modaka Rates & Item Varieties
+                    Edit Special Items & Rates
                   </h3>
                   <p className="text-xs text-purple-200">
-                    Configure standard selling rates (A–F formula) and catalog item mapping
+                    Configure standard selling rates and catalog item mapping
                   </p>
                 </div>
               </div>
@@ -978,7 +978,7 @@ export default function ModakaLedgerPage() {
               )}
 
               <p className="text-xs text-slate-500">
-                These 7 items populate the Modaka Stock Ledger on all cashier terminals. Updating rates here applies to new shift handovers and calculations.
+                These items populate the Special Stock Ledger on all cashier terminals. Updating rates here applies to new shift handovers and calculations.
               </p>
 
               <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
@@ -986,7 +986,7 @@ export default function ModakaLedgerPage() {
                   <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-10">#</th>
-                      <th className="py-2.5 px-3">Catalog Medicine Product</th>
+                      <th className="py-2.5 px-3">Catalog Item</th>
                       <th className="py-2.5 px-3 text-right w-32">Rate (LKR)</th>
                       <th className="py-2.5 px-3 text-center w-16">Active</th>
                     </tr>
@@ -1092,7 +1092,7 @@ export default function ModakaLedgerPage() {
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    Save Modaka Rates
+                    Save Special Rates
                   </>
                 )}
               </button>

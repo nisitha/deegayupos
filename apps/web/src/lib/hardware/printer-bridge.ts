@@ -218,15 +218,15 @@ export class PrinterBridge {
             }
 
             return `
-          <div style="margin-bottom: 4px;">
-            <div style="font-weight: bold;">${item.productName}</div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444;">
+          <div style="margin-bottom: 5px;">
+            <div style="font-weight: 700; font-size: ${paperWidth === '58mm' ? '12px' : '13.5px'}; color: #000000 !important; line-height: 1.25;">${item.productName}</div>
+            <div style="display: flex; justify-content: space-between; font-size: ${paperWidth === '58mm' ? '11px' : '12.5px'}; font-weight: 700; color: #000000 !important; margin-top: 1px;">
               <span>${formattedQty} x ${Number(item.unitPrice).toFixed(2)}</span>
-              <span style="font-weight: bold; color: #000;">${currency} ${Number(item.subtotal).toFixed(2)}</span>
+              <span style="font-weight: 800; color: #000000 !important;">${currency} ${Number(item.subtotal).toFixed(2)}</span>
             </div>
             ${
               item.discountAmount && Number(item.discountAmount) > 0
-                ? `<div style="text-align: right; font-size: 9px; color: #15803d;">(Disc: -${currency} ${Number(item.discountAmount).toFixed(2)})</div>`
+                ? `<div style="text-align: right; font-size: ${paperWidth === '58mm' ? '10px' : '11px'}; font-weight: 700; color: #000000 !important;">(Disc: -${currency} ${Number(item.discountAmount).toFixed(2)})</div>`
                 : ''
             }
           </div>
@@ -239,12 +239,12 @@ export class PrinterBridge {
         .map((p) => {
           const m =
             p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT'
-              ? 'Store Credit (ණය)'
+              ? 'Store Credit'
               : p.paymentMethod;
           return `
-          <div style="display: flex; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; font-size: ${paperWidth === '58mm' ? '11.5px' : '13px'}; font-weight: 700; color: #000000 !important;">
             <span>Paid via ${m}:</span>
-            <span>${currency} ${Number(p.amount).toFixed(2)}</span>
+            <span style="font-weight: 800;">${currency} ${Number(p.amount).toFixed(2)}</span>
           </div>
         `;
         })
@@ -266,22 +266,36 @@ export class PrinterBridge {
               margin: 0;
               size: ${paperWidth === '58mm' ? '58mm auto' : '80mm auto'};
             }
+            * {
+              color: #000000 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              box-sizing: border-box;
+            }
             body {
               margin: 0;
-              padding: ${paperWidth === '58mm' ? '3mm' : '5mm'};
-              font-family: 'Courier New', Courier, monospace;
-              font-size: ${paperWidth === '58mm' ? '10px' : '11px'};
-              color: #000;
+              padding: ${paperWidth === '58mm' ? '2.5mm' : '4.5mm'};
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", Courier, monospace;
+              font-size: ${paperWidth === '58mm' ? '12px' : '13px'};
+              font-weight: 700;
+              color: #000000 !important;
               background: #fff;
-              width: ${paperWidth === '58mm' ? '48mm' : '72mm'};
-              line-height: 1.25;
+              width: ${paperWidth === '58mm' ? '50mm' : '72mm'};
+              line-height: 1.3;
             }
             .center { text-align: center; }
             .right { text-align: right; }
-            .bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 4px 0; }
-            .divider-double { border-bottom: 2px solid #000; margin: 4px 0; }
-            .row { display: flex; justify-content: space-between; }
+            .bold { font-weight: 700; }
+            .extrabold { font-weight: 800; }
+            .divider { border-bottom: 1.5px dashed #000000; margin: 4.5px 0; }
+            .divider-double { border-bottom: 2.5px solid #000000; margin: 5px 0; }
+            .row {
+              display: flex;
+              justify-content: space-between;
+              font-size: ${paperWidth === '58mm' ? '11.5px' : '13px'};
+              font-weight: 700;
+              line-height: 1.3;
+            }
             svg {
               shape-rendering: crispEdges !important;
               image-rendering: pixelated !important;
@@ -295,27 +309,30 @@ export class PrinterBridge {
               <img src="${storeDetails.logoUrl}" style="max-height: 48px; max-width: 140px; object-fit: contain;" />
             </div>
           ` : ''}
-          <div class="center bold" style="font-size: ${paperWidth === '58mm' ? '13px' : '15px'};">
+          <div class="center extrabold" style="font-size: ${paperWidth === '58mm' ? '16px' : '19px'}; line-height: 1.15; text-transform: uppercase;">
             ${storeDetails?.storeName || 'DEEGAYU WEDA MADURA'}
           </div>
-          <div class="center" style="font-size: 10px;">දීගායු වෙද මැදුර</div>
-          <div class="center bold" style="font-size: 11px; margin-top: 2px;">Outlet: ${resolvedBranchName}</div>
-          ${storeDetails?.address ? `<div class="center" style="font-size: 9px;">${storeDetails.address}</div>` : ''}
-          ${storeDetails?.phone ? `<div class="center">Tel: ${storeDetails.phone}</div>` : ''}
-          ${storeDetails?.taxNumber ? `<div class="center">Tax ID: ${storeDetails.taxNumber}</div>` : ''}
+          <div class="center bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '13px'}; margin-top: 3px;">
+            Outlet: ${resolvedBranchName}
+          </div>
+          ${storeDetails?.address ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11px' : '12px'}; margin-top: 2px;">${storeDetails.address}</div>` : ''}
+          ${storeDetails?.phone ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11.5px' : '12.5px'};">Tel: ${storeDetails.phone}</div>` : ''}
+          ${storeDetails?.taxNumber ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11px' : '12px'};">Tax Reg: ${storeDetails.taxNumber}</div>` : ''}
 
           <div class="divider-double"></div>
-          <div class="bold center">TAX INVOICE / RECEIPT</div>
-          <div class="row"><span>Invoice:</span><span class="bold">#${sale.invoiceNumber}</span></div>
+          <div class="extrabold center" style="font-size: ${paperWidth === '58mm' ? '13px' : '14px'}; letter-spacing: 0.05em;">
+            TAX INVOICE / RECEIPT
+          </div>
+          <div class="row"><span>Invoice:</span><span class="extrabold">#${sale.invoiceNumber}</span></div>
           <div class="row"><span>Date:</span><span class="bold">${billDate}</span></div>
           <div class="row"><span>Time:</span><span class="bold">${billTime}</span></div>
           <div class="row"><span>Outlet:</span><span class="bold">${resolvedBranchName}</span></div>
-          <div class="row"><span>Station:</span><span>REG-01</span></div>
-          <div class="row"><span>Cashier:</span><span class="bold">${cashierName}</span></div>
-          ${sale.customerName ? `<div class="row"><span>Customer:</span><span>${sale.customerName}</span></div>` : ''}
+          <div class="row"><span>Station:</span><span class="bold">REG-01</span></div>
+          <div class="row"><span>Cashier:</span><span class="extrabold">${cashierName}</span></div>
+          ${sale.customerName ? `<div class="row"><span>Customer:</span><span class="bold">${sale.customerName}</span></div>` : ''}
 
           <div class="divider"></div>
-          <div class="row bold">
+          <div class="row extrabold" style="font-size: ${paperWidth === '58mm' ? '12px' : '13px'}; text-transform: uppercase;">
             <span>Description</span>
             <span>Total (${currency})</span>
           </div>
@@ -324,19 +341,22 @@ export class PrinterBridge {
           ${itemsHtml}
 
           <div class="divider"></div>
-          <div class="row"><span>Subtotal:</span><span>${currency} ${Number(sale.subtotal).toFixed(2)}</span></div>
+          <div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};">
+            <span>Subtotal:</span>
+            <span>${currency} ${Number(sale.subtotal).toFixed(2)}</span>
+          </div>
           ${
             sale.discountAmount && Number(sale.discountAmount) > 0
-              ? `<div class="row" style="color: #15803d;"><span>Discount:</span><span>-${currency} ${Number(sale.discountAmount).toFixed(2)}</span></div>`
+              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Discount:</span><span>-${currency} ${Number(sale.discountAmount).toFixed(2)}</span></div>`
               : ''
           }
           ${
             sale.taxAmount && Number(sale.taxAmount) > 0
-              ? `<div class="row"><span>Tax (VAT):</span><span>${currency} ${Number(sale.taxAmount).toFixed(2)}</span></div>`
+              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Tax (VAT):</span><span>${currency} ${Number(sale.taxAmount).toFixed(2)}</span></div>`
               : ''
           }
           <div class="divider-double"></div>
-          <div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};">
+          <div class="row extrabold" style="font-size: ${paperWidth === '58mm' ? '16px' : '19px'}; padding: 2px 0;">
             <span>NET TOTAL:</span>
             <span>${currency} ${Number(sale.totalAmount).toFixed(2)}</span>
           </div>
@@ -345,17 +365,17 @@ export class PrinterBridge {
           ${paymentsHtml}
           ${
             sale.changeDue && Number(sale.changeDue) > 0
-              ? `<div class="row bold"><span>Change Due:</span><span>${currency} ${Number(sale.changeDue).toFixed(2)}</span></div>`
+              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'}; margin-top: 2px;"><span>Change Due:</span><span>${currency} ${Number(sale.changeDue).toFixed(2)}</span></div>`
               : ''
           }
 
           ${barcodeBlockHtml}
 
           <div class="divider"></div>
-          <div class="center" style="margin-top: 6px; font-size: 10px;">
-            ${settings.footerMessage || 'නිරෝගී සුවය පතමු! / Thank You Come Again'}
+          <div class="center bold" style="margin-top: 6px; font-size: ${paperWidth === '58mm' ? '11px' : '12px'};">
+            ${settings.footerMessage || 'Thank You Come Again'}
           </div>
-          <div class="center" style="font-size: 8px; color: #666; margin-top: 4px;">
+          <div class="center" style="font-size: 9px; font-weight: 600; margin-top: 4px; letter-spacing: 0.05em;">
             PixelCraft POS Engine • pos.pixelcraftlk.com
           </div>
         </body>

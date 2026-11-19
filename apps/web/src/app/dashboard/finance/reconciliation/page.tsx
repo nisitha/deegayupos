@@ -2132,12 +2132,12 @@ export default function CashReconciliationPage() {
               <div className="text-[10px] text-amber-400/70 mt-0.5">Live register collections</div>
             </div>
             <div className="p-3 bg-slate-900 border border-purple-500/30 bg-purple-950/10 rounded-xl">
-              <div className="text-[11px] font-bold text-purple-300">Modaka Sales</div>
+              <div className="text-[11px] font-bold text-purple-300">Special Sales (Shift Ledger)</div>
               <div className="text-lg font-black text-purple-200 mt-1 font-mono">
                 LKR {modakaSalesTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
               <div className="text-[10px] text-purple-300/70 mt-0.5">
-                {worksheetData.modakaUnitsTotal || 0} units (Shift Ledger)
+                {worksheetData.modakaUnitsTotal || 0} units (Special Stock)
               </div>
             </div>
             <div className="p-3 bg-slate-900 border border-slate-800/80 rounded-xl">
@@ -2222,7 +2222,7 @@ export default function CashReconciliationPage() {
                           </div>
                         </div>
                         <div>
-                          <span className="text-slate-500">Modaka Sales:</span>
+                          <span className="text-slate-500">Special Sales:</span>
                           <div className="font-bold text-purple-300">
                             LKR {(s.modaka_total_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                           </div>
@@ -2579,7 +2579,7 @@ export default function CashReconciliationPage() {
                   </div>
                   {modakaSalesTotal > 0 && (
                     <div className="px-2.5 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                      <span className="text-purple-300 font-medium">Modaka Sales (Shift Ledger): </span>
+                      <span className="text-purple-300 font-medium">Special Sales (Shift Ledger): </span>
                       <strong className="text-purple-200">
                         +LKR {modakaSalesTotal.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                       </strong>

@@ -589,6 +589,9 @@ export default function SalesOrdersPage() {
           #cashier-audit-report-printable,
           #cashier-audit-report-printable * {
             visibility: visible !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           #cashier-audit-report-printable {
             position: absolute !important;
@@ -598,7 +601,7 @@ export default function SalesOrdersPage() {
             margin: 0 !important;
             padding: 24px !important;
             background: #ffffff !important;
-            color: #0f172a !important;
+            color: #000000 !important;
           }
           .no-print {
             display: none !important;
@@ -1076,12 +1079,12 @@ export default function SalesOrdersPage() {
                 }}
                 className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-[#005BD3]"
               >
-                <option value="created_at-desc">Newest First (අලුත් මුලින්)</option>
-                <option value="created_at-asc">Oldest First (පැරණි මුලින්)</option>
-                <option value="total_amount-desc">Highest Amount (මුදල වැඩි)</option>
-                <option value="total_amount-asc">Lowest Amount (මුදල අඩු)</option>
-                <option value="cashier_name-asc">Cashier A-Z (අයකැමි)</option>
-                <option value="invoice_number-desc">Invoice # (බිල් අංකය)</option>
+                <option value="created_at-desc">Newest First</option>
+                <option value="created_at-asc">Oldest First</option>
+                <option value="total_amount-desc">Highest Amount</option>
+                <option value="total_amount-asc">Lowest Amount</option>
+                <option value="cashier_name-asc">Cashier A-Z</option>
+                <option value="invoice_number-desc">Invoice #</option>
               </select>
             </div>
           </div>
@@ -1544,14 +1547,14 @@ export default function SalesOrdersPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Award className="w-6 h-6 text-[#005BD3]" />
-                        <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase">
+                        <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">
                           Deegayu Weda Madura
                         </h1>
                       </div>
-                      <p className="text-xs text-slate-600 font-medium mt-0.5 font-sinhala">
-                        දීගායු වෙද මැදුර • ආයුර්වේද ඖෂධ සහ ප්‍රතිකාර සේවා
+                      <p className="text-xs text-slate-700 font-bold mt-0.5">
+                        Ayurvedic Healthcare & Pharmaceutical Services
                       </p>
-                      <p className="text-[11px] text-slate-500 mt-1">
+                      <p className="text-xs text-slate-600 mt-1 font-medium">
                         Executive Sales & Cashier Settlement Ledger • Official Financial Audit
                       </p>
                     </div>

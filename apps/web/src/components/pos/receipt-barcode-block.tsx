@@ -127,8 +127,8 @@ export async function generateReceiptBarcodeHtml(options: {
             <div style="display: inline-block; padding: 2px; background: #fff;">
               ${qrSvg}
             </div>
-            <div style="font-size: 8px; font-family: sans-serif; color: #444; margin-top: 2px;">Scan to verify receipt online</div>
-            <div style="font-size: 7px; font-family: monospace; color: #666; word-break: break-all;">${vUrl}</div>
+            <div style="font-size: 9px; font-weight: bold; font-family: sans-serif; color: #000000; margin-top: 2px;">Scan to verify receipt online</div>
+            <div style="font-size: 8px; font-weight: bold; font-family: monospace; color: #000000; word-break: break-all;">${vUrl}</div>
           </div>
         `
           : ''

@@ -34,13 +34,13 @@ export default function PublicReceiptPage() {
     }
   }, []);
 
-  const storeName = 'දීගායු වෙද මැදුර / Deegayu Weda Madura';
+  const storeName = 'Deegayu Weda Madura';
   const legalName = 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd';
   const address = 'Main Street, Kalutara, Western Province, Sri Lanka';
   const phone = '+94 34 222 3456';
   const email = 'dispensary@deegayu.pixelcraftlk.com';
   const vatNumber = 'VAT-10928392-8000';
-  const footerNote = 'නිරෝගී සුවය පතමු! / Wishing you healthy living! Return within 7 days.';
+  const footerNote = 'Thank You Come Again! Return within 7 days.';
   const returnPolicy = 'Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.';
 
   const items = [
@@ -109,11 +109,11 @@ export default function PublicReceiptPage() {
                 PixelCraft POS Verified
               </span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sinhala">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">
               {storeName}
             </h1>
-            <p className="text-xs text-slate-500 font-medium">{legalName}</p>
-            <div className="pt-2 text-xs text-slate-500 space-y-0.5 font-sans">
+            <p className="text-xs text-slate-600 font-bold">{legalName}</p>
+            <div className="pt-2 text-xs text-slate-600 space-y-0.5 font-sans font-bold">
               <div className="flex items-center justify-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>{address}</span>
@@ -171,21 +171,21 @@ export default function PublicReceiptPage() {
 
             <div className="divide-y divide-slate-100">
               {items.map((item, idx) => (
-                <div key={idx} className="py-2.5 flex items-start justify-between text-xs">
+                <div key={idx} className="py-2.5 flex items-start justify-between text-xs sm:text-sm">
                   <div className="pr-2">
-                    <div className="font-semibold text-slate-900 leading-tight">
+                    <div className="font-bold text-slate-900 leading-tight">
                       {item.name}
                     </div>
-                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    <div className="text-xs text-slate-500 font-mono font-bold mt-0.5">
                       {item.quantity} x LKR {item.unitPrice.toFixed(2)}
                       {item.discount > 0 && (
-                        <span className="text-emerald-600 ml-1.5 font-sans">
+                        <span className="text-emerald-700 ml-1.5 font-sans font-bold">
                           (Save LKR {item.discount.toFixed(2)})
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="font-mono font-bold text-slate-900 text-right shrink-0">
+                  <div className="font-mono font-black text-slate-900 text-right shrink-0">
                     LKR {(item.subtotal - item.discount).toFixed(2)}
                   </div>
                 </div>
@@ -194,27 +194,27 @@ export default function PublicReceiptPage() {
           </div>
 
           {/* Totals Section */}
-          <div className="border-t-2 border-dashed border-slate-300 pt-3 space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-500">
+          <div className="border-t-2 border-black pt-3 space-y-1.5 text-xs sm:text-sm font-bold">
+            <div className="flex justify-between text-slate-700">
               <span>Subtotal</span>
               <span className="font-mono">LKR {subtotal.toFixed(2)}</span>
             </div>
 
             {discountTotal > 0 && (
-              <div className="flex justify-between text-emerald-600 font-medium">
+              <div className="flex justify-between text-emerald-800 font-extrabold">
                 <span>Discounts Applied</span>
                 <span className="font-mono">-LKR {discountTotal.toFixed(2)}</span>
               </div>
             )}
 
-            <div className="flex justify-between text-slate-500">
+            <div className="flex justify-between text-slate-700">
               <span>Tax (VAT 0% Exempt Medical)</span>
               <span className="font-mono">LKR 0.00</span>
             </div>
 
-            <div className="flex justify-between items-center text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
+            <div className="flex justify-between items-center text-lg sm:text-xl font-extrabold text-slate-900 pt-2 border-t-2 border-black">
               <span className="uppercase tracking-tight">Total Amount</span>
-              <span className="font-mono text-lg text-emerald-700 font-black">
+              <span className="font-mono text-xl sm:text-2xl text-slate-950 font-black">
                 LKR {totalAmount.toFixed(2)}
               </span>
             </div>

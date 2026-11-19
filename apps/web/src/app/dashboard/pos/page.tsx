@@ -1274,15 +1274,15 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
 
-            {/* High-visibility + Modaka In (B) Button */}
+            {/* High-visibility + Special Stock In (B) Button */}
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
               className="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Record incoming Modaka stock (B) received during this shift [F7]"
+              title="Record incoming Special Stock (B) received during this shift [F7]"
             >
               <PackagePlus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>+ Modaka In (B)</span>
+              <span>+ Special Stock In (B)</span>
             </button>
 
             {/* High-visibility End Shift (Shift Off) Button */}
@@ -1290,7 +1290,7 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
               className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Close shift, complete Modaka ledger, count cash, and hand over to next employee"
+              title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>End Shift (Shift Off)</span>
@@ -1441,12 +1441,12 @@ export default function ConfidencyPosPage() {
               </div>
             </button>
 
-            {/* Card 5: Modaka In (B) */}
+            {/* Card 5: Special Stock In (B) */}
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
               className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-rose-500 to-pink-600 shadow-rose-500/25 select-none"
-              title="Record incoming Modaka stock (B) [F7]"
+              title="Record incoming Special Stock (B) [F7]"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
@@ -1454,7 +1454,7 @@ export default function ConfidencyPosPage() {
                 </div>
                 <div className="min-w-0 flex flex-col text-left">
                   <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Modaka In (B)
+                    Special Stock In (B)
                   </span>
                   <span className="text-xs text-white/85 font-medium truncate">
                     Add Received Stock
@@ -2531,7 +2531,7 @@ export default function ConfidencyPosPage() {
         cashierName={cashierName}
         onSuccess={() => {
           refreshActiveShift();
-          setScanFeedback('Modaka incoming stock (B) updated.');
+          setScanFeedback('Special incoming stock (B) updated.');
           setTimeout(() => setScanFeedback(null), 3000);
         }}
       />

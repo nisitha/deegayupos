@@ -51,7 +51,7 @@ export function ModakaStockInModal({
         setItems(
           activeShift.modakaEntries.map((e) => ({
             productId: e.productId,
-            productName: e.productName || 'Modaka Variety',
+            productName: e.productName || 'Special Item',
             openingQty: Number(e.openingQty || 0),
             currentInQty: Number(e.inQty || 0),
             appliedRate: Number(e.appliedRate || 250),
@@ -78,7 +78,7 @@ export function ModakaStockInModal({
             setItems(
               entries.map((e) => ({
                 productId: e.productId,
-                productName: e.productName || 'Modaka Variety',
+                productName: e.productName || 'Special Item',
                 openingQty: Number(e.openingQty || 0),
                 currentInQty: Number(e.inQty || 0),
                 appliedRate: Number(e.appliedRate || 250),
@@ -106,7 +106,7 @@ export function ModakaStockInModal({
       }
     } catch (err: any) {
       console.warn('[ModakaStockInModal] load error:', err);
-      setErrorMessage('Could not load Modaka varieties. Please try again.');
+      setErrorMessage('Could not load special items. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -182,7 +182,7 @@ export function ModakaStockInModal({
         onSuccess();
         onClose();
       } else {
-        setErrorMessage(res.error?.message || 'Failed to record incoming Modaka stock.');
+        setErrorMessage(res.error?.message || 'Failed to record incoming special stock.');
       }
     } catch (err: any) {
       setIsSubmitting(false);
@@ -202,14 +202,14 @@ export function ModakaStockInModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black tracking-tight">
-                  Modaka Stock In (B)
+                  Special Stock In (B)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/20">
                   {activeShift ? `Shift ${activeShift.shiftNumber}` : 'Active Shift'}
                 </span>
               </div>
               <p className="text-xs text-rose-100 font-medium">
-                Record incoming Modaka stock received during the current working shift
+                Record incoming Special Stock received during the current working shift
               </p>
             </div>
           </div>
@@ -235,12 +235,12 @@ export function ModakaStockInModal({
             {isLoading ? (
               <div className="py-16 text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-rose-600 mx-auto" />
-                <p className="text-xs font-bold text-slate-600">Loading Modaka Varieties...</p>
+                <p className="text-xs font-bold text-slate-600">Loading Special Items...</p>
               </div>
             ) : items.length === 0 ? (
               <div className="py-12 text-center space-y-2 bg-slate-50 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold text-slate-700">No active Modaka varieties configured</p>
-                <p className="text-[11px] text-slate-400">Configure Modaka items in Admin Finance Ledger</p>
+                <p className="text-xs font-bold text-slate-700">No active special items configured</p>
+                <p className="text-[11px] text-slate-400">Configure special items in Admin Finance Ledger</p>
               </div>
             ) : (
               <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
@@ -248,7 +248,7 @@ export function ModakaStockInModal({
                   <thead className="bg-slate-100/90 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3 w-8 text-center">#</th>
-                      <th className="py-2.5 px-3">Modaka Variety</th>
+                      <th className="py-2.5 px-3">Special Item</th>
                       <th className="py-2.5 px-2 text-center w-24">Opening (A)</th>
                       <th className="py-2.5 px-3 text-center w-28 bg-rose-100/70 text-rose-950 font-black">
                         Add In (B)
@@ -301,7 +301,7 @@ export function ModakaStockInModal({
 
             {/* Total incoming footer */}
             <div className="flex items-center justify-between p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs">
-              <span className="font-bold text-slate-700">Total Additional Modaka Units Received:</span>
+              <span className="font-bold text-slate-700">Total Additional Special Units Received:</span>
               <span className="font-mono text-lg font-black text-rose-600">
                 +{totalInQty} units
               </span>
@@ -326,12 +326,12 @@ export function ModakaStockInModal({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving Modaka In...
+                  Saving Special Stock In...
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Save Modaka In (+{totalInQty})
+                  Save Special Stock In (+{totalInQty})
                 </>
               )}
             </button>

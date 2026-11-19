@@ -56,7 +56,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
-      { name: 'Modaka & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
+      { name: 'Special Stock & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
       { name: 'Pricing Engine', href: '/dashboard/pricing', icon: Tag },
       { name: 'Customers', href: '/dashboard/customers', icon: Users },
     ],
@@ -65,7 +65,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
     title: 'FINANCE & REPORTS',
     items: [
       { name: 'Cash Reconciliation', href: '/dashboard/finance/reconciliation', icon: Banknote, badge: 'Daily' },
-      { name: 'Shift & Modaka Ledger', href: '/dashboard/finance/modaka', icon: FileSpreadsheet, badge: 'A-F' },
+      { name: 'Special Sales & Stock Summary', href: '/dashboard/finance/modaka', icon: FileSpreadsheet, badge: 'A-F' },
       { name: 'Reports Suite', href: '/dashboard/reports', icon: BarChart3, badge: '30' },
       { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },
       { name: 'Tax Engine', href: '/dashboard/finance/tax', icon: FileText },
@@ -187,7 +187,7 @@ export function PosSidebar() {
               ]
             : []),
           {
-            name: 'Modaka & Shift Off',
+            name: 'Special Stock & Shift Off',
             href: '/dashboard/pos?action=shift-handover',
             icon: FileSpreadsheet,
             badge: 'Shift',
