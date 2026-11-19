@@ -27,7 +27,7 @@ const OWNER_ONLY_ROUTES = [
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const isPosPage = pathname === '/dashboard/pos';
+  const isPosPage = pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos');
   const [authChecked, setAuthChecked] = useState(false);
   const {
     isOwner,
@@ -120,8 +120,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Viewport */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          {/* Non-POS pages render standard Header; POS page renders its integrated Top Terminal Status Bar */}
-          {!isPosPage && <Header />}
+          {/* Executive Header (Adapts automatically for POS and non-POS routes) */}
+          <Header />
 
           {/* Page Content Viewport */}
           <main

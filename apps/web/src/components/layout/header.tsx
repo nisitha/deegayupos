@@ -25,7 +25,7 @@ import { formatSriLankaHeaderClock } from '../../lib/date-utils';
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const isPosPage = pathname === '/dashboard/pos';
+  const isPosPage = pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos');
 
   const {
     selectedBranchId,
@@ -135,71 +135,70 @@ export function Header() {
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-5 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]">
+      <header className="h-14 bg-white border-b border-slate-200/90 px-4 sm:px-5 flex items-center justify-between shrink-0 z-30 shadow-2xs">
         {/* Left: Store Monogram & Active Status */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3] shadow-sm shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3] shadow-2xs shrink-0">
             <Store className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-              <span className="truncate max-w-[140px] sm:max-w-[200px]">{businessName}</span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Online
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 font-medium truncate max-w-[180px]">
-              {currentBranchName} • Terminal REG-01
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
+              {businessName}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Online
+            </span>
           </div>
         </div>
 
-        {/* Center: Global Search Bar (Non-POS pages) */}
-        <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-          <div className="relative w-full">
-            <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search products, orders, receipts..."
-              className="w-full bg-[#F8FAFC] border border-slate-200/80 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#005BD3] focus:bg-white transition-all shadow-inner"
-            />
+        {/* Center: Global Search Bar (Non-POS pages only) */}
+        {!isPosPage && (
+          <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search products, orders, receipts..."
+                className="w-full bg-[#F8FAFC] border border-slate-200/80 rounded-xl pl-10 pr-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#005BD3] focus:bg-white transition-all shadow-inner"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right: Launch POS CTA, Branch Switcher, Live Date, User Profile Menu */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* High-Visibility "Launch POS" CTA Button */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* High-Visibility "Launch POS" CTA Button (Hidden on POS route) */}
           {!isPosPage && (
             <Link
               href="/dashboard/pos"
               prefetch={false}
-              className="bg-[#005BD3] hover:bg-[#004CB5] text-white text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1.5 sm:gap-2 shadow-sm shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="h-8 bg-[#005BD3] hover:bg-[#004CB5] text-white text-xs font-semibold px-3 rounded-lg flex items-center gap-1.5 shadow-2xs transition-all whitespace-nowrap shrink-0"
               title="Launch Retail POS Terminal (Shortcut: F1)"
             >
-              <Store className="w-4 h-4" />
+              <Store className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Open POS Terminal</span>
               <span className="sm:hidden text-[11px]">POS</span>
-              <kbd className="hidden sm:inline-block bg-blue-700/60 text-[10px] px-1.5 py-0.5 rounded text-blue-100 font-mono">
+              <kbd className="hidden sm:inline-block bg-blue-700/60 text-[10px] px-1 py-0.2 rounded text-blue-100 font-mono">
                 F1
               </kbd>
             </Link>
           )}
 
           {/* Branch Section: Locked Session for Staff, Switcher for Owner */}
-          <div className="relative" ref={branchRef}>
+          <div className="relative shrink-0" ref={branchRef}>
             {!isOwner ? (
               /* Non-owner staff: Locked Branch Badge + Switch Shop (Logout) Button */
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs font-semibold text-slate-800 select-none shadow-2xs"
+                  className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 select-none shadow-2xs whitespace-nowrap shrink-0"
                   title={`Branch Session Locked: ${currentBranchName}`}
                 >
                   <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-                  <span className="truncate max-w-[110px] sm:max-w-[140px] font-bold text-slate-900">
+                  <span className="font-bold text-slate-900 whitespace-nowrap">
                     {currentBranchName}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 shrink-0">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 shrink-0 whitespace-nowrap">
                     Locked Session
                   </span>
                 </div>
@@ -207,12 +206,11 @@ export function Header() {
                 <button
                   type="button"
                   onClick={handleSwitchShopLogout}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
                   title="Switch branch by terminating session and logging in"
                 >
                   <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span className="hidden sm:inline">Switch Shop</span>
-                  <span className="text-[10px] text-rose-500 font-mono hidden md:inline">(Logout)</span>
+                  <span className="whitespace-nowrap">Switch Shop</span>
                 </button>
               </div>
             ) : (
@@ -220,15 +218,15 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none cursor-pointer"
+                className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none cursor-pointer whitespace-nowrap shrink-0"
                 title="Switch Retail Branch / Location"
               >
                 <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-                <span className="truncate max-w-[90px] sm:max-w-[120px] font-bold text-slate-800">
+                <span className="font-bold text-slate-800 whitespace-nowrap">
                   {currentBranchName}
                 </span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 shrink-0 ${
                     branchDropdownOpen ? 'rotate-180 text-slate-700' : ''
                   }`}
                 />
@@ -334,47 +332,42 @@ export function Header() {
           {/* Real-Time Sri Lanka Clock Badge (Asia/Colombo, tabular-nums) */}
           {currentDateStr && (
             <div
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 font-mono tabular-nums shadow-2xs select-none"
+              className="hidden lg:flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#F8FAFC] border border-slate-200 text-xs font-medium text-slate-600 font-mono tabular-nums shadow-2xs select-none whitespace-nowrap shrink-0"
               title="Sri Lanka Standard Time (Asia/Colombo, UTC+05:30)"
             >
               <Clock className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-              <span>{currentDateStr}</span>
+              <span className="whitespace-nowrap">{currentDateStr}</span>
             </div>
           )}
 
           {/* Notification Bell */}
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+            className="relative h-8 w-8 rounded-lg border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shrink-0"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#005BD3]" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#005BD3]" />
           </button>
 
           {/* Interactive Cashier / User Profile Dropdown */}
-          <div className="relative" ref={profileRef}>
+          <div className="relative shrink-0" ref={profileRef}>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none"
+              className="h-8 flex items-center gap-2 px-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none whitespace-nowrap shrink-0"
               aria-expanded={profileDropdownOpen}
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#005BD3] to-[#4F46E5] text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-white shrink-0">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#005BD3] to-[#4F46E5] text-white flex items-center justify-center font-bold text-[11px] shadow-2xs shrink-0">
                 {displayName.charAt(0)}
               </div>
-              <div className="hidden sm:block text-left">
-                <div className="text-xs font-bold text-slate-800 leading-tight flex items-center gap-1.5">
-                  <span>{displayName}</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-50 text-[#005BD3] border border-blue-200/60 uppercase">
-                    {displayRole}
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">
-                  {businessName}
-                </div>
+              <div className="hidden sm:flex items-center gap-1.5 whitespace-nowrap">
+                <span className="text-xs font-bold text-slate-800 whitespace-nowrap">{displayName}</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-50 text-[#005BD3] border border-blue-200/60 uppercase whitespace-nowrap">
+                  {displayRole}
+                </span>
               </div>
               <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 shrink-0 ${
                   profileDropdownOpen ? 'rotate-180 text-slate-700' : ''
                 }`}
               />

@@ -10,13 +10,12 @@ export function parseValidDate(input?: string | number | Date | null): Date {
 }
 
 /**
- * Format live real-time header clock: "Tue, Nov 17, 2026 • 10:05:30 AM"
+ * Format live real-time header clock: "Nov 19, 2026 • 10:25 AM"
  */
 export function formatSriLankaHeaderClock(dateInput?: string | number | Date | null): string {
   const d = parseValidDate(dateInput);
   const datePart = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Colombo',
-    weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -26,7 +25,6 @@ export function formatSriLankaHeaderClock(dateInput?: string | number | Date | n
     timeZone: 'Asia/Colombo',
     hour: 'numeric',
     minute: '2-digit',
-    second: '2-digit',
     hour12: true,
   }).format(d);
 

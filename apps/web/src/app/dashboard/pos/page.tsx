@@ -54,7 +54,6 @@ import {
 } from '../../../components/pos/quantity-unit-modal';
 import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
 import {
-  AYURVEDIC_MASTER_DEPARTMENTS,
   AYURVEDIC_DEPARTMENT_LIST,
   classifyAyurvedicDepartment,
 } from '../../../lib/ayurvedic-departments';
@@ -1170,12 +1169,21 @@ export default function ConfidencyPosPage() {
         if (searchQuery.trim().length > 0) {
           setIsSearchDropdownOpen(true);
         }
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        setIsCustomerModalOpen(true);
       } else if (e.key === 'F4') {
         e.preventDefault();
         if (cart.length > 0) handleHoldTicket();
+      } else if (e.key === 'F6' || e.key === 'F8') {
+        e.preventDefault();
+        setIsDiscountModalOpen(true);
       } else if (e.key === 'F7') {
         e.preventDefault();
         setIsModakaStockInModalOpen(true);
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        setIsCustomSaleModalOpen(true);
       } else if (e.key === 'Escape') {
         setIsSearchDropdownOpen(false);
         setIsEndShiftModalOpen(false);
@@ -1217,41 +1225,41 @@ export default function ConfidencyPosPage() {
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#E6EAF2] min-w-0">
-        {/* 1. Top Terminal Status Bar (Clean, Non-Clipping Two-Group Header) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-white border-b border-slate-200 shrink-0 shadow-2xs">
+        {/* 1. Top Terminal Status Bar (Clean, Non-Clipping Single Line) */}
+        <div className="h-11 px-4 flex items-center justify-between gap-3 bg-white border-b border-slate-200 shrink-0 shadow-2xs overflow-x-auto no-scrollbar">
           {/* Left Group: Terminal Badge & Cashier Profile */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/90 text-xs font-bold text-[#5B46F6]">
+          <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] shrink-0 whitespace-nowrap">
               <Layers className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-300">•</span>
-              <span className="truncate max-w-[150px]">{currentBranchName}</span>
+              <span className="whitespace-nowrap">{currentBranchName}</span>
             </div>
 
             <button
               type="button"
               onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs group"
+              className="flex items-center gap-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs group shrink-0 whitespace-nowrap"
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="font-bold text-slate-900 group-hover:text-[#5B46F6] transition-colors whitespace-nowrap">
                 Cashier: {cashierName}
               </span>
-              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors shrink-0">
+              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
                 PIN Switch
               </span>
             </button>
           </div>
 
-          {/* Right Group: Compact Qty Toggle, Modaka Stock In & End Shift */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Right Group: Compact Qty Toggle & End Shift */}
+          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
             {/* Compact Qty Popup Toggle */}
             <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs shadow-2xs shrink-0 whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
-                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'ALL'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1263,7 +1271,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
-                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'WEIGHT_LIQUID'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1274,28 +1282,17 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
 
-            {/* High-visibility + Special Stock In (B) Button */}
-            <button
-              type="button"
-              onClick={() => setIsModakaStockInModalOpen(true)}
-              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Record incoming Special Stock (B) received during this shift [F7]"
-            >
-              <PackagePlus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>+ Special Stock In (B)</span>
-            </button>
-
-            {/* High-visibility End Shift (Shift Off) Button */}
+            {/* End Shift (Shift Off) Button */}
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3 py-1 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
               title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>End Shift (Shift Off)</span>
+              <span className="whitespace-nowrap">End Shift</span>
               {activeShift && (
-                <span className="bg-rose-800/80 text-rose-100 text-[10px] px-1.5 py-0.2 rounded-md font-mono">
+                <span className="bg-rose-800/80 text-rose-100 text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0">
                   S{activeShift.shiftNumber}
                 </span>
               )}
@@ -1303,34 +1300,27 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Vibrant Tactile Action Cards (h-16, 5-column responsive grid) */}
-        <div className="px-4 lg:px-5 py-3.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0 backdrop-blur-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-            {/* Card 1: Apply Discount */}
+        {/* 2. Sleek Horizontal Action Pills (h-11, 5-column grid, zero text overlap) */}
+        <div className="px-4 lg:px-5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+            {/* Pill 1: Discount [F8] */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/20 select-none ${
-                discountType !== 'NONE' ? 'ring-2 ring-emerald-300/70' : ''
+              className={`h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${
+                discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
               }`}
-              title="Apply order discount (Percent or Flat) [F6]"
+              title="Apply order discount [F8]"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-                  <Percent className="w-5 h-5 text-white stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex flex-col text-left">
-                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Apply Discount
-                  </span>
-                  <span className="text-xs text-white/85 font-medium truncate">
-                    {discountType === 'PERCENT'
-                      ? `${discountPercent}% Off Total`
-                      : discountType === 'FLAT'
-                      ? `LKR ${discountFlat} Off Total`
-                      : 'Bill or % off'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <Percent className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs font-bold whitespace-nowrap truncate">
+                  {discountType === 'PERCENT'
+                    ? `${discountPercent}% Off`
+                    : discountType === 'FLAT'
+                    ? `LKR ${discountFlat} Off`
+                    : 'Discount'}
+                </span>
               </div>
               {discountType !== 'NONE' ? (
                 <span
@@ -1338,39 +1328,32 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     resetDiscount();
                   }}
-                  className="w-7 h-7 rounded-lg bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  className="w-5 h-5 rounded-md bg-black/20 hover:bg-black/30 flex items-center justify-center text-white shrink-0 cursor-pointer"
                   title="Remove discount"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
-                  [F6]
+                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                  F8
                 </span>
               )}
             </button>
 
-            {/* Card 2: Customer */}
+            {/* Pill 2: Customer [F3] */}
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-500/20 select-none ${
-                selectedCustomer ? 'ring-2 ring-blue-300/70' : ''
+              className={`h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${
+                selectedCustomer ? 'ring-2 ring-blue-300' : ''
               }`}
-              title="Select customer for billing and credit [F3]"
+              title="Select customer [F3]"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-                  <UserPlus className="w-5 h-5 text-white stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex flex-col text-left">
-                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Customer
-                  </span>
-                  <span className="text-xs text-white/85 font-medium truncate max-w-[130px]">
-                    {selectedCustomer ? selectedCustomer.name : 'Walk-in Customer'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <UserPlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs font-bold whitespace-nowrap truncate max-w-[95px]">
+                  {selectedCustomer ? selectedCustomer.name : 'Customer'}
+                </span>
               </div>
               {selectedCustomer ? (
                 <span
@@ -1378,91 +1361,69 @@ export default function ConfidencyPosPage() {
                     e.stopPropagation();
                     setSelectedCustomer(null);
                   }}
-                  className="w-7 h-7 rounded-lg bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  className="w-5 h-5 rounded-md bg-black/20 hover:bg-black/30 flex items-center justify-center text-white shrink-0 cursor-pointer"
                   title="Remove customer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
-                  [F3]
+                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                  F3
                 </span>
               )}
             </button>
 
-            {/* Card 3: Hold Ticket */}
+            {/* Pill 3: Hold [F4] */}
             <button
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/20 select-none disabled:opacity-50 disabled:pointer-events-none"
+              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none"
               title="Park current order ticket [F4]"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-                  <PauseCircle className="w-5 h-5 text-white stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex flex-col text-left">
-                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Hold Ticket
+              <div className="flex items-center gap-2 min-w-0">
+                <PauseCircle className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs font-bold whitespace-nowrap truncate">Hold</span>
+                {heldTickets.length > 0 && (
+                  <span className="text-[10px] font-bold bg-white/25 px-1.5 py-0.2 rounded-full shrink-0">
+                    {heldTickets.length}
                   </span>
-                  <span className="text-xs text-white/85 font-medium truncate">
-                    {heldTickets.length > 0 ? `${heldTickets.length} Parked` : 'Park Current Bill'}
-                  </span>
-                </div>
+                )}
               </div>
-              <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
-                [F4]
+              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                F4
               </span>
             </button>
 
-            {/* Card 4: Custom Sale Item */}
+            {/* Pill 4: Custom Item [F9] */}
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-violet-600 to-purple-700 shadow-violet-500/20 select-none"
-              title="Add non-catalog or custom priced item"
+              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-violet-600 hover:bg-violet-700"
+              title="Add non-catalog or custom item [F9]"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-                  <Tag className="w-5 h-5 text-white stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex flex-col text-left">
-                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Custom Item
-                  </span>
-                  <span className="text-xs text-white/85 font-medium truncate">
-                    Quick Entry / Misc
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <Tag className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs font-bold whitespace-nowrap truncate">Custom Item</span>
               </div>
-              <div className="w-7 h-7 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0 border border-white/25">
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-              </div>
+              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                F9
+              </span>
             </button>
 
-            {/* Card 5: Special Stock In (B) */}
+            {/* Pill 5: Special Stock In [F7] */}
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
-              className="relative h-16 rounded-2xl px-4 flex items-center justify-between text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer bg-gradient-to-r from-rose-500 to-pink-600 shadow-rose-500/25 select-none"
-              title="Record incoming Special Stock (B) [F7]"
+              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700"
+              title="Record incoming Special Stock [F7]"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-                  <PackagePlus className="w-5 h-5 text-white stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex flex-col text-left">
-                  <span className="font-bold text-sm tracking-tight text-white leading-tight">
-                    Special Stock In (B)
-                  </span>
-                  <span className="text-xs text-white/85 font-medium truncate">
-                    Add Received Stock
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <PackagePlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs font-bold whitespace-nowrap truncate">Special Stock In</span>
               </div>
-              <span className="text-[11px] font-mono font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg border border-white/20 shrink-0">
-                [F7]
+              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                F7
               </span>
             </button>
           </div>
@@ -1658,19 +1619,19 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 4. Ayurvedic Master Department Tabs (10 Sri Lankan Departments + Sinhala/English Labels) */}
-        <div className="px-5 py-2.5 border-b border-slate-200/80 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white/90 backdrop-blur-xs">
+        {/* 4. Category Tabs (English-Only) */}
+        <div className="px-5 py-2 border-b border-slate-200/80 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white/90 backdrop-blur-xs">
           {/* All Departments Tab */}
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
+            className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
               selectedDeptId === 'all'
                 ? 'bg-[#0F1222] text-white border-[#0F1222] shadow-sm'
                 : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
             }`}
           >
-            <span>All Products (සියලු වර්ග)</span>
+            <span>All Products</span>
             <span
               className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
                 selectedDeptId === 'all' ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
@@ -1680,7 +1641,7 @@ export default function ConfidencyPosPage() {
             </span>
           </button>
 
-          {/* 10 Standardized Ayurvedic Departments */}
+          {/* Standardized Departments (Clean English Only) */}
           {AYURVEDIC_DEPARTMENT_LIST.map((dept) => {
             const isActive = selectedDeptId === dept.id;
             const count = departmentCounts[dept.id] || 0;
@@ -1690,7 +1651,7 @@ export default function ConfidencyPosPage() {
                 key={dept.id}
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
                   isActive
                     ? 'bg-[#0F1222] text-white border-[#0F1222] font-bold shadow-sm'
                     : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
@@ -1698,15 +1659,13 @@ export default function ConfidencyPosPage() {
               >
                 {/* 3D Mini Dot */}
                 <span
-                  className={`w-2.5 h-2.5 rounded-full ${
+                  className={`w-2 h-2 rounded-full ${
                     isActive ? 'bg-[#5B46F6]' : `bg-gradient-to-br ${dept.gradient}`
                   } shadow-2xs shrink-0`}
                 />
-                <span className="whitespace-nowrap">
-                  {dept.en} <span className={`font-normal text-xs ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>({dept.si})</span>
-                </span>
+                <span className="whitespace-nowrap">{dept.en}</span>
                 <span
-                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
+                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${
                     isActive ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
@@ -1759,72 +1718,56 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
               {visibleProducts.map((product) => {
-                const dept =
-                  (product.departmentId && AYURVEDIC_MASTER_DEPARTMENTS[product.departmentId]) ||
-                  AYURVEDIC_MASTER_DEPARTMENTS['fmcg']!;
-
                 return (
                   <div
                     key={product.id}
                     onClick={() => handleProductClick(product)}
-                    className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md hover:border-indigo-400 hover:-translate-y-0.5 transition-all duration-150 overflow-hidden flex flex-col p-3.5 cursor-pointer group active:scale-[0.98] select-none relative justify-between"
+                    className="rounded-xl border border-slate-200/80 bg-white p-2.5 hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative"
                   >
-                    {/* Top Row: Department Sinhala Pill + Stock Indicator */}
-                    <div className="flex items-center justify-between mb-2">
-                      <span
-                        className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${dept.bgTint} ${dept.textColor} ${dept.borderTint}`}
-                      >
-                        {dept.si || dept.en}
-                      </span>
-                      {product.stockOnHand <= 0 ? (
-                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70 font-mono">
-                          0 left
-                        </span>
-                      ) : product.stockOnHand <= 5 ? (
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/70 font-mono">
-                          {product.stockOnHand} left
-                        </span>
-                      ) : (
-                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 font-mono">
-                          Qty: {product.stockOnHand}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* High-Contrast Realistic Product Photo Container (Studio-Tinted Stage) */}
-                    <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-emerald-50/30 border border-slate-100 rounded-xl h-28 w-full p-2 overflow-hidden flex items-center justify-center mb-2.5 group-hover:scale-[1.02] transition-transform relative">
+                    {/* Image Frame (h-24, centered photo, top-right stock badge) */}
+                    <div className="relative h-24 w-full rounded-lg bg-slate-50 overflow-hidden mb-2 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
-                        className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200"
+                        className="w-full h-full object-contain drop-shadow-2xs transition-transform duration-200"
                         loading="lazy"
                         onError={(e) => {
                           e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
                         }}
                       />
+                      <div className="absolute top-1.5 right-1.5 z-10">
+                        {product.stockOnHand <= 0 ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-mono shadow-2xs">
+                            0 left
+                          </span>
+                        ) : product.stockOnHand <= 5 ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono shadow-2xs">
+                            {product.stockOnHand} left
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shadow-2xs">
+                            {product.stockOnHand.toLocaleString()} left
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Product Details, Legible Typography & Tactile Add Action */}
+                    {/* Product Title (Clean 2-line English) */}
                     <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4
-                          className="text-sm md:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[42px] group-hover:text-indigo-600 transition-colors"
-                          title={product.name}
-                        >
-                          {product.name}
-                        </h4>
-                        <div className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                          {dept.en}
-                        </div>
-                      </div>
+                      <h4
+                        className="text-[13px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[2.25rem] group-hover:text-indigo-600 transition-colors"
+                        title={product.name}
+                      >
+                        {product.name}
+                      </h4>
 
-                      {/* Bottom Row: Large High-Contrast Price + Tactile '+' Add Button */}
-                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100">
+                      {/* Bottom Price & Quick-Add Row */}
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex items-baseline">
-                          <span className="text-xs font-bold text-slate-400 mr-1">LKR</span>
-                          <span className="text-slate-900 font-bold tabular-nums text-base md:text-lg tracking-tight">
+                          <span className="text-[11px] font-bold text-slate-400 mr-1">LKR</span>
+                          <span className="text-sm font-extrabold text-slate-900 tabular-nums">
                             {product.retailPrice.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -1837,11 +1780,11 @@ export default function ConfidencyPosPage() {
                             e.stopPropagation();
                             handleProductClick(product);
                           }}
-                          className="w-8 h-8 rounded-lg bg-[#5B46F6] hover:bg-[#4935E3] text-white flex items-center justify-center font-bold shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                          className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white flex items-center justify-center font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
                           title="Add to cart"
                           aria-label={`Add ${product.name} to cart`}
                         >
-                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                         </button>
                       </div>
                     </div>

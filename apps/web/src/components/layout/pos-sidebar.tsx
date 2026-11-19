@@ -25,6 +25,8 @@ import {
   BarChart3,
   Banknote,
   FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
@@ -88,6 +90,21 @@ export function PosSidebar() {
   const { user, tenant, business, isOwner, grnBranchIds, selectedBranchId } = useTenantBranch();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const isPosRoute = pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos');
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(isPosRoute);
+  const prevRouteRef = useRef(pathname);
+
+  useEffect(() => {
+    if (prevRouteRef.current !== pathname) {
+      if (pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos')) {
+        setIsCollapsed(true);
+      } else {
+        setIsCollapsed(false);
+      }
+      prevRouteRef.current = pathname;
+    }
+  }, [pathname]);
 
   // Global ⌘K / Ctrl+K shortcut listener to quickly focus command search
   useEffect(() => {
@@ -244,81 +261,156 @@ export function PosSidebar() {
   }, [sectionsToDisplay, searchTerm]);
 
   return (
-    <aside className="hidden md:flex w-[240px] lg:w-[260px] bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30">
+    <aside
+      className={`hidden md:flex ${
+        isCollapsed ? 'w-[68px]' : 'w-[240px] lg:w-[260px]'
+      } bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30 transition-all duration-200`}
+    >
       {/* 1. Brand Header */}
-      <div className="p-4 pb-3 border-b border-slate-800/60">
-        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2.5 group">
-          <div className="bg-white/5 border border-white/10 text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform overflow-hidden p-0.5">
-            {logoUrl && !logoError ? (
-              <img
-                src={logoUrl}
-                alt={businessName}
-                className="w-full h-full object-contain"
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <span>{initial}</span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
-              {businessName}
-            </h2>
-            <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
-              Ayurvedic Pharmacy OS
-            </p>
-          </div>
-        </Link>
+      <div className={`border-b border-slate-800/60 ${isCollapsed ? 'p-3 pb-3 flex flex-col items-center gap-2.5' : 'p-4 pb-3'}`}>
+        {isCollapsed ? (
+          <>
+            <Link href="/dashboard" prefetch={false} className="group" title={businessName}>
+              <div className="bg-white/5 border border-white/10 text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform overflow-hidden p-0.5">
+                {logoUrl && !logoError ? (
+                  <img
+                    src={logoUrl}
+                    alt={businessName}
+                    className="w-full h-full object-contain"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <span>{initial}</span>
+                )}
+              </div>
+            </Link>
 
-        {/* 2. Sleek Command Search Input */}
-        <div className="mt-3 relative">
-          <div className="w-full bg-white/[0.06] border border-white/10 text-sm px-3 py-2 rounded-xl text-slate-200 flex items-center justify-between focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400/30 transition-all">
-            <div className="flex items-center gap-2 min-w-0">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search... ⌘K"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setSearchTerm('');
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-                className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-400 focus:outline-none"
-              />
-            </div>
-            {searchTerm ? (
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(false)}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Expand Sidebar"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <Link href="/dashboard" prefetch={false} className="flex items-center gap-2.5 group min-w-0">
+                <div className="bg-white/5 border border-white/10 text-white font-bold rounded-xl w-10 h-10 flex items-center justify-center text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform overflow-hidden p-0.5">
+                  {logoUrl && !logoError ? (
+                    <img
+                      src={logoUrl}
+                      alt={businessName}
+                      className="w-full h-full object-contain"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <span>{initial}</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
+                    {businessName}
+                  </h2>
+                  <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                    Ayurvedic Pharmacy OS
+                  </p>
+                </div>
+              </Link>
+
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="text-[10px] text-slate-400 hover:text-white px-1 cursor-pointer"
-                title="Clear search"
+                onClick={() => setIsCollapsed(true)}
+                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-1"
+                title="Collapse Sidebar"
               >
-                ✕
+                <ChevronLeft className="w-4 h-4" />
               </button>
-            ) : (
-              <kbd className="text-[10px] font-mono bg-white/10 border border-white/10 px-1.5 py-0.5 rounded text-slate-400 shadow-2xs shrink-0 font-medium">
-                ⌘K
-              </kbd>
-            )}
-          </div>
-        </div>
+            </div>
+
+            {/* 2. Sleek Command Search Input */}
+            <div className="mt-3 relative">
+              <div className="w-full bg-white/[0.06] border border-white/10 text-sm px-3 py-2 rounded-xl text-slate-200 flex items-center justify-between focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400/30 transition-all">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search... ⌘K"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchTerm('');
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-400 focus:outline-none"
+                  />
+                </div>
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="text-[10px] text-slate-400 hover:text-white px-1 cursor-pointer"
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <kbd className="text-[10px] font-mono bg-white/10 border border-white/10 px-1.5 py-0.5 rounded text-slate-400 shadow-2xs shrink-0 font-medium">
+                    ⌘K
+                  </kbd>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 3. Categorized Menu Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 no-scrollbar">
-        {filteredSections.map((section) => (
-          <div key={section.title}>
-            <div className="text-[11px] font-semibold tracking-wider text-slate-400/80 mb-2 px-3 uppercase">
-              {section.title}
-            </div>
-            <div className="space-y-0.5">
+      <div className={`flex-1 overflow-y-auto no-scrollbar ${isCollapsed ? 'px-2 py-3 space-y-2 flex flex-col items-center' : 'px-3 py-3 space-y-4'}`}>
+        {filteredSections.map((section, sIdx) => (
+          <div key={section.title} className={isCollapsed ? 'w-full flex flex-col items-center space-y-1' : ''}>
+            {isCollapsed ? (
+              sIdx > 0 && <div className="w-6 h-px bg-slate-800/80 my-1.5" />
+            ) : (
+              <div className="text-[11px] font-semibold tracking-wider text-slate-400/80 mb-2 px-3 uppercase">
+                {section.title}
+              </div>
+            )}
+            <div className={isCollapsed ? 'space-y-1 w-full flex flex-col items-center' : 'space-y-0.5'}>
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = isItemActive(item.href);
+
+                if (isCollapsed) {
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      prefetch={false}
+                      onClick={() => {
+                        if (item.href.includes('action=shift-handover') && typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('open-shift-handover'));
+                        }
+                      }}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group relative ${
+                        isActive
+                          ? 'bg-gradient-to-r from-[#5B46F6] to-[#4F46E5] text-white shadow-md shadow-indigo-950/50'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                      }`}
+                      title={item.name}
+                    >
+                      <Icon className="w-5 h-5 shrink-0" />
+                      {item.badge && (
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#5B46F6] ring-2 ring-[#0F1222]" />
+                      )}
+                    </Link>
+                  );
+                }
 
                 return (
                   <Link
@@ -367,31 +459,50 @@ export function PosSidebar() {
       </div>
 
       {/* 4. Bottom User Profile & Sign Out */}
-      <div className="p-3 border-t border-white/10 bg-white/[0.02]">
-        <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white/[0.05] transition-colors">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5B46F6] to-[#7052FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10">
+      <div className={`border-t border-white/10 bg-white/[0.02] ${isCollapsed ? 'p-2 flex flex-col items-center gap-2' : 'p-3'}`}>
+        {isCollapsed ? (
+          <>
+            <div
+              className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5B46F6] to-[#7052FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10 cursor-pointer"
+              title={`${displayName} (${userEmail})`}
+            >
               {displayName.charAt(0)}
             </div>
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-white truncate">
-                {displayName}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
+              title="Sign out of POS session"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5B46F6] to-[#7052FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10">
+                {displayName.charAt(0)}
               </div>
-              <div className="text-xs text-slate-400 font-mono truncate">
-                {userEmail}
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white truncate">
+                  {displayName}
+                </div>
+                <div className="text-xs text-slate-400 font-mono truncate">
+                  {userEmail}
+                </div>
               </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg"
-            title="Sign out of POS session"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg cursor-pointer"
+              title="Sign out of POS session"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
