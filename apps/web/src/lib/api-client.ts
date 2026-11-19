@@ -3121,6 +3121,20 @@ export interface ShiftModakaEntryDto {
   totalAmount: number; // F = D * appliedRate
 }
 
+export interface ShiftFinancialAdjustmentDto {
+  id: string;
+  adjustmentDate: string;
+  branchId: string;
+  shiftId: string;
+  employeeId?: string | null;
+  employeeName: string;
+  shiftNumber: number;
+  adjustmentType: 'salary_deduction' | 'extra_income';
+  amount: number;
+  notes?: string | null;
+  createdAt: string;
+}
+
 export interface CashierShiftDto {
   id: string;
   tenantId: string;
@@ -3149,10 +3163,16 @@ export interface CashierShiftDto {
   otherExpenses: number;
   expectedCashBeforeBank: number;
   countedDrawerCash: number;
+  expectedRemainingDrawerCash?: number;
+  countedRemainingDrawerCash?: number;
   denominationsJson: Record<string, number>;
   bankedAmount: number;
   closingDrawerFloat: number;
+  closingFloat?: number;
   cashVariance: number;
+  tallyStatus?: 'open' | 'balanced' | 'shortage' | 'excess';
+  salaryDeductionAmount?: number;
+  extraIncomeAmount?: number;
   handoverNotes?: string | null;
   modakaEntries?: ShiftModakaEntryDto[];
   createdAt?: string;
@@ -3163,15 +3183,17 @@ export interface EndShiftPayload {
   shiftId: string;
   branchId: string;
   cashierId: string;
+  employeeName?: string;
   openingFloat: number;
   declaredShiftSale: number;
   goodsPurchasedPaid: number;
   otherExpenses: number;
-  countedDrawerCash: number;
-  denominationsJson: Record<string, number>;
   bankedAmount: number;
   bankAccountDetails?: string;
-  closingDrawerFloat: number;
+  countedDrawerCash?: number;
+  countedRemainingDrawerCash?: number;
+  denominationsJson: Record<string, number>;
+  closingDrawerFloat?: number;
   handoverNotes?: string;
   modakaEntries: {
     productId: string;
@@ -3466,14 +3488,16 @@ export const shiftsApi = {
       // Find previous closed shift for this branch
       const { data: prevShift } = await supabase
         .from('cashier_shifts')
-        .select('id, closing_drawer_float')
+        .select('id, closing_drawer_float, closing_float, counted_remaining_drawer_cash')
         .eq('branch_id', branchId)
         .eq('status', 'closed')
         .order('ended_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const carriedOpeningFloat = Number(prevShift?.closing_drawer_float || 0);
+      const carriedOpeningFloat = Number(
+        prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
+      );
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
@@ -3716,22 +3740,131 @@ export const shiftsApi = {
           }, { onConflict: 'shift_id,product_id' });
       }
 
-      // 3. Cash & Expense Summary calculations
+      // 3. Exact Shift Cash Tally Math & Financial Adjustments
       const openingFloat = Number(payload.openingFloat || 0);
-      const declaredShiftSale = Number(payload.declaredShiftSale || 0);
-      const totalCashAvailable = openingFloat + declaredShiftSale + modakaTotalAmount;
+      const systemPosCashSales = Number(
+        payload.declaredShiftSale > 0 ? payload.declaredShiftSale : posCash
+      );
+      const specialStockSalesTotal = modakaTotalAmount;
+      const totalCashInflow = openingFloat + systemPosCashSales + specialStockSalesTotal;
+
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
-      const expectedCashBeforeBank = totalCashAvailable - goodsPurchasedPaid - otherExpenses;
-      const countedDrawerCash = Number(payload.countedDrawerCash || 0);
-      const cashVariance = countedDrawerCash - expectedCashBeforeBank;
       const bankedAmount = Number(payload.bankedAmount || 0);
-      const closingDrawerFloat = countedDrawerCash - bankedAmount;
+
+      // Expected Remaining Drawer Cash = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
+      const expectedRemainingDrawerCash =
+        totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount;
+
+      // Counted Remaining Drawer Cash = Sum of counted remaining drawer notes/coins from Denominations
+      const countedRemainingDrawerCash = Number(
+        payload.countedRemainingDrawerCash !== undefined
+          ? payload.countedRemainingDrawerCash
+          : payload.countedDrawerCash || 0
+      );
+
+      // Cash Variance = Counted Remaining Drawer Cash - Expected Remaining Drawer Cash
+      const cashVariance = countedRemainingDrawerCash - expectedRemainingDrawerCash;
+
+      // Carry-Forward to Next Shift: Save closing_float = Counted Remaining Drawer Cash
+      const closingFloat = countedRemainingDrawerCash;
+      const closingDrawerFloat = countedRemainingDrawerCash;
+
+      // Auto-Record Shortage or Excess on Submit
+      let tallyStatus: 'balanced' | 'shortage' | 'excess' = 'balanced';
+      let salaryDeductionAmount = 0;
+      let extraIncomeAmount = 0;
+
+      if (cashVariance < 0) {
+        tallyStatus = 'shortage';
+        salaryDeductionAmount = Math.abs(cashVariance);
+      } else if (cashVariance > 0) {
+        tallyStatus = 'excess';
+        extraIncomeAmount = cashVariance;
+      } else {
+        tallyStatus = 'balanced';
+      }
+
+      // Fetch shift metadata for financial adjustments audit
+      const { data: shiftRow } = await supabase
+        .from('cashier_shifts')
+        .select('shift_date, shift_number, cashier_id, branch_id')
+        .eq('id', payload.shiftId)
+        .maybeSingle();
+
+      const shiftDate = shiftRow?.shift_date || getSriLankaDateStr();
+      const shiftNumber = shiftRow?.shift_number || 1;
+      const employeeId = payload.cashierId || shiftRow?.cashier_id || null;
+      let employeeName = payload.employeeName?.trim();
+      if (!employeeName && employeeId) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('full_name, email')
+          .eq('id', employeeId)
+          .maybeSingle();
+        employeeName = userRow?.full_name || userRow?.email || 'Cashier';
+      }
+      if (!employeeName) employeeName = 'Cashier';
+
+      // Persist Shortage / Excess Financial Adjustment
+      if (tallyStatus === 'shortage') {
+        const { error: adjErr } = await supabase
+          .from('shift_financial_adjustments')
+          .upsert(
+            {
+              adjustment_date: shiftDate,
+              branch_id: payload.branchId,
+              shift_id: payload.shiftId,
+              employee_id: employeeId,
+              employee_name: employeeName,
+              shift_number: shiftNumber,
+              adjustment_type: 'salary_deduction',
+              amount: salaryDeductionAmount,
+              notes: `Shift ${shiftNumber} drawer shortage of LKR ${salaryDeductionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
+            },
+            { onConflict: 'shift_id' }
+          );
+        if (adjErr) {
+          console.warn('[shiftsApi] shift_financial_adjustments shortage upsert error:', adjErr.message);
+        }
+      } else if (tallyStatus === 'excess') {
+        const { error: adjErr } = await supabase
+          .from('shift_financial_adjustments')
+          .upsert(
+            {
+              adjustment_date: shiftDate,
+              branch_id: payload.branchId,
+              shift_id: payload.shiftId,
+              employee_id: employeeId,
+              employee_name: employeeName,
+              shift_number: shiftNumber,
+              adjustment_type: 'extra_income',
+              amount: extraIncomeAmount,
+              notes: `Shift ${shiftNumber} drawer excess of LKR ${extraIncomeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
+            },
+            { onConflict: 'shift_id' }
+          );
+        if (adjErr) {
+          console.warn('[shiftsApi] shift_financial_adjustments excess upsert error:', adjErr.message);
+        }
+      } else {
+        // Balanced: Clean up any prior adjustment on re-submit
+        await supabase
+          .from('shift_financial_adjustments')
+          .delete()
+          .eq('shift_id', payload.shiftId);
+      }
 
       const formattedNotes = [
         payload.handoverNotes?.trim(),
         payload.bankAccountDetails && bankedAmount > 0
           ? `[Bank Deposit: LKR ${bankedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} deposited to ${payload.bankAccountDetails}]`
+          : null,
+        tallyStatus === 'shortage'
+          ? `[Shortage Salary Deduction: LKR ${salaryDeductionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} recorded for ${employeeName}]`
+          : null,
+        tallyStatus === 'excess'
+          ? `[Excess Extra Income: LKR ${extraIncomeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} credited to company]`
           : null,
       ]
         .filter(Boolean)
@@ -3752,16 +3885,22 @@ export const shiftsApi = {
           modaka_total_sold_qty: modakaTotalSoldQty,
           modaka_total_amount: modakaTotalAmount,
           opening_float: openingFloat,
-          declared_shift_sale: declaredShiftSale,
-          total_cash_available: totalCashAvailable,
+          declared_shift_sale: systemPosCashSales,
+          total_cash_available: totalCashInflow,
           goods_purchased_paid: goodsPurchasedPaid,
           other_expenses: otherExpenses,
-          expected_cash_before_bank: expectedCashBeforeBank,
-          counted_drawer_cash: countedDrawerCash,
+          expected_cash_before_bank: totalCashInflow - goodsPurchasedPaid - otherExpenses,
+          counted_drawer_cash: countedRemainingDrawerCash,
           denominations_json: payload.denominationsJson || {},
           banked_amount: bankedAmount,
           closing_drawer_float: closingDrawerFloat,
+          closing_float: closingFloat,
+          expected_remaining_drawer_cash: expectedRemainingDrawerCash,
+          counted_remaining_drawer_cash: countedRemainingDrawerCash,
           cash_variance: cashVariance,
+          tally_status: tallyStatus,
+          salary_deduction_amount: salaryDeductionAmount,
+          extra_income_amount: extraIncomeAmount,
           handover_notes: formattedNotes || null,
         })
         .eq('id', payload.shiftId)
@@ -3879,10 +4018,16 @@ export const shiftsApi = {
         otherExpenses: Number(s.other_expenses || 0),
         expectedCashBeforeBank: Number(s.expected_cash_before_bank || 0),
         countedDrawerCash: Number(s.counted_drawer_cash || 0),
+        expectedRemainingDrawerCash: Number(s.expected_remaining_drawer_cash || 0),
+        countedRemainingDrawerCash: Number(s.counted_remaining_drawer_cash || 0),
         denominationsJson: s.denominations_json || {},
         bankedAmount: Number(s.banked_amount || 0),
         closingDrawerFloat: Number(s.closing_drawer_float || 0),
+        closingFloat: Number(s.closing_float || s.closing_drawer_float || 0),
         cashVariance: Number(s.cash_variance || 0),
+        tallyStatus: s.tally_status || 'open',
+        salaryDeductionAmount: Number(s.salary_deduction_amount || 0),
+        extraIncomeAmount: Number(s.extra_income_amount || 0),
         handoverNotes: s.handover_notes,
         modakaEntries: entriesByShiftId.get(s.id) || [],
         createdAt: s.created_at,
@@ -3917,6 +4062,63 @@ export const shiftsApi = {
 
       return { success: true, data: list };
     } catch {
+      return { success: false, data: [] };
+    }
+  },
+
+  getShiftFinancialAdjustments: async (params?: {
+    branchId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    adjustmentType?: 'salary_deduction' | 'extra_income';
+    employeeId?: string;
+  }): Promise<ApiResponse<ShiftFinancialAdjustmentDto[]>> => {
+    try {
+      let query = supabase
+        .from('shift_financial_adjustments')
+        .select('*')
+        .order('adjustment_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (params?.branchId && params.branchId !== 'ALL') {
+        query = query.eq('branch_id', params.branchId);
+      }
+      if (params?.dateFrom) {
+        query = query.gte('adjustment_date', params.dateFrom);
+      }
+      if (params?.dateTo) {
+        query = query.lte('adjustment_date', params.dateTo);
+      }
+      if (params?.adjustmentType) {
+        query = query.eq('adjustment_type', params.adjustmentType);
+      }
+      if (params?.employeeId) {
+        query = query.eq('employee_id', params.employeeId);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn('[shiftsApi] getShiftFinancialAdjustments error:', error.message);
+        return { success: false, data: [] };
+      }
+
+      const list: ShiftFinancialAdjustmentDto[] = (data || []).map((row: any) => ({
+        id: row.id,
+        adjustmentDate: row.adjustment_date,
+        branchId: row.branch_id,
+        shiftId: row.shift_id,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        shiftNumber: Number(row.shift_number || 1),
+        adjustmentType: row.adjustment_type as 'salary_deduction' | 'extra_income',
+        amount: Number(row.amount || 0),
+        notes: row.notes,
+        createdAt: row.created_at,
+      }));
+
+      return { success: true, data: list };
+    } catch (err: any) {
+      console.error('[shiftsApi] getShiftFinancialAdjustments fatal:', err);
       return { success: false, data: [] };
     }
   },

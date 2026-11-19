@@ -32,7 +32,7 @@ interface ShiftEndModalProps {
   cashierId?: string | null;
 }
 
-const DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const;
+const DENOMINATIONS = [5000, 2000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const;
 
 export function ShiftEndModal({
   isOpen,
@@ -69,9 +69,10 @@ export function ShiftEndModal({
     }[]
   >([]);
 
-  // Section 2: Denomination counts state
+  // Section 2: Denomination counts state (including 2000 LKR notes)
   const [counts, setCounts] = useState<Record<number, number>>({
     5000: 0,
+    2000: 0,
     1000: 0,
     500: 0,
     100: 0,
@@ -148,9 +149,10 @@ export function ShiftEndModal({
         }));
         setModakaRows(rows);
 
-        // Initialize denominations from JSON or 0
+        // Initialize denominations from JSON or 0 (including 2000 LKR notes)
         const initialCounts: Record<number, number> = {
           5000: 0,
+          2000: 0,
           1000: 0,
           500: 0,
           100: 0,
@@ -223,27 +225,31 @@ export function ShiftEndModal({
   const modakaUnitsTotal = modakaTotals.sumD;
   const modakaSalesTotal = modakaTotals.sumF;
 
-  // Denominations Total
-  const countedDrawerCash = useMemo(() => {
+  // Exact Shift Tally Math:
+  // Counted Remaining Drawer Cash = Sum of counted notes/coins from Denominations
+  const countedRemainingDrawerCash = useMemo(() => {
     return DENOMINATIONS.reduce((acc, d) => acc + d * (counts[d] || 0), 0);
   }, [counts]);
 
-  // Expense Summary calculations
-  const totalCashAvailable = useMemo(() => {
+  // 1. Total Cash Inflow = openingFloat + systemPosCashSales + specialStockSalesTotal
+  const totalCashInflow = useMemo(() => {
     return openingFloat + declaredShiftSale + modakaSalesTotal;
   }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
-  const expectedCashBeforeBank = useMemo(() => {
-    return totalCashAvailable - goodsPurchasedPaid - otherExpenses;
-  }, [totalCashAvailable, goodsPurchasedPaid, otherExpenses]);
+  // 2. Expected Remaining Drawer Cash = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
+  const expectedRemainingDrawerCash = useMemo(() => {
+    return totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount;
+  }, [totalCashInflow, goodsPurchasedPaid, otherExpenses, bankedAmount]);
 
+  // 3. Cash Variance = Counted Remaining Drawer Cash - Expected Remaining Drawer Cash
   const cashVariance = useMemo(() => {
-    return countedDrawerCash - expectedCashBeforeBank;
-  }, [countedDrawerCash, expectedCashBeforeBank]);
+    return countedRemainingDrawerCash - expectedRemainingDrawerCash;
+  }, [countedRemainingDrawerCash, expectedRemainingDrawerCash]);
 
+  // 4. Carry-Forward Float for next shift: Save closing_float = Counted Remaining Drawer Cash
   const closingDrawerFloat = useMemo(() => {
-    return Math.max(0, countedDrawerCash - bankedAmount);
-  }, [countedDrawerCash, bankedAmount]);
+    return countedRemainingDrawerCash;
+  }, [countedRemainingDrawerCash]);
 
   if (!isOpen) return null;
   const currentShift = activeShift || localShift;
@@ -293,15 +299,17 @@ export function ShiftEndModal({
       shiftId: targetShift.id,
       branchId: targetShift.branchId,
       cashierId: targetShift.cashierId,
+      employeeName: cashierName,
       openingFloat,
       declaredShiftSale,
       goodsPurchasedPaid,
       otherExpenses,
-      countedDrawerCash,
-      denominationsJson: counts,
       bankedAmount,
       bankAccountDetails: selectedBankStr,
+      countedDrawerCash: countedRemainingDrawerCash,
+      countedRemainingDrawerCash,
       closingDrawerFloat,
+      denominationsJson: counts,
       handoverNotes: handoverNotes.trim(),
       modakaEntries: modakaRows.map((r) => ({
         productId: r.productId,
@@ -403,7 +411,7 @@ export function ShiftEndModal({
                 : 'bg-slate-100 text-slate-600'
                 }`}
             >
-              LKR {countedDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+              LKR {countedRemainingDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 0 })}
             </span>
           </button>
           <button
@@ -416,12 +424,16 @@ export function ShiftEndModal({
           >
             <Receipt className="w-4 h-4" />
             <span>3. Cash & Expenses</span>
-            {cashVariance !== 0 && (
+            {cashVariance !== 0 ? (
               <span
                 className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] font-bold ${cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                   }`}
               >
                 {cashVariance > 0 ? `+${cashVariance.toFixed(0)}` : cashVariance.toFixed(0)}
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded-md font-mono text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                Balanced
               </span>
             )}
           </button>
@@ -639,15 +651,15 @@ export function ShiftEndModal({
                       <Coins className="w-6 h-6 text-emerald-600" />
                       <div>
                         <h5 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                          Counted Drawer Cash
+                          Counted Remaining Drawer Cash
                         </h5>
                         <p className="text-[11px] text-emerald-700">
-                          Total value of all notes and coins counted in drawer
+                          Total physical notes and coins remaining in cash drawer (excluding bank deposit)
                         </p>
                       </div>
                     </div>
                     <span className="text-2xl font-black font-mono text-emerald-800">
-                      LKR {countedDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      LKR {countedRemainingDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
@@ -745,13 +757,18 @@ export function ShiftEndModal({
                       </span>
                     </div>
 
-                    {/* Total Cash Available */}
-                    <div className="flex items-center justify-between pt-2.5 font-bold bg-slate-50/70 p-2 rounded-xl">
-                      <span className="text-slate-900">
-                        Total Cash:
-                      </span>
-                      <span className="font-mono text-sm text-slate-900">
-                        LKR {totalCashAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {/* Total Cash Inflow */}
+                    <div className="flex items-center justify-between pt-2.5 font-bold bg-indigo-50/80 p-2.5 rounded-xl border border-indigo-100">
+                      <div>
+                        <span className="text-slate-900 block">
+                          Total Cash Inflow:
+                        </span>
+                        <span className="text-[10px] text-indigo-700 font-medium">
+                          Opening Float + POS Live Cash + Special Stock Sales
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-black text-indigo-950">
+                        LKR {totalCashInflow.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </div>
 
@@ -801,67 +818,19 @@ export function ShiftEndModal({
                       </div>
                     </div>
 
-                    {/* Expected Cash Before Bank */}
-                    <div className="flex items-center justify-between pt-2.5 font-bold bg-amber-50/60 p-2 rounded-xl">
-                      <span className="text-amber-950">
-                        Net Cash Before Bank:
-                      </span>
-                      <span className="font-mono text-sm text-amber-900 font-black">
-                        LKR {expectedCashBeforeBank.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    {/* Actual Counted Cash from Section 2 */}
-                    <div className="flex items-center justify-between pt-2.5">
-                      <div>
-                        <span className="font-bold text-emerald-800 block">
-                          Counted Drawer Cash
-                        </span>
-                        <span className="text-[11px] text-emerald-600">
-                          Calculated from Denominations Counter
-                        </span>
-                      </div>
-                      <span className="font-mono text-sm font-black text-emerald-700">
-                        LKR {countedDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    {/* Variance Display */}
-                    <div
-                      className={`flex items-center justify-between p-2.5 rounded-xl font-bold ${cashVariance === 0
-                        ? 'bg-slate-100 text-slate-800'
-                        : cashVariance > 0
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                          : 'bg-rose-100 text-rose-900 border border-rose-300'
-                        }`}
-                    >
-                      <span>
-                        Cash Variance:{' '}
-                        {cashVariance === 0
-                          ? 'Balanced'
-                          : cashVariance > 0
-                            ? 'Excess / Over (+)'
-                            : 'Shortage / Deficit (-)'}
-                      </span>
-                      <span className="font-mono text-sm">
-                        {cashVariance > 0 ? '+' : ''}
-                        LKR {cashVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
                     {/* 5. Banked Amount & Bank Selection */}
-                    <div className="pt-3 space-y-2">
+                    <div className="pt-2 space-y-2">
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="font-bold text-slate-800 block">
-                            Banked Amount
+                            Bank Deposit Amount
                           </span>
                           <span className="text-[11px] text-slate-400">
                             Cash taken out from drawer to deposit into company bank
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-400">LKR</span>
+                          <span className="text-xs font-bold text-slate-400">- LKR</span>
                           <input
                             type="number"
                             step="0.01"
@@ -910,12 +879,84 @@ export function ShiftEndModal({
                       )}
                     </div>
 
-                    {/* Closing Drawer Float (Auto Carried Forward) */}
-                    <div className="pt-3">
-                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between shadow-xs">
+                    {/* Expected Remaining Drawer Cash */}
+                    <div className="flex items-center justify-between pt-2.5 font-bold bg-amber-50/80 p-2.5 rounded-xl border border-amber-200">
+                      <div>
+                        <span className="text-amber-950 block">
+                          Expected Remaining Drawer Cash:
+                        </span>
+                        <span className="text-[10px] text-amber-700 font-medium">
+                          Total Inflow - Purchases - Expenses - Bank Deposit
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-black text-amber-950">
+                        LKR {expectedRemainingDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Actual Counted Remaining Cash from Section 2 */}
+                    <div className="flex items-center justify-between pt-2.5 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200">
+                      <div>
+                        <span className="font-bold text-emerald-950 block">
+                          Counted Remaining Drawer Cash:
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-medium">
+                          Sum of physical notes & coins counted in Tab 2. Denominations
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-black text-emerald-800">
+                        LKR {countedRemainingDrawerCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Cash Variance Display & Automatic Action Notice */}
+                    <div
+                      className={`p-3 rounded-2xl font-bold border transition-all ${cashVariance === 0
+                        ? 'bg-slate-100 text-slate-800 border-slate-300'
+                        : cashVariance > 0
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-300 shadow-2xs'
+                          : 'bg-rose-50 text-rose-900 border-rose-300 shadow-2xs'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs uppercase tracking-wider">
+                          Cash Variance:{' '}
+                          {cashVariance === 0
+                            ? 'Balanced'
+                            : cashVariance > 0
+                              ? 'Excess / Over (+)'
+                              : 'Shortage / Deficit (-)'}
+                        </span>
+                        <span className="font-mono text-base font-black">
+                          {cashVariance > 0 ? '+' : ''}
+                          LKR {cashVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-medium mt-1">
+                        {cashVariance === 0 && (
+                          <span className="text-slate-600">
+                            ✓ Drawer cash tallies perfectly with calculated expectation.
+                          </span>
+                        )}
+                        {cashVariance < 0 && (
+                          <span className="text-rose-700 font-semibold">
+                            ⚠️ Shortage of LKR {Math.abs(cashVariance).toLocaleString(undefined, { minimumFractionDigits: 2 })} will be automatically recorded as a Salary Deduction for {cashierName}.
+                          </span>
+                        )}
+                        {cashVariance > 0 && (
+                          <span className="text-emerald-700 font-semibold">
+                            ✓ Excess of LKR {cashVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })} will be automatically recorded as Extra Income for the business.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Closing Drawer Float (Auto Carried Forward to Next Shift) */}
+                    <div className="pt-2">
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-xs">
                         <div>
                           <span className="text-xs font-bold uppercase tracking-wider block">
-                            Closing Drawer Float
+                            Next Shift Opening Float (Carry-Forward)
                           </span>
                           <span className="text-[10px] text-emerald-100 font-medium">
                             Auto carries forward as Shift {currentShift?.shiftNumber === 1 ? '2' : '1'} Opening Float
@@ -981,10 +1022,10 @@ export function ShiftEndModal({
           <div className="px-4 sm:px-6 py-3 bg-white border-t border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs text-slate-600 shrink-0">
             <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 flex-wrap">
               <span>
-                Drawer: <strong className="font-mono text-emerald-700">LKR {countedDrawerCash.toFixed(2)}</strong>
+                Drawer: <strong className="font-mono text-emerald-700">LKR {countedRemainingDrawerCash.toFixed(2)}</strong>
               </span>
               <span>
-                Expected: <strong className="font-mono text-slate-900">LKR {expectedCashBeforeBank.toFixed(2)}</strong>
+                Expected: <strong className="font-mono text-slate-900">LKR {expectedRemainingDrawerCash.toFixed(2)}</strong>
               </span>
               <span>
                 Next Float:{' '}
