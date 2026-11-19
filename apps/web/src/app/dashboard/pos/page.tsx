@@ -19,6 +19,7 @@ import {
   User,
   UserPlus,
   Plus,
+  Minus,
   PauseCircle,
   Tag,
   Clock,
@@ -821,6 +822,26 @@ export default function ConfidencyPosPage() {
     setCart((prev) => prev.filter((item) => item.id !== itemId));
   };
 
+  const handleIncrementQuantity = (itemId: string) => {
+    setCart((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        return { ...it, quantity: it.quantity + 1 };
+      })
+    );
+  };
+
+  const handleDecrementQuantity = (itemId: string) => {
+    setCart((prev) =>
+      prev
+        .map((it) => {
+          if (it.id !== itemId) return it;
+          return { ...it, quantity: Math.max(0, it.quantity - 1) };
+        })
+        .filter((it) => it.quantity > 0)
+    );
+  };
+
   const clearCart = useCallback(() => {
     setEditingItemId(null);
     setEditingPriceInput('');
@@ -860,6 +881,21 @@ export default function ConfidencyPosPage() {
       return acc + (Number(item.quantity) >= 1 ? Math.round(Number(item.quantity)) : 1);
     }, 0);
   }, [cart]);
+
+  const chargeButtonGradient = useMemo(() => {
+    switch (paymentMethod) {
+      case 'CASH':
+        return 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-700';
+      case 'CARD':
+        return 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 shadow-indigo-500/30 hover:from-blue-700 hover:to-violet-700';
+      case 'STORE_CREDIT':
+        return 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-amber-500/30 hover:from-amber-600 hover:to-rose-600';
+      case 'SPLIT':
+        return 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 shadow-purple-500/30 hover:from-purple-700 hover:to-indigo-700';
+      default:
+        return 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-indigo-500/30 hover:from-indigo-700 hover:to-purple-700';
+    }
+  }, [paymentMethod]);
 
   // Hold Active Cart
   const handleHoldTicket = useCallback(() => {
@@ -1877,13 +1913,13 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (>= lg screens)
       ===================================================================== */}
-      <aside className="hidden lg:flex w-[340px] xl:w-[380px] bg-[#ECEFF9] border-l-2 border-indigo-200/80 shadow-[-6px_0_24px_-12px_rgba(15,18,34,0.12)] flex-col h-full shrink-0 select-none">
-        {/* 1. Cart Header */}
-        <div className="h-14 px-5 border-b border-indigo-200/60 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-xs">
+      <aside className="hidden lg:flex w-[340px] xl:w-[380px] bg-slate-50/80 border-l border-slate-200/90 shadow-[-6px_0_24px_-12px_rgba(15,18,34,0.12)] flex-col h-full shrink-0 select-none">
+        {/* 1. Colorful Top Cart Header */}
+        <div className="h-14 px-4 sm:px-5 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm md:text-base font-bold text-slate-900">Order Summary</h3>
-            <span className="text-xs font-mono font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
-              {totalItemCount}
+            <h3 className="text-sm md:text-base font-bold text-white tracking-tight">Order Summary</h3>
+            <span className="text-xs font-mono font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full border border-white/25 shadow-xs">
+              {totalItemCount} {totalItemCount === 1 ? 'Item' : 'Items'}
             </span>
           </div>
 
@@ -1891,10 +1927,10 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={clearCart}
-              className="text-rose-600 hover:text-rose-700 text-xs md:text-sm font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+              className="bg-white/15 hover:bg-rose-500 text-white text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-white/20"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Reset Order</span>
+              <span>Reset</span>
             </button>
           )}
         </div>
@@ -1929,7 +1965,7 @@ export default function ConfidencyPosPage() {
         )}
 
         {/* 3. Scrollable Cart Items List */}
-        <div className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5">
+        <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-2.5">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
               <ShoppingBag className="w-10 h-10 mb-2 opacity-20 text-slate-400" />
@@ -1937,19 +1973,31 @@ export default function ConfidencyPosPage() {
               <p className="text-xs text-slate-400 mt-0.5">Click any product in the catalog</p>
             </div>
           ) : (
-            cart.map((item) => {
+            cart.map((item, idx) => {
               const unitConfig = detectUnitConfig(item);
               const activeUnit = item.selectedUnit || unitConfig.baseUnit;
               const isMultiUnit = unitConfig.mode === 'weight_g' || unitConfig.mode === 'volume_ml';
               const isFractional = unitConfig.mode === 'fractional';
               const isWeightOrVolume = isMultiUnit || isFractional;
+              const accentBorder = ['border-l-indigo-500', 'border-l-emerald-500', 'border-l-amber-500', 'border-l-sky-500'][idx % 4];
+
+              const unitBadge = (() => {
+                const u = (activeUnit || '').toLowerCase();
+                if (u.includes('kalan') || u.includes('kal') || u.includes('කලං')) {
+                  return { label: activeUnit, cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+                }
+                if (u.includes('g') || u.includes('ml') || u.includes('kg') || u.includes('l') || isWeightOrVolume) {
+                  return { label: activeUnit || unitConfig.baseUnit, cls: 'bg-teal-50 text-teal-700 border-teal-200' };
+                }
+                return { label: activeUnit || 'Units', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+              })();
 
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl border border-indigo-100/90 shadow-2xs p-3 flex flex-col gap-2 group transition-all hover:border-indigo-300 hover:shadow-xs"
+                  className={`rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs hover:shadow-md transition-all relative overflow-hidden flex flex-col gap-2 group border-l-4 ${accentBorder}`}
                 >
-                  {/* Top Row: Squircle Photo + Name & SKU + Trash Button */}
+                  {/* Top Row: Squircle Photo + Name & SKU/Unit Badge + Remove Button */}
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden p-0.5">
                       <img
@@ -1971,11 +2019,9 @@ export default function ConfidencyPosPage() {
                         <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded shrink-0">
                           {item.sku}
                         </span>
-                        {isWeightOrVolume && (
-                          <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded shrink-0">
-                            Sold by {unitConfig.baseUnit}
-                          </span>
-                        )}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${unitBadge.cls}`}>
+                          {unitBadge.label}
+                        </span>
                       </div>
                     </div>
 
@@ -1989,19 +2035,37 @@ export default function ConfidencyPosPage() {
                     </button>
                   </div>
 
-                  {/* Bottom Row: Quantity Badge + Inline Unit Price Pill + Line Total */}
+                  {/* Bottom Row: Tactile - / Qty / + Stepper + Inline Unit Price + Line Total */}
                   <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                      {/* Quantity & Unit Pill (Opens Modal) */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditItemModal(item)}
-                        className="group/qty inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold text-indigo-950 font-mono transition-colors cursor-pointer shrink-0"
-                        title="Click to change quantity or unit in modal"
-                      >
-                        <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
-                        <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/qty:text-indigo-700" />
-                      </button>
+                      {/* Tactile - / Qty / + Stepper */}
+                      <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => handleDecrementQuantity(item.id)}
+                          className="w-6 h-6 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer shrink-0"
+                          title="Decrease quantity"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditItemModal(item)}
+                          className="px-2 h-6 inline-flex items-center gap-1 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 font-bold text-xs font-mono transition-colors cursor-pointer"
+                          title="Click to edit quantity or unit in modal"
+                        >
+                          <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                          <Pencil className="w-2.5 h-2.5 text-indigo-500" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleIncrementQuantity(item.id)}
+                          className="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer shrink-0"
+                          title="Increase quantity"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
 
                       {/* Unit Price: Clickable Inline Editor / Active Input */}
                       {editingItemId === item.id ? (
@@ -2027,7 +2091,7 @@ export default function ConfidencyPosPage() {
                                 handleCancelEditPrice();
                               }
                             }}
-                            className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border border-[#5B46F6] rounded-md focus:outline-none focus:ring-2 focus:ring-[#5B46F6]/20 shadow-xs"
+                            className="w-20 px-1.5 py-0.5 text-xs font-mono font-bold text-slate-900 bg-white border border-indigo-500 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs"
                           />
                           <button
                             type="button"
@@ -2046,14 +2110,14 @@ export default function ConfidencyPosPage() {
                           <button
                             type="button"
                             onClick={() => handleStartEditPrice(item)}
-                            className="group/rate inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-[11px] font-mono font-medium text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                            className="group/rate inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-[11px] font-mono font-medium text-slate-700 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
                             title="Click to edit unit price for this bill only"
                           >
                             <span>
                               LKR {item.price.toFixed(2)}
                               {isWeightOrVolume ? `/${unitConfig.baseUnit}` : ''}
                             </span>
-                            <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/rate:text-[#5B46F6]" />
+                            <Pencil className="w-2.5 h-2.5 text-slate-400 group-hover/rate:text-indigo-600" />
                           </button>
 
                           {item.price !== item.originalUnitPrice && (
@@ -2064,7 +2128,7 @@ export default function ConfidencyPosPage() {
                               <button
                                 type="button"
                                 onClick={() => handleResetUnitPrice(item.id)}
-                                className="p-1 text-slate-400 hover:text-[#5B46F6] hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
                                 title={`Reset to catalog price (LKR ${item.originalUnitPrice.toFixed(2)})`}
                               >
                                 <RotateCcw className="w-3 h-3" />
@@ -2077,7 +2141,7 @@ export default function ConfidencyPosPage() {
 
                     {/* Right: Line Total */}
                     <div className="text-right shrink-0">
-                      <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono tabular-nums">
+                      <span className="text-sm font-extrabold text-slate-900 font-mono tabular-nums">
                         LKR {(item.price * item.quantity).toFixed(2)}
                       </span>
                     </div>
@@ -2089,7 +2153,7 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 4. Financial Breakdown Summary & Bottom Checkout Dock */}
-        <div className="p-4 sm:p-5 border-t border-indigo-200/70 bg-white shadow-[0_-6px_20px_-8px_rgba(15,18,34,0.08)] space-y-3 shrink-0">
+        <div className="p-4 sm:p-5 border-t border-slate-200/90 bg-white shadow-[0_-6px_20px_-8px_rgba(15,18,34,0.08)] space-y-3 shrink-0">
           <div className="space-y-1.5 font-mono">
             <div className="flex justify-between text-sm text-slate-600">
               <span className="font-sans font-medium">Subtotal</span>
@@ -2128,23 +2192,23 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setIsDiscountModalOpen(true)}
-                className="w-full py-1.5 rounded-lg border border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50/50 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <Percent className="w-3.5 h-3.5" />
-                <span>% Add Order Discount</span>
+                <span>+ Add Order Discount</span>
               </button>
             )}
 
-            {/* TOTAL PAYABLE: Midnight Indigo Digital Readout Card */}
-            <div className="mt-2 bg-[#0F1222] text-white rounded-xl px-4 py-3.5 flex items-center justify-between shadow-inner border border-slate-800">
+            {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
+            <div className="mt-2 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 p-3.5 text-white shadow-lg border border-indigo-500/30 flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[11px] uppercase font-bold tracking-wider text-slate-400">
-                  Total Payable
+                <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-200">
+                  TOTAL PAYABLE
                 </span>
-                <span className="text-[11px] text-indigo-400 font-medium">Net Due (LKR)</span>
+                <span className="text-[11px] text-slate-300 font-medium">Net Payable (LKR)</span>
               </div>
-              <span className="text-2xl md:text-3xl font-black font-mono tracking-tight text-white">
-                LKR {totalAmount.toFixed(2)}
+              <span className="text-2xl font-black font-mono tracking-tight text-emerald-300">
+                LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -2154,12 +2218,36 @@ export default function ConfidencyPosPage() {
             <label className="text-xs font-bold text-slate-700 block mb-1.5">
               Payment Method
             </label>
-            <div className="bg-slate-100/90 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs">
+            <div className="grid grid-cols-4 gap-1.5 text-xs">
               {[
-                { id: 'CARD', label: 'Card', icon: CreditCard },
-                { id: 'CASH', label: 'Cash', icon: Banknote },
-                { id: 'STORE_CREDIT', label: 'Credit', icon: BookOpen },
-                { id: 'SPLIT', label: 'Split', icon: Split },
+                {
+                  id: 'CASH',
+                  label: 'Cash',
+                  icon: Banknote,
+                  inactiveCls: 'bg-emerald-50/80 border-emerald-200 text-emerald-800 hover:bg-emerald-100',
+                  activeCls: 'bg-emerald-600 border-emerald-600 text-white ring-2 ring-emerald-400 ring-offset-1 shadow-md scale-[1.02]',
+                },
+                {
+                  id: 'CARD',
+                  label: 'Card',
+                  icon: CreditCard,
+                  inactiveCls: 'bg-blue-50/80 border-blue-200 text-blue-800 hover:bg-blue-100',
+                  activeCls: 'bg-blue-600 border-blue-600 text-white ring-2 ring-blue-400 ring-offset-1 shadow-md scale-[1.02]',
+                },
+                {
+                  id: 'STORE_CREDIT',
+                  label: 'Credit',
+                  icon: BookOpen,
+                  inactiveCls: 'bg-amber-50/80 border-amber-200 text-amber-800 hover:bg-amber-100',
+                  activeCls: 'bg-amber-500 border-amber-500 text-white ring-2 ring-amber-400 ring-offset-1 shadow-md scale-[1.02]',
+                },
+                {
+                  id: 'SPLIT',
+                  label: 'Split',
+                  icon: Split,
+                  inactiveCls: 'bg-purple-50/80 border-purple-200 text-purple-800 hover:bg-purple-100',
+                  activeCls: 'bg-purple-600 border-purple-600 text-white ring-2 ring-purple-400 ring-offset-1 shadow-md scale-[1.02]',
+                },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isSelected = paymentMethod === tab.id;
@@ -2168,10 +2256,9 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isSelected
-                      ? 'bg-indigo-50 border-2 border-[#5B46F6] text-[#5B46F6] font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-white/60'
-                      }`}
+                    className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                      isSelected ? tab.activeCls : tab.inactiveCls
+                    }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{tab.label}</span>
@@ -2231,7 +2318,7 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleCharge}
               disabled={cart.length === 0 || isProcessingCheckout}
-              className="w-full bg-gradient-to-r from-[#5B46F6] to-[#4A35E5] hover:from-[#4E39EC] hover:to-[#3E29D6] text-white font-semibold text-base md:text-lg py-3.5 rounded-xl shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-[0.99] disabled:opacity-40"
+              className={`w-full h-12 rounded-xl font-extrabold text-base text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${chargeButtonGradient}`}
             >
               {isProcessingCheckout ? (
                 <>
@@ -2239,7 +2326,7 @@ export default function ConfidencyPosPage() {
                   <span>Processing Checkout...</span>
                 </>
               ) : (
-                <span>Charge LKR {totalAmount.toFixed(2)}</span>
+                <span>Charge LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               )}
             </button>
           </div>
@@ -2290,31 +2377,31 @@ export default function ConfidencyPosPage() {
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
           />
 
-          <div className="relative bg-white rounded-t-3xl shadow-bottom-sheet z-10 max-h-[92dvh] h-full sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-250">
-            {/* Drag Pill */}
-            <div className="pt-3 pb-1 flex justify-center">
-              <div className="w-12 h-1.5 rounded-full bg-slate-300" />
-            </div>
-
+          <div className="relative bg-white rounded-t-3xl shadow-bottom-sheet z-10 max-h-[92dvh] h-full sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden">
             {/* Header */}
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm md:text-base font-bold text-slate-800">
-                Order Summary ({totalItemCount})
-              </h3>
+            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm md:text-base font-bold text-white tracking-tight">Order Summary</h3>
+                <span className="text-xs font-mono font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full border border-white/25 shadow-xs">
+                  {totalItemCount} {totalItemCount === 1 ? 'Item' : 'Items'}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 {cart.length > 0 && (
                   <button
                     type="button"
                     onClick={clearCart}
-                    className="text-xs md:text-sm text-rose-600 font-semibold px-2 py-1"
+                    className="bg-white/15 hover:bg-rose-500 text-white text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-white/20"
                   >
-                    Reset
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Reset</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsMobileCartOpen(false)}
-                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
+                  className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close cart drawer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2322,16 +2409,31 @@ export default function ConfidencyPosPage() {
             </div>
 
             {/* Line Items List */}
-            <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100 max-h-[36vh]">
-              {cart.map((item) => {
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 max-h-[40vh] bg-slate-50/70">
+              {cart.map((item, idx) => {
                 const unitConfig = detectUnitConfig(item);
                 const activeUnit = item.selectedUnit || unitConfig.baseUnit;
                 const isMultiUnit = unitConfig.mode === 'weight_g' || unitConfig.mode === 'volume_ml';
                 const isFractional = unitConfig.mode === 'fractional';
                 const isWeightOrVolume = isMultiUnit || isFractional;
+                const accentBorder = ['border-l-indigo-500', 'border-l-emerald-500', 'border-l-amber-500', 'border-l-sky-500'][idx % 4];
+
+                const unitBadge = (() => {
+                  const u = (activeUnit || '').toLowerCase();
+                  if (u.includes('kalan') || u.includes('kal') || u.includes('කලං')) {
+                    return { label: activeUnit, cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+                  }
+                  if (u.includes('g') || u.includes('ml') || u.includes('kg') || u.includes('l') || isWeightOrVolume) {
+                    return { label: activeUnit || unitConfig.baseUnit, cls: 'bg-teal-50 text-teal-700 border-teal-200' };
+                  }
+                  return { label: activeUnit || 'Units', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+                })();
 
                 return (
-                  <div key={item.id} className="py-2.5 flex flex-col gap-2">
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs flex flex-col gap-2 relative overflow-hidden border-l-4 ${accentBorder}`}
+                  >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0 flex-1">
                         <h5 className="text-sm font-bold text-slate-900 truncate">{item?.name || 'Item'}</h5>
@@ -2339,11 +2441,9 @@ export default function ConfidencyPosPage() {
                           <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded shrink-0">
                             {item.sku}
                           </span>
-                          {isWeightOrVolume && (
-                            <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded shrink-0">
-                              Sold by {unitConfig.baseUnit}
-                            </span>
-                          )}
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${unitBadge.cls}`}>
+                            {unitBadge.label}
+                          </span>
                         </div>
                       </div>
                       <button
@@ -2358,16 +2458,34 @@ export default function ConfidencyPosPage() {
 
                     <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                        {/* Quantity & Unit Pill (Opens Modal) */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditItemModal(item)}
-                          className="group/qty inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold text-indigo-950 font-mono transition-colors cursor-pointer shrink-0"
-                          title="Click to change quantity or unit in modal"
-                        >
-                          <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
-                          <Pencil className="w-2.5 h-2.5 text-indigo-500 group-hover/qty:text-indigo-700" />
-                        </button>
+                        {/* Tactile - / Qty / + Stepper */}
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => handleDecrementQuantity(item.id)}
+                            className="w-7 h-7 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer shrink-0"
+                            title="Decrease quantity"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditItemModal(item)}
+                            className="px-2 h-7 inline-flex items-center gap-1 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 font-bold text-xs font-mono transition-colors cursor-pointer"
+                            title="Click to edit quantity or unit in modal"
+                          >
+                            <span>{formatQuantityWithUnit(item.quantity, activeUnit, unitConfig)}</span>
+                            <Pencil className="w-2.5 h-2.5 text-indigo-500" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleIncrementQuantity(item.id)}
+                            className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white flex items-center justify-center font-bold text-xs transition-colors cursor-pointer shrink-0"
+                            title="Increase quantity"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
 
                         {/* Unit Price: Clickable Inline Editor / Active Input */}
                         {editingItemId === item.id ? (
@@ -2442,7 +2560,7 @@ export default function ConfidencyPosPage() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-sm font-bold text-slate-900 font-mono tabular-nums">
+                        <span className="text-sm font-extrabold text-slate-900 font-mono tabular-nums">
                           LKR {(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
@@ -2453,36 +2571,101 @@ export default function ConfidencyPosPage() {
             </div>
 
             {/* Financial breakdown & Charge */}
-            <div className="p-5 bg-white border-t border-slate-100 space-y-3">
-              <div className="flex justify-between items-baseline text-slate-900">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500">
-                  Total Payable
-                </span>
-                <span className="text-xl md:text-2xl font-black font-mono text-slate-950">
-                  LKR {totalAmount.toFixed(2)}
+            <div className="p-4 sm:p-5 bg-white border-t border-slate-200/90 space-y-3 shrink-0">
+              {/* Discount line if applied */}
+              {discountType !== 'NONE' && (
+                <div className="flex justify-between items-center text-emerald-600 font-semibold text-xs">
+                  <span className="flex items-center gap-1 font-sans">
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})</span>
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span>- LKR {discountAmount.toFixed(2)}</span>
+                    <button
+                      type="button"
+                      onClick={resetDiscount}
+                      className="text-rose-400 hover:text-rose-600 p-0.5 cursor-pointer"
+                      title="Remove discount"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Add Discount Pill (if no discount active) */}
+              {discountType === 'NONE' && cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsDiscountModalOpen(true)}
+                  className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Percent className="w-3.5 h-3.5" />
+                  <span>+ Add Order Discount</span>
+                </button>
+              )}
+
+              {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
+              <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 p-3 text-white shadow-lg border border-indigo-500/30 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-200">
+                    TOTAL PAYABLE
+                  </span>
+                  <span className="text-[10px] text-slate-300 font-medium">Net Due (LKR)</span>
+                </div>
+                <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-300">
+                  LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               {/* Payment selector */}
-              <div className="bg-slate-100 p-1 rounded-xl grid grid-cols-4 gap-1 text-xs md:text-sm">
+              <div className="grid grid-cols-4 gap-1.5 text-xs">
                 {[
-                  { id: 'CARD', label: 'Card' },
-                  { id: 'CASH', label: 'Cash' },
-                  { id: 'STORE_CREDIT', label: 'Credit' },
-                  { id: 'SPLIT', label: 'Split' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-2 rounded-lg font-semibold transition-all text-center ${paymentMethod === tab.id
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
-                      : 'text-slate-600'
+                  {
+                    id: 'CASH',
+                    label: 'Cash',
+                    icon: Banknote,
+                    inactiveCls: 'bg-emerald-50/80 border-emerald-200 text-emerald-800 hover:bg-emerald-100',
+                    activeCls: 'bg-emerald-600 border-emerald-600 text-white ring-2 ring-emerald-400 ring-offset-1 shadow-md scale-[1.02]',
+                  },
+                  {
+                    id: 'CARD',
+                    label: 'Card',
+                    icon: CreditCard,
+                    inactiveCls: 'bg-blue-50/80 border-blue-200 text-blue-800 hover:bg-blue-100',
+                    activeCls: 'bg-blue-600 border-blue-600 text-white ring-2 ring-blue-400 ring-offset-1 shadow-md scale-[1.02]',
+                  },
+                  {
+                    id: 'STORE_CREDIT',
+                    label: 'Credit',
+                    icon: BookOpen,
+                    inactiveCls: 'bg-amber-50/80 border-amber-200 text-amber-800 hover:bg-amber-100',
+                    activeCls: 'bg-amber-500 border-amber-500 text-white ring-2 ring-amber-400 ring-offset-1 shadow-md scale-[1.02]',
+                  },
+                  {
+                    id: 'SPLIT',
+                    label: 'Split',
+                    icon: Split,
+                    inactiveCls: 'bg-purple-50/80 border-purple-200 text-purple-800 hover:bg-purple-100',
+                    activeCls: 'bg-purple-600 border-purple-600 text-white ring-2 ring-purple-400 ring-offset-1 shadow-md scale-[1.02]',
+                  },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isSelected = paymentMethod === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
+                      className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border text-center ${
+                        isSelected ? tab.activeCls : tab.inactiveCls
                       }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <button
@@ -2492,9 +2675,16 @@ export default function ConfidencyPosPage() {
                   handleCharge();
                 }}
                 disabled={cart.length === 0 || isProcessingCheckout}
-                className="w-full bg-[#5B46F6] hover:bg-[#4A35E5] text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-[#5B46F6]/20 flex items-center justify-center gap-2"
+                className={`w-full h-12 rounded-xl font-extrabold text-base text-white shadow-lg transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${chargeButtonGradient}`}
               >
-                <span>Charge LKR {totalAmount.toFixed(2)}</span>
+                {isProcessingCheckout ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Processing Checkout...</span>
+                  </>
+                ) : (
+                  <span>Charge LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                )}
               </button>
             </div>
           </div>
