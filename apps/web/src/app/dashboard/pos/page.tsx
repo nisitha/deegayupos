@@ -3026,7 +3026,7 @@ export default function ConfidencyPosPage() {
                       <span className="text-[11px] text-slate-400">Type or click quick-fill bills</span>
                     </div>
                     <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 pointer-events-none select-none z-10">
                         LKR
                       </span>
                       <input
@@ -3039,8 +3039,8 @@ export default function ConfidencyPosPage() {
                           setCashTendered(e.target.value);
                           setCheckoutError(null);
                         }}
-                        placeholder={totalAmount.toFixed(2)}
-                        className="w-full pl-13 pr-4 py-3 bg-[#131B2E] border border-slate-700 rounded-2xl font-mono text-lg font-bold text-white focus:bg-[#162038] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all placeholder:text-slate-500"
+                        placeholder="0.00"
+                        className="w-full pl-14 pr-4 py-3 bg-[#131B2E] border border-slate-700 rounded-2xl font-mono text-lg font-bold text-white focus:bg-[#162038] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all placeholder:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   </div>

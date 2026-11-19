@@ -1159,7 +1159,12 @@ export const posApi = {
       }
     }
 
-    // 8. Insert Payment Record into Supabase
+    // 8. Insert Payment Record into Supabase (Store NET settled amount, never gross cash received)
+    const grandTotal = Number(data.totalAmount || 0);
+    const tenderedPaid = Number(data.paidAmount ?? grandTotal);
+    const changeGiven = Number(data.changeDue || 0);
+    const netCashSettled = Math.max(0, Number((tenderedPaid - changeGiven).toFixed(2)));
+
     let mappedMethod: SalePaymentMethod = 'CASH';
     const rawMethod = (data.paymentMethod || data.payments?.[0]?.paymentMethod || 'CASH').toUpperCase();
     if (rawMethod.includes('CARD')) mappedMethod = 'CARD';
@@ -1168,13 +1173,43 @@ export const posApi = {
     else if (rawMethod.includes('CREDIT')) mappedMethod = 'STORE_CREDIT';
     else mappedMethod = 'CASH';
 
-    const { error: payErr } = await supabase.from('sale_payments').insert({
-      tenant_id: tenantId,
-      sale_id: saleId,
-      payment_method: mappedMethod,
-      amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
-      status: 'SUCCESS',
-    });
+    const netAmount = mappedMethod === 'CASH'
+      ? (netCashSettled > 0 ? netCashSettled : grandTotal)
+      : grandTotal;
+
+    const paymentsToInsert = (data.payments && data.payments.length > 0)
+      ? data.payments.map((p: any) => {
+          const rawM = String(p.paymentMethod || 'CASH').toUpperCase();
+          let m: SalePaymentMethod = 'CASH';
+          if (rawM.includes('CARD')) m = 'CARD';
+          else if (rawM.includes('QR') || rawM.includes('LANKA')) m = 'QR_PAYMENT';
+          else if (rawM.includes('BANK')) m = 'BANK_TRANSFER';
+          else if (rawM.includes('CREDIT')) m = 'STORE_CREDIT';
+          else m = 'CASH';
+
+          let amt = Number(p.amount || 0);
+          if (m === 'CASH') {
+            amt = Math.min(amt > 0 ? amt : netCashSettled, grandTotal);
+          }
+          return {
+            tenant_id: tenantId,
+            sale_id: saleId,
+            payment_method: m,
+            amount: amt,
+            status: 'SUCCESS',
+          };
+        })
+      : [
+          {
+            tenant_id: tenantId,
+            sale_id: saleId,
+            payment_method: mappedMethod,
+            amount: netAmount,
+            status: 'SUCCESS',
+          },
+        ];
+
+    const { error: payErr } = await supabase.from('sale_payments').insert(paymentsToInsert);
     if (payErr) {
       console.warn('[posApi.checkout] Supabase sale_payments insert warning:', payErr.message);
     }
@@ -1239,16 +1274,14 @@ export const posApi = {
         taxAmount: Number(i.taxAmount || 0),
         subtotal: Number(i.subtotal ?? (Number(i.unitPrice || 0) * Number(i.quantity || 1))),
       })),
-      payments: [
-        {
-          id: `pay-${Date.now()}`,
-          saleId,
-          paymentMethod: mappedMethod,
-          amount: Number(data.paidAmount ?? data.totalAmount ?? 0),
-          status: 'SUCCESS',
-          createdAt: new Date().toISOString(),
-        },
-      ],
+      payments: paymentsToInsert.map((p, idx) => ({
+        id: `pay-${Date.now()}-${idx}`,
+        saleId,
+        paymentMethod: p.payment_method,
+        amount: p.amount,
+        status: 'SUCCESS',
+        createdAt: new Date().toISOString(),
+      })),
       cashier: {
         id: cashierId,
         fullName: cashierName,
@@ -4383,38 +4416,44 @@ export const shiftsApi = {
 
         const st = String(s.status || '').toUpperCase();
         if (st === 'COMPLETED') {
-          const tot = Number(s.total_amount || s.paid_amount || 0);
-          let billHasCash = false;
+          const grandTotal = Number(s.total_amount ?? s.grand_total ?? 0);
           let billCashPortion = 0;
+          let billHasCash = false;
 
-          if (s.sale_payments && Array.isArray(s.sale_payments) && s.sale_payments.length > 0) {
-            let foundMethod = false;
-            s.sale_payments.forEach((p: any) => {
-              const pm = String(p.payment_method || '').toUpperCase();
-              const amt = Number(p.amount || 0);
-              if (pm === 'CASH') {
-                billCashPortion += amt;
-                billHasCash = true;
-                foundMethod = true;
-              } else if (pm === 'CARD' || pm === 'QR_PAYMENT' || pm.includes('CREDIT') || pm.includes('BANK')) {
-                foundMethod = true;
-              }
-            });
-            if (!foundMethod) {
-              billCashPortion = tot;
+          const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
+
+          if (payments.length === 0) {
+            // Default single-payment CASH sale
+            billCashPortion = grandTotal;
+            billHasCash = true;
+          } else if (payments.length === 1) {
+            const p = payments[0];
+            const pm = String(p.payment_method || '').toUpperCase();
+            if (pm === 'CASH') {
+              // Single-payment 'CASH' sale: sum grandTotal (never cash_received / amount_tendered)
+              billCashPortion = grandTotal;
               billHasCash = true;
             }
           } else {
-            billCashPortion = tot;
-            billHasCash = true;
+            // Split sale with multiple payment methods:
+            // Sum the 'CASH' payment rows' net settled amount (capped at grandTotal)
+            let cashSum = 0;
+            payments.forEach((p: any) => {
+              const pm = String(p.payment_method || '').toUpperCase();
+              if (pm === 'CASH') {
+                cashSum += Number(p.amount || 0);
+                billHasCash = true;
+              }
+            });
+            billCashPortion = Math.min(cashSum, grandTotal);
           }
 
           if (billHasCash && billCashPortion > 0) {
             posBills += 1;
             posCashSales += billCashPortion;
-            posGrossSales += tot;
-          } else if (tot > 0) {
-            posGrossSales += tot;
+            posGrossSales += grandTotal;
+          } else if (grandTotal > 0) {
+            posGrossSales += grandTotal;
           }
         }
       });
