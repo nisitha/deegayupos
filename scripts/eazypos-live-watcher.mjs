@@ -23,6 +23,8 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -139,18 +141,26 @@ class EazyPosClient {
     return Array.from(this.cookieJar.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
   }
 
-  async fetchWithPacing(url, options = {}) {
-    await sleep(150); // Polite 150ms pacing
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Cookie': this.getCookieHeader(),
-      ...(options.headers || {})
-    };
+  async fetchWithPacing(url, options = {}, retries = 3) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        await sleep(250); // Polite 250ms pacing
+        const headers = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Cookie': this.getCookieHeader(),
+          ...(options.headers || {})
+        };
 
-    const res = await fetch(url, { ...options, headers });
-    this.updateCookies(res);
-    return res;
+        const res = await fetch(url, { ...options, headers });
+        this.updateCookies(res);
+        return res;
+      } catch (err) {
+        console.warn(`[SYNC ENGINE] Network fetch retry ${attempt + 1}/${retries} for ${url}: ${err.message}`);
+        if (attempt === retries - 1) throw err;
+        await sleep(1500 * (attempt + 1));
+      }
+    }
   }
 
   async login(username, password) {
@@ -310,6 +320,8 @@ async function main() {
     }
     const invRows = JSON.parse(invMatch[1]);
     console.log(`[SYNC ENGINE] Loaded ${invRows.length} inventory records from eazypos99.`);
+    const locNames = Array.from(new Set(invRows.map((r) => r.location_name)));
+    console.log(`[SYNC ENGINE] Discovered stock locations:`, locNames);
 
     // Cache products from DB
     const allProducts = await retry(() => prisma.product.findMany({
@@ -447,12 +459,14 @@ async function main() {
     const salesRows = salesDataMatch ? JSON.parse(salesDataMatch[1]) : [];
     const salesDetails = salesDetMatch ? JSON.parse(salesDetMatch[1]) : {};
     console.log(`[SYNC ENGINE] Total sales in November date span: ${salesRows.length}`);
+    if (salesRows.length > 0) {
+      console.log(`[SYNC ENGINE] Latest sale row:`, JSON.stringify(salesRows[salesRows.length - 1]));
+    }
 
     // Check which invoiceNumbers already exist in DB
     const existingSales = await retry(() => prisma.sale.findMany({
       where: {
         tenantId: TENANT_ID,
-        invoiceNumber: { startsWith: 'INV-' }
       },
       select: { invoiceNumber: true }
     }));
@@ -466,7 +480,7 @@ async function main() {
       if (saleIntId > maxSaleId) maxSaleId = saleIntId;
 
       const invoiceNumber = `INV-${row.id}`;
-      if (salesExists.has(invoiceNumber)) continue;
+      if (salesExists.has(invoiceNumber) || salesExists.has(`LEG-SALE-${row.id}`)) continue;
 
       const saleId = crypto.randomUUID();
       const saleDate = parseLegacyDate(row.sale_time);
@@ -474,11 +488,13 @@ async function main() {
       const cashierName = row.employee_name || 'Sale Admin';
       const cashierId = CASHIER_MAP[cashierName] || DEFAULT_CASHIER_ID;
 
-      let branchInfo = BRANCH_MAP['Alawwa'];
-      if (cashierName.includes('Dabadeniya')) branchInfo = BRANCH_MAP['Dabadeniya'];
-      else if (cashierName.includes('Giriulla')) branchInfo = BRANCH_MAP['Giriulla'];
-      else if (cashierName.includes('Alawwa')) branchInfo = BRANCH_MAP['Alawwa'];
-      else if (cashierName.includes('Admin')) branchInfo = BRANCH_MAP['Main store'];
+      let branchInfo = BRANCH_MAP['Main store'];
+      const empLower = cashierName.toLowerCase();
+      if (empLower.includes('daba') || empLower.includes('damba')) branchInfo = BRANCH_MAP['Dabadeniya'];
+      else if (empLower.includes('giri')) branchInfo = BRANCH_MAP['Giriulla'];
+      else if (empLower.includes('alaw')) branchInfo = BRANCH_MAP['Alawwa'];
+      else if (empLower.includes('admin') || empLower.includes('main')) branchInfo = BRANCH_MAP['Main store'];
+      else if (empLower.includes('user1')) branchInfo = BRANCH_MAP['Dabadeniya'];
 
       const subtotal = Math.max(0, cleanMoney(row.subtotal));
       const tax = cleanMoney(row.tax);
@@ -584,7 +600,6 @@ async function main() {
     const existingGrns = await retry(() => prisma.goodsReceivedNote.findMany({
       where: {
         tenantId: TENANT_ID,
-        grnNumber: { startsWith: 'GRN-' }
       },
       select: { grnNumber: true }
     }));
@@ -597,7 +612,7 @@ async function main() {
       if (recIntId > maxGrnId) maxGrnId = recIntId;
 
       const grnNumber = `GRN-${row.id}`;
-      if (grnExists.has(grnNumber)) continue;
+      if (grnExists.has(grnNumber) || grnExists.has(`LEG-GRN-${row.id}`)) continue;
 
       const suppName = row.supplier_name ? row.supplier_name.trim().toLowerCase() : '';
       const supplierId = supplierByName.get(suppName) || defaultSupplierId;
@@ -724,7 +739,7 @@ async function main() {
 
   } catch (err) {
     const finishTime = new Date();
-    console.error(`[SYNC ENGINE] ❌ ERROR ENCOUNTERED:`, err.message);
+    console.error(`[SYNC ENGINE] ❌ ERROR ENCOUNTERED:`, err.message, err.cause, err.stack);
 
     try {
       await retry(() => prisma.legacySyncLog.create({

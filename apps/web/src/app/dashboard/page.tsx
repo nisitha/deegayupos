@@ -343,7 +343,7 @@ export default function DashboardPage() {
                 {syncConfig?.isEnabled ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    Active (Auto-syncing every 5m)
+                    Legacy Bridge: Auto-Syncing All 4 Branches (5m)
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -421,7 +421,7 @@ export default function DashboardPage() {
                 {syncConfig?.isEnabled ? (
                   <>
                     <PauseCircle className="w-3.5 h-3.5" />
-                    <span>Pause Sync (Saturday Cutover)</span>
+                    <span>Pause Sync (Saturday Go-Live)</span>
                   </>
                 ) : (
                   <>
