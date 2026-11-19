@@ -4317,27 +4317,21 @@ export const shiftsApi = {
   getLiveShiftPosSales: async (
     branchId: string,
     shiftId?: string | null,
-    startedAt?: string | null
+    _startedAt?: string | null
   ): Promise<ApiResponse<{ posBills: number; posCashSales: number; posGrossSales: number }>> => {
     try {
-      if (!branchId) {
+      if (!branchId || !shiftId) {
         return { success: true, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
       }
 
       let query = supabase
         .from('sales')
-        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount, status)')
+        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, legacy_sale_id, sale_payments(payment_method, amount, status)')
         .eq('branch_id', branchId)
         .eq('status', 'COMPLETED')
-        .not('invoice_number', 'ilike', 'LEG-SALE-%');
-
-      if (shiftId && startedAt) {
-        query = query.or(`shift_id.eq.${shiftId},sold_at.gte.${startedAt},created_at.gte.${startedAt}`);
-      } else if (shiftId) {
-        query = query.eq('shift_id', shiftId);
-      } else if (startedAt) {
-        query = query.or(`sold_at.gte.${startedAt},created_at.gte.${startedAt}`);
-      }
+        .is('legacy_sale_id', null)
+        .not('invoice_number', 'ilike', 'LEG-SALE-%')
+        .eq('shift_id', shiftId);
 
       const { data: sales, error } = await query;
       if (error) {
@@ -4350,7 +4344,7 @@ export const shiftsApi = {
 
       (sales || []).forEach((s: any) => {
         const inv = String(s.invoice_number || '');
-        if (inv.startsWith('LEG-SALE-')) return;
+        if (inv.startsWith('LEG-SALE-') || /^INV-\d+$/.test(inv) || s.legacy_sale_id) return;
 
         const st = String(s.status || '').toUpperCase();
         if (st === 'COMPLETED') {

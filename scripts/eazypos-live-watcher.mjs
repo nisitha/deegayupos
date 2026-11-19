@@ -629,6 +629,7 @@ async function main() {
               createdAt: saleDate,
               updatedAt: saleDate,
               soldAt: saleDate,
+              legacySaleId: String(row.id),
             }
           }));
 
@@ -756,6 +757,7 @@ async function main() {
             createdAt: saleDate,
             updatedAt: saleDate,
             soldAt: saleDate,
+            legacySaleId: String(row.id),
           }
         }));
 
