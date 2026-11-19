@@ -98,15 +98,13 @@ export function PosSidebar() {
   const prevRouteRef = useRef(pathname);
 
   useEffect(() => {
-    if (prevRouteRef.current !== pathname) {
-      if (pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos')) {
-        setIsCollapsed(true);
-      } else {
-        setIsCollapsed(false);
-      }
-      prevRouteRef.current = pathname;
-      setMobileDrawerOpen(false);
+    if (pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos')) {
+      setIsCollapsed(true);
+    } else {
+      setIsCollapsed(false);
     }
+    prevRouteRef.current = pathname;
+    setMobileDrawerOpen(false);
   }, [pathname]);
 
   // Listen to mobile menu drawer toggle event from top header

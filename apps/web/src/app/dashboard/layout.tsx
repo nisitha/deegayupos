@@ -107,21 +107,27 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    /* Outer Viewport Canvas (Soft Modern Canvas Tint, Zero Mobile Horizontal Overflow) */
-    <div className="h-dvh w-screen max-w-full overflow-x-hidden bg-[#EDE9FE] p-0 sm:p-2 md:p-3 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
-      {/* Inner Floating App Surface (Full-Screen on Mobile, Floating on Tablet/Desktop) */}
+    /* Outer Viewport Canvas: Edge-to-edge on POS, subtle canvas tint on Admin */
+    <div
+      className={`h-dvh w-screen max-w-full overflow-x-hidden ${
+        isPosPage ? 'p-0 bg-[#0F1222]' : 'bg-[#EDE9FE] p-0 sm:p-2 md:p-3 lg:p-5'
+      } overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white`}
+    >
+      {/* Inner Surface: Full Edge-to-Edge on POS, Floating on Admin */}
       <div
-        className={`rounded-none sm:rounded-2xl lg:rounded-3xl shadow-none sm:shadow-2xl border-0 sm:border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
-          isPosPage ? 'bg-[#0F1222]' : 'bg-white'
-        }`}
+        className={`${
+          isPosPage
+            ? 'rounded-none border-0 shadow-none bg-[#0F1222]'
+            : 'rounded-none sm:rounded-2xl lg:rounded-3xl shadow-none sm:shadow-2xl border-0 sm:border border-slate-200/60 bg-white'
+        } w-full h-full flex overflow-hidden relative`}
       >
         {/* Left Column: Categorized Navigation Sidebar / Mobile Slide-Over Drawer */}
         <PosSidebar />
 
         {/* Main Content Viewport */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          {/* Executive Header (Adapts automatically for POS, Mobile & Desktop) */}
-          <Header />
+          {/* Executive Header: Render exclusively on non-POS pages; POS page has its own dedicated top bar */}
+          {!isPosPage && <Header />}
 
           {/* Page Content Viewport */}
           <main

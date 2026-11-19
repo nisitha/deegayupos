@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CreditCard,
   Banknote,
@@ -9,7 +10,6 @@ import {
   Trash2,
   Search,
   X,
-  Layers,
   ShoppingBag,
   Sparkles,
   Package,
@@ -33,6 +33,8 @@ import {
   RotateCcw,
   LogOut,
   PackagePlus,
+  Store,
+  Menu,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -40,6 +42,7 @@ import type {
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { posApi, shiftsApi, type CashierShiftDto } from '../../../lib/api-client';
+import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
 import { ModakaStockInModal } from '../../../components/pos/modaka-stock-in-modal';
@@ -104,8 +107,18 @@ interface CartItem {
 }
 
 export default function ConfidencyPosPage() {
+  const router = useRouter();
   const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
   const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
+  const [currentDateStr, setCurrentDateStr] = useState<string>('');
+
+  useEffect(() => {
+    setCurrentDateStr(formatSriLankaHeaderClock(new Date()));
+    const timer = setInterval(() => {
+      setCurrentDateStr(formatSriLankaHeaderClock(new Date()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
@@ -1225,12 +1238,27 @@ export default function ConfidencyPosPage() {
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#E6EAF2] min-w-0">
-        {/* 1. Top Terminal Status Bar (Clean, Non-Clipping Single Line) */}
-        <div className="h-11 px-4 flex items-center justify-between gap-3 bg-white border-b border-slate-200 shrink-0 shadow-2xs overflow-x-auto no-scrollbar">
-          {/* Left Group: Terminal Badge & Cashier Profile */}
-          <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
+        {/* 1. Top Terminal Status Bar (Unified Single Header for POS Terminal) */}
+        <div className="h-12 px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 bg-white border-b border-slate-200 shrink-0 shadow-2xs overflow-x-auto no-scrollbar">
+          {/* Left Group: Mobile Hamburger, Store/Terminal Badge, Cashier Profile */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 whitespace-nowrap">
+            {/* Hamburger for mobile slide-over navigation (< lg) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
+                }
+              }}
+              className="lg:hidden w-10 h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
+              aria-label="Open mobile navigation menu"
+              title="Menu"
+            >
+              <Menu className="w-5 h-5 text-slate-800" />
+            </button>
+
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] shrink-0 whitespace-nowrap">
-              <Layers className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
+              <Store className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-300">•</span>
               <span className="whitespace-nowrap">{currentBranchName}</span>
@@ -1252,8 +1280,16 @@ export default function ConfidencyPosPage() {
             </button>
           </div>
 
-          {/* Right Group: Compact Qty Toggle & End Shift */}
-          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {/* Right Group: Clock, Qty Toggle, End Shift, Switch Shop */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 whitespace-nowrap">
+            {/* Live Sri Lanka Clock */}
+            {currentDateStr && (
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-mono font-medium text-slate-600">
+                <Clock className="w-3.5 h-3.5 text-[#5B46F6]" />
+                <span>{currentDateStr}</span>
+              </div>
+            )}
+
             {/* Compact Qty Popup Toggle */}
             <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs shadow-2xs shrink-0 whitespace-nowrap">
               <button
@@ -1296,6 +1332,23 @@ export default function ConfidencyPosPage() {
                   S{activeShift.shiftNumber}
                 </span>
               )}
+            </button>
+
+            {/* Switch Shop (Logout) Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('pixelcraft_access_token');
+                  localStorage.removeItem('pixelcraft_pos_session');
+                  router.push('/login');
+                }
+              }}
+              className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200/60 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              title="Switch Shop / Logout"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Switch Shop</span>
             </button>
           </div>
         </div>
@@ -1726,8 +1779,8 @@ export default function ConfidencyPosPage() {
                     onClick={() => handleProductClick(product)}
                     className="rounded-xl border border-slate-200/80 bg-white p-2.5 hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative"
                   >
-                    {/* Image Frame (h-24, centered photo, top-right stock badge) */}
-                    <div className="relative h-24 w-full rounded-lg bg-slate-50 overflow-hidden mb-2 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
+                    {/* Image Frame (h-28 sm:h-32, clean white frame, top-right stock badge) */}
+                    <div className="relative h-28 sm:h-32 w-full rounded-xl bg-white border border-slate-100 overflow-hidden mb-2.5 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
