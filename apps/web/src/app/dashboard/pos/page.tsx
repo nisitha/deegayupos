@@ -42,7 +42,7 @@ import type {
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi, shiftsApi, type CashierShiftDto } from '../../../lib/api-client';
+import { posApi, shiftsApi, formatShiftLabel, type CashierShiftDto } from '../../../lib/api-client';
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
@@ -1489,7 +1489,7 @@ export default function ConfidencyPosPage() {
               <span className="whitespace-nowrap">End Shift</span>
               {activeShift && (
                 <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
-                  S{activeShift.shiftNumber}
+                  {formatShiftLabel(activeShift.shiftNumber)}
                 </span>
               )}
             </button>

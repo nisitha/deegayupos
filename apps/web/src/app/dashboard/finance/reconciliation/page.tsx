@@ -36,7 +36,7 @@ import {
   Scale,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
-import { shiftsApi, type ShiftFinancialAdjustmentDto } from '../../../../lib/api-client';
+import { shiftsApi, formatShiftLabel, type ShiftFinancialAdjustmentDto } from '../../../../lib/api-client';
 import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
 import {
   reconciliationApi,
@@ -1553,7 +1553,7 @@ export default function CashReconciliationPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-sm text-slate-100">{sh.cashier_name}</span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                                Shift {sh.shift_number}
+                                {formatShiftLabel(sh.shift_number)}
                               </span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                                 {sh.branch_name}
@@ -1797,7 +1797,7 @@ export default function CashReconciliationPage() {
                       const rows = salaryDeductionsLog.map((r) => [
                         r.date,
                         r.branchName,
-                        `Shift ${r.shiftNumber}`,
+                        formatShiftLabel(r.shiftNumber),
                         r.employeeName,
                         r.amount,
                         r.notes,
@@ -1838,7 +1838,7 @@ export default function CashReconciliationPage() {
                             <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
                             <td className="py-2.5 px-2 text-center">
                               <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                S{r.shiftNumber}
+                                {formatShiftLabel(r.shiftNumber)}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
@@ -1875,7 +1875,7 @@ export default function CashReconciliationPage() {
                       const rows = extraIncomeLog.map((r) => [
                         r.date,
                         r.branchName,
-                        `Shift ${r.shiftNumber}`,
+                        formatShiftLabel(r.shiftNumber),
                         r.employeeName,
                         r.amount,
                         r.notes,
@@ -1916,7 +1916,7 @@ export default function CashReconciliationPage() {
                             <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
                             <td className="py-2.5 px-2 text-center">
                               <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                S{r.shiftNumber}
+                                {formatShiftLabel(r.shiftNumber)}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
@@ -3052,7 +3052,7 @@ export default function CashReconciliationPage() {
                           <span className="font-bold text-xs text-slate-200">{s.cashier_name}</span>
                         </div>
                         <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          Shift {s.shift_number}
+                          {formatShiftLabel(s.shift_number)}
                         </span>
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">

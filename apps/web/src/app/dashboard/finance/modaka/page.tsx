@@ -25,6 +25,7 @@ import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import {
   shiftsApi,
   productsApi,
+  formatShiftLabel,
   CashierShiftDto,
   ModakaItemConfigDto,
 } from '../../../../lib/api-client';
@@ -251,7 +252,7 @@ export default function ModakaLedgerPage() {
         rows.push([
           s.shiftDate,
           s.branchName || '',
-          String(s.shiftNumber),
+          formatShiftLabel(s.shiftNumber),
           s.cashierName || '',
           s.status,
           '',
@@ -280,7 +281,7 @@ export default function ModakaLedgerPage() {
           rows.push([
             s.shiftDate,
             s.branchName || '',
-            String(s.shiftNumber),
+            formatShiftLabel(s.shiftNumber),
             s.cashierName || '',
             s.status,
             String(idx + 1),
@@ -646,13 +647,13 @@ export default function ModakaLedgerPage() {
                 {/* Shift Card Header */}
                 <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center font-mono font-black text-sm text-purple-300 shadow-inner">
-                      S{shift.shiftNumber}
+                    <span className="w-9 h-9 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center font-mono font-black text-xs text-purple-300 shadow-inner px-1 text-center">
+                      {formatShiftLabel(shift.shiftNumber)}
                     </span>
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-base font-black tracking-tight text-white">
-                          Shift {shift.shiftNumber} Handover Sheet
+                          {formatShiftLabel(shift.shiftNumber)} Handover Sheet
                         </h3>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -789,7 +790,7 @@ export default function ModakaLedgerPage() {
                             Special Sales Balance
                           </span>
                           <span className="text-[10px] text-purple-700">
-                            Calculated value of special units sold during Shift {shift.shiftNumber}
+                            Calculated value of special units sold during {formatShiftLabel(shift.shiftNumber)}
                           </span>
                         </div>
                       </div>
@@ -909,7 +910,7 @@ export default function ModakaLedgerPage() {
                             Closing Drawer Float for Next Shift
                           </span>
                           <span className="text-[9px] text-emerald-100">
-                            Carries forward as Shift {shift.shiftNumber === 1 ? '2' : '1'} Opening Float
+                            Carries forward as {formatShiftLabel((shift.shiftNumber || 1) + 1)} Opening Float
                           </span>
                         </div>
                         <span className="text-base font-black font-mono">

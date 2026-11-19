@@ -20,6 +20,7 @@ import {
   CashierShiftDto,
   EndShiftPayload,
   shiftsApi,
+  formatShiftLabel,
 } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
 import { useTenantBranch } from '../../context/tenant-branch-context';
@@ -127,7 +128,11 @@ export function ShiftEndModal({
   const [handoverNotes, setHandoverNotes] = useState<string>('');
 
   const isInitialZeroFloat = Number(localShift?.openingFloat || activeShift?.openingFloat || 0) === 0;
-  const canEditOpeningFloat = isOwner || isInitialZeroFloat || isEditingOpeningFloat;
+  const isLockedOpeningFloat = Boolean(
+    localShift?.hasLockedOpeningFloat ?? ((localShift?.shiftNumber || activeShift?.shiftNumber || 1) > 1)
+  );
+  const prevShiftLabel = localShift?.previousShiftLabel || formatShiftLabel((localShift?.shiftNumber || 2) - 1);
+  const canEditOpeningFloat = !isLockedOpeningFloat && (isOwner || isInitialZeroFloat || isEditingOpeningFloat);
 
   useEffect(() => {
     if (activeShift) {
@@ -488,7 +493,7 @@ export function ShiftEndModal({
                   End Shift Handover
                 </h3>
                 <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                  SHIFT {currentShift?.shiftNumber || 1}
+                  {formatShiftLabel(currentShift?.shiftNumber).toUpperCase()}
                 </span>
               </div>
               <p className="text-sm text-slate-400 mt-0.5">
@@ -596,7 +601,7 @@ export function ShiftEndModal({
               <CheckCircle2 className="w-16 h-16 text-emerald-600 mx-auto animate-bounce" />
               <h4 className="text-2xl font-bold text-slate-900">Shift Handover Completed!</h4>
               <p className="text-sm text-slate-600 max-w-md mx-auto">
-                Shift {currentShift.shiftNumber} has been officially closed and verified. Signing out cashier{' '}
+                {formatShiftLabel(currentShift.shiftNumber)} has been officially closed and verified. Signing out cashier{' '}
                 <strong className="text-emerald-700 font-bold">{cashierName}</strong> to allow the next shift cashier to sign in...
               </p>
             </div>
@@ -886,20 +891,26 @@ export function ShiftEndModal({
                             <span className="font-semibold text-[15px] text-slate-900 block">
                               Opening Float
                             </span>
-                            {isOwner && !isInitialZeroFloat && (
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingOpeningFloat(!isEditingOpeningFloat)}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer"
-                              >
-                                {isEditingOpeningFloat ? 'Lock' : 'Edit'}
-                              </button>
+                            {isLockedOpeningFloat ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-300 flex items-center gap-1">
+                                <span>🔒</span> Locked
+                              </span>
+                            ) : (
+                              isOwner && !isInitialZeroFloat && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsEditingOpeningFloat(!isEditingOpeningFloat)}
+                                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer"
+                                >
+                                  {isEditingOpeningFloat ? 'Lock' : 'Edit'}
+                                </button>
+                              )
                             )}
                           </div>
                           <span className="text-xs text-slate-500 block mt-0.5">
-                            {isInitialZeroFloat
-                              ? 'No prior closed shift — enter starting drawer cash'
-                              : 'Carried forward from previous shift closing float'}
+                            {isLockedOpeningFloat
+                              ? `Auto-carried from ${prevShiftLabel} Closing Drawer Float (Read-Only)`
+                              : 'No prior closed shift — enter starting drawer cash'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -911,9 +922,12 @@ export function ShiftEndModal({
                             placeholder="0.00"
                             value={openingFloat || ''}
                             onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
-                            readOnly={!canEditOpeningFloat}
+                            readOnly={isLockedOpeningFloat || !canEditOpeningFloat}
+                            disabled={isLockedOpeningFloat}
                             className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg focus:outline-none ${
-                              canEditOpeningFloat
+                              isLockedOpeningFloat
+                                ? 'bg-slate-100 text-slate-700 border-slate-300 cursor-not-allowed select-none'
+                                : canEditOpeningFloat
                                 ? 'bg-white text-slate-900 border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15'
                                 : 'bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed'
                             }`}

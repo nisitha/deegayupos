@@ -3203,7 +3203,9 @@ export interface CashierShiftDto {
   cashierId: string;
   cashierName?: string;
   shiftDate: string; // YYYY-MM-DD
-  shiftNumber: number; // 1 or 2
+  shiftNumber: number; // 1, 2, ...
+  hasLockedOpeningFloat?: boolean;
+  previousShiftLabel?: string;
   startedAt: string;
   endedAt?: string | null;
   status: 'open' | 'closed';
@@ -3272,6 +3274,16 @@ function getSriLankaDateStr(d: Date = new Date()): string {
     day: '2-digit',
   }).format(d);
 }
+
+export function formatShiftLabel(shiftNumber?: number | null): string {
+  const n = Number(shiftNumber || 1);
+  if (n >= 1 && n <= 26) {
+    return `Shift ${String.fromCharCode(64 + n)}`;
+  }
+  return n > 26 ? `Shift ${n}` : 'Shift A';
+}
+
+export const formatShiftLetterLabel = formatShiftLabel;
 
 export const shiftsApi = {
   getModakaConfigs: async (): Promise<ApiResponse<ModakaItemConfigDto[]>> => {
@@ -3540,6 +3552,8 @@ export const shiftsApi = {
           cashierName,
           shiftDate: openShift.shift_date,
           shiftNumber: openShift.shift_number || 1,
+          hasLockedOpeningFloat: (openShift.shift_number || 1) > 1,
+          previousShiftLabel: (openShift.shift_number || 1) > 1 ? formatShiftLabel((openShift.shift_number || 2) - 1) : undefined,
           startedAt: openShift.started_at,
           endedAt: openShift.ended_at,
           status: 'open',
@@ -3589,28 +3603,39 @@ export const shiftsApi = {
       // 2. Start a new shift
       const todayDate = getSriLankaDateStr();
 
-      // Check how many shifts exist today for this branch
-      const { count } = await supabase
+      // Check how many closed shifts exist today for this branch (Sequential Shift A -> Shift B -> ...)
+      const { count: closedCount } = await supabase
         .from('cashier_shifts')
         .select('id', { count: 'exact', head: true })
         .eq('branch_id', branchId)
-        .eq('shift_date', todayDate);
+        .eq('shift_date', todayDate)
+        .eq('status', 'closed');
 
-      const shiftNumber = (count || 0) + 1;
+      const shiftNumber = (closedCount || 0) + 1;
 
       // Find previous closed shift for this branch
       const { data: prevShift } = await supabase
         .from('cashier_shifts')
-        .select('id, closing_drawer_float, closing_float, counted_remaining_drawer_cash')
+        .select('id, shift_number, closing_drawer_float, closing_float, counted_remaining_drawer_cash')
         .eq('branch_id', branchId)
         .eq('status', 'closed')
         .order('ended_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const carriedOpeningFloat = Number(
-        prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
-      );
+      const carriedOpeningFloat =
+        shiftNumber > 1 && prevShift
+          ? Number(
+              prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
+            )
+          : 0;
+
+      const hasLockedOpeningFloat = shiftNumber > 1 && !!prevShift;
+      const previousShiftLabel = prevShift
+        ? formatShiftLabel(prevShift.shift_number)
+        : shiftNumber > 1
+        ? formatShiftLabel(shiftNumber - 1)
+        : undefined;
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
@@ -3732,6 +3757,8 @@ export const shiftsApi = {
           cashierName,
           shiftDate: newShift.shift_date,
           shiftNumber: newShift.shift_number,
+          hasLockedOpeningFloat,
+          previousShiftLabel,
           startedAt: newShift.started_at,
           status: 'open',
           posTotalBills: 0,
@@ -4045,7 +4072,7 @@ export const shiftsApi = {
               shift_number: shiftNumber,
               adjustment_type: 'salary_deduction',
               amount: salaryDeductionAmount,
-              notes: `Shift ${shiftNumber} drawer shortage of LKR ${salaryDeductionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
+              notes: `${formatShiftLabel(shiftNumber)} drawer shortage of LKR ${salaryDeductionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
             },
             { onConflict: 'shift_id' }
           );
@@ -4065,7 +4092,7 @@ export const shiftsApi = {
               shift_number: shiftNumber,
               adjustment_type: 'extra_income',
               amount: extraIncomeAmount,
-              notes: `Shift ${shiftNumber} drawer excess of LKR ${extraIncomeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
+              notes: `${formatShiftLabel(shiftNumber)} drawer excess of LKR ${extraIncomeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} on ${shiftDate}. Cashier: ${employeeName}.`,
             },
             { onConflict: 'shift_id' }
           );
