@@ -129,7 +129,8 @@ export function PosSidebar() {
     performAppLogout(router);
   };
 
-  const businessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madura';
   const initial = businessName.charAt(0) || 'D';
   const logoUrl = business?.logoUrl || (tenant as { logoUrl?: string | null } | null)?.logoUrl;
   const [logoError, setLogoError] = useState(false);
@@ -147,36 +148,16 @@ export function PosSidebar() {
       Array.isArray(grnBranchIds) &&
       grnBranchIds.includes(selectedBranchId!));
 
-  // Strict Role-Based Navigation Sections
+  // Strict Role-Based Navigation Sections (Financial Blind Mode)
   // OWNER sees 100% of sections (COMMAND, COMMERCE, FINANCE & REPORTS, PLATFORM).
-  // STAFF sees a clean operational tree:
-  // - Entire COMMERCE section is HIDDEN
-  // - FINANCE & REPORTS is simplified to FINANCE with only Cash Reconciliation (Reports Suite, Revenue Desk, Tax Engine hidden)
-  // - PLATFORM is replaced with OPERATIONS (POS Terminal, and Purchases & GRN only if authorized for a branch)
+  // STAFF sees strictly 3 operational links under OPERATIONS (POS Terminal, Purchases & GRN, Special Stock & Shift Off).
+  // All financial pages (Overview, Alerts, Cash Reconciliation, Modaka Summary, Reports, etc.) are completely hidden.
   const sectionsToDisplay: SidebarMenuSection[] = React.useMemo(() => {
     if (isOwner) {
       return MENU_SECTIONS;
     }
 
     const staffSections: SidebarMenuSection[] = [
-      {
-        title: 'COMMAND',
-        items: [
-          { name: 'Overview', href: '/dashboard', icon: LayoutGrid },
-          { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
-        ],
-      },
-      {
-        title: 'FINANCE',
-        items: [
-          {
-            name: 'Cash Reconciliation',
-            href: '/dashboard/finance/reconciliation',
-            icon: Banknote,
-            badge: 'Daily',
-          },
-        ],
-      },
       {
         title: 'OPERATIONS',
         items: [

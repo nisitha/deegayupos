@@ -682,8 +682,8 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      {/* KPI Cards Row */}
-      <div className="px-6 pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+      {/* KPI Cards Row (Blind Mode for Staff: Only non-financial operational metrics visible) */}
+      <div className={`px-6 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-3 shrink-0`}>
         <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500 uppercase">Total GRNs</span>
@@ -695,16 +695,18 @@ export default function PurchasesPage() {
           <p className="text-[11px] text-slate-400 mt-0.5">Physical goods shipments</p>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase">Procurement Value</span>
-            <DollarSign className="w-4 h-4 text-emerald-600" />
+        {isOwner && (
+          <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Procurement Value</span>
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="text-xl font-black text-slate-900 mt-1">
+              {formatLkr(kpis.totalValue)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">Total received cost</p>
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {formatLkr(kpis.totalValue)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Total received cost</p>
-        </div>
+        )}
 
         <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between">
@@ -717,16 +719,18 @@ export default function PurchasesPage() {
           <p className="text-[11px] text-slate-400 mt-0.5">Ayurvedic pharma vendors</p>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase">Average GRN Value</span>
-            <Package className="w-4 h-4 text-purple-600" />
+        {isOwner && (
+          <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Average GRN Value</span>
+              <Package className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="text-xl font-black text-slate-900 mt-1">
+              {formatLkr(kpis.avgValue)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">Per supplier consignment</p>
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {formatLkr(kpis.avgValue)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Per supplier consignment</p>
-        </div>
+        )}
       </div>
 
       {/* Tabs and Filter Toolbar */}
@@ -852,7 +856,11 @@ export default function PurchasesPage() {
                     <th className="py-3 px-4">Supplier</th>
                     <th className="py-3 px-4">Invoice Ref</th>
                     <th className="py-3 px-4">Received Date</th>
-                    <th className="py-3 px-4 text-right">Total Cost</th>
+                    {isOwner ? (
+                      <th className="py-3 px-4 text-right">Total Cost</th>
+                    ) : (
+                      <th className="py-3 px-4 text-center">Items Received</th>
+                    )}
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-center">Action</th>
                   </tr>
@@ -881,9 +889,15 @@ export default function PurchasesPage() {
                           year: 'numeric',
                         })}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                        {formatLkr(g.totalCost)}
-                      </td>
+                      {isOwner ? (
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
+                          {formatLkr(g.totalCost)}
+                        </td>
+                      ) : (
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-700 font-bold">
+                          {g.items?.length || 1} lines
+                        </td>
+                      )}
                       <td className="py-3.5 px-4 text-center">
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
@@ -1038,12 +1052,21 @@ export default function PurchasesPage() {
                     {viewingGrn.supplierInvoiceNo || 'N/A'}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount</span>
-                  <span className="font-bold font-mono text-emerald-700">
-                    {formatLkr(viewingGrn.totalCost)}
-                  </span>
-                </div>
+                {isOwner ? (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount</span>
+                    <span className="font-bold font-mono text-emerald-700">
+                      {formatLkr(viewingGrn.totalCost)}
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Received</span>
+                    <span className="font-bold font-mono text-emerald-700">
+                      {viewingGrnItems.reduce((acc, i) => acc + (i.receivedQuantity || 0), 0)} Units
+                    </span>
+                  </div>
+                )}
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
                   <span className="font-bold text-emerald-700">
@@ -1075,8 +1098,12 @@ export default function PurchasesPage() {
                           <th className="py-2.5 px-3">Product Name</th>
                           <th className="py-2.5 px-3 text-center">Batch / Exp</th>
                           <th className="py-2.5 px-3 text-center">Qty</th>
-                          <th className="py-2.5 px-3 text-right">Unit Cost</th>
-                          <th className="py-2.5 px-3 text-right">Subtotal</th>
+                          {isOwner && (
+                            <>
+                              <th className="py-2.5 px-3 text-right">Unit Cost</th>
+                              <th className="py-2.5 px-3 text-right">Subtotal</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1095,23 +1122,40 @@ export default function PurchasesPage() {
                             <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
                               {item.receivedQuantity}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                              {formatLkr(item.unitCost)}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                              {formatLkr(item.subtotal)}
-                            </td>
+                            {isOwner && (
+                              <>
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                                  {formatLkr(item.unitCost)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                  {formatLkr(item.subtotal)}
+                                </td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                       <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                         <tr>
-                          <td colSpan={4} className="py-2.5 px-3 text-right text-xs uppercase text-slate-600">
-                            Total Received Value:
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-xs text-slate-900">
-                            {formatLkr(viewingGrn.totalCost)}
-                          </td>
+                          {isOwner ? (
+                            <>
+                              <td colSpan={4} className="py-2.5 px-3 text-right text-xs uppercase text-slate-600">
+                                Total Received Value:
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-xs text-slate-900">
+                                {formatLkr(viewingGrn.totalCost)}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td colSpan={2} className="py-2.5 px-3 text-right text-xs uppercase text-slate-600">
+                                Total Received Units:
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono text-xs text-slate-900">
+                                {viewingGrnItems.reduce((acc, i) => acc + (i.receivedQuantity || 0), 0)}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       </tfoot>
                     </table>
@@ -1300,14 +1344,16 @@ export default function PurchasesPage() {
                               SKU: {p.sku}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="font-mono text-slate-700 font-bold block">
-                              Cost: {formatLkr(p.costPrice)}
-                            </span>
-                            <span className="font-mono text-emerald-600 text-[10px] block">
-                              Retail: {formatLkr(p.retailPrice)}
-                            </span>
-                          </div>
+                          {isOwner && (
+                            <div className="text-right">
+                              <span className="font-mono text-slate-700 font-bold block">
+                                Cost: {formatLkr(p.costPrice)}
+                              </span>
+                              <span className="font-mono text-emerald-600 text-[10px] block">
+                                Retail: {formatLkr(p.retailPrice)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1324,7 +1370,7 @@ export default function PurchasesPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                    <div className={`grid grid-cols-2 ${isOwner ? 'sm:grid-cols-6' : 'sm:grid-cols-4'} gap-2`}>
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
                           Received Qty
@@ -1338,33 +1384,37 @@ export default function PurchasesPage() {
                         />
                       </div>
 
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                          Unit Cost (LKR)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newCost}
-                          onChange={(e) => setNewCost(parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 font-mono font-bold text-purple-700"
-                        />
-                      </div>
+                      {isOwner && (
+                        <>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                              Unit Cost (LKR)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newCost}
+                              onChange={(e) => setNewCost(parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 font-mono font-bold text-purple-700"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                          Retail Price
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newRetail}
-                          onChange={(e) => setNewRetail(parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 font-mono text-emerald-700"
-                        />
-                      </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                              Retail Price
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newRetail}
+                              onChange={(e) => setNewRetail(parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 font-mono text-emerald-700"
+                            />
+                          </div>
+                        </>
+                      )}
 
                       <div>
                         <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
@@ -1411,7 +1461,9 @@ export default function PurchasesPage() {
                     Received Product Lines ({grnItems.length})
                   </h4>
                   <span className="text-xs font-mono font-bold text-slate-900">
-                    Grand Total: {formatLkr(grnTotalCost)}
+                    {isOwner
+                      ? `Grand Total: ${formatLkr(grnTotalCost)}`
+                      : `Grand Total: ${grnItems.reduce((acc, i) => acc + Number(i.receivedQuantity || 0), 0)} Units`}
                   </span>
                 </div>
 
@@ -1432,13 +1484,21 @@ export default function PurchasesPage() {
                           </div>
                         </div>
 
-                        <div className="font-mono text-slate-600 text-xs shrink-0">
-                          {item.receivedQuantity} × {formatLkr(item.unitCost)}
-                        </div>
+                        {isOwner ? (
+                          <>
+                            <div className="font-mono text-slate-600 text-xs shrink-0">
+                              {item.receivedQuantity} × {formatLkr(item.unitCost)}
+                            </div>
 
-                        <div className="font-mono font-bold text-slate-900 text-xs shrink-0">
-                          {formatLkr(item.receivedQuantity * item.unitCost)}
-                        </div>
+                            <div className="font-mono font-bold text-slate-900 text-xs shrink-0">
+                              {formatLkr(item.receivedQuantity * item.unitCost)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="font-mono font-bold text-slate-700 text-xs shrink-0">
+                            {item.receivedQuantity} Units
+                          </div>
+                        )}
 
                         <button
                           type="button"
@@ -1474,7 +1534,11 @@ export default function PurchasesPage() {
                       <span>Posting GRN to Branch Stock...</span>
                     </>
                   ) : (
-                    <span>Post & Receive Inventory ({formatLkr(grnTotalCost)})</span>
+                    <span>
+                      {isOwner
+                        ? `Post & Receive Inventory (${formatLkr(grnTotalCost)})`
+                        : `Post & Receive Inventory (${grnItems.reduce((acc, i) => acc + Number(i.receivedQuantity || 0), 0)} Units)`}
+                    </span>
                   )}
                 </button>
               </div>

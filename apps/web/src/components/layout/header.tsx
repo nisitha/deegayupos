@@ -98,7 +98,8 @@ export function Header() {
   const currentBranchName = currentBranch?.name || (selectedBranchId === null ? 'All Branches' : 'Main Branch');
   const displayName = user?.fullName || 'Dr. Deegayu (Owner)';
   const displayRole = user?.role || tenant?.role || 'OWNER';
-  const businessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
+  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madura';
 
   return (
     <>
@@ -424,13 +425,13 @@ export function Header() {
                     </Link>
                   ) : (
                     <Link
-                      href="/dashboard/finance/reconciliation"
+                      href="/dashboard/pos?action=shift-handover"
                       prefetch={false}
                       onClick={() => setProfileDropdownOpen(false)}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                     >
                       <Banknote className="w-4 h-4 text-emerald-600" />
-                      <span>Daily Reconciliation</span>
+                      <span>Special Stock & Shift Off</span>
                     </Link>
                   )}
                 </div>

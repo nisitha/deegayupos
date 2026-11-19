@@ -7,23 +7,6 @@ import { Header } from '../../components/layout/header';
 import { BottomNavBar } from '../../components/layout/bottom-nav-bar';
 import { TenantBranchProvider, useTenantBranch } from '../../context/tenant-branch-context';
 
-// Master list of administrative routes restricted exclusively to OWNER
-const OWNER_ONLY_ROUTES = [
-  '/dashboard/orders',
-  '/dashboard/sales',
-  '/dashboard/products',
-  '/dashboard/suppliers',
-  '/dashboard/pricing',
-  '/dashboard/customers',
-  '/dashboard/reports',
-  '/dashboard/live',
-  '/dashboard/finance/revenue',
-  '/dashboard/finance/tax',
-  '/dashboard/finance/payouts',
-  '/dashboard/staff',
-  '/dashboard/settings',
-];
-
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -65,29 +48,28 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [authChecked, isTenantLoading, isOwner, assignedBranchIds, selectedBranchId, router]);
 
-  // Determine if active route is restricted for current staff session
+  // Determine if active route is restricted for current staff session (Strict Financial Blind Mode)
   const isRestrictedForStaff = useMemo(() => {
     if (!authChecked || isTenantLoading || isOwner) {
       return false;
     }
 
-    // Direct match or sub-path match on OWNER_ONLY_ROUTES
-    const isOwnerRoute = OWNER_ONLY_ROUTES.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
-    );
-    if (isOwnerRoute) return true;
+    // 1. POS Terminal is allowed
+    if (pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos')) {
+      return false;
+    }
 
-    // Purchases & GRN is allowed for staff ONLY if authorized for the currently active branch (e.g. Dambadeniya for Tharindu)
+    // 2. Purchases & GRN is allowed for staff ONLY if authorized for the currently active branch
     if (pathname === '/dashboard/purchases' || pathname.startsWith('/dashboard/purchases/')) {
       const canAccessActiveBranchGrn =
-        isOwner ||
-        (Boolean(selectedBranchId) &&
-          Array.isArray(grnBranchIds) &&
-          grnBranchIds.includes(selectedBranchId!));
+        Boolean(selectedBranchId) &&
+        Array.isArray(grnBranchIds) &&
+        grnBranchIds.includes(selectedBranchId!);
       return !canAccessActiveBranchGrn;
     }
 
-    return false;
+    // All other administrative, overview & financial routes are strictly restricted for STAFF
+    return true;
   }, [authChecked, isTenantLoading, isOwner, grnBranchIds, selectedBranchId, pathname]);
 
   // Enforce Route Guard: redirect unauthorized staff to /dashboard/pos
