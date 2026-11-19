@@ -17,6 +17,7 @@ import {
   Check,
   Banknote,
   Clock,
+  Menu,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { BranchCreateModal } from '../branches/branch-create-modal';
@@ -135,17 +136,32 @@ export function Header() {
 
   return (
     <>
-      <header className="h-14 bg-white border-b border-slate-200/90 px-4 sm:px-5 flex items-center justify-between shrink-0 z-30 shadow-2xs">
-        {/* Left: Store Monogram & Active Status */}
-        <div className="flex items-center gap-2.5 shrink-0">
+      <header className="h-14 bg-white border-b border-slate-200/90 px-3 sm:px-5 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+        {/* Left: Mobile Drawer Trigger + Store Monogram & Active Status */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* 44x44px Touch-Target Hamburger Menu Button (< lg screens) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
+              }
+            }}
+            className="lg:hidden w-11 h-11 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
+            aria-label="Open mobile navigation menu"
+            title="Menu"
+          >
+            <Menu className="w-5 h-5 text-slate-800" />
+          </button>
+
           <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3] shadow-2xs shrink-0">
             <Store className="w-4 h-4" />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-xs font-bold text-slate-900 whitespace-nowrap truncate max-w-[105px] sm:max-w-[180px]">
               {businessName}
             </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0 whitespace-nowrap">
+            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0 whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Online
             </span>
@@ -167,13 +183,13 @@ export function Header() {
         )}
 
         {/* Right: Launch POS CTA, Branch Switcher, Live Date, User Profile Menu */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* High-Visibility "Launch POS" CTA Button (Hidden on POS route) */}
           {!isPosPage && (
             <Link
               href="/dashboard/pos"
               prefetch={false}
-              className="h-8 bg-[#005BD3] hover:bg-[#004CB5] text-white text-xs font-semibold px-3 rounded-lg flex items-center gap-1.5 shadow-2xs transition-all whitespace-nowrap shrink-0"
+              className="h-8 bg-[#005BD3] hover:bg-[#004CB5] text-white text-xs font-semibold px-2.5 sm:px-3 rounded-lg flex items-center gap-1.5 shadow-2xs transition-all whitespace-nowrap shrink-0"
               title="Launch Retail POS Terminal (Shortcut: F1)"
             >
               <Store className="w-3.5 h-3.5" />
@@ -189,28 +205,28 @@ export function Header() {
           <div className="relative shrink-0" ref={branchRef}>
             {!isOwner ? (
               /* Non-owner staff: Locked Branch Badge + Switch Shop (Logout) Button */
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <div
-                  className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 select-none shadow-2xs whitespace-nowrap shrink-0"
+                  className="h-8 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 select-none shadow-2xs whitespace-nowrap shrink-0"
                   title={`Branch Session Locked: ${currentBranchName}`}
                 >
                   <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-                  <span className="font-bold text-slate-900 whitespace-nowrap">
+                  <span className="font-bold text-slate-900 whitespace-nowrap truncate max-w-[85px] sm:max-w-none">
                     {currentBranchName}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 shrink-0 whitespace-nowrap">
-                    Locked Session
+                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 shrink-0 whitespace-nowrap">
+                    Locked
                   </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleSwitchShopLogout}
-                  className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
+                  className="h-8 flex items-center gap-1 px-2 sm:px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
                   title="Switch branch by terminating session and logging in"
                 >
                   <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span className="whitespace-nowrap">Switch Shop</span>
+                  <span className="hidden sm:inline whitespace-nowrap">Switch Shop</span>
                 </button>
               </div>
             ) : (
@@ -218,11 +234,11 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
-                className="h-8 flex items-center gap-1.5 px-3 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none cursor-pointer whitespace-nowrap shrink-0"
+                className="h-8 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all select-none cursor-pointer whitespace-nowrap shrink-0"
                 title="Switch Retail Branch / Location"
               >
                 <MapPin className="w-3.5 h-3.5 text-[#005BD3] shrink-0" />
-                <span className="font-bold text-slate-800 whitespace-nowrap">
+                <span className="font-bold text-slate-800 whitespace-nowrap truncate max-w-[85px] sm:max-w-none">
                   {currentBranchName}
                 </span>
                 <ChevronDown
@@ -343,7 +359,7 @@ export function Header() {
           {/* Notification Bell */}
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative h-8 w-8 rounded-lg border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+            className="hidden sm:flex relative h-8 w-8 rounded-lg border border-slate-200/80 bg-white hover:bg-slate-50 items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shrink-0"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
@@ -354,7 +370,7 @@ export function Header() {
           <div className="relative shrink-0" ref={profileRef}>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="h-8 flex items-center gap-2 px-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none whitespace-nowrap shrink-0"
+              className="h-8 flex items-center gap-1 sm:gap-2 px-1 sm:px-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none whitespace-nowrap shrink-0"
               aria-expanded={profileDropdownOpen}
             >
               <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#005BD3] to-[#4F46E5] text-white flex items-center justify-center font-bold text-[11px] shadow-2xs shrink-0">

@@ -632,9 +632,6 @@ export default function PurchasesPage() {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 Purchases & Goods Received Notes (GRN)
               </h1>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-[#5E3FE6] font-sinhala">
-                භාණ්ඩ ලැබීම් සටහන්
-              </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Multi-branch supplier procurement ledger, stock receiving verification, and cost tracking.
@@ -1185,10 +1182,10 @@ export default function PurchasesPage() {
                       onChange={(e) => setGrnBranchId(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF]"
                     >
-                      <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa (අලව්ව)</option>
-                      <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya (දඹදෙණිය)</option>
-                      <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla (ගිරිඋල්ල)</option>
-                      <option value="133eeaec-5726-4702-a819-8423750db203">Main Store (ප්‍රධාන ගබඩාව)</option>
+                      <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
+                      <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya</option>
+                      <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla</option>
+                      <option value="133eeaec-5726-4702-a819-8423750db203">Main Store</option>
                     </select>
                   ) : (
                     <div className="w-full px-3 py-2 text-xs rounded-xl bg-slate-100 border border-slate-200 text-slate-800 font-bold flex items-center gap-1.5">

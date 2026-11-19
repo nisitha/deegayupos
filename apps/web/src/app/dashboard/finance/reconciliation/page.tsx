@@ -782,7 +782,7 @@ export default function CashReconciliationPage() {
 
   const currentBranchName =
     activeBranchFilter === 'ALL'
-      ? 'All Outlets (සියල්ල)'
+      ? 'All Outlets'
       : branches.find((b) => b.id === effectiveBranchId)?.name || 'Main Branch';
 
   // Bank register calculations
@@ -904,7 +904,7 @@ export default function CashReconciliationPage() {
                 className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer"
               >
                 <option value="ALL" className="bg-slate-900 text-slate-200">
-                  All Branches (සියල්ල)
+                  All Branches
                 </option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
@@ -2042,7 +2042,7 @@ export default function CashReconciliationPage() {
                     className="bg-transparent text-slate-200 outline-none cursor-pointer font-semibold"
                   >
                     <option value="ALL" className="bg-slate-900 text-slate-200">
-                      All Branches (සියල්ල)
+                      All Branches
                     </option>
                     {branches.map((b) => (
                       <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">

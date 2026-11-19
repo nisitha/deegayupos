@@ -325,7 +325,7 @@ export function ReceiptModal({
   const isA4OrA5 = paperSize === 'A4' || paperSize === 'A5';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       {/* Dynamic CSS @media print style */}
       <style jsx global>{`
         @media print {
@@ -367,7 +367,7 @@ export function ReceiptModal({
         }
       `}</style>
 
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col h-[94dvh] sm:h-auto sm:max-h-[92vh] overflow-hidden">
         {/* Modal Top Bar */}
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/70">
           <div className="flex items-center gap-2.5">
@@ -939,7 +939,7 @@ export function ReceiptModal({
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
-                    SMS (දුරකථන)
+                    SMS
                   </button>
                   <button
                     type="button"
@@ -950,7 +950,7 @@ export function ReceiptModal({
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
-                    Email (විද්‍යුත් තැපෑල)
+                    Email
                   </button>
                 </div>
 

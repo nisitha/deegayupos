@@ -185,7 +185,7 @@ export function CustomerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
         onClick={onClose}
@@ -193,9 +193,9 @@ export function CustomerModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 flex flex-col animate-in zoom-in-95 duration-150 max-h-[90vh]">
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 flex flex-col animate-in zoom-in-95 duration-150 h-[92dvh] sm:h-auto sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
               <User className="w-5 h-5" />
@@ -205,14 +205,14 @@ export function CustomerModal({
                 Customer & Khata Credit Directory
               </h3>
               <p className="text-[11px] text-slate-500">
-                Deegayu Ayurvedic CRM & Credit Accounts (ණය පොත)
+                Deegayu Ayurvedic CRM & Credit Accounts
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 sm:w-8 sm:h-8 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -337,7 +337,7 @@ export function CustomerModal({
                               {c.customerType === 'WHOLESALE'
                                 ? 'Wholesale'
                                 : c.customerType === 'RETAIL_CREDIT'
-                                ? 'Khata / ණය'
+                                ? 'Khata Credit'
                                 : 'Walk-in'}
                             </span>
                             {isSelected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
@@ -446,8 +446,8 @@ export function CustomerModal({
                     onChange={(e) => setNewCustomerType(e.target.value as typeof newCustomerType)}
                     className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 font-medium"
                   >
-                    <option value="RETAIL_CREDIT">Retail Credit (ණය පාරිභෝගික)</option>
-                    <option value="WHOLESALE">Wholesale (තොග)</option>
+                    <option value="RETAIL_CREDIT">Retail Credit</option>
+                    <option value="WHOLESALE">Wholesale</option>
                     <option value="WALK_IN">Standard Walk-in</option>
                   </select>
                 </div>

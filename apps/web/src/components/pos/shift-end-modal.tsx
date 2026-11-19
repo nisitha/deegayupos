@@ -334,24 +334,24 @@ export function ShiftEndModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center font-bold text-white shadow-inner">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center font-bold text-white shadow-inner shrink-0">
               <Layers className="w-5 h-5 text-purple-300" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
-                  End Shift Handover (Shift Off)
+                  End Shift Handover
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/30 text-purple-200 border border-purple-400/30">
                   Shift {currentShift?.shiftNumber || 1}
                 </span>
               </div>
-              <p className="text-xs text-slate-300 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-300 font-medium truncate max-w-[220px] sm:max-w-none">
                 {branchName} • Cashier: <strong className="text-white">{cashierName}</strong>
               </p>
             </div>
@@ -359,26 +359,27 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            aria-label="Close modal"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="px-6 pt-3 pb-2 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 shrink-0 overflow-x-auto">
+        <div className="px-4 sm:px-6 pt-2.5 pb-2 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 shrink-0 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('MODAKA')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'MODAKA'
+            className={`min-h-[44px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'MODAKA'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
               }`}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <FileSpreadsheet className="w-4 h-4" />
             <span>1. Special Stock</span>
             <span
-              className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${activeTab === 'MODAKA'
+              className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] ${activeTab === 'MODAKA'
                 ? 'bg-purple-800 text-purple-200'
                 : 'bg-slate-100 text-slate-600'
                 }`}
@@ -389,15 +390,15 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('DENOMINATIONS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'DENOMINATIONS'
+            className={`min-h-[44px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'DENOMINATIONS'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
               }`}
           >
-            <Banknote className="w-3.5 h-3.5" />
+            <Banknote className="w-4 h-4" />
             <span>2. Denominations</span>
             <span
-              className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] ${activeTab === 'DENOMINATIONS'
+              className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] ${activeTab === 'DENOMINATIONS'
                 ? 'bg-purple-800 text-purple-200'
                 : 'bg-slate-100 text-slate-600'
                 }`}
@@ -408,16 +409,16 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('SUMMARY')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'SUMMARY'
+            className={`min-h-[44px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'SUMMARY'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
               }`}
           >
-            <Receipt className="w-3.5 h-3.5" />
+            <Receipt className="w-4 h-4" />
             <span>3. Cash & Expenses</span>
             {cashVariance !== 0 && (
               <span
-                className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] font-bold ${cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] font-bold ${cashVariance > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                   }`}
               >
                 {cashVariance > 0 ? `+${cashVariance.toFixed(0)}` : cashVariance.toFixed(0)}
@@ -471,13 +472,13 @@ export function ShiftEndModal({
                     </div>
                   </div>
 
-                  <div className="border border-slate-200 bg-white rounded-2xl overflow-hidden shadow-2xs">
-                    <table className="w-full text-xs text-left">
+                  <div className="border border-slate-200 bg-white rounded-2xl overflow-x-auto shadow-2xs">
+                    <table className="w-full min-w-[580px] text-xs text-left">
                       <thead className="bg-slate-100/80 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                         <tr>
                           <th className="py-2.5 px-3 w-8 text-center">#</th>
                           <th className="py-2.5 px-3 w-24">Item Code</th>
-                          <th className="py-2.5 px-3 min-w-[180px]">Special Item</th>
+                          <th className="py-2.5 px-3 min-w-[150px] sticky left-0 bg-slate-100 z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">Special Item</th>
                           <th className="py-2.5 px-2 text-center w-20">A (Opening)</th>
                           <th className="py-2.5 px-2 text-center w-24 bg-amber-50/70 text-amber-900">
                             B (In)
@@ -503,7 +504,7 @@ export function ShiftEndModal({
                               <td className="py-2.5 px-3 font-mono text-[11px] font-semibold text-slate-500">
                                 {row.productSku || `MOD-0${idx + 1}`}
                               </td>
-                              <td className="py-2.5 px-3">
+                              <td className="py-2.5 px-3 sticky left-0 bg-white z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                                 <span className="font-bold text-slate-800 block text-xs">
                                   {row.productName}
                                 </span>
@@ -518,7 +519,7 @@ export function ShiftEndModal({
                                   placeholder="0"
                                   value={row.inQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'inQty', e.target.value)}
-                                  className="w-16 px-2 py-1 text-center font-bold font-mono text-xs bg-white border border-amber-300 rounded-lg focus:border-amber-500 focus:outline-none"
+                                  className="w-16 h-10 px-1 text-center font-bold font-mono text-base sm:text-xs bg-white border border-amber-300 rounded-lg focus:border-amber-500 focus:outline-none"
                                 />
                               </td>
                               <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-700 bg-slate-50/40">
@@ -531,7 +532,7 @@ export function ShiftEndModal({
                                   placeholder="0"
                                   value={row.soldQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'soldQty', e.target.value)}
-                                  className="w-16 px-2 py-1 text-center font-bold font-mono text-xs bg-white border border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none"
+                                  className="w-16 h-10 px-1 text-center font-bold font-mono text-base sm:text-xs bg-white border border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none"
                                 />
                               </td>
                               <td className="py-2.5 px-2 text-center font-mono font-black text-emerald-700 bg-emerald-50/30">
@@ -560,7 +561,7 @@ export function ShiftEndModal({
                     <button
                       type="button"
                       onClick={() => setActiveTab('DENOMINATIONS')}
-                      className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                      className="min-h-[44px] px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer w-full sm:w-auto"
                     >
                       <span>Proceed to Denomination Counter</span>
                       <ArrowRight className="w-4 h-4" />
@@ -618,7 +619,7 @@ export function ShiftEndModal({
                               placeholder="0"
                               value={count > 0 ? count : ''}
                               onChange={(e) => handleCountChange(d, e.target.value)}
-                              className="w-16 px-2 py-1 text-center font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-purple-500 focus:outline-none"
+                              className="w-20 h-10 px-2 py-1 text-center font-mono font-bold text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-purple-500 focus:outline-none"
                             />
                           </div>
                           <div className="text-right">
@@ -650,11 +651,11 @@ export function ShiftEndModal({
                     </span>
                   </div>
 
-                  <div className="flex justify-between pt-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
                     <button
                       type="button"
                       onClick={() => setActiveTab('MODAKA')}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                      className="min-h-[44px] px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
                       <ArrowLeft className="w-4 h-4" />
                       <span>Back to Special Stock</span>
@@ -662,7 +663,7 @@ export function ShiftEndModal({
                     <button
                       type="button"
                       onClick={() => setActiveTab('SUMMARY')}
-                      className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                      className="min-h-[44px] px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                     >
                       <span>Proceed to Shift Summary</span>
                       <ArrowRight className="w-4 h-4" />
@@ -941,11 +942,11 @@ export function ShiftEndModal({
                     </div>
                   </div>
 
-                  <div className="flex justify-between pt-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
                     <button
                       type="button"
                       onClick={() => setActiveTab('DENOMINATIONS')}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                      className="min-h-[44px] px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
                       <ArrowLeft className="w-4 h-4" />
                       <span>Back to Denominations</span>
@@ -954,7 +955,7 @@ export function ShiftEndModal({
                       type="button"
                       onClick={handleFinalSubmit}
                       disabled={isSubmitting}
-                      className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                      className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-purple-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isSubmitting ? (
                         <>
@@ -977,16 +978,16 @@ export function ShiftEndModal({
 
         {/* Persistent Mini Footer */}
         {!isSuccess && (
-          <div className="px-6 py-3 bg-white border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-600 shrink-0">
-            <div className="flex items-center gap-4">
+          <div className="px-4 sm:px-6 py-3 bg-white border-t border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs text-slate-600 shrink-0">
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 flex-wrap">
               <span>
-                Drawer Cash: <strong className="font-mono text-emerald-700">LKR {countedDrawerCash.toFixed(2)}</strong>
+                Drawer: <strong className="font-mono text-emerald-700">LKR {countedDrawerCash.toFixed(2)}</strong>
               </span>
               <span>
                 Expected: <strong className="font-mono text-slate-900">LKR {expectedCashBeforeBank.toFixed(2)}</strong>
               </span>
               <span>
-                Next Shift Float:{' '}
+                Next Float:{' '}
                 <strong className="font-mono text-purple-700">LKR {closingDrawerFloat.toFixed(2)}</strong>
               </span>
             </div>
@@ -994,7 +995,7 @@ export function ShiftEndModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+              className="min-h-[36px] sm:min-h-0 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors py-1 px-2 rounded-lg bg-slate-100 sm:bg-transparent text-center"
             >
               Cancel / Return to POS
             </button>

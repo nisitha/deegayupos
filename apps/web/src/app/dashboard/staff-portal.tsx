@@ -172,9 +172,6 @@ export function StaffPersonalWorkspace() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Staff Shift & Payroll Workspace
             </h1>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 font-sinhala">
-              කාර්ය මණ්ඩල දීමනා සහ වැටුප් පුවරුව
-            </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
               Shift Active
             </span>

@@ -107,20 +107,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    /* Outer Viewport Canvas (Soft Modern Canvas Tint) */
-    <div className="h-screen w-screen bg-[#EDE9FE] p-2 sm:p-3 md:p-4 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
-      {/* Inner Floating App Surface (Confidency OS Design System) */}
+    /* Outer Viewport Canvas (Soft Modern Canvas Tint, Zero Mobile Horizontal Overflow) */
+    <div className="h-dvh w-screen max-w-full overflow-x-hidden bg-[#EDE9FE] p-0 sm:p-2 md:p-3 lg:p-5 overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white">
+      {/* Inner Floating App Surface (Full-Screen on Mobile, Floating on Tablet/Desktop) */}
       <div
-        className={`rounded-3xl shadow-2xl border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
+        className={`rounded-none sm:rounded-2xl lg:rounded-3xl shadow-none sm:shadow-2xl border-0 sm:border border-slate-200/60 w-full h-full flex overflow-hidden relative ${
           isPosPage ? 'bg-[#0F1222]' : 'bg-white'
         }`}
       >
-        {/* Left Column: Categorized Navigation Sidebar (220px-240px) */}
+        {/* Left Column: Categorized Navigation Sidebar / Mobile Slide-Over Drawer */}
         <PosSidebar />
 
         {/* Main Content Viewport */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          {/* Executive Header (Adapts automatically for POS and non-POS routes) */}
+          {/* Executive Header (Adapts automatically for POS, Mobile & Desktop) */}
           <Header />
 
           {/* Page Content Viewport */}
@@ -128,16 +128,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             className={`flex-1 ${
               isPosPage
                 ? 'overflow-hidden p-0 h-full bg-[#E6EAF2]'
-                : 'overflow-y-auto p-4 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'
+                : 'overflow-y-auto p-3 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'
             }`}
           >
             {children}
           </main>
 
-          {/* Mobile Bottom Thumb Navigation (< md) */}
-          <div className="md:hidden shrink-0">
-            <BottomNavBar />
-          </div>
+          {/* Mobile Bottom Thumb Navigation (< md) for non-POS pages */}
+          {!isPosPage && (
+            <div className="md:hidden shrink-0">
+              <BottomNavBar />
+            </div>
+          )}
         </div>
       </div>
     </div>

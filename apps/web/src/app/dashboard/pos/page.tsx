@@ -1300,14 +1300,14 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Sleek Horizontal Action Pills (h-11, 5-column grid, zero text overlap) */}
-        <div className="px-4 lg:px-5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+        {/* 2. Sleek Horizontal Action Pills (h-11, swipeable on mobile, 5-column grid on desktop) */}
+        <div className="px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
+          <div className="flex md:grid md:grid-cols-3 xl:grid-cols-5 overflow-x-auto md:overflow-visible gap-2 md:gap-2.5 pb-1 md:pb-0 no-scrollbar">
             {/* Pill 1: Discount [F8] */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${
+              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${
                 discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
               }`}
               title="Apply order discount [F8]"
@@ -1344,7 +1344,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${
+              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${
                 selectedCustomer ? 'ring-2 ring-blue-300' : ''
               }`}
               title="Select customer [F3]"
@@ -1378,7 +1378,7 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none"
+              className="h-11 min-h-[44px] min-w-[100px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none"
               title="Park current order ticket [F4]"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1399,7 +1399,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-violet-600 hover:bg-violet-700"
+              className="h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-violet-600 hover:bg-violet-700"
               title="Add non-catalog or custom item [F9]"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1415,7 +1415,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
-              className="h-11 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700"
+              className="h-11 min-h-[44px] min-w-[150px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700"
               title="Record incoming Special Stock [F7]"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1490,7 +1490,7 @@ export default function ConfidencyPosPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              className="w-full h-12 md:h-13 text-sm md:text-base font-medium pl-11 pr-44 rounded-xl border border-slate-200/90 bg-white shadow-xs focus:outline-none focus:border-[#5B46F6] focus:ring-2 focus:ring-[#5B46F6]/15 transition-all text-slate-900 placeholder:text-slate-400"
+              className="w-full h-11 sm:h-12 md:h-13 text-base sm:text-sm md:text-base font-medium pl-10 sm:pl-11 pr-20 sm:pr-44 rounded-xl border border-slate-200/90 bg-white shadow-xs focus:outline-none focus:border-[#5B46F6] focus:ring-2 focus:ring-[#5B46F6]/15 transition-all text-slate-900 placeholder:text-slate-400"
             />
 
             {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
@@ -1518,7 +1518,7 @@ export default function ConfidencyPosPage() {
               </div>
 
               {/* Live Count Badge */}
-              <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
+              <div className="hidden sm:block text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
                 {filteredProducts.length.toLocaleString()} items
               </div>
             </div>
@@ -1820,9 +1820,9 @@ export default function ConfidencyPosPage() {
       </div>
 
       {/* =====================================================================
-          RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (340px-380px)
+          RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (>= lg screens)
       ===================================================================== */}
-      <aside className="hidden md:flex w-[340px] lg:w-[360px] xl:w-[380px] bg-[#ECEFF9] border-l-2 border-indigo-200/80 shadow-[-6px_0_24px_-12px_rgba(15,18,34,0.12)] flex-col h-full shrink-0 select-none">
+      <aside className="hidden lg:flex w-[340px] xl:w-[380px] bg-[#ECEFF9] border-l-2 border-indigo-200/80 shadow-[-6px_0_24px_-12px_rgba(15,18,34,0.12)] flex-col h-full shrink-0 select-none">
         {/* 1. Cart Header */}
         <div className="h-14 px-5 border-b border-indigo-200/60 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-xs">
           <div className="flex items-center gap-2">
@@ -2149,7 +2149,7 @@ export default function ConfidencyPosPage() {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-600">
-                      <span>Current Debt (ණය):</span>
+                      <span>Current Debt:</span>
                       <span className="font-mono font-bold text-rose-600">
                         LKR {Number(selectedCustomer.currentBalance || 0).toLocaleString()}
                       </span>
@@ -2193,33 +2193,33 @@ export default function ConfidencyPosPage() {
       </aside>
 
       {/* =====================================================================
-          UBER-EATS STYLE FLOATING BOTTOM CART BAR (< md screens)
+          UBER-EATS STYLE FLOATING BOTTOM CART BAR (< lg screens)
       ===================================================================== */}
       {cart.length > 0 && !isMobileCartOpen && (
         <aside
           aria-label="Floating Mobile Cart"
           onClick={() => setIsMobileCartOpen(true)}
-          className="fixed bottom-20 inset-x-3 md:hidden z-40 bg-[#5B46F6] text-white rounded-2xl p-3.5 shadow-float flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all animate-in slide-in-from-bottom-4 duration-200"
+          className="fixed bottom-3 inset-x-3 lg:hidden z-30 bg-[#0F1222] text-white rounded-2xl p-3 shadow-2xl border border-indigo-500/30 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all animate-in slide-in-from-bottom-4 duration-200"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm md:text-base">
+                <span className="font-bold text-sm">
                   {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}
                 </span>
                 <span className="text-white/40">•</span>
-                <span className="font-mono font-bold text-white text-sm md:text-base">
+                <span className="font-mono font-bold text-emerald-400 text-sm">
                   LKR {totalAmount.toFixed(2)}
                 </span>
               </div>
-              <p className="text-xs text-white/90">Tap to review & checkout</p>
+              <p className="text-xs text-slate-300">Tap to review & checkout</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white text-[#5B46F6] px-4 py-2 rounded-xl font-bold text-xs md:text-sm shadow-sm">
+          <div className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm">
             <span>Checkout</span>
             <ArrowRight className="w-4 h-4" />
           </div>
@@ -2227,16 +2227,16 @@ export default function ConfidencyPosPage() {
       )}
 
       {/* =====================================================================
-          MOBILE BOTTOM SHEET DRAWER (< md screens)
+          MOBILE BOTTOM SHEET DRAWER (< lg screens)
       ===================================================================== */}
       {isMobileCartOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end">
+        <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end">
           <div
             onClick={() => setIsMobileCartOpen(false)}
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
           />
 
-          <div className="relative bg-white rounded-t-3xl shadow-bottom-sheet z-10 max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-250">
+          <div className="relative bg-white rounded-t-3xl shadow-bottom-sheet z-10 max-h-[92dvh] h-full sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-250">
             {/* Drag Pill */}
             <div className="pt-3 pb-1 flex justify-center">
               <div className="w-12 h-1.5 rounded-full bg-slate-300" />
@@ -2811,7 +2811,7 @@ export default function ConfidencyPosPage() {
                         </span>
                       </div>
                       <div className="flex justify-between text-slate-600">
-                        <span>Current Balance (ණය):</span>
+                        <span>Current Balance:</span>
                         <span className="font-mono font-bold text-rose-600">
                           LKR {Number(selectedCustomer.currentBalance || 0).toLocaleString()}
                         </span>

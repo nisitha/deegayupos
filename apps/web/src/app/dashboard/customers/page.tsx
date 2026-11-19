@@ -462,7 +462,7 @@ export default function CustomersManagementPage() {
               <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                 <span>Customer CRM & Credit Ledger</span>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold">
-                  ණය පොත (Khata)
+                  Khata Ledger
                 </span>
               </h1>
               <p className="text-xs text-slate-500 font-medium">
@@ -517,7 +517,7 @@ export default function CustomersManagementPage() {
         <div className="bg-white p-4 rounded-2xl border border-rose-100 shadow-xs hover:border-rose-200 transition-all flex items-center justify-between bg-gradient-to-br from-white to-rose-50/20">
           <div>
             <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
-              Outstanding Debt (ණය)
+              Outstanding Debt
             </span>
             <div className="text-2xl font-black text-rose-700 mt-1 font-mono">
               LKR {telemetry.totalReceivables.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -731,7 +731,7 @@ export default function CustomersManagementPage() {
                           {c.customerType === 'WHOLESALE'
                             ? 'Wholesale'
                             : c.customerType === 'RETAIL_CREDIT'
-                            ? 'Khata / ණය'
+                            ? 'Khata Credit'
                             : 'Walk-in'}
                         </span>
                       </td>
@@ -917,7 +917,7 @@ export default function CustomersManagementPage() {
             <div className="flex-1 p-6 overflow-y-auto space-y-4">
               <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-indigo-600" />
-                <span>Khata Statement Timeline (ණය ඉතිහාසය)</span>
+                <span>Khata Statement Timeline</span>
               </h3>
 
               {isLoadingLedger ? (
@@ -1023,7 +1023,7 @@ export default function CustomersManagementPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    Record Debt Settlement (ණය පියවීම)
+                    Record Debt Settlement
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Payment receipt voucher against Khata ledger
@@ -1154,9 +1154,9 @@ export default function CustomersManagementPage() {
                     </label>
                     <div className="grid grid-cols-3 gap-2 text-xs font-bold">
                       {[
-                        { id: 'CASH', label: 'Cash (මුදල්)' },
-                        { id: 'CARD', label: 'Card (කාඩ්)' },
-                        { id: 'BANK_TRANSFER', label: 'Bank (බැංකු)' },
+                        { id: 'CASH', label: 'Cash' },
+                        { id: 'CARD', label: 'Card' },
+                        { id: 'BANK_TRANSFER', label: 'Bank Transfer' },
                       ].map((tab) => (
                         <button
                           key={tab.id}
@@ -1333,8 +1333,8 @@ export default function CustomersManagementPage() {
                     onChange={(e) => setNewCustomerType(e.target.value as CustomerType)}
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
                   >
-                    <option value="RETAIL_CREDIT">Retail Khata (ණය පාරිභෝගික)</option>
-                    <option value="WHOLESALE">Wholesale (තොග පාරිභෝගික)</option>
+                    <option value="RETAIL_CREDIT">Retail Khata</option>
+                    <option value="WHOLESALE">Wholesale</option>
                     <option value="WALK_IN">Standard Walk-in</option>
                   </select>
                 </div>

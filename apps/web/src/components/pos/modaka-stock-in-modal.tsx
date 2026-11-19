@@ -191,40 +191,41 @@ export function ModakaStockInModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-5 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4.5 bg-gradient-to-r from-rose-500 via-pink-600 to-orange-500 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-rose-500 via-pink-600 to-orange-500 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shadow-inner">
-              <PackagePlus className="w-6 h-6 stroke-[2.5]" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shadow-inner shrink-0">
+              <PackagePlus className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-black tracking-tight">
+                <h3 className="text-base sm:text-lg font-black tracking-tight">
                   Special Stock In (B)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/20">
                   {activeShift ? `Shift ${activeShift.shiftNumber}` : 'Active Shift'}
                 </span>
               </div>
-              <p className="text-xs text-rose-100 font-medium">
-                Record incoming Special Stock received during the current working shift
+              <p className="text-[11px] sm:text-xs text-rose-100 font-medium">
+                Record incoming Special Stock received during shift
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            aria-label="Close modal"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-6 overflow-y-auto space-y-4">
+          <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
             {errorMessage && (
               <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -243,12 +244,12 @@ export function ModakaStockInModal({
                 <p className="text-[11px] text-slate-400">Configure special items in Admin Finance Ledger</p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <table className="w-full text-xs text-left">
+              <div className="border border-slate-200 rounded-2xl overflow-x-auto shadow-2xs">
+                <table className="w-full min-w-[500px] text-xs text-left">
                   <thead className="bg-slate-100/90 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-2.5 px-3 w-8 text-center">#</th>
-                      <th className="py-2.5 px-3">Special Item</th>
+                      <th className="py-2.5 px-2.5 w-8 text-center">#</th>
+                      <th className="py-2.5 px-3 sticky left-0 bg-slate-100 z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">Special Item</th>
                       <th className="py-2.5 px-2 text-center w-24">Opening (A)</th>
                       <th className="py-2.5 px-3 text-center w-28 bg-rose-100/70 text-rose-950 font-black">
                         Add In (B)
@@ -264,14 +265,14 @@ export function ModakaStockInModal({
 
                       return (
                         <tr key={item.productId} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-3 text-center font-bold text-slate-400">
+                          <td className="py-3 px-2.5 text-center font-bold text-slate-400">
                             {idx + 1}
                           </td>
-                          <td className="py-3 px-3">
+                          <td className="py-3 px-3 sticky left-0 bg-white z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">
                             <p className="font-bold text-slate-900 text-xs">{item.productName}</p>
                             {item.currentInQty > 0 && (
                               <span className="text-[10px] text-amber-600 font-mono font-medium block">
-                                Already received today: {item.currentInQty}
+                                In today: {item.currentInQty}
                               </span>
                             )}
                           </td>
@@ -285,7 +286,7 @@ export function ModakaStockInModal({
                               placeholder="0"
                               value={inQuantities[item.productId] || ''}
                               onChange={(e) => handleQtyChange(item.productId, e.target.value)}
-                              className="w-20 px-2 py-1.5 text-center font-bold font-mono text-sm bg-white border border-rose-300 rounded-xl focus:border-rose-600 focus:ring-2 focus:ring-rose-200 focus:outline-none shadow-2xs"
+                              className="w-16 sm:w-20 h-10 px-2 text-center font-bold font-mono text-base sm:text-sm bg-white border border-rose-300 rounded-xl focus:border-rose-600 focus:ring-2 focus:ring-rose-200 focus:outline-none shadow-2xs"
                             />
                           </td>
                           <td className="py-3 px-2 text-center font-mono font-black text-emerald-700">
@@ -300,38 +301,38 @@ export function ModakaStockInModal({
             )}
 
             {/* Total incoming footer */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs">
-              <span className="font-bold text-slate-700">Total Additional Special Units Received:</span>
-              <span className="font-mono text-lg font-black text-rose-600">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs">
+              <span className="font-bold text-slate-700">Total Additional Units:</span>
+              <span className="font-mono text-base sm:text-lg font-black text-rose-600">
                 +{totalInQty} units
               </span>
             </div>
           </div>
 
           {/* Footer buttons */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+          <div className="px-5 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || totalInQty <= 0}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs font-bold shadow-md shadow-rose-500/25 flex items-center gap-2 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              className="min-h-[44px] px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-rose-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving Special Stock In...
+                  <span>Saving...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Save Special Stock In (+{totalInQty})
+                  <span>Save Special Stock In (+{totalInQty})</span>
                 </>
               )}
             </button>
