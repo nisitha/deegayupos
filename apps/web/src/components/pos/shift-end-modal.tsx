@@ -93,6 +93,7 @@ export function ShiftEndModal({
 
   // Section 3: Shift Cash & Expense Summary state
   const [openingFloat, setOpeningFloat] = useState<number>(0);
+  const [isEditingOpeningFloat, setIsEditingOpeningFloat] = useState<boolean>(false);
   const [declaredShiftSale, setDeclaredShiftSale] = useState<number>(0);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
@@ -100,6 +101,9 @@ export function ShiftEndModal({
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
+
+  const isInitialZeroFloat = Number(localShift?.openingFloat || activeShift?.openingFloat || 0) === 0;
+  const canEditOpeningFloat = isOwner || isInitialZeroFloat || isEditingOpeningFloat;
 
   useEffect(() => {
     if (activeShift) {
@@ -225,9 +229,27 @@ export function ShiftEndModal({
 
         // Initialize expenses & float
         setOpeningFloat(Number(shift.openingFloat || 0));
-        setDeclaredShiftSale(
-          Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
-        );
+
+        // Auto-pull live completed POS cash sales for this active shift window
+        try {
+          const liveSalesRes = await shiftsApi.getLiveShiftPosSales(
+            effectiveBranchId || shift.branchId,
+            shift.id,
+            shift.startedAt
+          );
+          if (liveSalesRes.success && liveSalesRes.data) {
+            setDeclaredShiftSale(liveSalesRes.data.posCashSales);
+          } else {
+            setDeclaredShiftSale(
+              Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
+            );
+          }
+        } catch {
+          setDeclaredShiftSale(
+            Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
+          );
+        }
+
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
         setOtherExpenses(Number(shift.otherExpenses || 0));
         setRemainingDrawerCash(
@@ -789,11 +811,24 @@ export function ShiftEndModal({
                       {/* 1. Opening Drawer Float */}
                       <div className="flex items-center justify-between pt-1">
                         <div>
-                          <span className="font-bold text-slate-800 block">
-                            Opening Float
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800 block">
+                              Opening Float
+                            </span>
+                            {isOwner && !isInitialZeroFloat && (
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingOpeningFloat(!isEditingOpeningFloat)}
+                                className="text-[10px] font-bold text-purple-600 hover:text-purple-800 hover:underline px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 rounded transition-colors cursor-pointer"
+                              >
+                                {isEditingOpeningFloat ? 'Lock' : 'Edit'}
+                              </button>
+                            )}
+                          </div>
                           <span className="text-[11px] text-slate-400">
-                            Carried forward from previous shift closing drawer float
+                            {isInitialZeroFloat
+                              ? 'No previous closed shift — enter starting drawer cash'
+                              : 'Carried forward from previous shift closing drawer float'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -802,12 +837,13 @@ export function ShiftEndModal({
                             type="number"
                             step="0.01"
                             inputMode="decimal"
-                            value={openingFloat}
+                            placeholder="0.00"
+                            value={openingFloat || ''}
                             onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
-                            readOnly={!isOwner}
+                            readOnly={!canEditOpeningFloat}
                             className={`w-32 px-2.5 py-1.5 text-right font-mono font-bold text-xs rounded-xl focus:outline-none ${
-                              isOwner
-                                ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500'
+                              canEditOpeningFloat
+                                ? 'bg-slate-50 border border-slate-300 focus:bg-white focus:border-purple-500'
                                 : 'bg-slate-100 text-slate-700 border border-slate-200 cursor-not-allowed'
                             }`}
                           />
@@ -826,19 +862,9 @@ export function ShiftEndModal({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-400">LKR</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            inputMode="decimal"
-                            value={declaredShiftSale}
-                            onChange={(e) => setDeclaredShiftSale(parseFloat(e.target.value) || 0)}
-                            readOnly={!isOwner}
-                            className={`w-32 px-2.5 py-1.5 text-right font-mono font-bold text-xs rounded-xl focus:outline-none ${
-                              isOwner
-                                ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200 cursor-not-allowed'
-                            }`}
-                          />
+                          <span className="w-32 px-2.5 py-1.5 text-right font-mono font-bold text-xs rounded-xl bg-purple-50 text-purple-950 border border-purple-200/80 block">
+                            {declaredShiftSale.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                       </div>
 

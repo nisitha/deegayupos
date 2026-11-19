@@ -1072,6 +1072,22 @@ export const posApi = {
     const validCustomerId = isValidUuid(data.customerId) ? data.customerId : null;
     const customerName = data.customerName || (validCustomerId ? null : 'Walk-in Customer');
 
+    // 4b. Resolve Shift ID with fallback to active open shift for branch
+    let shiftId = isValidUuid(data.shiftId) ? data.shiftId : null;
+    if (!shiftId && branchId) {
+      try {
+        const { data: activeShiftRow } = await supabase
+          .from('cashier_shifts')
+          .select('id')
+          .eq('branch_id', branchId)
+          .eq('status', 'open')
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeShiftRow?.id) shiftId = activeShiftRow.id;
+      } catch {}
+    }
+
     // 5. Generate clean, unique invoice number
     const invYear = new Date().getFullYear();
     const invRandom = Math.floor(10000 + Math.random() * 90000);
@@ -1083,7 +1099,7 @@ export const posApi = {
       .insert({
         tenant_id: tenantId,
         branch_id: branchId,
-        shift_id: isValidUuid(data.shiftId) ? data.shiftId : null,
+        shift_id: shiftId,
         cashier_id: cashierId,
         cashier_name: cashierName,
         customer_id: validCustomerId,
@@ -3672,11 +3688,41 @@ export const shiftsApi = {
 
   closeShiftHandover: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
     try {
-      // 1. Fetch live sales for this shift
-      const { data: shiftSales } = await supabase
+      // Fetch shift metadata upfront for started_at window and financial adjustments audit
+      const { data: shiftRow } = await supabase
+        .from('cashier_shifts')
+        .select('shift_date, shift_number, cashier_id, branch_id, started_at')
+        .eq('id', payload.shiftId)
+        .maybeSingle();
+
+      const shiftDate = shiftRow?.shift_date || getSriLankaDateStr();
+      const shiftNumber = shiftRow?.shift_number || 1;
+      const shiftStartedAt = shiftRow?.started_at;
+
+      // 1. Fetch live sales for this shift window
+      let salesQuery = supabase
         .from('sales')
-        .select('id, total_amount, paid_amount, status, sale_payments(payment_method, amount)')
-        .eq('shift_id', payload.shiftId);
+        .select('id, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount)');
+
+      if (payload.branchId) {
+        salesQuery = salesQuery.eq('branch_id', payload.branchId);
+      }
+
+      if (payload.shiftId && shiftStartedAt) {
+        salesQuery = salesQuery.or(`shift_id.eq.${payload.shiftId},sold_at.gte.${shiftStartedAt},created_at.gte.${shiftStartedAt}`);
+      } else if (payload.shiftId) {
+        salesQuery = salesQuery.eq('shift_id', payload.shiftId);
+      }
+
+      const { data: shiftSales } = await salesQuery;
+
+      // Retroactively link any completed sales that occurred in this shift window
+      if (shiftSales && shiftSales.length > 0 && payload.shiftId) {
+        const unlinked = shiftSales.filter((s: any) => !s.shift_id).map((s: any) => s.id);
+        if (unlinked.length > 0) {
+          await supabase.from('sales').update({ shift_id: payload.shiftId }).in('id', unlinked);
+        }
+      }
 
       let posBills = 0;
       let posVoided = 0;
@@ -3687,22 +3733,38 @@ export const shiftsApi = {
       let posCredit = 0;
 
       (shiftSales || []).forEach((s: any) => {
-        if (s.status === 'COMPLETED') {
+        const st = String(s.status || '').toUpperCase();
+        if (st === 'COMPLETED') {
           posBills += 1;
-          posGross += Number(s.total_amount || 0);
-          if (s.sale_payments && s.sale_payments.length > 0) {
+          const tot = Number(s.total_amount || s.paid_amount || 0);
+          posGross += tot;
+          if (s.sale_payments && Array.isArray(s.sale_payments) && s.sale_payments.length > 0) {
+            let foundMethod = false;
             s.sale_payments.forEach((p: any) => {
+              const pm = String(p.payment_method || '').toUpperCase();
               const amt = Number(p.amount || 0);
-              if (p.payment_method === 'CASH') posCash += amt;
-              else if (p.payment_method === 'CARD') posCard += amt;
-              else if (p.payment_method === 'QR_PAYMENT') posQr += amt;
-              else if (p.payment_method === 'STORE_CREDIT' || p.payment_method === 'CUSTOMER_CREDIT') posCredit += amt;
-              else posCash += amt;
+              if (pm === 'CASH') {
+                posCash += amt;
+                foundMethod = true;
+              } else if (pm === 'CARD') {
+                posCard += amt;
+                foundMethod = true;
+              } else if (pm === 'QR_PAYMENT') {
+                posQr += amt;
+                foundMethod = true;
+              } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
+                posCredit += amt;
+                foundMethod = true;
+              } else {
+                posCash += amt;
+                foundMethod = true;
+              }
             });
+            if (!foundMethod) posCash += tot;
           } else {
-            posCash += Number(s.paid_amount || s.total_amount || 0);
+            posCash += tot;
           }
-        } else if (s.status === 'VOIDED') {
+        } else if (st === 'VOIDED') {
           posVoided += 1;
         }
       });
@@ -3796,15 +3858,6 @@ export const shiftsApi = {
         tallyStatus = 'balanced';
       }
 
-      // Fetch shift metadata for financial adjustments audit
-      const { data: shiftRow } = await supabase
-        .from('cashier_shifts')
-        .select('shift_date, shift_number, cashier_id, branch_id')
-        .eq('id', payload.shiftId)
-        .maybeSingle();
-
-      const shiftDate = shiftRow?.shift_date || getSriLankaDateStr();
-      const shiftNumber = shiftRow?.shift_number || 1;
       const employeeId = payload.cashierId || shiftRow?.cashier_id || null;
       let employeeName = payload.employeeName?.trim();
       if (!employeeName && employeeId) {
@@ -4132,6 +4185,142 @@ export const shiftsApi = {
     } catch (err: any) {
       console.error('[shiftsApi] getShiftFinancialAdjustments fatal:', err);
       return { success: false, data: [] };
+    }
+  },
+
+  getLiveShiftPosSales: async (
+    branchId: string,
+    shiftId?: string | null,
+    startedAt?: string | null
+  ): Promise<ApiResponse<{ posBills: number; posCashSales: number; posGrossSales: number }>> => {
+    try {
+      let query = supabase
+        .from('sales')
+        .select('id, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount, status)');
+
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
+
+      if (shiftId && startedAt) {
+        query = query.or(`shift_id.eq.${shiftId},sold_at.gte.${startedAt},created_at.gte.${startedAt}`);
+      } else if (shiftId) {
+        query = query.eq('shift_id', shiftId);
+      } else if (startedAt) {
+        query = query.or(`sold_at.gte.${startedAt},created_at.gte.${startedAt}`);
+      }
+
+      const { data: sales, error } = await query;
+      if (error) {
+        console.warn('[shiftsApi] getLiveShiftPosSales query error:', error.message);
+      }
+
+      let posBills = 0;
+      let posGrossSales = 0;
+      let posCashSales = 0;
+
+      (sales || []).forEach((s: any) => {
+        const st = String(s.status || '').toUpperCase();
+        if (st === 'COMPLETED') {
+          posBills += 1;
+          const tot = Number(s.total_amount || s.paid_amount || 0);
+          posGrossSales += tot;
+
+          if (s.sale_payments && Array.isArray(s.sale_payments) && s.sale_payments.length > 0) {
+            let foundMethod = false;
+            s.sale_payments.forEach((p: any) => {
+              const pm = String(p.payment_method || '').toUpperCase();
+              const amt = Number(p.amount || 0);
+              if (pm === 'CASH') {
+                posCashSales += amt;
+                foundMethod = true;
+              } else if (pm === 'CARD' || pm === 'QR_PAYMENT' || pm.includes('CREDIT') || pm.includes('BANK')) {
+                foundMethod = true;
+              }
+            });
+            if (!foundMethod) {
+              posCashSales += tot;
+            }
+          } else {
+            posCashSales += tot;
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: { posBills, posCashSales, posGrossSales },
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] getLiveShiftPosSales fatal:', err);
+      return { success: false, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
+    }
+  },
+
+  setBranchOpeningFloat: async (
+    branchId: string,
+    amount: number
+  ): Promise<ApiResponse<boolean>> => {
+    try {
+      // 1. Look for an active open shift for this branch
+      const { data: openShift } = await supabase
+        .from('cashier_shifts')
+        .select('id, shift_number')
+        .eq('branch_id', branchId)
+        .eq('status', 'open')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (openShift?.id) {
+        const { error: updErr } = await supabase
+          .from('cashier_shifts')
+          .update({
+            opening_float: amount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', openShift.id);
+
+        if (updErr) throw updErr;
+        return { success: true, data: true };
+      } else {
+        // 2. If no open shift exists, initialize one with this opening float
+        const todayDate = getSriLankaDateStr();
+        const { count } = await supabase
+          .from('cashier_shifts')
+          .select('id', { count: 'exact', head: true })
+          .eq('branch_id', branchId)
+          .eq('shift_date', todayDate);
+
+        let tenantId = DEEGAYU_TENANT_ID;
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('pixelcraft_tenant_id');
+          if (isValidUuid(stored)) tenantId = stored!;
+        }
+
+        const { error: insErr } = await supabase
+          .from('cashier_shifts')
+          .insert({
+            tenant_id: tenantId,
+            branch_id: branchId,
+            cashier_id: DEEGAYU_CASHIER_ID,
+            shift_date: todayDate,
+            shift_number: (count || 0) + 1,
+            started_at: new Date().toISOString(),
+            status: 'open',
+            opening_float: amount,
+          });
+
+        if (insErr) throw insErr;
+        return { success: true, data: true };
+      }
+    } catch (err: any) {
+      console.error('[shiftsApi] setBranchOpeningFloat fatal:', err);
+      return {
+        success: false,
+        data: false,
+        error: { code: 'FLOAT_SET_ERROR', message: err.message, statusCode: 500 },
+      };
     }
   },
 };

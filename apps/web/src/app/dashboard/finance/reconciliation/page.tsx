@@ -120,6 +120,13 @@ export default function CashReconciliationPage() {
 
   const [staffEditingSubmitted, setStaffEditingSubmitted] = useState<boolean>(false);
 
+  // Owner Branch Opening Float Modal state
+  const [showSetBranchFloatModal, setShowSetBranchFloatModal] = useState<boolean>(false);
+  const [targetFloatBranchId, setTargetFloatBranchId] = useState<string>('');
+  const [newOpeningFloatAmount, setNewOpeningFloatAmount] = useState<string>('');
+  const [isSubmittingBranchFloat, setIsSubmittingBranchFloat] = useState<boolean>(false);
+  const [branchFloatError, setBranchFloatError] = useState<string | null>(null);
+
   const [selectedDate, setSelectedDate] = useState<string>(getTodaySriLanka());
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -978,6 +985,38 @@ export default function CashReconciliationPage() {
     }
   };
 
+  const handleSetBranchOpeningFloat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetFloatBranchId) {
+      setBranchFloatError('Please select a branch.');
+      return;
+    }
+    const amt = parseFloat(newOpeningFloatAmount);
+    if (isNaN(amt) || amt < 0) {
+      setBranchFloatError('Please enter a valid starting float amount.');
+      return;
+    }
+
+    setIsSubmittingBranchFloat(true);
+    setBranchFloatError(null);
+
+    try {
+      const res = await shiftsApi.setBranchOpeningFloat(targetFloatBranchId, amt);
+      if (res.success) {
+        const branchObj = branches.find((b) => b.id === targetFloatBranchId);
+        setSaveSuccessMsg(`Opening Float of LKR ${amt.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully set for ${branchObj?.name || 'the branch'}.`);
+        setShowSetBranchFloatModal(false);
+        loadAllData();
+      } else {
+        setBranchFloatError(res.error?.message || 'Failed to update Branch Opening Float.');
+      }
+    } catch (err: any) {
+      setBranchFloatError(err.message || 'Error updating Branch Opening Float.');
+    } finally {
+      setIsSubmittingBranchFloat(false);
+    }
+  };
+
   const currentBranchName =
     activeBranchFilter === 'ALL'
       ? 'All Outlets'
@@ -1172,6 +1211,23 @@ export default function CashReconciliationPage() {
             >
               <Printer className="w-3.5 h-3.5" />
               Print Report
+            </button>
+          )}
+
+          {/* Set Branch Opening Float - Executive Owner Only */}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                setTargetFloatBranchId(effectiveBranchId || (branches[0]?.id ?? ''));
+                setNewOpeningFloatAmount('');
+                setBranchFloatError(null);
+                setShowSetBranchFloatModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+            >
+              <Coins className="w-3.5 h-3.5" />
+              <span>Set Branch Opening Float</span>
             </button>
           )}
         </div>
@@ -4154,6 +4210,102 @@ export default function CashReconciliationPage() {
                 className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-600/20 transition"
               >
                 Save Account
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* SET BRANCH OPENING FLOAT MODAL */}
+      {showSetBranchFloatModal && isOwner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <form
+            onSubmit={handleSetBranchOpeningFloat}
+            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Coins className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100">Set Branch Opening Float</h3>
+                  <p className="text-xs text-slate-400">Owner starting cash control for shifts</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSetBranchFloatModal(false)}
+                className="text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {branchFloatError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{branchFloatError}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
+                Target Branch
+              </label>
+              <select
+                value={targetFloatBranchId}
+                onChange={(e) => setTargetFloatBranchId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500 font-semibold cursor-pointer"
+                required
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
+                Starting Drawer Float (LKR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-xs font-mono font-bold text-slate-400">
+                  LKR
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="e.g. 5000.00"
+                  value={newOpeningFloatAmount}
+                  onChange={(e) => setNewOpeningFloatAmount(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-3 py-2 text-sm text-slate-100 font-mono font-bold outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Updates active open shift opening float or pre-seeds next shift opening float.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSetBranchFloatModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingBranchFloat}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-600/20 transition disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingBranchFloat ? 'Saving Float...' : 'Confirm & Set Float'}
               </button>
             </div>
           </form>

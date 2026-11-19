@@ -1032,9 +1032,27 @@ export default function ConfidencyPosPage() {
             : selectedCustomer.name
           : 'Walk-in Customer';
 
+        let currentShiftId = activeShift?.id;
+        if (!currentShiftId && selectedBranchId) {
+          try {
+            const curCashierId = activeCashier?.id || user?.id || cashierId;
+            const shiftRes = await shiftsApi.getOrCreateActiveShift(
+              selectedBranchId,
+              curCashierId,
+              cashierName
+            );
+            if (shiftRes.success && shiftRes.data) {
+              currentShiftId = shiftRes.data.id;
+              setActiveShift(shiftRes.data);
+            }
+          } catch (e) {
+            console.warn('[POS] Active shift lookup during checkout:', e);
+          }
+        }
+
         const payload: CheckoutPayload = {
           branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-          shiftId: activeShift?.id || undefined,
+          shiftId: currentShiftId || activeShift?.id || undefined,
           cashierId,
           cashierName,
           customerId: selectedCustomer?.id || undefined,
