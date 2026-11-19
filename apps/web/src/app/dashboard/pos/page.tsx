@@ -1316,8 +1316,8 @@ export default function ConfidencyPosPage() {
               <Menu className="w-5 h-5 text-slate-200" />
             </button>
 
-            <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-indigo-950/70 border border-indigo-700/60 text-xs font-bold text-indigo-300 shrink-0 whitespace-nowrap">
-              <Store className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/70 border border-indigo-700/60 text-[13px] sm:text-sm font-bold text-indigo-300 shrink-0 whitespace-nowrap">
+              <Store className="w-4 h-4 text-indigo-400 shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-400">•</span>
               <span className="whitespace-nowrap truncate max-w-[90px] sm:max-w-none">{currentBranchName}</span>
@@ -1326,14 +1326,14 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-1.5 bg-[#131B2E] hover:bg-[#1A243D] border border-slate-700/70 px-2 sm:px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs group shrink-0 whitespace-nowrap text-slate-200"
+              className="flex items-center gap-1 sm:gap-1.5 bg-[#131B2E] hover:bg-[#1A243D] border border-slate-700/70 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[13px] sm:text-sm group shrink-0 whitespace-nowrap text-slate-200"
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <span className="font-bold text-slate-100 group-hover:text-indigo-300 transition-colors whitespace-nowrap">
                 Cashier: {cashierName}
               </span>
-              <span className="hidden sm:inline-block text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
+              <span className="hidden sm:inline-block text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
                 PIN Switch
               </span>
             </button>
@@ -1343,8 +1343,8 @@ export default function ConfidencyPosPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
             {/* Live Sri Lanka Clock (Visible on wide screens) */}
             {currentDateStr && (
-              <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#12192C] border border-slate-800 text-[11px] font-mono font-medium text-slate-300">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#12192C] border border-slate-800 text-xs font-mono font-medium text-slate-300">
+                <Clock className="w-4 h-4 text-indigo-400" />
                 <span>{currentDateStr}</span>
               </div>
             )}
@@ -1354,7 +1354,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
-                className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'ALL'
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1366,7 +1366,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
-                className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'WEIGHT_LIQUID'
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1381,13 +1381,13 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-2.5 sm:px-3 py-1 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13px] sm:text-sm px-3 py-1.5 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
               title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" />
               <span className="whitespace-nowrap">End Shift</span>
               {activeShift && (
-                <span className="hidden sm:inline-block bg-rose-800/80 text-rose-100 text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0">
+                <span className="hidden sm:inline-block bg-rose-800/80 text-rose-100 text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
                   S{activeShift.shiftNumber}
                 </span>
               )}
@@ -1397,10 +1397,10 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="hidden md:flex items-center gap-1 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700/70 bg-[#12192C] px-2.5 h-8 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700/70 bg-[#12192C] px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
               title="Switch Shop / Change Branch"
             >
-              <Store className="w-3.5 h-3.5 text-slate-400" />
+              <Store className="w-4 h-4 text-slate-400" />
               <span>Switch Shop</span>
             </button>
 
@@ -1408,10 +1408,10 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="h-8 px-2.5 rounded-lg border border-rose-700/60 bg-rose-950/60 text-rose-300 hover:bg-rose-600 hover:text-white text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="h-8.5 px-3 rounded-lg border border-rose-700/60 bg-rose-950/60 text-rose-300 hover:bg-rose-600 hover:text-white text-[13px] sm:text-sm font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Logout from system"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" />
               <span>Logout</span>
             </button>
           </div>
@@ -1430,7 +1430,7 @@ export default function ConfidencyPosPage() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <Percent className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-xs font-bold whitespace-nowrap truncate">
+                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">
                   {discountType === 'PERCENT'
                     ? `${discountPercent}% Off`
                     : discountType === 'FLAT'
@@ -1450,7 +1450,7 @@ export default function ConfidencyPosPage() {
                   <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
                   F8
                 </span>
               )}
@@ -1466,7 +1466,7 @@ export default function ConfidencyPosPage() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <UserPlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-xs font-bold whitespace-nowrap truncate max-w-[95px]">
+                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate max-w-[95px]">
                   {selectedCustomer ? selectedCustomer.name : 'Customer'}
                 </span>
               </div>
@@ -1482,7 +1482,7 @@ export default function ConfidencyPosPage() {
                   <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
                   F3
                 </span>
               )}
@@ -1498,14 +1498,14 @@ export default function ConfidencyPosPage() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <PauseCircle className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-xs font-bold whitespace-nowrap truncate">Hold</span>
+                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Hold</span>
                 {heldTickets.length > 0 && (
                   <span className="text-[10px] font-bold bg-white/25 px-1.5 py-0.2 rounded-full shrink-0">
                     {heldTickets.length}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F4
               </span>
             </button>
@@ -1519,9 +1519,9 @@ export default function ConfidencyPosPage() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <Tag className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-xs font-bold whitespace-nowrap truncate">Custom Item</span>
+                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Custom Item</span>
               </div>
-              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F9
               </span>
             </button>
@@ -1535,9 +1535,9 @@ export default function ConfidencyPosPage() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <PackagePlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-xs font-bold whitespace-nowrap truncate">Special Stock In</span>
+                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Special Stock In</span>
               </div>
-              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-black/15 text-white shrink-0">
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F7
               </span>
             </button>
@@ -1605,7 +1605,7 @@ export default function ConfidencyPosPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              className="w-full h-11 sm:h-12 md:h-13 text-base sm:text-sm md:text-base font-medium pl-10 sm:pl-11 pr-20 sm:pr-44 rounded-xl border border-slate-700/80 bg-[#12192C] shadow-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-white placeholder:text-slate-400"
+              className="w-full h-12 text-[15px] font-medium pl-10 sm:pl-11 pr-20 sm:pr-44 rounded-xl border border-slate-700/80 bg-[#12192C] shadow-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-white placeholder:text-slate-400"
             />
 
             {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
@@ -1739,7 +1739,7 @@ export default function ConfidencyPosPage() {
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
-            className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
+            className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
               ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/25'
               : 'bg-[#12192C] border border-slate-800 text-slate-300 hover:border-indigo-500/50 shadow-2xs'
               }`}
@@ -1763,7 +1763,7 @@ export default function ConfidencyPosPage() {
                 key={dept.id}
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
+                className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
                   ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/25'
                   : 'bg-[#12192C] border border-slate-800 text-slate-300 hover:border-indigo-500/50 shadow-2xs'
                   }`}
@@ -1866,7 +1866,7 @@ export default function ConfidencyPosPage() {
                     {/* Product Title (Clean 2-line English) */}
                     <div className="flex-1 flex flex-col justify-between">
                       <h4
-                        className="text-[13px] font-semibold text-slate-100 leading-snug line-clamp-2 min-h-[2.25rem] group-hover:text-indigo-300 transition-colors"
+                        className="text-[15px] font-bold text-slate-100 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-indigo-300 transition-colors"
                         title={product.name}
                       >
                         {product.name}
@@ -1875,8 +1875,8 @@ export default function ConfidencyPosPage() {
                       {/* Bottom Price & Quick-Add Row */}
                       <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between">
                         <div className="flex items-baseline">
-                          <span className="text-[11px] font-bold text-slate-400 mr-1">LKR</span>
-                          <span className="text-sm font-extrabold text-emerald-400 tabular-nums">
+                          <span className="text-xs font-bold text-slate-400 mr-1">LKR</span>
+                          <span className="text-base font-extrabold text-emerald-400 tabular-nums">
                             {product.retailPrice.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -2030,14 +2030,14 @@ export default function ConfidencyPosPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h5 className="text-xs sm:text-sm font-bold text-white truncate leading-snug" title={item.name}>
+                      <h5 className="text-[15px] font-bold text-white truncate leading-snug" title={item.name}>
                         {item.name}
                       </h5>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[10px] font-mono text-slate-400 bg-[#0D1322] border border-slate-800 px-1.5 py-0.2 rounded shrink-0">
+                        <span className="text-xs font-mono text-slate-400 bg-[#0D1322] border border-slate-800 px-2 py-0.5 rounded shrink-0">
                           {item.sku}
                         </span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${unitBadge.cls}`}>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded border shrink-0 ${unitBadge.cls}`}>
                           {unitBadge.label}
                         </span>
                       </div>
@@ -2159,7 +2159,7 @@ export default function ConfidencyPosPage() {
 
                     {/* Right: Line Total */}
                     <div className="text-right shrink-0">
-                      <span className="text-sm font-extrabold text-emerald-300 font-mono tabular-nums">
+                      <span className="text-base font-extrabold text-emerald-300 font-mono tabular-nums">
                         LKR {(item.price * item.quantity).toFixed(2)}
                       </span>
                     </div>
@@ -2173,12 +2173,12 @@ export default function ConfidencyPosPage() {
         {/* 4. Financial Breakdown Summary & Bottom Checkout Dock */}
         <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0E1526] shadow-2xl space-y-3 shrink-0">
           <div className="space-y-1.5 font-mono">
-            <div className="flex justify-between text-sm text-slate-300">
-              <span className="font-sans font-medium">Subtotal</span>
+            <div className="flex justify-between text-sm font-semibold text-slate-200">
+              <span className="font-sans font-semibold">Subtotal</span>
               <span className="font-bold text-white">LKR {subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-slate-400">
-              <span className="font-sans font-medium">Tax (0% / Ex)</span>
+            <div className="flex justify-between text-sm font-semibold text-slate-400">
+              <span className="font-sans font-semibold">Tax (0% / Ex)</span>
               <span>LKR 0.00</span>
             </div>
 
@@ -2220,12 +2220,12 @@ export default function ConfidencyPosPage() {
             {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
             <div className="mt-2 rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3.5 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-300">
+                <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
                   TOTAL PAYABLE
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">Net Payable (LKR)</span>
+                <span className="text-xs text-slate-400 font-medium">Net Payable (LKR)</span>
               </div>
-              <span className="text-2xl font-black font-mono tracking-tight text-emerald-400">
+              <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
                 LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -2454,12 +2454,12 @@ export default function ConfidencyPosPage() {
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0 flex-1">
-                        <h5 className="text-sm font-bold text-white truncate">{item?.name || 'Item'}</h5>
+                        <h5 className="text-[15px] font-bold text-white truncate leading-snug">{item?.name || 'Item'}</h5>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-[10px] font-mono text-slate-400 bg-[#0D1322] border border-slate-800 px-1.5 py-0.2 rounded shrink-0">
+                          <span className="text-xs font-mono text-slate-400 bg-[#0D1322] border border-slate-800 px-2 py-0.5 rounded shrink-0">
                             {item.sku}
                           </span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${unitBadge.cls}`}>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded border shrink-0 ${unitBadge.cls}`}>
                             {unitBadge.label}
                           </span>
                         </div>
@@ -2578,7 +2578,7 @@ export default function ConfidencyPosPage() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-sm font-extrabold text-emerald-300 font-mono tabular-nums">
+                        <span className="text-base font-extrabold text-emerald-300 font-mono tabular-nums">
                           LKR {(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
@@ -2626,12 +2626,12 @@ export default function ConfidencyPosPage() {
               {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
               <div className="rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-300">
+                  <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
                     TOTAL PAYABLE
                   </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Net Due (LKR)</span>
+                  <span className="text-xs text-slate-400 font-medium">Net Due (LKR)</span>
                 </div>
-                <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400">
+                <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
                   LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>

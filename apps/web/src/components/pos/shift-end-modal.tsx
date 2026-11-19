@@ -99,7 +99,7 @@ export function ShiftEndModal({
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
   const [remainingDrawerCash, setRemainingDrawerCash] = useState<number>(0);
-  const [isDrawerCashManualOverride, setIsDrawerCashManualOverride] = useState<boolean>(false);
+  const [isDrawerManuallyEdited, setIsDrawerManuallyEdited] = useState<boolean>(false);
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
@@ -121,7 +121,7 @@ export function ShiftEndModal({
     setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMessage(null);
-    setIsDrawerCashManualOverride(false);
+    setIsDrawerManuallyEdited(false);
 
     const initShift = async () => {
       let shift = activeShift;
@@ -323,26 +323,27 @@ export function ShiftEndModal({
     return openingFloat + declaredShiftSale + modakaSalesTotal;
   }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
-  // 2. Expected Remaining Drawer Cash (Closing Float) = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
+  // 2. Expected Remaining Drawer Cash (Closing Float) = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - denominationsTotal
   const expectedClosingDrawerFloat = useMemo(() => {
     return Math.max(
       0,
       Number(
-        ((openingFloat + declaredShiftSale + modakaSalesTotal) -
+        (
+          totalCashInflow -
           goodsPurchasedPaid -
           otherExpenses -
           denominationsTotal
         ).toFixed(2)
       )
     );
-  }, [openingFloat, declaredShiftSale, modakaSalesTotal, goodsPurchasedPaid, otherExpenses, denominationsTotal]);
+  }, [totalCashInflow, goodsPurchasedPaid, otherExpenses, denominationsTotal]);
 
   // Auto-sync remainingDrawerCash to expectedClosingDrawerFloat unless manually overridden
   useEffect(() => {
-    if (!isDrawerCashManualOverride) {
+    if (!isDrawerManuallyEdited) {
       setRemainingDrawerCash(expectedClosingDrawerFloat);
     }
-  }, [expectedClosingDrawerFloat, isDrawerCashManualOverride]);
+  }, [expectedClosingDrawerFloat, isDrawerManuallyEdited]);
 
   // 3. Expected Remaining Drawer Cash for variance comparison
   const expectedRemainingDrawerCash = useMemo(() => {
@@ -452,31 +453,31 @@ export function ShiftEndModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#0B101D] text-slate-100 rounded-t-3xl sm:rounded-3xl max-w-5xl w-full shadow-2xl border border-slate-800 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
-        {/* Header */}
-        <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-[#0E1527] via-[#1A1F38] to-[#16122E] border-b border-slate-800 flex items-center justify-between shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center font-bold text-white shadow-inner shrink-0">
-              <Layers className="w-6 h-6 text-purple-400" />
+      <div className="max-w-4xl w-full bg-[#0B101D] border border-slate-800 text-slate-100 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
+        {/* Header: Vibrant Indigo/Violet/Purple Gradient */}
+        <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-md">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center font-bold text-white shadow-inner shrink-0">
+              <Layers className="w-6 h-6 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
                 <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
                   End Shift Handover
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-white/20 text-white border border-white/30 shadow-xs">
                   Shift {currentShift?.shiftNumber || 1}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium truncate max-w-[260px] sm:max-w-none mt-0.5">
-                {branchName} • Cashier: <strong className="text-slate-200">{cashierName}</strong>
+              <p className="text-[13px] sm:text-sm text-indigo-100 font-medium truncate max-w-[320px] sm:max-w-none mt-0.5">
+                {branchName} • Cashier: <strong className="text-white font-bold">{cashierName}</strong>
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-slate-700"
+            className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-white/20"
             aria-label="Close modal"
           >
             <X className="w-5 h-5 sm:w-4 sm:h-4" />
@@ -488,7 +489,7 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('MODAKA')}
-            className={`min-h-[52px] h-13 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'MODAKA'
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
                 : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
@@ -509,7 +510,7 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('DENOMINATIONS')}
-            className={`min-h-[52px] h-13 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'DENOMINATIONS'
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
                 : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
@@ -530,7 +531,7 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('SUMMARY')}
-            className={`min-h-[52px] h-13 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'SUMMARY'
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
                 : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
@@ -591,19 +592,19 @@ export function ShiftEndModal({
                       <h4 className="text-lg sm:text-xl font-extrabold text-white">
                         Special Stock & Sales Summary
                       </h4>
-                      <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                      <p className="text-[13px] sm:text-sm text-slate-400 mt-0.5">
                         Opening stock carries forward automatically from previous closed shift. Enter incoming stock (B) and shift sales (D).
                       </p>
                     </div>
                     <div className="text-right flex flex-col sm:items-end gap-1 shrink-0 bg-[#11182A] p-3 rounded-xl border border-slate-800">
                       <div className="flex items-center sm:justify-end gap-2">
-                        <span className="text-xs font-semibold text-slate-400">Total Sold Units:</span>
+                        <span className="text-[13px] font-semibold text-slate-400">Total Sold Units:</span>
                         <span className="text-sm sm:text-base font-extrabold font-mono text-purple-400">
                           {modakaUnitsTotal} units
                         </span>
                       </div>
                       <div className="flex items-center sm:justify-end gap-2">
-                        <span className="text-xs font-semibold text-slate-400">Total Special Stock Sales:</span>
+                        <span className="text-[13px] font-semibold text-slate-400">Total Special Stock Sales:</span>
                         <span className="text-base sm:text-lg font-black font-mono text-emerald-400">
                           LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
@@ -611,9 +612,9 @@ export function ShiftEndModal({
                     </div>
                   </div>
 
-                  <div className="border border-slate-800 bg-[#11182A] rounded-2xl overflow-x-auto shadow-xl">
+                  <div className="border border-slate-800 bg-[#11182A] rounded-xl overflow-x-auto shadow-xl">
                     <table className="w-full min-w-[780px] text-xs text-left">
-                      <thead className="bg-[#0D1527] text-slate-300 uppercase font-bold text-[11px] tracking-wider border-b border-slate-800">
+                      <thead className="bg-[#0D1527] text-slate-300 uppercase font-bold text-xs tracking-wider border-b border-slate-800">
                         <tr>
                           <th className="py-3 px-3 w-8 text-center text-slate-400">#</th>
                           <th className="py-3 px-3 w-28 text-slate-300">Item Code</th>
@@ -651,11 +652,11 @@ export function ShiftEndModal({
                                 {row.productSku || `MOD-0${idx + 1}`}
                               </td>
                               <td className="py-3 px-3 sticky left-0 bg-[#11182A] z-10 shadow-[2px_0_4px_rgba(0,0,0,0.4)]">
-                                <span className="font-semibold text-[15px] text-slate-100 block">
+                                <span className="font-semibold text-[15px] sm:text-base text-slate-100 block">
                                   {row.productName}
                                 </span>
                               </td>
-                              <td className="py-3 px-2 text-center font-mono text-base font-bold text-slate-300">
+                              <td className="py-3 px-2 text-center font-mono text-[15px] sm:text-base font-bold text-slate-300">
                                 {row.openingQty}
                               </td>
                               <td className="py-2 px-2 text-center bg-amber-950/20 border-x border-amber-900/20">
@@ -665,10 +666,10 @@ export function ShiftEndModal({
                                   placeholder="0"
                                   value={row.inQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'inQty', e.target.value)}
-                                  className="w-20 h-10 px-2 text-center font-extrabold font-mono text-base bg-[#0A0F1D] text-amber-300 border border-amber-600/50 rounded-lg focus:border-amber-400 focus:outline-none"
+                                  className="w-20 h-11 px-2 text-center font-bold font-mono text-base bg-[#0A0F1D] text-amber-300 border border-amber-600/50 rounded-lg focus:border-amber-400 focus:outline-none"
                                 />
                               </td>
-                              <td className="py-3 px-2 text-center font-mono text-base font-bold text-slate-200 bg-[#0A0F1D]/40">
+                              <td className="py-3 px-2 text-center font-mono text-[15px] sm:text-base font-bold text-slate-200 bg-[#0A0F1D]/40">
                                 {totalAvail}
                               </td>
                               <td className="py-2 px-2 text-center bg-purple-950/20 border-x border-purple-900/20">
@@ -678,16 +679,16 @@ export function ShiftEndModal({
                                   placeholder="0"
                                   value={row.soldQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'soldQty', e.target.value)}
-                                  className="w-20 h-10 px-2 text-center font-extrabold font-mono text-base bg-[#0A0F1D] text-purple-300 border border-purple-600/50 rounded-lg focus:border-purple-400 focus:outline-none"
+                                  className="w-20 h-11 px-2 text-center font-bold font-mono text-base bg-[#0A0F1D] text-purple-300 border border-purple-600/50 rounded-lg focus:border-purple-400 focus:outline-none"
                                 />
                               </td>
-                              <td className="py-3 px-2 text-center font-mono text-base font-black text-emerald-400 bg-emerald-950/20">
+                              <td className="py-3 px-2 text-center font-mono text-[15px] sm:text-base font-black text-emerald-400 bg-emerald-950/20">
                                 {closing}
                               </td>
                               <td className="py-3 px-3 text-right font-mono text-[15px] font-bold text-slate-300">
                                 {row.appliedRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
-                              <td className="py-3 px-3 text-right font-mono text-base font-black text-emerald-400 bg-emerald-950/20">
+                              <td className="py-3 px-3 text-right font-mono text-[15px] sm:text-base font-black text-emerald-400 bg-emerald-950/20">
                                 {lineSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -734,7 +735,7 @@ export function ShiftEndModal({
                       <h4 className="text-lg sm:text-xl font-extrabold text-white">
                         Bank Deposit Denomination Counter
                       </h4>
-                      <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                      <p className="text-[13px] sm:text-sm text-slate-400 mt-0.5">
                         Count notes &amp; coins bundled for bank deposit. Total automatically populates Bank Deposit Amount.
                       </p>
                     </div>
@@ -755,11 +756,11 @@ export function ShiftEndModal({
                       return (
                         <div
                           key={d}
-                          className="flex items-center justify-between p-3.5 rounded-2xl bg-[#11182A] border border-slate-800 shadow-sm hover:border-purple-500/50 transition-colors"
+                          className="flex items-center justify-between p-3.5 rounded-xl bg-[#11182A] border border-slate-800 shadow-sm hover:border-purple-500/50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <span
-                              className={`w-18 text-center py-1.5 rounded-xl text-sm font-mono font-black ${
+                              className={`w-20 text-center py-1.5 rounded-xl text-base font-bold font-mono ${
                                 d >= 500
                                   ? 'bg-purple-950/80 text-purple-200 border border-purple-600/40'
                                   : d >= 20
@@ -776,7 +777,7 @@ export function ShiftEndModal({
                               placeholder="0"
                               value={count > 0 ? count : ''}
                               onChange={(e) => handleCountChange(d, e.target.value)}
-                              className="w-24 h-12 px-2 py-1 text-center font-mono font-extrabold text-xl tabular-nums bg-[#0A0F1D] text-white border border-slate-700 rounded-xl focus:border-purple-500 focus:bg-[#0E1528] focus:outline-none"
+                              className="w-24 h-11 px-2 py-1 text-center font-mono font-extrabold text-lg sm:text-xl tabular-nums bg-[#0A0F1D] text-white border border-slate-700 rounded-xl focus:border-purple-500 focus:bg-[#0E1528] focus:outline-none"
                             />
                           </div>
                           <div className="text-right">
@@ -791,7 +792,7 @@ export function ShiftEndModal({
                   </div>
 
                   {/* Big Total Box */}
-                  <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-teal-950/70 to-emerald-950/80 border border-emerald-500/40 flex items-center justify-between shadow-lg shadow-emerald-950/40">
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-indigo-950 border border-emerald-500/40 flex items-center justify-between shadow-lg shadow-emerald-950/40">
                     <div className="flex items-center gap-3">
                       <Coins className="w-7 h-7 text-emerald-400" />
                       <div>
@@ -836,7 +837,7 @@ export function ShiftEndModal({
                     <h4 className="text-lg sm:text-xl font-extrabold text-white">
                       Shift Cash & Expense Summary
                     </h4>
-                    <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                    <p className="text-[13px] sm:text-sm text-slate-400 mt-0.5">
                       Side-by-side reconciliation of shift inflows, expenses, bank deposits, and next shift drawer float.
                     </p>
                   </div>
@@ -844,7 +845,7 @@ export function ShiftEndModal({
                   {/* 2-Column Responsive Layout */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* LEFT COLUMN: CASH INFLOWS */}
-                    <div className="bg-[#11182A] rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-4 shadow-xl">
+                    <div className="bg-[#11182A] rounded-2xl border border-slate-800 p-5 space-y-4 shadow-xl">
                       <div className="pb-2 border-b border-slate-800 flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-wider text-purple-400">
                           1. Cash Inflows (Shift Sales &amp; Float)
@@ -930,7 +931,7 @@ export function ShiftEndModal({
                       </div>
 
                       {/* Subtotal: Total Shift Cash Hero Box */}
-                      <div className="p-4.5 rounded-xl bg-gradient-to-r from-indigo-950/90 to-purple-950/90 border border-indigo-500/40 flex items-center justify-between shadow-lg">
+                      <div className="p-4.5 rounded-xl bg-gradient-to-r from-indigo-950/90 to-emerald-950/90 border border-indigo-500/40 flex items-center justify-between shadow-lg">
                         <div>
                           <span className="text-[15px] font-black text-indigo-200 block">
                             Total Shift Cash Inflow
@@ -939,14 +940,14 @@ export function ShiftEndModal({
                             Opening Float + POS Cash + Special Sales
                           </span>
                         </div>
-                        <span className="font-mono text-2xl sm:text-3xl font-black text-indigo-200">
+                        <span className="font-mono text-2xl sm:text-3xl font-black text-emerald-400">
                           LKR {totalCashInflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
 
                     {/* RIGHT COLUMN: DEDUCTIONS, BANK DEPOSIT & CLOSING FLOAT */}
-                    <div className="bg-[#11182A] rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-4 shadow-xl">
+                    <div className="bg-[#11182A] rounded-2xl border border-slate-800 p-5 space-y-4 shadow-xl">
                       <div className="pb-2 border-b border-slate-800 flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-wider text-rose-400">
                           2. Deductions &amp; Drawer Float
@@ -1074,11 +1075,11 @@ export function ShiftEndModal({
                             <span className="font-semibold text-[15px] sm:text-base text-slate-200 block">
                               Remaining Cash Left in Drawer
                             </span>
-                            {isDrawerCashManualOverride ? (
+                            {isDrawerManuallyEdited ? (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setIsDrawerCashManualOverride(false);
+                                  setIsDrawerManuallyEdited(false);
                                   setRemainingDrawerCash(expectedClosingDrawerFloat);
                                 }}
                                 className="text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:underline px-2 py-0.5 bg-emerald-950/60 border border-emerald-500/30 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
@@ -1105,7 +1106,7 @@ export function ShiftEndModal({
                             placeholder="0.00"
                             value={remainingDrawerCash || ''}
                             onChange={(e) => {
-                              setIsDrawerCashManualOverride(true);
+                              setIsDrawerManuallyEdited(true);
                               setRemainingDrawerCash(parseFloat(e.target.value) || 0);
                             }}
                             className="w-36 h-12 px-3 text-right font-mono text-lg sm:text-xl font-extrabold tabular-nums bg-[#0A0F1D] text-emerald-300 border border-emerald-500/50 rounded-xl focus:border-emerald-400 focus:outline-none"
@@ -1114,16 +1115,16 @@ export function ShiftEndModal({
                       </div>
 
                       {/* Glowing Emerald Carry-Forward Banner */}
-                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 border border-emerald-400/50 text-white flex items-center justify-between shadow-xl shadow-emerald-950/60">
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 border border-emerald-400/50 text-white flex items-center justify-between shadow-xl shadow-emerald-950/60">
                         <div>
-                          <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-300 block">
+                          <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-100 block">
                             CLOSING DRAWER FLOAT (CARRIED TO NEXT SHIFT)
                           </span>
-                          <span className="text-xs text-emerald-200 font-medium block mt-0.5">
+                          <span className="text-xs text-emerald-100 font-medium block mt-0.5">
                             Auto carries forward as next shift Opening Float
                           </span>
                         </div>
-                        <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-300">
+                        <span className="text-2xl sm:text-3xl font-black font-mono text-white">
                           LKR {remainingDrawerCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
