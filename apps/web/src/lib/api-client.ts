@@ -3313,15 +3313,15 @@ export const shiftsApi = {
     cashierName?: string
   ): Promise<ApiResponse<CashierShiftDto | null>> => {
     try {
-      if (!isValidUuid(branchId) || !isValidUuid(cashierId)) {
+      if (!isValidUuid(branchId)) {
         return { success: false, data: null };
       }
 
+      // Query active open shift for branch (shared across PIN switches in the branch)
       const { data: openShift, error: findErr } = await supabase
         .from('cashier_shifts')
         .select('*')
         .eq('branch_id', branchId)
-        .eq('cashier_id', cashierId)
         .eq('status', 'open')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -3331,9 +3331,37 @@ export const shiftsApi = {
         return { success: true, data: null };
       }
 
+      // If switched cashier PIN within the same branch, update cashier_id on active shift
+      if (cashierId && isValidUuid(cashierId) && openShift.cashier_id !== cashierId) {
+        await supabase
+          .from('cashier_shifts')
+          .update({ cashier_id: cashierId })
+          .eq('id', openShift.id);
+        openShift.cashier_id = cashierId;
+      }
+
       // Fetch configs
       const configsRes = await shiftsApi.getModakaConfigs();
       const activeConfigs = (configsRes.data || []).filter((c) => c.isActive);
+
+      // Query branch warehouse stock fallback
+      const { data: wh } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('branch_id', branchId)
+        .limit(1)
+        .maybeSingle();
+
+      const branchStockMap = new Map<string, number>();
+      if (wh?.id) {
+        const { data: stocks } = await supabase
+          .from('stock_levels')
+          .select('product_id, quantity_on_hand')
+          .eq('warehouse_id', wh.id);
+        (stocks || []).forEach((s: any) => {
+          branchStockMap.set(s.product_id, Number(s.quantity_on_hand || 0));
+        });
+      }
 
       // Fetch existing entries
       const { data: entries } = await supabase
@@ -3349,7 +3377,29 @@ export const shiftsApi = {
 
       for (const cfg of activeConfigs) {
         const existing = entryMap.get(cfg.productId);
+        const bStock = branchStockMap.get(cfg.productId) || 0;
         if (existing) {
+          const currentOpen = Number(existing.opening_qty || 0);
+          const currentIn = Number(existing.in_qty || 0);
+          const currentSold = Number(existing.sold_qty || 0);
+          let effectiveOpen = currentOpen;
+
+          // If opening_qty is 0 but branch stock exists in stock_levels, update to branch stock
+          if (currentOpen === 0 && bStock > 0) {
+            effectiveOpen = bStock;
+            const updatedAvail = effectiveOpen + currentIn;
+            const updatedClosing = updatedAvail - currentSold;
+            await supabase
+              .from('shift_modaka_entries')
+              .update({
+                opening_qty: effectiveOpen,
+                total_available_qty: updatedAvail,
+                closing_qty: updatedClosing,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id);
+          }
+
           finalEntries.push({
             id: existing.id,
             shiftId: openShift.id,
@@ -3357,11 +3407,11 @@ export const shiftsApi = {
             productId: existing.product_id,
             productName: existing.products?.name || cfg.productName,
             productSku: existing.products?.sku || cfg.productSku,
-            openingQty: Number(existing.opening_qty || 0),
-            inQty: Number(existing.in_qty || 0),
-            totalAvailableQty: Number(existing.total_available_qty || 0),
-            soldQty: Number(existing.sold_qty || 0),
-            closingQty: Number(existing.closing_qty || 0),
+            openingQty: effectiveOpen,
+            inQty: currentIn,
+            totalAvailableQty: effectiveOpen + currentIn,
+            soldQty: currentSold,
+            closingQty: (effectiveOpen + currentIn) - currentSold,
             appliedRate: Number(existing.applied_rate || cfg.customRate),
             totalAmount: Number(existing.total_amount || 0),
           });
@@ -3371,11 +3421,11 @@ export const shiftsApi = {
             shift_id: openShift.id,
             branch_id: openShift.branch_id,
             product_id: cfg.productId,
-            opening_qty: 0,
+            opening_qty: bStock,
             in_qty: 0,
-            total_available_qty: 0,
+            total_available_qty: bStock,
             sold_qty: 0,
-            closing_qty: 0,
+            closing_qty: bStock,
             applied_rate: cfg.customRate,
             total_amount: 0,
           };
@@ -3386,11 +3436,11 @@ export const shiftsApi = {
             productId: cfg.productId,
             productName: cfg.productName,
             productSku: cfg.productSku,
-            openingQty: 0,
+            openingQty: bStock,
             inQty: 0,
-            totalAvailableQty: 0,
+            totalAvailableQty: bStock,
             soldQty: 0,
-            closingQty: 0,
+            closingQty: bStock,
             appliedRate: cfg.customRate,
             totalAmount: 0,
           });
@@ -3527,6 +3577,25 @@ export const shiftsApi = {
         });
       }
 
+      // Branch warehouse stock fallback
+      const { data: wh } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('branch_id', branchId)
+        .limit(1)
+        .maybeSingle();
+
+      const branchStockMap = new Map<string, number>();
+      if (wh?.id) {
+        const { data: stocks } = await supabase
+          .from('stock_levels')
+          .select('product_id, quantity_on_hand')
+          .eq('warehouse_id', wh.id);
+        (stocks || []).forEach((s: any) => {
+          branchStockMap.set(s.product_id, Number(s.quantity_on_hand || 0));
+        });
+      }
+
       let tenantId = DEEGAYU_TENANT_ID;
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('pixelcraft_tenant_id');
@@ -3562,7 +3631,10 @@ export const shiftsApi = {
       const activeConfigs = (configsRes.data || []).filter((c) => c.isActive);
 
       const entriesToInsert = activeConfigs.map((cfg) => {
-        const opening = prevClosingMap.get(cfg.productId) || 0;
+        let opening = prevClosingMap.get(cfg.productId);
+        if (opening === undefined || opening === null || (!prevShift && opening === 0)) {
+          opening = branchStockMap.get(cfg.productId) || 0;
+        }
         return {
           tenant_id: tenantId,
           shift_id: newShift.id,
@@ -3583,7 +3655,10 @@ export const shiftsApi = {
       }
 
       const formattedEntries: ShiftModakaEntryDto[] = activeConfigs.map((cfg) => {
-        const opening = prevClosingMap.get(cfg.productId) || 0;
+        let opening = prevClosingMap.get(cfg.productId);
+        if (opening === undefined || opening === null || (!prevShift && opening === 0)) {
+          opening = branchStockMap.get(cfg.productId) || 0;
+        }
         return {
           shiftId: newShift.id,
           branchId,
@@ -3683,6 +3758,45 @@ export const shiftsApi = {
       return { success: true, data: true };
     } catch (err: any) {
       return { success: false, data: false, error: { code: 'UPDATE_ERROR', message: err.message, statusCode: 500 } };
+    }
+  },
+
+  getShiftModakaEntries: async (
+    shiftId: string,
+    branchId?: string
+  ): Promise<ApiResponse<ShiftModakaEntryDto[]>> => {
+    try {
+      if (!isValidUuid(shiftId)) {
+        return { success: false, data: [] };
+      }
+      const { data: entries, error } = await supabase
+        .from('shift_modaka_entries')
+        .select('*, products(name, sku)')
+        .eq('shift_id', shiftId);
+
+      if (error) {
+        return { success: false, data: [], error: { code: 'FETCH_ERROR', message: error.message, statusCode: 500 } };
+      }
+
+      const formatted: ShiftModakaEntryDto[] = (entries || []).map((e: any) => ({
+        id: e.id,
+        shiftId: e.shift_id,
+        branchId: e.branch_id || branchId || '',
+        productId: e.product_id,
+        productName: e.products?.name || '',
+        productSku: e.products?.sku || '',
+        openingQty: Number(e.opening_qty || 0),
+        inQty: Number(e.in_qty || 0),
+        totalAvailableQty: Number(e.total_available_qty || 0),
+        soldQty: Number(e.sold_qty || 0),
+        closingQty: Number(e.closing_qty || 0),
+        appliedRate: Number(e.applied_rate || 0),
+        totalAmount: Number(e.total_amount || 0),
+      }));
+
+      return { success: true, data: formatted };
+    } catch (err: any) {
+      return { success: false, data: [], error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 } };
     }
   },
 
