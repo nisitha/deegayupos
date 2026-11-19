@@ -1296,9 +1296,9 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-800/90 bg-[#080C16] text-slate-100 min-w-0">
+      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/90 bg-slate-50/90 text-slate-900 min-w-0">
         {/* 1. Top Terminal Status Bar (Unified Single Header for POS Terminal) */}
-        <div className="h-11 sm:h-12 px-2.5 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-2.5 bg-[#0E1424] border-b border-slate-800/90 shrink-0 shadow-sm overflow-x-auto no-scrollbar text-slate-200">
+        <div className="h-11 sm:h-12 px-2.5 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-2.5 bg-white border-b border-slate-200/90 shrink-0 shadow-xs overflow-x-auto no-scrollbar text-slate-700">
           {/* Left Group: Mobile Hamburger, Store/Terminal Badge, Cashier Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
             {/* Hamburger for mobile slide-over navigation (< lg) */}
@@ -1309,15 +1309,15 @@ export default function ConfidencyPosPage() {
                   window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
                 }
               }}
-              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-300 hover:bg-slate-800 active:scale-95 transition-all shrink-0 cursor-pointer"
+              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
               aria-label="Open mobile navigation menu"
               title="Menu"
             >
-              <Menu className="w-5 h-5 text-slate-200" />
+              <Menu className="w-5 h-5 text-slate-700" />
             </button>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/70 border border-indigo-700/60 text-[13px] sm:text-sm font-bold text-indigo-300 shrink-0 whitespace-nowrap">
-              <Store className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[13px] sm:text-sm font-bold text-indigo-700 shrink-0 whitespace-nowrap shadow-2xs">
+              <Store className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-400">•</span>
               <span className="whitespace-nowrap truncate max-w-[90px] sm:max-w-none">{currentBranchName}</span>
@@ -1326,14 +1326,14 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-1.5 bg-[#131B2E] hover:bg-[#1A243D] border border-slate-700/70 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[13px] sm:text-sm group shrink-0 whitespace-nowrap text-slate-200"
+              className="flex items-center gap-1 sm:gap-1.5 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[13px] sm:text-sm group shrink-0 whitespace-nowrap text-slate-800 shadow-2xs"
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="font-bold text-slate-100 group-hover:text-indigo-300 transition-colors whitespace-nowrap">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
                 Cashier: {cashierName}
               </span>
-              <span className="hidden sm:inline-block text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
+              <span className="hidden sm:inline-block text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
                 PIN Switch
               </span>
             </button>
@@ -1343,21 +1343,21 @@ export default function ConfidencyPosPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
             {/* Live Sri Lanka Clock (Visible on wide screens) */}
             {currentDateStr && (
-              <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#12192C] border border-slate-800 text-xs font-mono font-medium text-slate-300">
-                <Clock className="w-4 h-4 text-indigo-400" />
+              <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono font-medium text-slate-600">
+                <Clock className="w-4 h-4 text-indigo-600" />
                 <span>{currentDateStr}</span>
               </div>
             )}
 
             {/* Compact Qty Popup Toggle */}
-            <div className="inline-flex items-center bg-[#12192C] p-0.5 rounded-lg border border-slate-800 text-xs shadow-2xs shrink-0 whitespace-nowrap">
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs shadow-2xs shrink-0 whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
                 className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'ALL'
                     ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
                 title="Clicking any product card immediately pops up the large centered modal"
               >
@@ -1369,7 +1369,7 @@ export default function ConfidencyPosPage() {
                 className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'WEIGHT_LIQUID'
                     ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
                 title="Only 1g weight & 1ml liquid items open modal; boxed/discrete items add 1 directly"
               >
@@ -1381,13 +1381,13 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13px] sm:text-sm px-3 py-1.5 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13px] sm:text-sm px-3 py-1.5 rounded-lg shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
               title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
             >
               <LogOut className="w-4 h-4" />
               <span className="whitespace-nowrap">End Shift</span>
               {activeShift && (
-                <span className="hidden sm:inline-block bg-rose-800/80 text-rose-100 text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
+                <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
                   S{activeShift.shiftNumber}
                 </span>
               )}
@@ -1397,10 +1397,10 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700/70 bg-[#12192C] px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 bg-white px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
               title="Switch Shop / Change Branch"
             >
-              <Store className="w-4 h-4 text-slate-400" />
+              <Store className="w-4 h-4 text-slate-500" />
               <span>Switch Shop</span>
             </button>
 
@@ -1408,7 +1408,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="h-8.5 px-3 rounded-lg border border-rose-700/60 bg-rose-950/60 text-rose-300 hover:bg-rose-600 hover:text-white text-[13px] sm:text-sm font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="h-8.5 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white text-[13px] sm:text-sm font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               title="Logout from system"
             >
               <LogOut className="w-4 h-4" />
@@ -1418,7 +1418,7 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 2. Sleek Horizontal Action Pills (h-11, swipeable on mobile, 5-column grid on desktop) */}
-        <div className="px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-[#0A0E1A] border-b border-slate-800/80 shrink-0">
+        <div className="px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-slate-100/70 border-b border-slate-200/80 shrink-0">
           <div className="flex md:grid md:grid-cols-3 xl:grid-cols-5 overflow-x-auto md:overflow-visible gap-2 md:gap-2.5 pb-1 md:pb-0 no-scrollbar">
             {/* Pill 1: Discount [F8] */}
             <button
@@ -1545,9 +1545,9 @@ export default function ConfidencyPosPage() {
 
           {/* Held Tickets Banner (if tickets are held) */}
           {heldTickets.length > 0 && (
-            <div className="mt-3 flex items-center justify-between px-4 py-2 rounded-xl bg-amber-950/60 border border-amber-700/60 text-amber-200 text-xs shadow-xs">
+            <div className="mt-3 flex items-center justify-between px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs shadow-xs">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                 <span className="font-semibold">
                   {heldTickets.length} ticket{heldTickets.length > 1 ? 's' : ''} currently on hold
                 </span>
@@ -1555,7 +1555,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setIsHeldTicketsModalOpen(true)}
-                className="font-bold text-amber-300 hover:text-amber-100 underline cursor-pointer"
+                className="font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
               >
                 View & Resume &rarr;
               </button>
@@ -1564,7 +1564,7 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 3. Hero Search Station with Live Keystroke Autocomplete Dropdown */}
-        <div className="px-5 py-2.5 border-b border-slate-800/80 bg-[#0A0E1A] shrink-0 backdrop-blur-xs" ref={searchContainerRef}>
+        <div className="px-5 py-2.5 border-b border-slate-200/90 bg-white shrink-0 backdrop-blur-xs" ref={searchContainerRef}>
           <div className="relative w-full">
             {/* Left: Magnifying Glass Icon */}
             <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none z-10">
@@ -1605,7 +1605,7 @@ export default function ConfidencyPosPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              className="w-full h-12 text-[15px] font-medium pl-10 sm:pl-11 pr-20 sm:pr-44 rounded-xl border border-slate-700/80 bg-[#12192C] shadow-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-white placeholder:text-slate-400"
+              className="w-full h-12 text-[15px] font-medium pl-10 sm:pl-11 pr-20 sm:pr-44 rounded-xl border border-slate-200 bg-slate-50/60 shadow-xs focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 placeholder:text-slate-400"
             />
 
             {/* Right: Shortcut [F2] Badge, Item Count & Clear Button */}
@@ -1618,7 +1618,7 @@ export default function ConfidencyPosPage() {
                     setIsSearchDropdownOpen(false);
                     searchInputRef.current?.focus();
                   }}
-                  className="w-6 h-6 rounded-full bg-slate-700/80 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
                   title="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -1626,21 +1626,21 @@ export default function ConfidencyPosPage() {
               )}
 
               {/* Barcode [F2] Tag */}
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#162038] border border-slate-700/80 shadow-2xs text-xs font-mono text-slate-300">
-                <Barcode className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="font-semibold text-slate-200">[F2]</span>
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 shadow-2xs text-xs font-mono text-slate-600">
+                <Barcode className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="font-semibold text-slate-700">[F2]</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
 
               {/* Live Count Badge */}
-              <div className="hidden sm:block text-xs font-semibold text-slate-300 bg-[#162038] border border-slate-700/60 px-2.5 py-1 rounded-lg shrink-0">
+              <div className="hidden sm:block text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg shrink-0">
                 {filteredProducts.length.toLocaleString()} items
               </div>
             </div>
 
             {/* Floating Live Autocomplete Dropdown Popover */}
             {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#11182B] rounded-2xl shadow-2xl border border-slate-800 max-h-[380px] overflow-y-auto z-50 divide-y divide-slate-800/80 text-slate-100">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[380px] overflow-y-auto z-50 divide-y divide-slate-100 text-slate-900">
                 {liveSearchResults.length > 0 ? (
                   liveSearchResults.map((item, idx) => {
                     const isSelected = idx === selectedSearchIndex;
@@ -1652,12 +1652,12 @@ export default function ConfidencyPosPage() {
                           handleProductClick(item);
                           searchInputRef.current?.focus();
                         }}
-                        className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${isSelected ? 'bg-indigo-950/60 text-white' : 'hover:bg-[#162038] text-slate-200'
+                        className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-950' : 'hover:bg-slate-50 text-slate-800'
                           }`}
                       >
                         {/* Thumbnail & Product Meta */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-lg bg-[#0D1322] overflow-hidden shrink-0 flex items-center justify-center border border-slate-800 p-0.5">
+                          <div className="w-10 h-10 rounded-lg bg-slate-50 overflow-hidden shrink-0 flex items-center justify-center border border-slate-100 p-0.5">
                             <img
                               src={getProductPhoto(item)}
                               alt={item.name}
@@ -1670,21 +1670,21 @@ export default function ConfidencyPosPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs sm:text-sm font-semibold text-slate-100 truncate">
+                              <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
                                 {item.name}
                               </span>
-                              <span className="text-[10px] font-mono text-slate-400 bg-[#162038] px-1.5 py-0.5 rounded shrink-0">
+                              <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                                 {item.sku}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                               <span className="capitalize">{item.category?.name || 'Ayurvedic'}</span>
                               <span>•</span>
                               <span
                                 className={
                                   item.stockOnHand <= 5
-                                    ? 'text-amber-400 font-semibold'
-                                    : 'text-emerald-400 font-semibold'
+                                    ? 'text-amber-600 font-semibold'
+                                    : 'text-emerald-600 font-semibold'
                                 }
                               >
                                 In Stock: {item.stockOnHand}
@@ -1695,7 +1695,7 @@ export default function ConfidencyPosPage() {
 
                         {/* Price Badge & Instant Add Button */}
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-mono font-bold text-emerald-400 text-xs sm:text-sm">
+                          <span className="font-mono font-extrabold text-slate-900 text-xs sm:text-sm">
                             LKR{' '}
                             {item.retailPrice.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -1709,7 +1709,7 @@ export default function ConfidencyPosPage() {
                               handleProductClick(item);
                               searchInputRef.current?.focus();
                             }}
-                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors active:scale-95 flex items-center gap-1 shadow-2xs cursor-pointer"
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors active:scale-95 flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add</span>
@@ -1720,10 +1720,10 @@ export default function ConfidencyPosPage() {
                   })
                 ) : (
                   <div className="p-6 text-center">
-                    <p className="text-sm font-semibold text-slate-300">
+                    <p className="text-sm font-semibold text-slate-800">
                       No products found matching &ldquo;{searchQuery}&rdquo;
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Try searching by generic name, brand, or SKU barcode.
                     </p>
                   </div>
@@ -1734,19 +1734,19 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 4. Category Tabs (English-Only) */}
-        <div className="px-5 py-2 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-[#0A0E1A] backdrop-blur-xs">
+        <div className="px-5 py-2 border-b border-slate-200/90 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white backdrop-blur-xs">
           {/* All Departments Tab */}
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
             className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
-              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/25'
-              : 'bg-[#12192C] border border-slate-800 text-slate-300 hover:border-indigo-500/50 shadow-2xs'
+              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
               }`}
           >
             <span>All Products</span>
             <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${selectedDeptId === 'all' ? 'bg-indigo-700 text-white' : 'bg-[#18233C] text-slate-400'
+              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${selectedDeptId === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
             >
               {departmentCounts.all || 0}
@@ -1764,8 +1764,8 @@ export default function ConfidencyPosPage() {
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
                 className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
-                  ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-md shadow-indigo-500/25'
-                  : 'bg-[#12192C] border border-slate-800 text-slate-300 hover:border-indigo-500/50 shadow-2xs'
+                  ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
                   }`}
               >
                 {/* 3D Mini Dot */}
@@ -1775,7 +1775,7 @@ export default function ConfidencyPosPage() {
                 />
                 <span className="whitespace-nowrap">{dept.en}</span>
                 <span
-                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${isActive ? 'bg-indigo-700 text-white' : 'bg-[#18233C] text-slate-400'
+                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${isActive ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
                     }`}
                 >
                   {count}
@@ -1786,20 +1786,20 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 5. Product Cards Grid with 3D Category Emblems */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-[#080C16]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 md:pb-5 bg-slate-50/90">
           {isLoadingProducts && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
-              <h3 className="text-sm font-bold text-slate-200">Loading Deegayu Ayurvedic Catalog...</h3>
-              <p className="text-xs text-slate-400 mt-1">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+              <h3 className="text-sm font-bold text-slate-800">Loading Deegayu Ayurvedic Catalog...</h3>
+              <p className="text-xs text-slate-500 mt-1">
                 Syncing store inventory & price list...
               </p>
             </div>
           ) : catalogError && products.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <Package className="w-10 h-10 text-rose-400 mb-2" />
-              <h3 className="text-sm font-bold text-slate-200">Catalogue Sync Failed</h3>
-              <p className="text-xs text-rose-400 max-w-sm mt-1 mb-4">{catalogError}</p>
+              <Package className="w-10 h-10 text-rose-500 mb-2" />
+              <h3 className="text-sm font-bold text-slate-800">Catalogue Sync Failed</h3>
+              <p className="text-xs text-rose-600 max-w-sm mt-1 mb-4">{catalogError}</p>
               <button
                 type="button"
                 onClick={() => initCatalog()}
@@ -1810,9 +1810,9 @@ export default function ConfidencyPosPage() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <Package className="w-10 h-10 text-slate-500 mb-2" />
-              <h3 className="text-sm font-bold text-slate-300">No Products Found</h3>
-              <p className="text-xs text-slate-400 max-w-sm mt-1">
+              <Package className="w-10 h-10 text-slate-400 mb-2" />
+              <h3 className="text-sm font-bold text-slate-800">No Products Found</h3>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
                 No items matched &quot;{searchQuery}&quot; in the selected department
               </p>
               <button
@@ -1821,7 +1821,7 @@ export default function ConfidencyPosPage() {
                   setSearchQuery('');
                   setSelectedDeptId('all');
                 }}
-                className="mt-3 text-xs font-semibold text-indigo-400 hover:underline"
+                className="mt-3 text-xs font-semibold text-indigo-600 hover:underline"
               >
                 Clear Filters & Show All
               </button>
@@ -1833,10 +1833,10 @@ export default function ConfidencyPosPage() {
                   <div
                     key={product.id}
                     onClick={() => handleProductClick(product)}
-                    className="rounded-xl border border-slate-800/90 bg-[#11182A] p-2.5 hover:border-indigo-500/60 hover:bg-[#162038] hover:shadow-xl transition-all flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative"
+                    className="rounded-2xl border border-slate-200/90 bg-white p-2.5 hover:border-indigo-300 hover:bg-slate-50/70 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative shadow-xs"
                   >
-                    {/* Image Frame (h-28 sm:h-32, clean dark frame, top-right stock badge) */}
-                    <div className="relative h-28 sm:h-32 w-full rounded-xl bg-[#0D1322] border border-slate-800/80 overflow-hidden mb-2.5 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
+                    {/* Image Frame (h-28 sm:h-32, clean crisp frame, top-right stock badge) */}
+                    <div className="relative h-28 sm:h-32 w-full rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-2.5 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
                       <img
                         src={getProductPhoto(product)}
                         alt={product.name}
@@ -1848,15 +1848,15 @@ export default function ConfidencyPosPage() {
                       />
                       <div className="absolute top-1.5 right-1.5 z-10">
                         {product.stockOnHand <= 0 ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono shadow-2xs">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 font-mono shadow-2xs">
                             0 left
                           </span>
                         ) : product.stockOnHand <= 5 ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono shadow-2xs">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-mono shadow-2xs">
                             {product.stockOnHand} left
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono shadow-2xs">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono shadow-2xs">
                             {product.stockOnHand.toLocaleString()} left
                           </span>
                         )}
@@ -1866,17 +1866,17 @@ export default function ConfidencyPosPage() {
                     {/* Product Title (Clean 2-line English) */}
                     <div className="flex-1 flex flex-col justify-between">
                       <h4
-                        className="text-[15px] font-bold text-slate-100 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-indigo-300 transition-colors"
+                        className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-indigo-600 transition-colors"
                         title={product.name}
                       >
                         {product.name}
                       </h4>
 
                       {/* Bottom Price & Quick-Add Row */}
-                      <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex items-baseline">
-                          <span className="text-xs font-bold text-slate-400 mr-1">LKR</span>
-                          <span className="text-base font-extrabold text-emerald-400 tabular-nums">
+                          <span className="text-xs font-bold text-slate-500 mr-1">LKR</span>
+                          <span className="text-base font-extrabold text-slate-900 tabular-nums">
                             {product.retailPrice.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -1889,7 +1889,7 @@ export default function ConfidencyPosPage() {
                             e.stopPropagation();
                             handleProductClick(product);
                           }}
-                          className="h-7 w-7 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-600 hover:text-white flex items-center justify-center font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                          className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100 flex items-center justify-center font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
                           title="Add to cart"
                           aria-label={`Add ${product.name} to cart`}
                         >
@@ -1904,10 +1904,10 @@ export default function ConfidencyPosPage() {
               {visibleCount < filteredProducts.length && (
                 <div
                   ref={loadMoreSentinelRef}
-                  className="col-span-full py-6 flex flex-col items-center justify-center border-t border-dashed border-slate-800 mt-2"
+                  className="col-span-full py-6 flex flex-col items-center justify-center border-t border-dashed border-slate-200 mt-2"
                 >
-                  <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
                     <span>
                       Showing {visibleProducts.length} of {filteredProducts.length} products...
                     </span>
@@ -1917,7 +1917,7 @@ export default function ConfidencyPosPage() {
                     onClick={() =>
                       setVisibleCount((prev) => Math.min(prev + 48, filteredProducts.length))
                     }
-                    className="mt-2 text-xs font-semibold text-indigo-400 hover:underline cursor-pointer"
+                    className="mt-2 text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
                   >
                     Load next 48 items
                   </button>

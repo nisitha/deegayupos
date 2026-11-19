@@ -397,9 +397,8 @@ export function ShiftEndModal({
     if (bankedAmount > 0) {
       const foundBank = bankAccounts.find((b) => b.id === selectedBankId);
       if (foundBank) {
-        selectedBankStr = `${foundBank.bankName} (${foundBank.accountNumber} - ${foundBank.accountName}${
-          foundBank.branchName ? ` • ${foundBank.branchName}` : ''
-        })`;
+        selectedBankStr = `${foundBank.bankName} (${foundBank.accountNumber} - ${foundBank.accountName}${foundBank.branchName ? ` • ${foundBank.branchName}` : ''
+          })`;
       } else if (customBankDetails.trim()) {
         selectedBankStr = customBankDetails.trim();
       }
@@ -489,20 +488,18 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('MODAKA')}
-            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-              activeTab === 'MODAKA'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
-                : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
-            }`}
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'MODAKA'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
+              : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
+              }`}
           >
             <FileSpreadsheet className="w-4 h-4 text-purple-300" />
             <span>1. Special Stock</span>
             <span
-              className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${
-                activeTab === 'MODAKA'
-                  ? 'bg-purple-900/60 text-purple-200 border border-purple-400/30'
-                  : 'bg-[#0B101D] text-slate-400 border border-slate-800'
-              }`}
+              className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${activeTab === 'MODAKA'
+                ? 'bg-purple-900/60 text-purple-200 border border-purple-400/30'
+                : 'bg-[#0B101D] text-slate-400 border border-slate-800'
+                }`}
             >
               {modakaUnitsTotal} units • LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
@@ -510,20 +507,18 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('DENOMINATIONS')}
-            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-              activeTab === 'DENOMINATIONS'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
-                : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
-            }`}
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'DENOMINATIONS'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
+              : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
+              }`}
           >
             <Banknote className="w-4 h-4 text-indigo-300" />
             <span>2. Denominations</span>
             <span
-              className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${
-                activeTab === 'DENOMINATIONS'
-                  ? 'bg-purple-900/60 text-purple-200 border border-purple-400/30'
-                  : 'bg-[#0B101D] text-slate-400 border border-slate-800'
-              }`}
+              className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${activeTab === 'DENOMINATIONS'
+                ? 'bg-purple-900/60 text-purple-200 border border-purple-400/30'
+                : 'bg-[#0B101D] text-slate-400 border border-slate-800'
+                }`}
             >
               LKR {denominationsTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
@@ -531,22 +526,20 @@ export function ShiftEndModal({
           <button
             type="button"
             onClick={() => setActiveTab('SUMMARY')}
-            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-              activeTab === 'SUMMARY'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
-                : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
-            }`}
+            className={`min-h-[52px] sm:min-h-[56px] h-13 sm:h-14 flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl text-[15px] font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${activeTab === 'SUMMARY'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-400/30'
+              : 'bg-[#131E35] text-slate-300 hover:text-white hover:bg-[#1A2744] border border-slate-700/60'
+              }`}
           >
             <Receipt className="w-4 h-4 text-emerald-300" />
             <span>3. Cash & Expenses</span>
             {isOwner && (
               cashVariance !== 0 ? (
                 <span
-                  className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${
-                    cashVariance > 0
-                      ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-rose-950/80 text-rose-300 border border-rose-500/40'
-                  }`}
+                  className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${cashVariance > 0
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-rose-950/80 text-rose-300 border border-rose-500/40'
+                    }`}
                 >
                   {cashVariance > 0 ? `+${cashVariance.toFixed(0)}` : cashVariance.toFixed(0)}
                 </span>
@@ -760,13 +753,12 @@ export function ShiftEndModal({
                         >
                           <div className="flex items-center gap-3">
                             <span
-                              className={`w-20 text-center py-1.5 rounded-xl text-base font-bold font-mono ${
-                                d >= 500
-                                  ? 'bg-purple-950/80 text-purple-200 border border-purple-600/40'
-                                  : d >= 20
+                              className={`w-20 text-center py-1.5 rounded-xl text-base font-bold font-mono ${d >= 500
+                                ? 'bg-purple-950/80 text-purple-200 border border-purple-600/40'
+                                : d >= 20
                                   ? 'bg-amber-950/80 text-amber-200 border border-amber-600/40'
                                   : 'bg-slate-800 text-slate-200 border border-slate-700'
-                              }`}
+                                }`}
                             >
                               {d.toLocaleString()}
                             </span>
@@ -888,11 +880,10 @@ export function ShiftEndModal({
                             value={openingFloat || ''}
                             onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
                             readOnly={!canEditOpeningFloat}
-                            className={`w-36 h-12 px-3 text-right font-mono text-lg sm:text-xl font-extrabold tabular-nums rounded-xl focus:outline-none ${
-                              canEditOpeningFloat
-                                ? 'bg-[#0A0F1D] text-white border border-slate-700 focus:border-purple-500 focus:bg-[#0E1528]'
-                                : 'bg-[#0E1424] text-slate-400 border border-slate-800 cursor-not-allowed'
-                            }`}
+                            className={`w-36 h-12 px-3 text-right font-mono text-lg sm:text-xl font-extrabold tabular-nums rounded-xl focus:outline-none ${canEditOpeningFloat
+                              ? 'bg-[#0A0F1D] text-white border border-slate-700 focus:border-purple-500 focus:bg-[#0E1528]'
+                              : 'bg-[#0E1424] text-slate-400 border border-slate-800 cursor-not-allowed'
+                              }`}
                           />
                         </div>
                       </div>
@@ -1149,13 +1140,12 @@ export function ShiftEndModal({
 
                           {/* Cash Variance Display & Automatic Action Notice */}
                           <div
-                            className={`p-3.5 rounded-2xl font-bold border transition-all ${
-                              cashVariance === 0
-                                ? 'bg-slate-900/80 text-slate-200 border-slate-700'
-                                : cashVariance > 0
+                            className={`p-3.5 rounded-2xl font-bold border transition-all ${cashVariance === 0
+                              ? 'bg-slate-900/80 text-slate-200 border-slate-700'
+                              : cashVariance > 0
                                 ? 'bg-emerald-950/60 text-emerald-200 border-emerald-500/50 shadow-md'
                                 : 'bg-rose-950/60 text-rose-200 border-rose-500/50 shadow-md'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-xs uppercase tracking-wider">
@@ -1163,8 +1153,8 @@ export function ShiftEndModal({
                                 {cashVariance === 0
                                   ? 'Balanced'
                                   : cashVariance > 0
-                                  ? 'Excess / Over (+)'
-                                  : 'Shortage / Deficit (-)'}
+                                    ? 'Excess / Over (+)'
+                                    : 'Shortage / Deficit (-)'}
                               </span>
                               <span className="font-mono text-lg font-black">
                                 {cashVariance > 0 ? '+' : ''}
