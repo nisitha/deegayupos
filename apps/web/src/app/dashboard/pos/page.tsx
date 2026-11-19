@@ -43,6 +43,7 @@ import type {
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { posApi, shiftsApi, type CashierShiftDto } from '../../../lib/api-client';
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
+import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
 import { ModakaStockInModal } from '../../../components/pos/modaka-stock-in-modal';
@@ -119,6 +120,10 @@ export default function ConfidencyPosPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleLogout = useCallback(() => {
+    performAppLogout(router);
+  }, [router]);
 
   // Catalogue & Data State
   const [products, setProducts] = useState<RetailProductItem[]>([]);
@@ -565,10 +570,10 @@ export default function ConfidencyPosPage() {
         return prevCart.map((item) =>
           item.productId === product.id
             ? {
-                ...item,
-                displayQuantity: nextDisplay,
-                quantity: nextBase,
-              }
+              ...item,
+              displayQuantity: nextDisplay,
+              quantity: nextBase,
+            }
             : item,
         );
       }
@@ -617,10 +622,10 @@ export default function ConfidencyPosPage() {
           existingInCart?.displayQuantity !== undefined
             ? existingInCart.displayQuantity
             : config.mode === 'weight_g'
-            ? (defaultUnit === 'kg' ? 1 : 100)
-            : config.mode === 'volume_ml'
-            ? (defaultUnit === 'L' ? 1 : 250)
-            : 1;
+              ? (defaultUnit === 'kg' ? 1 : 100)
+              : config.mode === 'volume_ml'
+                ? (defaultUnit === 'L' ? 1 : 250)
+                : 1;
 
         setQuantityModalTarget({
           product: {
@@ -695,12 +700,12 @@ export default function ConfidencyPosPage() {
           return prevCart.map((it) =>
             it.id === cartItemId
               ? {
-                  ...it,
-                  selectedUnit,
-                  displayQuantity,
-                  quantity: baseQuantity,
-                  price: unitPrice,
-                }
+                ...it,
+                selectedUnit,
+                displayQuantity,
+                quantity: baseQuantity,
+                price: unitPrice,
+              }
               : it,
           );
         }
@@ -710,12 +715,12 @@ export default function ConfidencyPosPage() {
           return prevCart.map((it) =>
             it.productId === productId
               ? {
-                  ...it,
-                  selectedUnit,
-                  displayQuantity,
-                  quantity: baseQuantity,
-                  price: unitPrice,
-                }
+                ...it,
+                selectedUnit,
+                displayQuantity,
+                quantity: baseQuantity,
+                price: unitPrice,
+              }
               : it,
           );
         }
@@ -915,8 +920,8 @@ export default function ConfidencyPosPage() {
       paymentMethod === 'STORE_CREDIT'
         ? 'STORE_CREDIT'
         : paymentMethod === 'CARD'
-        ? 'CARD'
-        : 'CASH';
+          ? 'CARD'
+          : 'CASH';
     setCheckoutPaymentMethod(initialMethod);
     setCashTendered(totalAmount > 0 ? totalAmount.toFixed(2) : '');
     setIsCheckoutModalOpen(true);
@@ -1009,10 +1014,10 @@ export default function ConfidencyPosPage() {
             checkoutPaymentMethod === 'STORE_CREDIT'
               ? 'CUSTOMER_CREDIT'
               : checkoutPaymentMethod === 'CARD'
-              ? 'CARD'
-              : checkoutPaymentMethod === 'LANKA_QR'
-              ? 'QR_PAYMENT'
-              : 'CASH',
+                ? 'CARD'
+                : checkoutPaymentMethod === 'LANKA_QR'
+                  ? 'QR_PAYMENT'
+                  : 'CASH',
           items: cart.map((item) => ({
             productId: item.productId,
             productName: item.name,
@@ -1030,10 +1035,10 @@ export default function ConfidencyPosPage() {
                 checkoutPaymentMethod === 'STORE_CREDIT'
                   ? 'CUSTOMER_CREDIT'
                   : checkoutPaymentMethod === 'CARD'
-                  ? 'CARD'
-                  : checkoutPaymentMethod === 'LANKA_QR'
-                  ? 'QR_PAYMENT'
-                  : 'CASH',
+                    ? 'CARD'
+                    : checkoutPaymentMethod === 'LANKA_QR'
+                      ? 'QR_PAYMENT'
+                      : 'CASH',
               amount: totalAmount,
             },
           ],
@@ -1080,7 +1085,7 @@ export default function ConfidencyPosPage() {
             hw.autoOpenCashDrawer &&
             checkoutPaymentMethod === 'CASH'
           ) {
-            PrinterBridge.kickCashDrawer().catch(() => {});
+            PrinterBridge.kickCashDrawer().catch(() => { });
           }
           if (hw.autoPrintReceipt) {
             PrinterBridge.printReceipt(finalizedSale, undefined, {
@@ -1089,7 +1094,7 @@ export default function ConfidencyPosPage() {
               address: currentBranchObj?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka',
               phone: currentBranchObj?.phone || business?.phone || '+94 11 291 4500',
               taxNumber: 'VAT-10928392-8000',
-            }).catch(() => {});
+            }).catch(() => { });
           }
         } catch {
           // ignore
@@ -1099,13 +1104,13 @@ export default function ConfidencyPosPage() {
           setSelectedCustomer((prev) =>
             prev
               ? {
-                  ...prev,
-                  currentBalance: (prev.currentBalance || 0) + totalAmount,
-                  availableCredit: Math.max(
-                    0,
-                    (prev.creditLimit || 0) - ((prev.currentBalance || 0) + totalAmount),
-                  ),
-                }
+                ...prev,
+                currentBalance: (prev.currentBalance || 0) + totalAmount,
+                availableCredit: Math.max(
+                  0,
+                  (prev.creditLimit || 0) - ((prev.currentBalance || 0) + totalAmount),
+                ),
+              }
               : null,
           );
         }
@@ -1239,9 +1244,9 @@ export default function ConfidencyPosPage() {
       ===================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/80 bg-[#E6EAF2] min-w-0">
         {/* 1. Top Terminal Status Bar (Unified Single Header for POS Terminal) */}
-        <div className="h-12 px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 bg-white border-b border-slate-200 shrink-0 shadow-2xs overflow-x-auto no-scrollbar">
+        <div className="h-11 sm:h-12 px-2.5 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-2.5 bg-white border-b border-slate-200 shrink-0 shadow-2xs overflow-x-auto no-scrollbar">
           {/* Left Group: Mobile Hamburger, Store/Terminal Badge, Cashier Profile */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 whitespace-nowrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
             {/* Hamburger for mobile slide-over navigation (< lg) */}
             <button
               type="button"
@@ -1250,41 +1255,41 @@ export default function ConfidencyPosPage() {
                   window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
                 }
               }}
-              className="lg:hidden w-10 h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
+              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
               aria-label="Open mobile navigation menu"
               title="Menu"
             >
               <Menu className="w-5 h-5 text-slate-800" />
             </button>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] shrink-0 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100/90 text-xs font-bold text-[#5B46F6] shrink-0 whitespace-nowrap">
               <Store className="w-3.5 h-3.5 text-[#5B46F6] shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-300">•</span>
-              <span className="whitespace-nowrap">{currentBranchName}</span>
+              <span className="whitespace-nowrap truncate max-w-[90px] sm:max-w-none">{currentBranchName}</span>
             </div>
 
             <button
               type="button"
               onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs group shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1 sm:gap-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-2 sm:px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs group shrink-0 whitespace-nowrap"
               title="Click or press to switch cashier profile via 4-digit PIN"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="font-bold text-slate-900 group-hover:text-[#5B46F6] transition-colors whitespace-nowrap">
                 Cashier: {cashierName}
               </span>
-              <span className="text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
+              <span className="hidden sm:inline-block text-[10px] font-bold bg-[#5B46F6]/10 text-[#5B46F6] px-1.5 py-0.5 rounded group-hover:bg-[#5B46F6] group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
                 PIN Switch
               </span>
             </button>
           </div>
 
-          {/* Right Group: Clock, Qty Toggle, End Shift, Switch Shop */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 whitespace-nowrap">
-            {/* Live Sri Lanka Clock */}
+          {/* Right Group: Clock, Qty Toggle, End Shift, Switch Shop, Logout */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
+            {/* Live Sri Lanka Clock (Visible on wide screens) */}
             {currentDateStr && (
-              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-mono font-medium text-slate-600">
+              <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 text-[11px] font-mono font-medium text-slate-600">
                 <Clock className="w-3.5 h-3.5 text-[#5B46F6]" />
                 <span>{currentDateStr}</span>
               </div>
@@ -1295,7 +1300,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'ALL'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1307,7 +1312,7 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   qtyPopupMode === 'WEIGHT_LIQUID'
                     ? 'bg-[#5B46F6] text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1322,13 +1327,13 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3 py-1 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-2.5 sm:px-3 py-1 rounded-lg shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0"
               title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="whitespace-nowrap">End Shift</span>
               {activeShift && (
-                <span className="bg-rose-800/80 text-rose-100 text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0">
+                <span className="hidden sm:inline-block bg-rose-800/80 text-rose-100 text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0">
                   S{activeShift.shiftNumber}
                 </span>
               )}
@@ -1337,18 +1342,23 @@ export default function ConfidencyPosPage() {
             {/* Switch Shop (Logout) Button */}
             <button
               type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem('pixelcraft_access_token');
-                  localStorage.removeItem('pixelcraft_pos_session');
-                  router.push('/login');
-                }
-              }}
-              className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200/60 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-              title="Switch Shop / Logout"
+              onClick={handleLogout}
+              className="hidden md:flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 px-2.5 h-8 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              title="Switch Shop / Change Branch"
             >
-              <LogOut className="w-3 h-3" />
+              <Store className="w-3.5 h-3.5 text-slate-500" />
               <span>Switch Shop</span>
+            </button>
+
+            {/* Top-Right Logout Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="h-8 px-2.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Logout from system"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
@@ -1360,9 +1370,8 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${
-                discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
-              }`}
+              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
+                }`}
               title="Apply order discount [F8]"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1371,8 +1380,8 @@ export default function ConfidencyPosPage() {
                   {discountType === 'PERCENT'
                     ? `${discountPercent}% Off`
                     : discountType === 'FLAT'
-                    ? `LKR ${discountFlat} Off`
-                    : 'Discount'}
+                      ? `LKR ${discountFlat} Off`
+                      : 'Discount'}
                 </span>
               </div>
               {discountType !== 'NONE' ? (
@@ -1397,9 +1406,8 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${
-                selectedCustomer ? 'ring-2 ring-blue-300' : ''
-              }`}
+              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${selectedCustomer ? 'ring-2 ring-blue-300' : ''
+                }`}
               title="Select customer [F3]"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1590,9 +1598,8 @@ export default function ConfidencyPosPage() {
                           handleProductClick(item);
                           searchInputRef.current?.focus();
                         }}
-                        className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-purple-50/80' : 'hover:bg-slate-50'
-                        }`}
+                        className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${isSelected ? 'bg-purple-50/80' : 'hover:bg-slate-50'
+                          }`}
                       >
                         {/* Thumbnail & Product Meta */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1678,17 +1685,15 @@ export default function ConfidencyPosPage() {
           <button
             type="button"
             onClick={() => setSelectedDeptId('all')}
-            className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
-              selectedDeptId === 'all'
-                ? 'bg-[#0F1222] text-white border-[#0F1222] shadow-sm'
-                : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
-            }`}
+            className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
+              ? 'bg-[#0F1222] text-white border-[#0F1222] shadow-sm'
+              : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
+              }`}
           >
             <span>All Products</span>
             <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
-                selectedDeptId === 'all' ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
-              }`}
+              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${selectedDeptId === 'all' ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
+                }`}
             >
               {departmentCounts.all || 0}
             </span>
@@ -1704,23 +1709,20 @@ export default function ConfidencyPosPage() {
                 key={dept.id}
                 type="button"
                 onClick={() => setSelectedDeptId(dept.id)}
-                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${
-                  isActive
-                    ? 'bg-[#0F1222] text-white border-[#0F1222] font-bold shadow-sm'
-                    : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
-                }`}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
+                  ? 'bg-[#0F1222] text-white border-[#0F1222] font-bold shadow-sm'
+                  : 'bg-white border border-slate-200/80 text-slate-700 hover:border-indigo-300 shadow-2xs'
+                  }`}
               >
                 {/* 3D Mini Dot */}
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    isActive ? 'bg-[#5B46F6]' : `bg-gradient-to-br ${dept.gradient}`
-                  } shadow-2xs shrink-0`}
+                  className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#5B46F6]' : `bg-gradient-to-br ${dept.gradient}`
+                    } shadow-2xs shrink-0`}
                 />
                 <span className="whitespace-nowrap">{dept.en}</span>
                 <span
-                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${
-                    isActive ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
-                  }`}
+                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${isActive ? 'bg-[#5B46F6] text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
                 >
                   {count}
                 </span>
@@ -2166,11 +2168,10 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isSelected
-                        ? 'bg-indigo-50 border-2 border-[#5B46F6] text-[#5B46F6] font-bold shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-white/60'
-                    }`}
+                    className={`py-2 rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isSelected
+                      ? 'bg-indigo-50 border-2 border-[#5B46F6] text-[#5B46F6] font-bold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-white/60'
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{tab.label}</span>
@@ -2474,11 +2475,10 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-2 rounded-lg font-semibold transition-all text-center ${
-                      paymentMethod === tab.id
-                        ? 'bg-white text-slate-900 font-bold shadow-xs'
-                        : 'text-slate-600'
-                    }`}
+                    className={`py-2 rounded-lg font-semibold transition-all text-center ${paymentMethod === tab.id
+                      ? 'bg-white text-slate-900 font-bold shadow-xs'
+                      : 'text-slate-600'
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -2680,11 +2680,10 @@ export default function ConfidencyPosPage() {
                           setCheckoutPaymentMethod(m.id);
                           setCheckoutError(null);
                         }}
-                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-[#7052FF] text-white border-[#7052FF] shadow-md shadow-[#7052FF]/25'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${isActive
+                          ? 'bg-[#7052FF] text-white border-[#7052FF] shadow-md shadow-[#7052FF]/25'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
                       >
                         <Icon className="w-4 h-4 mb-1" />
                         <span>{m.label}</span>
@@ -2745,11 +2744,10 @@ export default function ConfidencyPosPage() {
                             setCheckoutError(null);
                             cashInputRef.current?.focus();
                           }}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                            cashTendered === pill.value
-                              ? 'bg-slate-900 text-white border-slate-900'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                          }`}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${cashTendered === pill.value
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                            }`}
                         >
                           {pill.label}
                         </button>

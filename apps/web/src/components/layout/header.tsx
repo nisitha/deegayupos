@@ -22,6 +22,7 @@ import {
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { BranchCreateModal } from '../branches/branch-create-modal';
 import { formatSriLankaHeaderClock } from '../../lib/date-utils';
+import { performAppLogout } from '../../lib/auth-utils';
 
 export function Header() {
   const pathname = usePathname();
@@ -84,48 +85,13 @@ export function Header() {
   }, [router]);
 
   const handleSignOut = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pixelcraft_access_token');
-      localStorage.removeItem('pixelcraft_refresh_token');
-      localStorage.removeItem('pixelcraft_user');
-      localStorage.removeItem('pixelcraft_tenant');
-      localStorage.removeItem('pixelcraft_tenant_id');
-      localStorage.removeItem('pixelcraft_permissions');
-      localStorage.removeItem('pixelcraft_pos_session');
-      localStorage.removeItem('pixelcraft_selected_branch');
-      localStorage.removeItem('pixelcraft_active_branch_id');
-      localStorage.removeItem('pixelcraft_active_branch_name');
-      localStorage.removeItem('pixelcraft_active_cashier');
-      sessionStorage.clear();
-      if (typeof document !== 'undefined') {
-        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
-        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
-      }
-    }
     setProfileDropdownOpen(false);
-    router.push('/login');
+    performAppLogout(router);
   };
 
   const handleSwitchShopLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pixelcraft_access_token');
-      localStorage.removeItem('pixelcraft_refresh_token');
-      localStorage.removeItem('pixelcraft_user');
-      localStorage.removeItem('pixelcraft_tenant');
-      localStorage.removeItem('pixelcraft_tenant_id');
-      localStorage.removeItem('pixelcraft_permissions');
-      localStorage.removeItem('pixelcraft_pos_session');
-      localStorage.removeItem('pixelcraft_selected_branch');
-      localStorage.removeItem('pixelcraft_active_branch_id');
-      localStorage.removeItem('pixelcraft_active_branch_name');
-      localStorage.removeItem('pixelcraft_active_cashier');
-      sessionStorage.clear();
-      if (typeof document !== 'undefined') {
-        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
-        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
-      }
-    }
-    router.push('/login');
+    setProfileDropdownOpen(false);
+    performAppLogout(router);
   };
 
   const currentBranch = branches.find((b) => b.id === selectedBranchId);
@@ -370,7 +336,7 @@ export function Header() {
           <div className="relative shrink-0" ref={profileRef}>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="h-8 flex items-center gap-1 sm:gap-2 px-1 sm:px-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none whitespace-nowrap shrink-0"
+              className="h-8 flex items-center gap-1 sm:gap-2 px-1 sm:px-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all select-none whitespace-nowrap shrink-0 cursor-pointer"
               aria-expanded={profileDropdownOpen}
             >
               <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#005BD3] to-[#4F46E5] text-white flex items-center justify-center font-bold text-[11px] shadow-2xs shrink-0">
@@ -483,6 +449,17 @@ export function Header() {
               </div>
             )}
           </div>
+
+          {/* Top-Right Direct Logout Button */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="hidden sm:flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white text-xs font-semibold whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+            title="Sign out of session"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Logout</span>
+          </button>
         </div>
       </header>
 

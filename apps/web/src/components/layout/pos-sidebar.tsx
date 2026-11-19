@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
+import { performAppLogout } from '../../lib/auth-utils';
 
 interface SidebarMenuItem {
   name: string;
@@ -92,18 +93,10 @@ export function PosSidebar() {
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const isPosRoute = pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos');
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(isPosRoute);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const prevRouteRef = useRef(pathname);
 
   useEffect(() => {
-    if (pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos')) {
-      setIsCollapsed(true);
-    } else {
-      setIsCollapsed(false);
-    }
-    prevRouteRef.current = pathname;
     setMobileDrawerOpen(false);
   }, [pathname]);
 
@@ -133,25 +126,7 @@ export function PosSidebar() {
   }, []);
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('pixelcraft_access_token');
-      localStorage.removeItem('pixelcraft_refresh_token');
-      localStorage.removeItem('pixelcraft_user');
-      localStorage.removeItem('pixelcraft_tenant');
-      localStorage.removeItem('pixelcraft_tenant_id');
-      localStorage.removeItem('pixelcraft_permissions');
-      localStorage.removeItem('pixelcraft_pos_session');
-      localStorage.removeItem('pixelcraft_selected_branch');
-      localStorage.removeItem('pixelcraft_active_branch_id');
-      localStorage.removeItem('pixelcraft_active_branch_name');
-      localStorage.removeItem('pixelcraft_active_cashier');
-      sessionStorage.clear();
-      if (typeof document !== 'undefined') {
-        document.cookie = 'pixelcraft_pos_session=; path=/; max-age=0; SameSite=Lax';
-        document.cookie = 'pixelcraft_access_token=; path=/; max-age=0; SameSite=Lax';
-      }
-    }
-    router.push('/login');
+    performAppLogout(router);
   };
 
   const businessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
@@ -443,7 +418,7 @@ export function PosSidebar() {
       {/* Desktop Sidebar (>= lg screens) */}
       <aside
         className={`hidden lg:flex ${
-          isCollapsed ? 'w-[68px]' : 'w-[240px] xl:w-[260px]'
+          isCollapsed ? 'w-[68px]' : 'w-64'
         } bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30 transition-all duration-200`}
       >
       {/* 1. Brand Header */}
