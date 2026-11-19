@@ -86,7 +86,7 @@ const MULTI_BRANCH_OPTIONS = [
     name: 'Alawwa Branch',
     nameSi: 'ඇලව්ව ශාඛාව',
     code: 'ALW-01',
-    address: 'Deegayu Weda Madura, Alawwa Road, Alawwa',
+    address: 'Deegayu Weda Madhura, Alawwa Road, Alawwa',
     phone: '037-2241088',
     rolesBadge: 'POS Billing & Daily Cash Reconciliation',
     rolesBadgeSi: 'POS බිල්පත් සහ දෛනික මුදල් සමථකරණය',
@@ -100,7 +100,7 @@ const MULTI_BRANCH_OPTIONS = [
     name: 'Dambadeniya Branch',
     nameSi: 'දඹදෙණිය ශාඛාව',
     code: 'DMB-01',
-    address: 'Deegayu Weda Madura, Kurunegala Road, Dambadeniya',
+    address: 'Deegayu Weda Madhura, Kurunegala Road, Dambadeniya',
     phone: '037-2287411',
     rolesBadge: 'POS Billing, Cash Reconciliation & Supplier GRN Officer',
     rolesBadgeSi: 'POS බිල්පත්, දෛනික මුදල් සමථකරණය සහ සැපයුම්කරු GRN නිලධාරී',
@@ -247,7 +247,7 @@ export default function LoginPage() {
 
     const tenantObj = {
       id: tenantId,
-      name: 'Deegayu Weda Madura',
+      name: 'Deegayu Weda Madhura',
       slug: 'deegayu',
       currency: 'LKR',
       role,

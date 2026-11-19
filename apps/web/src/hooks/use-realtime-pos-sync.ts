@@ -13,10 +13,10 @@ interface UseRealtimePosSyncOptions {
  * Includes a 15-second silent background poll fallback.
  */
 export function useRealtimePosSync(
-  onReload: () => void | Promise<void>,
+  onReload: (isBackground?: boolean) => void | Promise<void>,
   options: UseRealtimePosSyncOptions = {}
 ) {
-  const { showToast = true, intervalMs = 15000, channelName = 'pos_live_sync' } = options;
+  const { showToast = false, intervalMs = 15000, channelName = 'pos_live_sync' } = options;
   const reloadRef = useRef(onReload);
   reloadRef.current = onReload;
 
@@ -57,11 +57,11 @@ export function useRealtimePosSync(
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         try {
-          reloadRef.current();
+          reloadRef.current(true);
         } catch (e) {
           console.warn('[useRealtimePosSync] reload error:', e);
         }
-        if (toastMsg) triggerToast(toastMsg);
+        if (toastMsg && showToast) triggerToast(toastMsg);
       }, 400);
     };
 
@@ -96,7 +96,7 @@ export function useRealtimePosSync(
     // 2. Silent 15-second background interval fallback
     const intervalId = setInterval(() => {
       try {
-        reloadRef.current();
+        reloadRef.current(true);
       } catch (e) {
         console.warn('[useRealtimePosSync] interval reload error:', e);
       }

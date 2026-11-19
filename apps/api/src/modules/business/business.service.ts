@@ -288,8 +288,8 @@ export class BusinessService {
     return {
       id: ts?.id || bs?.id || business.id,
       tenantId: business.id,
-      name: ts?.name || business.name || 'දීගායු වෙද මැදුර / Deegayu Weda Madura',
-      legalName: ts?.legalName ?? business.legalName ?? 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
+      name: ts?.name || business.name || 'Deegayu Weda Madhura',
+      legalName: ts?.legalName ?? business.legalName ?? 'Deegayu Weda Madhura (Pvt) Ltd',
       logoUrl: ts?.logoUrl ?? business.logoUrl ?? 'https://pos.pixelcraftlk.com/images/deegayu-logo.png',
       phone: ts?.phone || business.phone || primaryBranch?.phone || '+94 34 222 3456',
       email: ts?.email ?? business.email ?? 'info@deegayu.pixelcraftlk.com',
@@ -299,7 +299,7 @@ export class BusinessService {
         ts?.receiptHeaderNote ??
         bs?.receiptHeaderNote ??
         bs?.receiptHeader ??
-        'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary',
+        'Welcome to Deegayu Weda Madhura • Traditional Ayurvedic Dispensary',
       receiptFooterNote:
         ts?.receiptFooterNote ??
         bs?.receiptFooterNote ??

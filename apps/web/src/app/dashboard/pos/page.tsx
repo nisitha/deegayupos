@@ -1244,7 +1244,7 @@ export default function ConfidencyPosPage() {
           }
           if (hw.autoPrintReceipt) {
             PrinterBridge.printReceipt(finalizedSale, undefined, {
-              storeName: business?.name || 'DEEGAYU WEDA MADURA',
+              storeName: business?.name || 'DEEGAYU WEDA MADHURA',
               branchName: branchDisplayName,
               address: currentBranchObj?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka',
               phone: currentBranchObj?.phone || business?.phone || '+94 11 291 4500',

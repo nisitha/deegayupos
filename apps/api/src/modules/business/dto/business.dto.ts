@@ -301,7 +301,7 @@ export class BusinessProfileDto {
 }
 
 export class UpdateTenantStoreSettingsDto {
-  @ApiPropertyOptional({ example: 'දීගායු වෙද මැදුර / Deegayu Weda Madura' })
+  @ApiPropertyOptional({ example: 'Deegayu Weda Madhura' })
   @IsOptional()
   @IsString()
   @MaxLength(255)
@@ -342,7 +342,7 @@ export class UpdateTenantStoreSettingsDto {
   @MaxLength(64)
   vatNumber?: string | null;
 
-  @ApiPropertyOptional({ example: 'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary' })
+  @ApiPropertyOptional({ example: 'Welcome to Deegayu Weda Madhura • Traditional Ayurvedic Dispensary' })
   @IsOptional()
   @IsString()
   @MaxLength(2000)

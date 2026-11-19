@@ -15,7 +15,7 @@ interface LegacySupplier {
 export async function seedSuppliers() {
   console.log('\n========================================================================');
   console.log('📦 PIXELCRAFT POS - DEEGAYU SUPPLIERS SEEDING ENGINE');
-  console.log('   Target Tenant: Deegayu Weda Madura (94 Legacy Suppliers)');
+  console.log('   Target Tenant: Deegayu Weda Madhura (94 Legacy Suppliers)');
   console.log('========================================================================\n');
 
   // 1. Resolve tenant

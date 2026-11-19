@@ -65,47 +65,61 @@ export default function ModakaLedgerPage() {
   const [configSuccessMsg, setConfigSuccessMsg] = useState<string | null>(null);
 
   // Load shifts & configs
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [shiftsRes, configsRes] = await Promise.all([
-        shiftsApi.getShiftLedgers({
-          branchId: selectedBranchId !== 'all' ? selectedBranchId : undefined,
-          shiftDate: selectedDate,
-          cashierId: selectedCashierId !== 'all' ? selectedCashierId : undefined,
-        }),
-        shiftsApi.getModakaConfigs(),
-      ]);
-
-      if (shiftsRes.success) {
-        setShifts(shiftsRes.data);
-
-        // Extract unique staff members from shifts
-        const uniqueStaff = new Map<string, string>();
-        shiftsRes.data.forEach((s) => {
-          if (s.cashierId && s.cashierName) {
-            uniqueStaff.set(s.cashierId, s.cashierName);
-          }
-        });
-        setStaffList(Array.from(uniqueStaff.entries()).map(([id, name]) => ({ id, name })));
+  const loadData = useCallback(
+    async (isBackground = false) => {
+      if (!isBackground) {
+        setIsLoading(true);
       }
+      try {
+        const [shiftsRes, configsRes] = await Promise.all([
+          shiftsApi.getShiftLedgers({
+            branchId: selectedBranchId !== 'all' ? selectedBranchId : undefined,
+            shiftDate: selectedDate,
+            cashierId: selectedCashierId !== 'all' ? selectedCashierId : undefined,
+          }),
+          shiftsApi.getModakaConfigs(),
+        ]);
 
-      if (configsRes.success) {
-        setConfigs(configsRes.data);
+        if (shiftsRes.success) {
+          setShifts((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(shiftsRes.data) ? shiftsRes.data : prev
+          );
+
+          // Extract unique staff members from shifts
+          const uniqueStaff = new Map<string, string>();
+          shiftsRes.data.forEach((s) => {
+            if (s.cashierId && s.cashierName) {
+              uniqueStaff.set(s.cashierId, s.cashierName);
+            }
+          });
+          const newStaff = Array.from(uniqueStaff.entries()).map(([id, name]) => ({ id, name }));
+          setStaffList((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(newStaff) ? newStaff : prev
+          );
+        }
+
+        if (configsRes.success) {
+          setConfigs((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(configsRes.data) ? configsRes.data : prev
+          );
+        }
+      } catch (err) {
+        console.error('[ModakaLedgerPage] loadData error:', err);
+      } finally {
+        if (!isBackground) {
+          setIsLoading(false);
+        }
       }
-    } catch (err) {
-      console.error('[ModakaLedgerPage] loadData error:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedBranchId, selectedDate, selectedCashierId]);
+    },
+    [selectedBranchId, selectedDate, selectedCashierId]
+  );
 
   useEffect(() => {
-    loadData();
+    loadData(false);
   }, [loadData]);
 
-  // Wire Real-time sync for live bill & shift events
-  useRealtimePosSync(loadData);
+  // Wire Real-time sync for live bill & shift events silently in the background
+  useRealtimePosSync((isBg) => loadData(isBg ?? true));
 
   // Load catalog products for config modal
   useEffect(() => {
@@ -471,7 +485,7 @@ export default function ModakaLedgerPage() {
           <div className="flex items-end">
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => loadData(false)}
               disabled={isLoading}
               className="w-full py-2 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
@@ -579,7 +593,7 @@ export default function ModakaLedgerPage() {
       {/* Printable Header (Visible only when printing) */}
       <div className="hidden print:block text-center border-b pb-4 mb-4">
         <h2 className="text-2xl font-black text-slate-900 uppercase">
-          Deegayu Weda Madura (Pvt) Ltd
+          Deegayu Weda Madhura (Pvt) Ltd
         </h2>
         <p className="text-sm font-bold text-slate-700">
           Daily Shift Handover & Special Sales Summary

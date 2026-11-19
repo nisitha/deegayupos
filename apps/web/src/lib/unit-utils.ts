@@ -1,5 +1,5 @@
 /**
- * Smart Multi-Unit Detection & Measurement Converter for Deegayu Weda Madura POS
+ * Smart Multi-Unit Detection & Measurement Converter for Deegayu Weda Madhura POS
  * Handles Weight (g <-> kg), Volume (ml <-> L), Ayurvedic Fractional units (Kalan, Manchadi),
  * and Discrete Retail Packs (Bottles, Packets, Boxes).
  */

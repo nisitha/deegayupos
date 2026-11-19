@@ -50,7 +50,7 @@ function slugify(text: string): string {
 export async function importDeegayuData() {
   console.log('\n========================================================================');
   console.log('🌿 PIXELCRAFT POS - COMMERCIAL TENANT PROVISIONING & DATA INGESTION');
-  console.log('   Target Client: Deegayu Weda Madura (Ayurvedic Pharmacy & Store)');
+  console.log('   Target Client: Deegayu Weda Madhura (Ayurvedic Pharmacy & Store)');
   console.log('========================================================================\n');
 
   // Locate xPOS data directory
@@ -95,7 +95,7 @@ export async function importDeegayuData() {
   console.log(`   - Customers:  ${customersRaw.length}\n`);
 
   // --------------------------------------------------------------------------
-  // STEP 1: Provision Dedicated Tenant ("Deegayu Weda Madura")
+  // STEP 1: Provision Dedicated Tenant ("Deegayu Weda Madhura")
   // --------------------------------------------------------------------------
   console.log('🏢 [Step 1/4] Provisioning Business Entity & Topology...');
 
@@ -103,17 +103,17 @@ export async function importDeegayuData() {
   const tenant = await prisma.business.upsert({
     where: { slug: tenantSlug },
     update: {
-      name: 'Deegayu Weda Madura',
-      legalName: 'Deegayu Weda Madura (Pvt) Ltd',
+      name: 'Deegayu Weda Madhura',
+      legalName: 'Deegayu Weda Madhura (Pvt) Ltd',
       businessType: 'PHARMACY',
       currency: 'LKR',
       timezone: 'Asia/Colombo',
       status: 'ACTIVE',
     },
     create: {
-      name: 'Deegayu Weda Madura',
+      name: 'Deegayu Weda Madhura',
       slug: tenantSlug,
-      legalName: 'Deegayu Weda Madura (Pvt) Ltd',
+      legalName: 'Deegayu Weda Madhura (Pvt) Ltd',
       businessType: 'PHARMACY',
       currency: 'LKR',
       timezone: 'Asia/Colombo',
@@ -169,7 +169,7 @@ export async function importDeegayuData() {
       isTaxInclusive: true,
       allowNegativeStock: true,
       negativeStockPolicy: 'ALLOW',
-      receiptHeader: 'DEEGAYU WEDA MADURA\nAyurvedic Pharmacy & Healthcare Store\nColombo, Sri Lanka\nHotline: 077-2634497',
+      receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store\nColombo, Sri Lanka\nHotline: 077-2634497',
       receiptFooter: 'Ayubowan! Thank you for purchasing authentic ayurvedic healthcare products.',
       returnPolicyText: 'Medicines & opened herbal products once sold cannot be returned.',
     },
@@ -180,7 +180,7 @@ export async function importDeegayuData() {
       isTaxInclusive: true,
       allowNegativeStock: true,
       negativeStockPolicy: 'ALLOW',
-      receiptHeader: 'DEEGAYU WEDA MADURA\nAyurvedic Pharmacy & Healthcare Store\nColombo, Sri Lanka\nHotline: 077-2634497',
+      receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store\nColombo, Sri Lanka\nHotline: 077-2634497',
       receiptFooter: 'Ayubowan! Thank you for purchasing authentic ayurvedic healthcare products.',
       returnPolicyText: 'Medicines & opened herbal products once sold cannot be returned.',
     },
@@ -196,7 +196,7 @@ export async function importDeegayuData() {
     },
     update: {
       name: 'Main Branch',
-      address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
+      address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
       phone: '0772634497',
       isPrimary: true,
       isActive: true,
@@ -205,7 +205,7 @@ export async function importDeegayuData() {
       tenantId: tenant.id,
       code: 'MAIN-01',
       name: 'Main Branch',
-      address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
+      address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
       phone: '0772634497',
       isPrimary: true,
       isActive: true,
@@ -293,7 +293,7 @@ export async function importDeegayuData() {
       tenantId: tenant.id,
       code: 'OWNER',
       name: 'Business Owner',
-      description: 'Full administrative and cashier access to Deegayu Weda Madura',
+      description: 'Full administrative and cashier access to Deegayu Weda Madhura',
       isSystem: true,
     },
   });
@@ -635,7 +635,7 @@ export async function importDeegayuData() {
     'Skipped Items': skippedCount,
   });
 
-  console.log('\n🔑 DEEGAYU WEDA MADURA - LOGIN CREDENTIALS:');
+  console.log('\n🔑 DEEGAYU WEDA MADHURA - LOGIN CREDENTIALS:');
   console.log(`   URL:      http://localhost:3000/dashboard/pos`);
   console.log(`   Email:    ${ownerEmail}`);
   console.log(`   Password: ${ownerPlainPassword}`);

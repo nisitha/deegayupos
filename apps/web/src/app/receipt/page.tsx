@@ -34,7 +34,7 @@ export default function PublicReceiptPage() {
     }
   }, []);
 
-  const storeName = 'Deegayu Weda Madura';
+  const storeName = 'Deegayu Weda Madhura';
   const legalName = 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd';
   const address = 'Main Street, Kalutara, Western Province, Sri Lanka';
   const phone = '+94 34 222 3456';

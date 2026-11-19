@@ -98,8 +98,8 @@ export function Header() {
   const currentBranchName = currentBranch?.name || (selectedBranchId === null ? 'All Branches' : 'Main Branch');
   const displayName = user?.fullName || 'Dr. Deegayu (Owner)';
   const displayRole = user?.role || tenant?.role || 'OWNER';
-  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
-  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madura';
+  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madhura';
+  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madhura';
 
   return (
     <>

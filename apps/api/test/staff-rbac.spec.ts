@@ -15,7 +15,7 @@ describe('PixelCraft POS - Step 5: Staff Accounts, RBAC & Cashier Attribution Su
 
   const AUTH_TENANT: AuthTenant = {
     id: TENANT_ID,
-    name: 'Deegayu Weda Madura',
+    name: 'Deegayu Weda Madhura',
     slug: 'deegayu',
     role: 'OWNER',
     roleId: OWNER_ROLE_ID,

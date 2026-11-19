@@ -466,7 +466,7 @@ export default function CustomersManagementPage() {
                 </span>
               </h1>
               <p className="text-xs text-slate-500 font-medium">
-                Deegayu Weda Madura • Retail Credit, Wholesale Accounts & Debt Settlement
+                Deegayu Weda Madhura • Retail Credit, Wholesale Accounts & Debt Settlement
               </p>
             </div>
           </div>

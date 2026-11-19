@@ -254,7 +254,7 @@ export default function CashReconciliationPage() {
 
   // Bank Deposits List (E)
   const [bankDeposits, setBankDeposits] = useState<BankDepositItem[]>([
-    { bank_name: 'BOC', account_number: '84200192', account_name: 'Deegayu Weda Madura (Pvt) Ltd', amount: 0 },
+    { bank_name: 'BOC', account_number: '84200192', account_name: 'Deegayu Weda Madhura (Pvt) Ltd', amount: 0 },
   ]);
 
   // System Cash Sales & Cashier data
@@ -537,10 +537,12 @@ export default function CashReconciliationPage() {
   // ==========================================
   // DATA LOADING ENGINE
   // ==========================================
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (isBackground = false) => {
     const fetchId = ++fetchIdRef.current;
-    setLoading(true);
-    setSaveSuccessMsg(null);
+    if (!isBackground) {
+      setLoading(true);
+      setSaveSuccessMsg(null);
+    }
 
     try {
       // =========================================================================
@@ -554,63 +556,78 @@ export default function CashReconciliationPage() {
         // Fetch company bank accounts for the deposit dropdown
         const bankAccs = await reconciliationApi.getBankAccounts(tenantId);
         if (fetchId !== fetchIdRef.current) return;
-        setCompanyBankAccounts(bankAccs);
+        setCompanyBankAccounts((prev) => (JSON.stringify(prev) !== JSON.stringify(bankAccs) ? bankAccs : prev));
 
         if (effectiveBranchId) {
           const worksheet = await reconciliationApi.loadReconciliationWorksheet(effectiveBranchId, todayStr);
           if (fetchId !== fetchIdRef.current) return;
-          setWorksheetData(worksheet);
-          setSystemCashSales(worksheet.systemCashSales);
-          setCashierSummaries(worksheet.cashierBreakdown);
 
-          if (worksheet.existingRec) {
-            const rec = worksheet.existingRec;
-            setExistingRecord(rec);
-            setOpeningFloatA(Number(rec.opening_float_a) || 0);
-            setCashExpensesB(Number(rec.cash_expenses_b) || 0);
-            setGeneralNotes(rec.notes || '');
+          if (!isBackground) {
+            setWorksheetData(worksheet);
+            setSystemCashSales(worksheet.systemCashSales);
+            setCashierSummaries(worksheet.cashierBreakdown);
 
-            if (rec.denominations && typeof rec.denominations === 'object') {
-              const loadedDenoms: Record<number, number> = {};
-              SRI_LANKA_DENOMINATIONS.forEach((d) => {
-                loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
-              });
-              setDenominations(loadedDenoms);
-            }
+            if (worksheet.existingRec) {
+              const rec = worksheet.existingRec;
+              setExistingRecord(rec);
+              setOpeningFloatA(Number(rec.opening_float_a) || 0);
+              setCashExpensesB(Number(rec.cash_expenses_b) || 0);
+              setGeneralNotes(rec.notes || '');
 
-            if (worksheet.existingDeposits.length > 0) {
-              setBankDeposits(worksheet.existingDeposits);
-            }
-            setIsFloatLocked(true);
-          } else {
-            setExistingRecord(null);
-            if (worksheet.previousClosingF !== null) {
-              setOpeningFloatA(worksheet.previousClosingF);
+              if (rec.denominations && typeof rec.denominations === 'object') {
+                const loadedDenoms: Record<number, number> = {};
+                SRI_LANKA_DENOMINATIONS.forEach((d) => {
+                  loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
+                });
+                setDenominations(loadedDenoms);
+              }
+
+              if (worksheet.existingDeposits.length > 0) {
+                setBankDeposits(worksheet.existingDeposits);
+              }
               setIsFloatLocked(true);
             } else {
-              setOpeningFloatA(0);
-              setIsFloatLocked(false);
+              setExistingRecord(null);
+              if (worksheet.previousClosingF !== null) {
+                setOpeningFloatA(worksheet.previousClosingF);
+                setIsFloatLocked(true);
+              } else {
+                setOpeningFloatA(0);
+                setIsFloatLocked(false);
+              }
+
+              setCashExpensesB(worksheet.autoCashExpenses);
+
+              const initialDenoms: Record<number, number> = {};
+              SRI_LANKA_DENOMINATIONS.forEach((d) => {
+                initialDenoms[d] = 0;
+              });
+              setDenominations(initialDenoms);
+
+              const firstAcc = bankAccs[0];
+              if (firstAcc) {
+                setBankDeposits([
+                  {
+                    bank_name: firstAcc.bank_name,
+                    account_number: firstAcc.account_number,
+                    account_name: firstAcc.account_name,
+                    amount: 0,
+                  },
+                ]);
+              }
             }
-
-            setCashExpensesB(worksheet.autoCashExpenses);
-
-            const initialDenoms: Record<number, number> = {};
-            SRI_LANKA_DENOMINATIONS.forEach((d) => {
-              initialDenoms[d] = 0;
-            });
-            setDenominations(initialDenoms);
-
-            const firstAcc = bankAccs[0];
-            if (firstAcc) {
-              setBankDeposits([
-                {
-                  bank_name: firstAcc.bank_name,
-                  account_number: firstAcc.account_number,
-                  account_name: firstAcc.account_name,
-                  amount: 0,
-                },
-              ]);
-            }
+          } else {
+            // Background sync: silently update live register cash sales & cashier tallies without resetting user input
+            setSystemCashSales((prev) => (prev !== worksheet.systemCashSales ? worksheet.systemCashSales : prev));
+            setCashierSummaries((prev) =>
+              JSON.stringify(prev) !== JSON.stringify(worksheet.cashierBreakdown) ? worksheet.cashierBreakdown : prev
+            );
+            setWorksheetData((prev) => ({
+              ...prev,
+              systemCashSales: worksheet.systemCashSales,
+              cashierBreakdown: worksheet.cashierBreakdown,
+              shifts: worksheet.shifts,
+            }));
           }
         }
         return;
@@ -649,7 +666,7 @@ export default function CashReconciliationPage() {
       // 1. Fetch Company Bank Accounts
       const bankAccs = await reconciliationApi.getBankAccounts(tenantId);
       if (fetchId !== fetchIdRef.current) return;
-      setCompanyBankAccounts(bankAccs);
+      setCompanyBankAccounts((prev) => (JSON.stringify(prev) !== JSON.stringify(bankAccs) ? bankAccs : prev));
 
       // 2. Fetch Multi-Branch Reconciliations
       const recHistory = await reconciliationApi.getReconciliationHistory({
@@ -659,7 +676,7 @@ export default function CashReconciliationPage() {
         status: summaryStatus !== 'all' ? summaryStatus : undefined,
       });
       if (fetchId !== fetchIdRef.current) return;
-      setConsolidatedSummaries(recHistory);
+      setConsolidatedSummaries((prev) => (JSON.stringify(prev) !== JSON.stringify(recHistory) ? recHistory : prev));
 
       // 3. Fetch Consolidated Bank Deposits
       const depositsReport = await reconciliationApi.getBankDepositsReport({
@@ -669,7 +686,9 @@ export default function CashReconciliationPage() {
         endDate: eDate,
       });
       if (fetchId !== fetchIdRef.current) return;
-      setConsolidatedBankDeposits(depositsReport);
+      setConsolidatedBankDeposits((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(depositsReport) ? depositsReport : prev
+      );
 
       // 4. Fetch Consolidated Shortages
       const shortagesReport = await reconciliationApi.getShortagesReport({
@@ -680,7 +699,9 @@ export default function CashReconciliationPage() {
         endDate: eDate,
       });
       if (fetchId !== fetchIdRef.current) return;
-      setConsolidatedShortages(shortagesReport);
+      setConsolidatedShortages((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(shortagesReport) ? shortagesReport : prev
+      );
 
       // 5. Fetch Consolidated Ledger
       const ledgerReport = await reconciliationApi.getConsolidatedLedger({
@@ -690,72 +711,89 @@ export default function CashReconciliationPage() {
         limit: 50,
       });
       if (fetchId !== fetchIdRef.current) return;
-      setConsolidatedLedger(ledgerReport);
+      setConsolidatedLedger((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(ledgerReport) ? ledgerReport : prev
+      );
 
       // 6. Load Worksheet for the selected date & branch
       const branchParam = activeBranchFilter || 'ALL';
       const worksheet = await reconciliationApi.loadReconciliationWorksheet(branchParam, selectedDate);
       if (fetchId !== fetchIdRef.current) return;
-      setWorksheetData(worksheet);
-      setSystemCashSales(worksheet.systemCashSales);
-      setCashierSummaries(worksheet.cashierBreakdown);
 
-      if (worksheet.existingRec) {
-        const rec = worksheet.existingRec;
-        setExistingRecord(rec);
-        setOpeningFloatA(Number(rec.opening_float_a) || 0);
-        setCashExpensesB(Number(rec.cash_expenses_b) || 0);
-        setGeneralNotes(rec.notes || '');
+      if (!isBackground) {
+        setWorksheetData(worksheet);
+        setSystemCashSales(worksheet.systemCashSales);
+        setCashierSummaries(worksheet.cashierBreakdown);
 
-        if (rec.denominations && typeof rec.denominations === 'object') {
-          const loadedDenoms: Record<number, number> = {};
+        if (worksheet.existingRec) {
+          const rec = worksheet.existingRec;
+          setExistingRecord(rec);
+          setOpeningFloatA(Number(rec.opening_float_a) || 0);
+          setCashExpensesB(Number(rec.cash_expenses_b) || 0);
+          setGeneralNotes(rec.notes || '');
+
+          if (rec.denominations && typeof rec.denominations === 'object') {
+            const loadedDenoms: Record<number, number> = {};
+            SRI_LANKA_DENOMINATIONS.forEach((d) => {
+              loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
+            });
+            setDenominations(loadedDenoms);
+          }
+
+          if (worksheet.existingDeposits.length > 0) {
+            setBankDeposits(worksheet.existingDeposits);
+          }
+          setIsFloatLocked(true);
+        } else {
+          setExistingRecord(null);
+          if (worksheet.isHistorical) {
+            setOpeningFloatA(0);
+            setIsFloatLocked(true);
+            setCashExpensesB(worksheet.autoCashExpenses);
+          } else if (worksheet.previousClosingF !== null) {
+            setOpeningFloatA(worksheet.previousClosingF);
+            setIsFloatLocked(true);
+            setCashExpensesB(worksheet.autoCashExpenses);
+          } else {
+            setOpeningFloatA(0);
+            setIsFloatLocked(false);
+            setCashExpensesB(worksheet.autoCashExpenses);
+          }
+
+          const initialDenoms: Record<number, number> = {};
           SRI_LANKA_DENOMINATIONS.forEach((d) => {
-            loadedDenoms[d] = Number((rec.denominations as any)[d]) || 0;
+            initialDenoms[d] = 0;
           });
-          setDenominations(loadedDenoms);
-        }
+          setDenominations(initialDenoms);
 
-        if (worksheet.existingDeposits.length > 0) {
-          setBankDeposits(worksheet.existingDeposits);
-        }
-        setIsFloatLocked(true);
-      } else {
-        setExistingRecord(null);
-        if (worksheet.isHistorical) {
-          setOpeningFloatA(0);
-          setIsFloatLocked(true);
-          setCashExpensesB(worksheet.autoCashExpenses);
-        } else if (worksheet.previousClosingF !== null) {
-          setOpeningFloatA(worksheet.previousClosingF);
-          setIsFloatLocked(true);
-          setCashExpensesB(worksheet.autoCashExpenses);
-        } else {
-          setOpeningFloatA(0);
-          setIsFloatLocked(false);
-          setCashExpensesB(worksheet.autoCashExpenses);
-        }
-
-        const initialDenoms: Record<number, number> = {};
-        SRI_LANKA_DENOMINATIONS.forEach((d) => {
-          initialDenoms[d] = 0;
-        });
-        setDenominations(initialDenoms);
-
-        if (worksheet.existingDeposits.length > 0) {
-          setBankDeposits(worksheet.existingDeposits);
-        } else {
-          const firstAcc = bankAccs[0];
-          if (firstAcc) {
-            setBankDeposits([
-              {
-                bank_name: firstAcc.bank_name,
-                account_number: firstAcc.account_number,
-                account_name: firstAcc.account_name,
-                amount: 0,
-              },
-            ]);
+          if (worksheet.existingDeposits.length > 0) {
+            setBankDeposits(worksheet.existingDeposits);
+          } else {
+            const firstAcc = bankAccs[0];
+            if (firstAcc) {
+              setBankDeposits([
+                {
+                  bank_name: firstAcc.bank_name,
+                  account_number: firstAcc.account_number,
+                  account_name: firstAcc.account_name,
+                  amount: 0,
+                },
+              ]);
+            }
           }
         }
+      } else {
+        // Background sync: update live totals without clearing form state
+        setSystemCashSales((prev) => (prev !== worksheet.systemCashSales ? worksheet.systemCashSales : prev));
+        setCashierSummaries((prev) =>
+          JSON.stringify(prev) !== JSON.stringify(worksheet.cashierBreakdown) ? worksheet.cashierBreakdown : prev
+        );
+        setWorksheetData((prev) => ({
+          ...prev,
+          systemCashSales: worksheet.systemCashSales,
+          cashierBreakdown: worksheet.cashierBreakdown,
+          shifts: worksheet.shifts,
+        }));
       }
 
       // 7. Load Shift Financial Adjustments (Shortages & Extra Income for Owner)
@@ -765,7 +803,9 @@ export default function CashReconciliationPage() {
         });
         if (fetchId !== fetchIdRef.current) return;
         if (adjRes.success && adjRes.data) {
-          setShiftAdjustments(adjRes.data);
+          setShiftAdjustments((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(adjRes.data) ? adjRes.data : prev
+          );
         }
       } catch (e) {
         console.warn('[Reconciliation] Error loading shift financial adjustments:', e);
@@ -773,7 +813,7 @@ export default function CashReconciliationPage() {
     } catch (err) {
       console.error('Error loading consolidated reconciliation data:', err);
     } finally {
-      if (fetchId === fetchIdRef.current) {
+      if (!isBackground && fetchId === fetchIdRef.current) {
         setLoading(false);
       }
     }
@@ -797,11 +837,11 @@ export default function CashReconciliationPage() {
   ]);
 
   useEffect(() => {
-    loadAllData();
+    loadAllData(false);
   }, [loadAllData]);
 
-  // Wire Real-time sync for live bill & shift events
-  useRealtimePosSync(loadAllData);
+  // Wire Real-time sync for live bill & shift events silently in the background
+  useRealtimePosSync((isBg) => loadAllData(isBg ?? true));
 
   // Shortage split calculation for worksheet
   useEffect(() => {
@@ -847,7 +887,7 @@ export default function CashReconciliationPage() {
     const defaultAcc = firstAcc || {
       bank_name: 'BOC',
       account_number: '84200192',
-      account_name: 'Deegayu Weda Madura (Pvt) Ltd',
+      account_name: 'Deegayu Weda Madhura (Pvt) Ltd',
     };
     setBankDeposits((prev) => [
       ...prev,
@@ -1195,7 +1235,7 @@ export default function CashReconciliationPage() {
 
           {/* Refresh Button */}
           <button
-            onClick={() => loadAllData()}
+            onClick={() => loadAllData(false)}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
           >
@@ -2241,7 +2281,7 @@ export default function CashReconciliationPage() {
                 <div className="text-xl font-bold text-slate-100">
                   LKR {bankDepositTotals.boc.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">A/C: 84200192 (Deegayu Weda Madura)</div>
+                <div className="text-xs text-slate-400 mt-1">A/C: 84200192 (Deegayu Weda Madhura)</div>
               </div>
               <div className="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-800/80">
                 Primary wholesale & clinic operating account
@@ -4178,7 +4218,7 @@ export default function CashReconciliationPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Deegayu Weda Madura (Pvt) Ltd"
+                  placeholder="e.g. Deegayu Weda Madhura (Pvt) Ltd"
                   value={newAccountForm.account_name}
                   onChange={(e) => setNewAccountForm({ ...newAccountForm, account_name: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 outline-none"
@@ -4317,7 +4357,7 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       <div className="hidden print:block text-black bg-white p-6 font-sans">
         <div className="text-center border-b pb-4 mb-4">
-          <h2 className="text-2xl font-black tracking-tight">{business?.name || 'Deegayu Weda Madura'}</h2>
+          <h2 className="text-2xl font-black tracking-tight">{business?.name || 'Deegayu Weda Madhura'}</h2>
           <p className="text-sm font-semibold">DAILY CASH RECONCILIATION & DEPOSIT SLIP</p>
           <p className="text-xs text-gray-600">
             Branch: {currentBranchName} • Date: {selectedDate} • Printed on: {new Date().toLocaleString()}

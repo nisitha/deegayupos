@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Save,
   Printer,
@@ -30,11 +29,10 @@ import { uploadStoreLogo } from '../../../lib/upload-store-logo';
 import { supabase } from '../../../lib/supabase';
 
 export default function SettingsDocumentPage() {
-  const router = useRouter();
   const { business, refreshProfile, hasPermission } = useTenantBranch();
 
   // 1. Store Identity & Contact States
-  const [storeName, setStoreName] = useState('DEEGAYU WEDA MADURA');
+  const [storeName, setStoreName] = useState('DEEGAYU WEDA MADHURA');
   const [legalName, setLegalName] = useState('Deegayu Ayurvedic Products & Health Care (Pvt) Ltd');
   const [branchName, setBranchName] = useState('Kalutara Flagship Dispensary');
   const [logoUrl, setLogoUrl] = useState('');
@@ -52,7 +50,7 @@ export default function SettingsDocumentPage() {
 
   // 3. Custom Receipt Notes & Policy
   const [receiptHeaderNote, setReceiptHeaderNote] = useState(
-    'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary',
+    'Welcome to Deegayu Weda Madhura • Traditional Ayurvedic Dispensary',
   );
   const [receiptFooterNote, setReceiptFooterNote] = useState(
     'Thank You Come Again! Return within 7 days.',
@@ -129,7 +127,6 @@ export default function SettingsDocumentPage() {
       }
 
       await refreshProfile();
-      router.refresh();
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -172,7 +169,6 @@ export default function SettingsDocumentPage() {
       }
 
       await refreshProfile();
-      router.refresh();
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -327,7 +323,6 @@ export default function SettingsDocumentPage() {
       setSaveSuccess(true);
       setIsDirty(false);
       await refreshProfile();
-      router.refresh();
       setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err: unknown) {
       console.error('Failed to save store settings:', err);
@@ -344,7 +339,7 @@ export default function SettingsDocumentPage() {
   const applyPreset = (preset: 'deegayu-kalutara' | 'deegayu-colombo' | 'compact-58mm') => {
     setIsDirty(true);
     if (preset === 'deegayu-kalutara') {
-      setStoreName('DEEGAYU WEDA MADURA');
+      setStoreName('DEEGAYU WEDA MADHURA');
       setLegalName('Deegayu Ayurvedic Products & Health Care (Pvt) Ltd');
       setBranchName('Kalutara Flagship Dispensary');
       setAddress('Main Street, Kalutara, Western Province, Sri Lanka');
@@ -356,7 +351,7 @@ export default function SettingsDocumentPage() {
       setShowVat(true);
       setShowBarcode(true);
       setShowQr(true);
-      setReceiptHeaderNote('Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary');
+      setReceiptHeaderNote('Welcome to Deegayu Weda Madhura • Traditional Ayurvedic Dispensary');
       setReceiptFooterNote('Wishing you healthy living! Return within 7 days.');
       setReturnPolicy('Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.');
     } else if (preset === 'deegayu-colombo') {
@@ -381,7 +376,7 @@ export default function SettingsDocumentPage() {
       setShowVat(true);
       setShowBarcode(true);
       setShowQr(false);
-      setReceiptHeaderNote('Deegayu Weda Madura (Quick Dispense)');
+      setReceiptHeaderNote('Deegayu Weda Madhura (Quick Dispense)');
       setReceiptFooterNote('Thank You Come Again!');
     }
   };
@@ -520,7 +515,7 @@ export default function SettingsDocumentPage() {
                       setStoreName(e.target.value);
                       setIsDirty(true);
                     }}
-                    placeholder="e.g. DEEGAYU WEDA MADURA"
+                    placeholder="e.g. DEEGAYU WEDA MADHURA"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#7052FF] focus:bg-white transition-colors"
                     required
                   />
@@ -913,7 +908,7 @@ export default function SettingsDocumentPage() {
                     setReceiptHeaderNote(e.target.value);
                     setIsDirty(true);
                   }}
-                  placeholder="e.g. Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary"
+                  placeholder="e.g. Welcome to Deegayu Weda Madhura • Traditional Ayurvedic Dispensary"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7052FF] focus:bg-white transition-colors"
                 />
               </div>
@@ -1015,7 +1010,7 @@ export default function SettingsDocumentPage() {
               )}
 
               <div className="text-sm font-black tracking-tight text-slate-950 uppercase leading-snug">
-                {storeName || 'DEEGAYU WEDA MADURA'}
+                {storeName || 'DEEGAYU WEDA MADHURA'}
               </div>
 
               <div className="text-[10px] text-slate-600 font-sans font-medium flex items-center justify-center gap-1">
@@ -1175,7 +1170,7 @@ export default function SettingsDocumentPage() {
                 </div>
               )}
               <div className="text-[7px] text-slate-400 uppercase tracking-wider pt-1 font-mono">
-                Powered by PixelCraft POS • Deegayu Weda Madura
+                Powered by PixelCraft POS • Deegayu Weda Madhura
               </div>
             </div>
           </div>

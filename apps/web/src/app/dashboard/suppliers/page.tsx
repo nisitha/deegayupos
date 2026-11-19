@@ -204,7 +204,7 @@ export default function SuppliersPage() {
               Suppliers Directory
             </h1>
             <p className="text-xs text-slate-500">
-              {totalCount || 94} Registered Ayurvedic & Pharmaceutical Vendors for Deegayu Weda Madura
+              {totalCount || 94} Registered Ayurvedic & Pharmaceutical Vendors for Deegayu Weda Madhura
             </p>
           </div>
         </div>
@@ -390,7 +390,7 @@ export default function SuppliersPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Add New Supplier</h3>
-                  <p className="text-[11px] text-slate-500">Deegayu Weda Madura Vendor Master</p>
+                  <p className="text-[11px] text-slate-500">Deegayu Weda Madhura Vendor Master</p>
                 </div>
               </div>
               <button

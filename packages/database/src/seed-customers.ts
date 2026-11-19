@@ -97,7 +97,7 @@ const SEED_CUSTOMERS = [
 export async function seedCustomers() {
   console.log('\n========================================================================');
   console.log('👤 PIXELCRAFT POS - CUSTOMER CRM & CREDIT LEDGER SEEDING');
-  console.log('   Target Tenant: Deegayu Weda Madura');
+  console.log('   Target Tenant: Deegayu Weda Madhura');
   console.log('========================================================================\n');
 
   const tenant = await prisma.business.findFirst({

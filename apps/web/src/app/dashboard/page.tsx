@@ -182,40 +182,55 @@ export default function DashboardPage() {
     }
   };
 
-  const loadDashboardData = useCallback(async () => {
-    // Zero sales/revenue telemetry loaded for non-owner staff
-    if (!isOwner) return;
+  const loadDashboardData = useCallback(
+    async (isBackground = false) => {
+      // Zero sales/revenue telemetry loaded for non-owner staff
+      if (!isOwner) return;
 
-    try {
-      setLoading(true);
-      const effectiveBranch = selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined;
-      const [metricsRes, activityRes, analyticsRes] = await Promise.all([
-        dashboardApi.getMetrics(effectiveBranch),
-        dashboardApi.getActivity(10, effectiveBranch),
-        posApi.getAnalytics<AnalyticsData>({
-          period,
-          branchId: effectiveBranch,
-        }).catch(() => ({ data: null })),
-      ]);
+      try {
+        if (!isBackground) {
+          setLoading(true);
+        }
+        const effectiveBranch = selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined;
+        const [metricsRes, activityRes, analyticsRes] = await Promise.all([
+          dashboardApi.getMetrics(effectiveBranch),
+          dashboardApi.getActivity(10, effectiveBranch),
+          posApi
+            .getAnalytics<AnalyticsData>({
+              period,
+              branchId: effectiveBranch,
+            })
+            .catch(() => ({ data: null })),
+        ]);
 
-      if (metricsRes.data) setMetrics(metricsRes.data);
-      if (activityRes.data) setActivity(activityRes.data);
-      if (analyticsRes?.data) setAnalytics(analyticsRes.data);
-    } catch (err) {
-      console.error('Failed to load dashboard telemetry:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [isOwner, selectedBranchId, period]);
+        if (metricsRes.data) {
+          setMetrics((prev) => (JSON.stringify(prev) !== JSON.stringify(metricsRes.data) ? metricsRes.data : prev));
+        }
+        if (activityRes.data) {
+          setActivity((prev) => (JSON.stringify(prev) !== JSON.stringify(activityRes.data) ? activityRes.data : prev));
+        }
+        if (analyticsRes?.data) {
+          setAnalytics((prev) => (JSON.stringify(prev) !== JSON.stringify(analyticsRes.data) ? analyticsRes.data : prev));
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard telemetry:', err);
+      } finally {
+        if (!isBackground) {
+          setLoading(false);
+        }
+      }
+    },
+    [isOwner, selectedBranchId, period]
+  );
 
   useEffect(() => {
     if (isOwner) {
-      loadDashboardData();
+      loadDashboardData(false);
     }
   }, [isOwner, loadDashboardData]);
 
-  // Wire Real-time sync for live bill & shift events
-  useRealtimePosSync(loadDashboardData);
+  // Wire Real-time sync for live bill & shift events silently in the background
+  useRealtimePosSync((isBg) => loadDashboardData(isBg ?? true));
 
   // Loading state during initial context hydration
   if (!isMounted || isTenantLoading) {
@@ -305,7 +320,7 @@ export default function DashboardPage() {
           </div>
 
           <button
-            onClick={loadDashboardData}
+            onClick={() => loadDashboardData(false)}
             disabled={loading}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors disabled:opacity-50"
           >

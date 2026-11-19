@@ -522,11 +522,11 @@ export const businessApi = {
 export const tenantSettingsApi = {
   getSettings: async (slug = 'deegayu'): Promise<ApiResponse<TenantStoreSettingsDto>> => {
     let settings: any = {
-      name: 'Deegayu Weda Madura',
+      name: 'Deegayu Weda Madhura',
       legalName: 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
       phone: '0772634497',
       email: 'info@deegayu.pixelcraftlk.com',
-      address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
+      address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
       logoUrl: null,
       receiptPaperWidth: '80mm',
       showLogo: true,
@@ -1033,7 +1033,7 @@ export const posApi = {
     return posApi.checkout(data);
   },
   checkout: async (data: CheckoutPayload): Promise<ApiResponse<SaleDto>> => {
-    // 1. Resolve Tenant ID (Fallback to Deegayu Weda Madura seeded UUID)
+    // 1. Resolve Tenant ID (Fallback to Deegayu Weda Madhura seeded UUID)
     let tenantId = DEEGAYU_TENANT_ID;
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('pixelcraft_tenant_id');
@@ -1595,11 +1595,11 @@ export const posApi = {
         changeDue: Number(sale.changeDue || 0),
         createdAt: sale.createdAt,
         business: {
-          name: 'Deegayu Weda Madura',
+          name: 'Deegayu Weda Madhura',
           legalName: 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
           phone: '0772634497',
-          address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
-          receiptHeader: 'DEEGAYU WEDA MADURA\nAyurvedic Pharmacy & Healthcare Store',
+          address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
+          receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store',
           receiptFooter: 'Ayubowan! Thank you for purchasing authentic ayurvedic healthcare products.',
         },
         branch: {
@@ -1615,7 +1615,7 @@ export const posApi = {
         },
         settings: {
           taxNumber: 'VAT-10928392-8000',
-          receiptHeader: 'DEEGAYU WEDA MADURA\nAyurvedic Pharmacy & Healthcare Store',
+          receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store',
           receiptFooter: 'Thank You Come Again',
           returnPolicyText: 'Authentic ayurvedic medicine once opened is non-refundable.',
           showBarcode: true,

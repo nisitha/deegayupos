@@ -152,12 +152,14 @@ export default function SalesOrdersPage() {
 
   // Fetch Sales Data reactively based on active filters with Request Sequence Guard
   const fetchSales = useCallback(
-    async (isManualRefresh = false) => {
+    async (mode?: 'manual' | 'background' | boolean) => {
+      const isBackground = mode === 'background' || mode === true;
+      const isManualRefresh = mode === 'manual';
       const fetchId = ++fetchIdRef.current;
       try {
         if (isManualRefresh) {
           setIsRefreshing(true);
-        } else {
+        } else if (!isBackground) {
           setLoading(true);
         }
 
@@ -180,11 +182,25 @@ export default function SalesOrdersPage() {
         if (fetchId !== fetchIdRef.current) return;
 
         if (res.data) {
-          setSales(res.data.items || []);
-          setTotalCount(res.data.total || 0);
-          setTotalPages(res.data.totalPages || 1);
-          if (res.data.summary) {
-            setKpiSummary(res.data.summary);
+          setSales((prev) => {
+            const newItems = res.data.items || [];
+            if (
+              prev.length === newItems.length &&
+              prev[0]?.id === newItems[0]?.id &&
+              prev[0]?.updatedAt === newItems[0]?.updatedAt &&
+              prev[prev.length - 1]?.id === newItems[newItems.length - 1]?.id
+            ) {
+              return prev;
+            }
+            return newItems;
+          });
+          setTotalCount((prev) => (prev !== (res.data.total || 0) ? res.data.total || 0 : prev));
+          setTotalPages((prev) => (prev !== (res.data.totalPages || 1) ? res.data.totalPages || 1 : prev));
+          const newSummary = res.data.summary;
+          if (newSummary) {
+            setKpiSummary((prev) =>
+              JSON.stringify(prev) !== JSON.stringify(newSummary) ? newSummary : prev
+            );
           }
         }
       } catch (err) {
@@ -193,8 +209,11 @@ export default function SalesOrdersPage() {
         }
       } finally {
         if (fetchId === fetchIdRef.current) {
-          setLoading(false);
-          setIsRefreshing(false);
+          if (isManualRefresh) {
+            setIsRefreshing(false);
+          } else if (!isBackground) {
+            setLoading(false);
+          }
         }
       }
     },
@@ -214,11 +233,11 @@ export default function SalesOrdersPage() {
   );
 
   useEffect(() => {
-    fetchSales();
+    fetchSales(false);
   }, [fetchSales]);
 
-  // Wire Real-time sync for live bill & shift events
-  useRealtimePosSync(fetchSales);
+  // Wire Real-time sync for live bill & shift events silently in the background
+  useRealtimePosSync((isBg) => fetchSales(isBg ?? true));
 
   // Instant 0ms Filter Handlers
   const handlePeriodChange = (newPeriod: PeriodFilter) => {
@@ -681,7 +700,7 @@ export default function SalesOrdersPage() {
 
           {/* Refresh Button */}
           <button
-            onClick={() => fetchSales(true)}
+            onClick={() => fetchSales('manual')}
             disabled={loading || isRefreshing}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
           >
@@ -1543,7 +1562,7 @@ export default function SalesOrdersPage() {
                       <div className="flex items-center gap-2">
                         <Award className="w-6 h-6 text-[#005BD3]" />
                         <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">
-                          Deegayu Weda Madura
+                          Deegayu Weda Madhura
                         </h1>
                       </div>
                       <p className="text-xs text-slate-700 font-bold mt-0.5">
@@ -1770,7 +1789,7 @@ export default function SalesOrdersPage() {
                       </div>
                       <div className="text-center text-slate-600">
                         <span className="font-bold text-slate-800">Dr. Deegayu (Managing Director)</span>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Deegayu Weda Madura Financial Governance</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Deegayu Weda Madhura Financial Governance</p>
                       </div>
                     </div>
                   </div>

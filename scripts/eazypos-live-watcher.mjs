@@ -3,7 +3,7 @@
 /**
  * =============================================================================
  * PIXELCRAFT POS — EAZYPOS99 AUTOMATED LIVE WATCHER & CATCH-UP SYNC ENGINE
- * Tenant: Deegayu Weda Madura (Tenant ID: 0fef1423-5d89-4147-8af8-17c7e641c88a)
+ * Tenant: Deegayu Weda Madhura (Tenant ID: 0fef1423-5d89-4147-8af8-17c7e641c88a)
  * 
  * Functions:
  * 1. Checks cutover kill-switch in `public.legacy_sync_config`.

@@ -278,7 +278,7 @@ export function generateEscPosReceipt(
   // 2. Header
   builder.align('center');
   builder.bold(true).size('title');
-  builder.textLine(options.storeName || 'DEEGAYU WEDA MADURA');
+  builder.textLine(options.storeName || 'DEEGAYU WEDA MADHURA');
   builder.size('normal');
 
   const outletDisplayName = options.branchName || (sale as any).branchName || 'Main Store';

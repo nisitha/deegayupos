@@ -282,7 +282,7 @@ export function ReceiptModal({
   };
 
   const businessName =
-    receiptData?.business?.legalName || receiptData?.business?.name || business?.name || 'DEEGAYU WEDA MADURA';
+    receiptData?.business?.legalName || receiptData?.business?.name || business?.name || 'DEEGAYU WEDA MADHURA';
   const logoUrl =
     (receiptData?.settings as { logoUrl?: string | null } | undefined)?.logoUrl ||
     (receiptData?.business as { logoUrl?: string | null } | undefined)?.logoUrl ||

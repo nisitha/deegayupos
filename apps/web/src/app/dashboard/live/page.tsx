@@ -37,7 +37,7 @@ export default function LiveMonitorPage() {
             </span>
           </div>
           <div className="text-2xl font-black text-slate-900 mt-2">REG-01 (Main Counter)</div>
-          <p className="text-xs text-slate-500 mt-1">Cashier Station • Deegayu Weda Madura</p>
+          <p className="text-xs text-slate-500 mt-1">Cashier Station • Deegayu Weda Madhura</p>
         </div>
 
         <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">

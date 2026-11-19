@@ -12,7 +12,7 @@ describe('PixelCraft POS - Phase 12: Customer CRM, Khata Ledger & Debt Settlemen
 
   const AUTH_TENANT: AuthTenant = {
     id: TENANT_ID,
-    name: 'Deegayu Weda Madura',
+    name: 'Deegayu Weda Madhura',
     slug: 'deegayu',
     role: 'MANAGER',
     roleId: 'role-mgr-001',

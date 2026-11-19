@@ -159,7 +159,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             id: '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
             name: 'Main Branch',
             code: 'MAIN-01',
-            address: 'Deegayu Weda Madura, Colombo, Sri Lanka',
+            address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
             phone: '0772634497',
             isPrimary: true,
             isActive: true,
@@ -195,9 +195,9 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
 
       // Check localStorage cached settings first
       let localLogo: string | null = null;
-      let localName = 'Deegayu Weda Madura';
+      let localName = 'Deegayu Weda Madhura';
       let localPhone = '0772634497';
-      let localAddress = 'Deegayu Weda Madura, Colombo, Sri Lanka';
+      let localAddress = 'Deegayu Weda Madhura, Colombo, Sri Lanka';
 
       if (typeof window !== 'undefined') {
         try {
@@ -234,7 +234,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         id: bizData?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
         name: bizData?.name || localName,
         slug: 'deegayu',
-        legalName: bizData?.legal_name || bizData?.legalName || 'Deegayu Weda Madura (Pvt) Ltd',
+        legalName: bizData?.legal_name || bizData?.legalName || 'Deegayu Weda Madhura (Pvt) Ltd',
         logoUrl: localLogo || bizData?.logo_url || bizData?.logoUrl || null,
         phone: bizData?.phone || localPhone,
         email: bizData?.email || 'info@deegayu.pixelcraftlk.com',

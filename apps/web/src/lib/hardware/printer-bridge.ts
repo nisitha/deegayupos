@@ -310,7 +310,7 @@ export class PrinterBridge {
             </div>
           ` : ''}
           <div class="center extrabold" style="font-size: ${paperWidth === '58mm' ? '16px' : '19px'}; line-height: 1.15; text-transform: uppercase;">
-            ${storeDetails?.storeName || 'DEEGAYU WEDA MADURA'}
+            ${storeDetails?.storeName || 'DEEGAYU WEDA MADHURA'}
           </div>
           <div class="center bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '13px'}; margin-top: 3px;">
             Outlet: ${resolvedBranchName}
@@ -554,7 +554,7 @@ export class PrinterBridge {
     // Construct raw ESC/POS binary buffer
     const escposOptions: EscPosReceiptOptions = {
       paperWidth: settings.paperWidth,
-      storeName: storeDetails?.storeName || 'DEEGAYU WEDA MADURA',
+      storeName: storeDetails?.storeName || 'DEEGAYU WEDA MADHURA',
       branchName: storeDetails?.branchName || (sale as any).branchName || 'Main Store',
       address: storeDetails?.address,
       phone: storeDetails?.phone,

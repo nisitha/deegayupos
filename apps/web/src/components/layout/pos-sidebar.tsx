@@ -129,8 +129,8 @@ export function PosSidebar() {
     performAppLogout(router);
   };
 
-  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madura';
-  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madura';
+  const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madhura';
+  const businessName = rawBusinessName.replace(/^[^\w\s/]*\s*\/\s*/, '').trim() || 'Deegayu Weda Madhura';
   const initial = businessName.charAt(0) || 'D';
   const logoUrl = business?.logoUrl || (tenant as { logoUrl?: string | null } | null)?.logoUrl;
   const [logoError, setLogoError] = useState(false);
