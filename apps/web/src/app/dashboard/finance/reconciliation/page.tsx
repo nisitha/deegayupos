@@ -86,11 +86,40 @@ export default function CashReconciliationPage() {
 
   // Get current date in Sri Lanka (UTC+5:30)
   const getTodaySriLanka = (): string => {
-    const now = new Date();
-    const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-    const slTime = new Date(utcTime + 5.5 * 3600000);
-    const datePart = slTime.toISOString().split('T')[0];
-    return datePart || new Date().toISOString().slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  };
+
+  const getYesterdaySriLanka = (): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  };
+
+  const getDaysAgoSriLanka = (days: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  };
+
+  const getFirstDayOfMonthSriLanka = (): string => {
+    const today = getTodaySriLanka();
+    const [y, m] = today.split('-');
+    return `${y}-${m}-01`;
   };
 
   // Set default tab based on role and URL params (Strictly locked to worksheet for Staff, Shift Tally for Owner)
@@ -128,6 +157,8 @@ export default function CashReconciliationPage() {
   const [branchFloatError, setBranchFloatError] = useState<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodaySriLanka());
+  const [selectedEndDate, setSelectedEndDate] = useState<string>(getTodaySriLanka());
+  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'last7' | 'thisMonth' | 'custom'>('today');
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
@@ -174,20 +205,80 @@ export default function CashReconciliationPage() {
     }
   }, [selectedBranchId, isOwner]);
 
-  // Date navigation handlers with immediate 0ms loading state
+  // Date range preset handlers with immediate 0ms loading state
+  const handlePresetSelect = (preset: 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'custom') => {
+    if (!isOwner) return;
+    setLoading(true);
+    setDatePreset(preset);
+    const today = getTodaySriLanka();
+    if (preset === 'today') {
+      setSelectedDate(today);
+      setSelectedEndDate(today);
+    } else if (preset === 'yesterday') {
+      const y = getYesterdaySriLanka();
+      setSelectedDate(y);
+      setSelectedEndDate(y);
+    } else if (preset === 'last7') {
+      setSelectedDate(getDaysAgoSriLanka(6));
+      setSelectedEndDate(today);
+    } else if (preset === 'thisMonth') {
+      setSelectedDate(getFirstDayOfMonthSriLanka());
+      setSelectedEndDate(today);
+    }
+  };
+
+  const handleStartDateChange = (newFrom: string) => {
+    if (!isOwner) return;
+    setLoading(true);
+    setDatePreset('custom');
+    setSelectedDate(newFrom);
+    if (newFrom > selectedEndDate) {
+      setSelectedEndDate(newFrom);
+    }
+  };
+
+  const handleEndDateChange = (newTo: string) => {
+    if (!isOwner) return;
+    setLoading(true);
+    setDatePreset('custom');
+    setSelectedEndDate(newTo);
+    if (newTo < selectedDate) {
+      setSelectedDate(newTo);
+    }
+  };
+
   const handleDateChange = (newDate: string) => {
     if (!isOwner && newDate !== getTodaySriLanka()) return; // Staff locked to today
     setLoading(true);
+    setDatePreset('custom');
     setSelectedDate(newDate);
+    setSelectedEndDate(newDate);
   };
 
   const handleDateStep = (days: number) => {
     if (!isOwner) return; // Staff locked to today
     setLoading(true);
-    const d = new Date(`${selectedDate}T12:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + days);
-    const dateStr = d.toISOString().split('T')[0] || selectedDate;
-    setSelectedDate(dateStr);
+    const today = getTodaySriLanka();
+
+    if (selectedDate === selectedEndDate) {
+      const d = new Date(`${selectedDate}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + days);
+      const newD = d.toISOString().split('T')[0] || selectedDate;
+      if (days > 0 && newD > today) return;
+      setSelectedDate(newD);
+      setSelectedEndDate(newD);
+    } else {
+      const d1 = new Date(`${selectedDate}T12:00:00Z`);
+      const d2 = new Date(`${selectedEndDate}T12:00:00Z`);
+      d1.setUTCDate(d1.getUTCDate() + days);
+      d2.setUTCDate(d2.getUTCDate() + days);
+      const newFrom = d1.toISOString().split('T')[0] || selectedDate;
+      const newTo = d2.toISOString().split('T')[0] || selectedEndDate;
+      if (days > 0 && newTo > today) return;
+      setSelectedDate(newFrom);
+      setSelectedEndDate(newTo);
+    }
+    setDatePreset('custom');
   };
 
   // ==========================================
@@ -217,11 +308,16 @@ export default function CashReconciliationPage() {
   const [consolidatedBankDeposits, setConsolidatedBankDeposits] = useState<ConsolidatedBankDepositRow[]>([]);
 
   // ==========================================
-  // TAB 3: CASHIER SHORTAGES STATE
+  // TAB 3: CASHIER SHORTAGES STATE & CONTROLS
   // ==========================================
+  const ACTIVE_STAFF = ['Anusha', 'Gindika', 'Kumari', 'Shashini', 'Tharindu'];
   const [shortageCashierFilter, setShortageCashierFilter] = useState<string>('ALL');
   const [shortageBranchFilter, setShortageBranchFilter] = useState<string>(activeBranchFilter);
   const [shortageStatusFilter, setShortageStatusFilter] = useState<'all' | 'pending_payroll' | 'deducted'>('all');
+  const [shortageVarianceTypeFilter, setShortageVarianceTypeFilter] = useState<'shortages' | 'excess' | 'all'>('shortages');
+  const [shortageSearchQuery, setShortageSearchQuery] = useState<string>('');
+  const [shortageSortField, setShortageSortField] = useState<'date' | 'cashier' | 'branch' | 'shift' | 'expected' | 'actual' | 'shortage'>('date');
+  const [shortageSortDir, setShortageSortDir] = useState<'asc' | 'desc'>('desc');
   const [consolidatedShortages, setConsolidatedShortages] = useState<CashierShortageRow[]>([]);
 
   // ==========================================
@@ -481,10 +577,10 @@ export default function CashReconciliationPage() {
 
     // Filter by date scope
     if (adjustmentDateScope === 'selected_date') {
-      return branchFiltered.filter((i) => i.date === selectedDate);
+      return branchFiltered.filter((i) => i.date >= selectedDate && i.date <= selectedEndDate);
     }
     return branchFiltered;
-  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, getBranchName]);
+  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, selectedEndDate, getBranchName]);
 
   // Aggregated Extra Income Log
   const extraIncomeLog = useMemo(() => {
@@ -529,10 +625,338 @@ export default function CashReconciliationPage() {
 
     // Filter by date scope
     if (adjustmentDateScope === 'selected_date') {
-      return branchFiltered.filter((i) => i.date === selectedDate);
+      return branchFiltered.filter((i) => i.date >= selectedDate && i.date <= selectedEndDate);
     }
     return branchFiltered;
-  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, getBranchName]);
+  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, selectedEndDate, getBranchName]);
+
+  // ==========================================
+  // UNIFIED CASHIER VARIANCE & SHORTAGE LEDGER
+  // ==========================================
+  const shortageLedgerRows = useMemo(() => {
+    const list: Array<{
+      id: string;
+      shiftId?: string;
+      date: string;
+      branchId: string;
+      branchName: string;
+      shiftNumber: number;
+      shiftLabel: string;
+      cashierName: string;
+      expectedCash: number;
+      actualCash: number;
+      variance: number;
+      shortageAmount: number;
+      excessAmount: number;
+      varianceType: 'shortage' | 'excess' | 'balanced';
+      deductionStatus: 'pending_payroll' | 'deducted' | 'settled';
+      notes: string;
+      status: string;
+    }> = [];
+
+    const shifts = worksheetData.shifts || [];
+    shifts.forEach((sh) => {
+      const shiftInflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
+      const shiftOutflow = (sh.goods_purchased_paid || 0) + (sh.other_expenses || 0) + (sh.banked_amount || 0);
+      const countedDrawer = Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash ?? 0);
+      const expectedDrawer = Number(sh.expected_remaining_drawer_cash ?? (shiftInflow - shiftOutflow));
+      const variance = Number(sh.cash_variance !== undefined ? sh.cash_variance : (countedDrawer - expectedDrawer));
+      const shortage = variance < -0.01 ? Math.abs(Number(sh.salary_deduction_amount) || variance) : 0;
+      const excess = variance > 0.01 ? (Number(sh.extra_income_amount) || variance) : 0;
+      const vType: 'shortage' | 'excess' | 'balanced' = variance < -0.01 ? 'shortage' : variance > 0.01 ? 'excess' : 'balanced';
+
+      list.push({
+        id: `shift-${sh.id}`,
+        shiftId: sh.id,
+        date: sh.shift_date,
+        branchId: sh.branch_id,
+        branchName: sh.branch_name || getBranchName(sh.branch_id),
+        shiftNumber: sh.shift_number || 1,
+        shiftLabel: formatShiftLabel(sh.shift_number),
+        cashierName: sh.cashier_name || 'Staff Cashier',
+        expectedCash: expectedDrawer,
+        actualCash: countedDrawer,
+        variance,
+        shortageAmount: shortage,
+        excessAmount: excess,
+        varianceType: vType,
+        deductionStatus: 'pending_payroll',
+        notes: sh.handover_notes || '',
+        status: sh.status,
+      });
+    });
+
+    // Also include recorded adjustments if any
+    shiftAdjustments.forEach((adj) => {
+      if (adj.shiftId && list.some((item) => item.shiftId === adj.shiftId)) return;
+      const isShortage = adj.adjustmentType === 'salary_deduction';
+      list.push({
+        id: `adj-${adj.id}`,
+        shiftId: adj.shiftId || undefined,
+        date: adj.adjustmentDate,
+        branchId: adj.branchId,
+        branchName: getBranchName(adj.branchId),
+        shiftNumber: adj.shiftNumber || 1,
+        shiftLabel: formatShiftLabel(adj.shiftNumber),
+        cashierName: adj.employeeName || 'Staff Cashier',
+        expectedCash: 0,
+        actualCash: 0,
+        variance: isShortage ? -adj.amount : adj.amount,
+        shortageAmount: isShortage ? adj.amount : 0,
+        excessAmount: !isShortage ? adj.amount : 0,
+        varianceType: isShortage ? 'shortage' : 'excess',
+        deductionStatus: 'pending_payroll',
+        notes: adj.notes || '',
+        status: 'closed',
+      });
+    });
+
+    // 1. Filter by Variance Type
+    let result = list;
+    if (shortageVarianceTypeFilter === 'shortages') {
+      result = result.filter((i) => i.varianceType === 'shortage' || i.shortageAmount > 0);
+    } else if (shortageVarianceTypeFilter === 'excess') {
+      result = result.filter((i) => i.varianceType === 'excess' || i.excessAmount > 0);
+    }
+
+    // 2. Filter by Cashier
+    if (shortageCashierFilter !== 'ALL') {
+      result = result.filter((i) => i.cashierName.toLowerCase().includes(shortageCashierFilter.toLowerCase()));
+    }
+
+    // 3. Filter by Branch
+    if (shortageBranchFilter !== 'ALL') {
+      result = result.filter((i) => i.branchId === shortageBranchFilter || i.branchName === shortageBranchFilter);
+    }
+
+    // 4. Filter by Deduction Status
+    if (shortageStatusFilter !== 'all') {
+      result = result.filter((i) => i.deductionStatus === shortageStatusFilter);
+    }
+
+    // 5. Search Filter
+    if (shortageSearchQuery.trim()) {
+      const q = shortageSearchQuery.toLowerCase().trim();
+      result = result.filter(
+        (i) =>
+          i.cashierName.toLowerCase().includes(q) ||
+          i.branchName.toLowerCase().includes(q) ||
+          i.shiftLabel.toLowerCase().includes(q) ||
+          i.date.includes(q) ||
+          i.notes.toLowerCase().includes(q)
+      );
+    }
+
+    // 6. Sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      if (shortageSortField === 'date') {
+        comparison = a.date.localeCompare(b.date);
+      } else if (shortageSortField === 'cashier') {
+        comparison = a.cashierName.localeCompare(b.cashierName);
+      } else if (shortageSortField === 'branch') {
+        comparison = a.branchName.localeCompare(b.branchName);
+      } else if (shortageSortField === 'shift') {
+        comparison = a.shiftNumber - b.shiftNumber;
+      } else if (shortageSortField === 'expected') {
+        comparison = a.expectedCash - b.expectedCash;
+      } else if (shortageSortField === 'actual') {
+        comparison = a.actualCash - b.actualCash;
+      } else if (shortageSortField === 'shortage') {
+        comparison = a.shortageAmount - b.shortageAmount;
+      }
+      return shortageSortDir === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [
+    worksheetData.shifts,
+    shiftAdjustments,
+    shortageVarianceTypeFilter,
+    shortageCashierFilter,
+    shortageBranchFilter,
+    shortageStatusFilter,
+    shortageSearchQuery,
+    shortageSortField,
+    shortageSortDir,
+    getBranchName,
+  ]);
+
+  // Per-Employee Shortage Summary for Active Staff
+  const staffShortageSummary = useMemo(() => {
+    const summary: Record<string, { count: number; totalShortage: number }> = {};
+    ACTIVE_STAFF.forEach((name) => {
+      summary[name] = { count: 0, totalShortage: 0 };
+    });
+
+    const allShifts = worksheetData.shifts || [];
+    allShifts.forEach((sh) => {
+      const counted = Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash ?? 0);
+      const shiftInflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
+      const shiftOutflow = (sh.goods_purchased_paid || 0) + (sh.other_expenses || 0) + (sh.banked_amount || 0);
+      const expected = Number(sh.expected_remaining_drawer_cash ?? (shiftInflow - shiftOutflow));
+      const variance = Number(sh.cash_variance !== undefined ? sh.cash_variance : (counted - expected));
+      if (variance < -0.01) {
+        const amt = Math.abs(Number(sh.salary_deduction_amount) || variance);
+        const name = sh.cashier_name || '';
+        const matchedStaff = ACTIVE_STAFF.find((s) => name.toLowerCase().includes(s.toLowerCase()));
+        if (matchedStaff && summary[matchedStaff]) {
+          summary[matchedStaff].count += 1;
+          summary[matchedStaff].totalShortage += amt;
+        }
+      }
+    });
+
+    return summary;
+  }, [worksheetData.shifts]);
+
+  const handleSortClick = (field: 'date' | 'cashier' | 'branch' | 'shift' | 'expected' | 'actual' | 'shortage') => {
+    if (shortageSortField === field) {
+      setShortageSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setShortageSortField(field);
+      setShortageSortDir(field === 'date' || field === 'shortage' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIndicator = (field: 'date' | 'cashier' | 'branch' | 'shift' | 'expected' | 'actual' | 'shortage') => {
+    if (shortageSortField !== field) {
+      return <span className="opacity-30 ml-1 text-[10px]">↕</span>;
+    }
+    return <span className="text-amber-400 font-black ml-1 text-xs">{shortageSortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
+  const exportShortagesCsv = () => {
+    const filename = `deegayu-cashier-shortages-${selectedDate}-to-${selectedEndDate}`;
+    const headers = [
+      'Date',
+      'Branch',
+      'Shift',
+      'Cashier Name',
+      'Expected Cash (LKR)',
+      'Actual Counted/Banked (LKR)',
+      'Variance (LKR)',
+      'Shortage Amount (LKR)',
+      'Variance Type',
+      'Handover Remarks',
+    ];
+    const rows = shortageLedgerRows.map((r) => [
+      r.date,
+      r.branchName,
+      r.shiftLabel,
+      r.cashierName,
+      r.expectedCash.toFixed(2),
+      r.actualCash.toFixed(2),
+      r.variance.toFixed(2),
+      r.shortageAmount.toFixed(2),
+      r.varianceType.toUpperCase(),
+      (r.notes || '').replace(/[\r\n]+/g, ' '),
+    ]);
+    exportCsv(filename, headers, rows);
+  };
+
+  const exportDetailedReconciliationCsv = () => {
+    const branchName = activeBranchFilter === 'ALL' ? 'all-branches' : getBranchName(activeBranchFilter).toLowerCase().replace(/\s+/g, '-');
+    const filename = `deegayu-reconciliation-${branchName}-${selectedDate}-to-${selectedEndDate}`;
+    
+    // KPI Summary Block
+    const summaryLines = [
+      ['DEEGAYU WEDA MADHURA - CONSOLIDATED CASH RECONCILIATION REPORT'],
+      ['Generated At', new Date().toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })],
+      ['Branch Scope', activeBranchFilter === 'ALL' ? 'All Branches' : getBranchName(activeBranchFilter)],
+      ['Date Range', `${selectedDate} to ${selectedEndDate}`],
+      ['Total Shifts Recorded', shiftTallyKPIs.filteredShifts.length],
+      ['Total Cash Inflow (LKR)', shiftTallyKPIs.totalCashInflow.toFixed(2)],
+      ['Total POS Cash Sales (LKR)', shiftTallyKPIs.totalPosCash.toFixed(2)],
+      ['Total Special Stock Sales (LKR)', shiftTallyKPIs.totalSpecialSales.toFixed(2)],
+      ['Total Bank Deposits (LKR)', shiftTallyKPIs.totalBanked.toFixed(2)],
+      ['Total Goods Purchased Paid Out (LKR)', shiftTallyKPIs.totalGoodsPaid.toFixed(2)],
+      ['Total Other Expenses (LKR)', shiftTallyKPIs.totalOtherExpenses.toFixed(2)],
+      ['Total Cash Shortages (LKR)', shiftTallyKPIs.totalShortageAmount.toFixed(2)],
+      ['Total Excess Amount (LKR)', shiftTallyKPIs.totalExcessAmount.toFixed(2)],
+      [],
+      ['DETAILED SHIFT-BY-SHIFT BREAKDOWN'],
+    ];
+
+    const headers = [
+      'Date',
+      'Branch',
+      'Shift',
+      'Cashier Name',
+      'Opened At (Asia/Colombo)',
+      'Closed At (Asia/Colombo)',
+      'Status',
+      'Opening Float (LKR)',
+      'POS Cash Sales (LKR)',
+      'Special Stock Units',
+      'Special Stock Sales (LKR)',
+      'Total Cash Inflow (LKR)',
+      'Goods Purchased Paid Out (LKR)',
+      'Other Expenses (LKR)',
+      'Bank Deposit Amount (LKR)',
+      'Deposit Bank Account',
+      'Expected Closing Drawer (LKR)',
+      'Counted / Remaining Drawer Float (LKR)',
+      'Variance (LKR)',
+      'Variance Type',
+      'Handover Remarks',
+    ];
+
+    const rows = shiftTallyKPIs.filteredShifts.map((sh) => {
+      const shiftInflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
+      const countedDrawer = sh.counted_remaining_drawer_cash || sh.counted_drawer_cash || 0;
+      const expectedDrawer = (sh.expected_remaining_drawer_cash ?? (shiftInflow - (sh.goods_purchased_paid || 0) - (sh.other_expenses || 0) - (sh.banked_amount || 0))) || 0;
+      const variance = sh.cash_variance !== undefined ? sh.cash_variance : (countedDrawer - expectedDrawer);
+      const varType = variance === 0 ? 'Balanced' : variance < 0 ? 'Shortage' : 'Excess';
+
+      const openedAtStr = sh.started_at
+        ? new Date(sh.started_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })
+        : '—';
+      const closedAtStr = sh.ended_at
+        ? new Date(sh.ended_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })
+        : 'Active / Open';
+
+      return [
+        sh.shift_date,
+        sh.branch_name,
+        formatShiftLabel(sh.shift_number),
+        sh.cashier_name,
+        openedAtStr,
+        closedAtStr,
+        sh.status,
+        (sh.opening_float || 0).toFixed(2),
+        (sh.pos_cash_sales || 0).toFixed(2),
+        sh.modaka_total_sold_qty || 0,
+        (sh.modaka_total_amount || 0).toFixed(2),
+        shiftInflow.toFixed(2),
+        (sh.goods_purchased_paid || 0).toFixed(2),
+        (sh.other_expenses || 0).toFixed(2),
+        (sh.banked_amount || 0).toFixed(2),
+        (sh as any).bank_account_details || '—',
+        expectedDrawer.toFixed(2),
+        countedDrawer.toFixed(2),
+        variance.toFixed(2),
+        varType,
+        (sh.handover_notes || '').replace(/[\r\n]+/g, ' '),
+      ];
+    });
+
+    const csvLines = [
+      ...summaryLines.map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')),
+      headers.map((h) => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')),
+    ];
+
+    const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // ==========================================
   // DATA LOADING ENGINE
@@ -717,7 +1141,7 @@ export default function CashReconciliationPage() {
 
       // 6. Load Worksheet for the selected date & branch
       const branchParam = activeBranchFilter || 'ALL';
-      const worksheet = await reconciliationApi.loadReconciliationWorksheet(branchParam, selectedDate);
+      const worksheet = await reconciliationApi.loadReconciliationWorksheet(branchParam, selectedDate, selectedEndDate);
       if (fetchId !== fetchIdRef.current) return;
 
       if (!isBackground) {
@@ -800,6 +1224,8 @@ export default function CashReconciliationPage() {
       try {
         const adjRes = await shiftsApi.getShiftFinancialAdjustments({
           branchId: activeBranchFilter !== 'ALL' ? activeBranchFilter : undefined,
+          dateFrom: selectedDate,
+          dateTo: selectedEndDate,
         });
         if (fetchId !== fetchIdRef.current) return;
         if (adjRes.success && adjRes.data) {
@@ -823,6 +1249,7 @@ export default function CashReconciliationPage() {
     effectiveBranchId,
     activeBranchFilter,
     selectedDate,
+    selectedEndDate,
     summaryPreset,
     summaryStartDate,
     summaryEndDate,
@@ -1137,9 +1564,6 @@ export default function CashReconciliationPage() {
     return { totalC, totalD, totalE, totalF, totalVariance, totalSales };
   }, [consolidatedSummaries]);
 
-  // Staff members list for quick pills (Strictly current active team members)
-  const KNOWN_STAFF = ['Dr. Deegayu (Owner)', 'Anusha', 'Gindika', 'Kumari', 'Shashini', 'Tharindu'];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
       {/* ========================================================= */}
@@ -1192,44 +1616,72 @@ export default function CashReconciliationPage() {
             </div>
           )}
 
-          {/* Date Stepper & Picker - Executive Admin Only */}
+          {/* Quick Date Range Preset Pills - Executive Admin Only */}
+          {isOwner && (
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+              {[
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: 'last7', label: 'Last 7 Days' },
+                { id: 'thisMonth', label: 'This Month' },
+                { id: 'custom', label: 'Custom Range' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handlePresetSelect(p.id as any)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                    datePreset === p.id
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Date Range Stepper & Pickers - Executive Admin Only */}
           {isOwner && (
             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg overflow-hidden text-xs">
               <button
                 type="button"
                 onClick={() => handleDateStep(-1)}
-                title="Previous Day"
+                title="Step Backward (Previous Day/Period)"
                 className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-950/60 text-slate-200">
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-950/60 text-slate-200 border-x border-slate-800/80">
+                <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[10px] text-slate-400 font-bold uppercase">From</span>
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
+                  max={getTodaySriLanka()}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="bg-transparent text-slate-200 font-mono font-semibold outline-none cursor-pointer text-xs"
+                />
+                <span className="text-slate-500 font-mono">→</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">To</span>
+                <input
+                  type="date"
+                  value={selectedEndDate}
+                  max={getTodaySriLanka()}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="bg-transparent text-slate-200 font-mono font-semibold outline-none cursor-pointer text-xs"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => handleDateStep(1)}
-                title="Next Day"
-                disabled={selectedDate >= getTodaySriLanka()}
+                title="Step Forward (Next Day/Period)"
+                disabled={selectedEndDate >= getTodaySriLanka()}
                 className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-              {selectedDate !== getTodaySriLanka() && (
-                <button
-                  type="button"
-                  onClick={() => handleDateChange(getTodaySriLanka())}
-                  className="px-2 py-1 text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition border-l border-slate-800 cursor-pointer"
-                >
-                  Today
-                </button>
-              )}
             </div>
           )}
 
@@ -1237,17 +1689,29 @@ export default function CashReconciliationPage() {
           <button
             onClick={() => loadAllData(false)}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
+            Refresh
           </button>
+
+          {/* Download Detailed Report (CSV) Button - Executive Admin Only */}
+          {isOwner && (
+            <button
+              onClick={exportDetailedReconciliationCsv}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
+              title="Download detailed Excel/CSV reconciliation report"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Detailed Report</span>
+            </button>
+          )}
 
           {/* Print Button - Executive Admin Only */}
           {isOwner && (
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               Print Report
@@ -1419,7 +1883,7 @@ export default function CashReconciliationPage() {
                 <p className="text-xs text-slate-400">
                   Operational shifts for{' '}
                   <strong className="text-purple-300 font-semibold">{activeBranchFilter === 'ALL' ? 'All Retail Branches' : getBranchName(activeBranchFilter)}</strong> on{' '}
-                  <strong className="text-amber-300 font-mono font-semibold">{selectedDate}</strong>
+                  <strong className="text-amber-300 font-mono font-semibold">{selectedDate === selectedEndDate ? selectedDate : `${selectedDate} to ${selectedEndDate}`}</strong>
                 </p>
               </div>
             </div>
@@ -1477,19 +1941,30 @@ export default function CashReconciliationPage() {
               </p>
             </div>
 
-            {/* 4. Staff Salary Deductions (Shortages) */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-rose-900/40 bg-rose-950/20 shadow-md">
+            {/* 4. Staff Salary Deductions (Shortages) - Clickable to open Shortages Tab */}
+            <div
+              onClick={() => setActiveTab('shortages')}
+              className="p-4 rounded-2xl bg-slate-900 border border-rose-900/40 bg-rose-950/20 shadow-md cursor-pointer hover:border-rose-700/60 hover:bg-rose-950/30 transition group"
+              title="Click to view Cashier Shortages & Payroll Deduction Ledger"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Salary Deductions</span>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider group-hover:text-rose-300">
+                  Salary Deductions
+                </span>
+                <AlertTriangle className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-black text-rose-400 font-mono mt-1.5">
                 {shiftTallyKPIs.totalShortageAmount > 0 ? '-' : ''}
                 LKR {shiftTallyKPIs.totalShortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <p className="text-[10px] text-rose-300/80 mt-1">
-                {shiftTallyKPIs.shortageShiftsCount} {shiftTallyKPIs.shortageShiftsCount === 1 ? 'shift shortage' : 'shift shortages'} recorded
-              </p>
+              <div className="flex items-center justify-between mt-1 text-[10px]">
+                <span className="text-rose-300/80">
+                  {shiftTallyKPIs.shortageShiftsCount} {shiftTallyKPIs.shortageShiftsCount === 1 ? 'shift shortage' : 'shift shortages'} recorded
+                </span>
+                <span className="text-rose-400 font-semibold group-hover:underline">
+                  View Ledger →
+                </span>
+              </div>
             </div>
 
             {/* 5. Extra Income (Cash Excess) */}
@@ -1524,7 +1999,7 @@ export default function CashReconciliationPage() {
               <div className="p-8 rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-center space-y-2">
                 <Clock className="w-8 h-8 text-slate-600 mx-auto" />
                 <div className="text-sm font-bold text-slate-300">
-                  No Cashier Shift Sheets Recorded for {selectedDate}
+                  No Cashier Shift Sheets Recorded for {selectedDate === selectedEndDate ? selectedDate : `${selectedDate} to ${selectedEndDate}`}
                 </div>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
                   When cashiers submit their shift end handovers via the POS terminal, their live drawer tally, receipts, expenses, bank deposits, and cash variances will immediately appear here.
@@ -1557,6 +2032,9 @@ export default function CashReconciliationPage() {
                               </span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                                 {sh.branch_name}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-950 text-amber-300 border border-slate-800">
+                                {sh.shift_date}
                               </span>
                             </div>
                             <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
@@ -2494,109 +2972,155 @@ export default function CashReconciliationPage() {
             <div className="bg-slate-900 border border-rose-900/40 bg-rose-950/20 rounded-2xl p-4 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-rose-400">Outstanding Pending Deductions</span>
+                  <span className="text-xs font-bold text-rose-400">Total Cash Shortages (Period)</span>
                   <AlertTriangle className="w-4 h-4 text-rose-400" />
                 </div>
-                <div className="text-2xl font-black text-rose-400">
-                  LKR {shortageTotals.pendingAmt.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                <div className="text-2xl font-black text-rose-400 font-mono">
+                  -LKR {shiftTallyKPIs.totalShortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-[11px] text-rose-300/80 mt-3 pt-2 border-t border-rose-900/40">
-                To be deducted from monthly cashier payroll
+                {shiftTallyKPIs.shortageShiftsCount} {shiftTallyKPIs.shortageShiftsCount === 1 ? 'shift shortage' : 'shift shortages'} recorded for {selectedDate === selectedEndDate ? selectedDate : `${selectedDate} to ${selectedEndDate}`}
               </div>
             </div>
 
             <div className="bg-slate-900 border border-emerald-900/40 bg-emerald-950/20 rounded-2xl p-4 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-emerald-400">Total Settled / Deducted</span>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-emerald-400">Total Cash Excess / Extra Income</span>
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-2xl font-black text-emerald-400">
-                  LKR {shortageTotals.deductedAmt.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                <div className="text-2xl font-black text-emerald-400 font-mono">
+                  +LKR {shiftTallyKPIs.totalExcessAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-[11px] text-emerald-300/80 mt-3 pt-2 border-t border-emerald-900/40">
-                Settled through previous salary payouts
+                {shiftTallyKPIs.excessShiftsCount} {shiftTallyKPIs.excessShiftsCount === 1 ? 'shift excess' : 'shift excesses'} recorded
               </div>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-300">Staff with Pending Shortages</span>
+                  <span className="text-xs font-bold text-slate-300">Shifts with Discrepancies</span>
                   <UserCheck className="w-4 h-4 text-amber-400" />
                 </div>
                 <div className="text-2xl font-black text-amber-400">
-                  {Object.keys(shortageTotals.pendingPerCashier).length} Cashiers
+                  {shiftTallyKPIs.shortageShiftsCount + shiftTallyKPIs.excessShiftsCount} Shifts
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-800/80">
-                Active cash accounts under recovery
+                Filtered across {shortageLedgerRows.length} matching rows
               </div>
             </div>
           </div>
 
-          {/* Cashier Filter Pills */}
+          {/* Per-Employee Shortage Summary Strip */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div className="text-xs font-semibold text-slate-400">Quick Cashier Filter:</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setShortageCashierFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  shortageCashierFilter === 'ALL'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                }`}
-              >
-                All Cashiers ({consolidatedShortages.length})
-              </button>
-
-              {KNOWN_STAFF.map((name) => {
-                const pendingAmt = shortageTotals.pendingPerCashier[name] || 0;
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Active Staff Shortage Totals ({selectedDate === selectedEndDate ? selectedDate : `${selectedDate} to ${selectedEndDate}`})
+              </span>
+              <span className="text-[11px] text-slate-500">Click a staff member to filter ledger</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              {ACTIVE_STAFF.map((staffName) => {
+                const s = staffShortageSummary[staffName] || { count: 0, totalShortage: 0 };
+                const isSelected = shortageCashierFilter === staffName;
                 return (
                   <button
-                    key={name}
-                    onClick={() => setShortageCashierFilter(name)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      shortageCashierFilter === name
-                        ? 'bg-amber-500 text-slate-950 shadow-sm'
-                        : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                    key={staffName}
+                    type="button"
+                    onClick={() => setShortageCashierFilter(isSelected ? 'ALL' : staffName)}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500/15 border-amber-400 ring-2 ring-amber-500/30'
+                        : s.totalShortage > 0
+                        ? 'bg-rose-950/20 border-rose-900/40 hover:bg-rose-950/30'
+                        : 'bg-slate-950/60 border-slate-800 hover:bg-slate-800/60'
                     }`}
                   >
-                    <span>{name}</span>
-                    {pendingAmt > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-black">
-                        LKR {pendingAmt.toLocaleString()}
-                      </span>
-                    )}
+                    <div className="flex items-center justify-between text-xs font-bold mb-1">
+                      <span className={isSelected ? 'text-amber-300' : 'text-slate-200'}>{staffName}</span>
+                      {s.count > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                          {s.count}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-mono font-black text-rose-400">
+                      {s.totalShortage > 0 ? `-LKR ${s.totalShortage.toLocaleString('en-LK', { minimumFractionDigits: 0 })}` : 'LKR 0.00'}
+                    </div>
                   </button>
                 );
               })}
             </div>
+          </div>
 
-            {/* Sub-Filters: Status & Branch */}
-            <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                  <span className="text-slate-400">Status:</span>
-                  <select
-                    value={shortageStatusFilter}
-                    onChange={(e) => setShortageStatusFilter(e.target.value as any)}
-                    className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
+          {/* Interactive Filter Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Variance Type Toggle */}
+              <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                {[
+                  { id: 'shortages', label: 'Shortages Only' },
+                  { id: 'excess', label: 'Excess Only' },
+                  { id: 'all', label: 'All Variances' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setShortageVarianceTypeFilter(t.id as any)}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      shortageVarianceTypeFilter === t.id
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
                   >
-                    <option value="all">All Shortages</option>
-                    <option value="pending_payroll">Pending Payroll Deduction</option>
-                    <option value="deducted">Deducted / Settled</option>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Download CSV */}
+              <button
+                type="button"
+                onClick={exportShortagesCsv}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition cursor-pointer"
+                title="Download CSV report of filtered shortages"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Shortage Report (CSV)</span>
+              </button>
+            </div>
+
+            {/* Sub-Filters: Cashier, Branch, and Search */}
+            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Cashier Filter Dropdown */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 font-medium">Cashier:</span>
+                  <select
+                    value={shortageCashierFilter}
+                    onChange={(e) => setShortageCashierFilter(e.target.value)}
+                    className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">All Active Staff</option>
+                    {ACTIVE_STAFF.map((name) => (
+                      <option key={name} value={name} className="bg-slate-900 text-slate-200">
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Branch Filter Dropdown */}
                 <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                  <span className="text-slate-400">Branch:</span>
+                  <span className="text-slate-400 font-medium">Branch:</span>
                   <select
                     value={shortageBranchFilter}
                     onChange={(e) => handleBranchChange(e.target.value)}
-                    className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs"
+                    className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer text-xs"
                   >
                     <option value="ALL">All Branches</option>
                     {branches.map((b) => (
@@ -2606,103 +3130,169 @@ export default function CashReconciliationPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* Deduction Status Dropdown */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 font-medium">Status:</span>
+                  <select
+                    value={shortageStatusFilter}
+                    onChange={(e) => setShortageStatusFilter(e.target.value as any)}
+                    className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer text-xs"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending_payroll">Pending Payroll</option>
+                    <option value="deducted">Deducted / Settled</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Export Button */}
-              <button
-                onClick={() => {
-                  const headers = ['Date', 'Branch', 'Cashier Name', 'Shortage Amount (LKR)', 'Deduction Status', 'Deducted At', 'Notes'];
-                  const rows = consolidatedShortages.map((s) => [
-                    s.shortage_date,
-                    s.branch_name,
-                    s.cashier_name,
-                    s.amount,
-                    s.deduction_status,
-                    s.deducted_at || 'Pending',
-                    s.notes || '',
-                  ]);
-                  exportCsv('cashier-shortages-report', headers, rows);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-400" />
-                Export Shortages CSV
-              </button>
+              {/* Search Box */}
+              <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search shift, remarks, date..."
+                  value={shortageSearchQuery}
+                  onChange={(e) => setShortageSearchQuery(e.target.value)}
+                  className="bg-transparent text-slate-200 placeholder-slate-500 outline-none text-xs w-full"
+                />
+                {shortageSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setShortageSearchQuery('')}
+                    className="text-slate-500 hover:text-slate-300 text-xs cursor-pointer"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Shortages Table */}
+          {/* Sortable Shortages Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800 select-none">
                   <tr>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Branch</th>
-                    <th className="py-3 px-4">Cashier Name</th>
-                    <th className="py-3 px-4 text-right">Shortage Amount</th>
-                    <th className="py-3 px-4 text-center">Deduction Status</th>
-                    <th className="py-3 px-4">Notes / Incident</th>
+                    <th
+                      onClick={() => handleSortClick('date')}
+                      className="py-3 px-4 cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Date {renderSortIndicator('date')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('cashier')}
+                      className="py-3 px-4 cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Employee / Cashier {renderSortIndicator('cashier')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('branch')}
+                      className="py-3 px-4 cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Branch {renderSortIndicator('branch')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('shift')}
+                      className="py-3 px-4 cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Shift {renderSortIndicator('shift')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('expected')}
+                      className="py-3 px-4 text-right cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Expected Cash (LKR) {renderSortIndicator('expected')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('actual')}
+                      className="py-3 px-4 text-right cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Actual Counted / Banked (LKR) {renderSortIndicator('actual')}
+                    </th>
+                    <th
+                      onClick={() => handleSortClick('shortage')}
+                      className="py-3 px-4 text-right cursor-pointer hover:text-slate-200 transition"
+                    >
+                      Shortage / Variance {renderSortIndicator('shortage')}
+                    </th>
+                    <th className="py-3 px-4">Handover Remarks</th>
                     <th className="py-3 px-4 text-right">Admin Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {consolidatedShortages.length === 0 ? (
+                <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                  {shortageLedgerRows.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
-                        No cashier shortages recorded matching the filters. Zero-variance maintained!
+                      <td colSpan={9} className="py-12 text-center text-slate-500 font-sans text-sm">
+                        No cash discrepancies recorded matching the selected filters. Zero-variance maintained!
                       </td>
                     </tr>
                   ) : (
-                    consolidatedShortages.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-800/30 transition">
-                        <td className="py-3 px-4 font-mono text-xs text-slate-200 font-bold whitespace-nowrap">
-                          {item.shortage_date}
-                        </td>
-                        <td className="py-3 px-4 font-semibold text-slate-200 whitespace-nowrap">
-                          {item.branch_name}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-slate-100 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span>{item.cashier_name}</span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                              {item.branch_name}
+                    shortageLedgerRows.map((item) => {
+                      const isShortage = item.varianceType === 'shortage' || item.shortageAmount > 0;
+                      const isExcess = item.varianceType === 'excess' || item.excessAmount > 0;
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-800/30 transition">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-200 whitespace-nowrap">
+                            {item.date}
+                          </td>
+                          <td className="py-3 px-4 font-sans font-bold text-slate-100 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span>{item.cashierName}</span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700 font-sans">
+                                {item.branchName}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-sans text-slate-300 whitespace-nowrap">
+                            {item.branchName}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded font-black text-[11px] bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                              {item.shiftLabel}
                             </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right font-black text-rose-400 font-mono text-sm whitespace-nowrap">
-                          LKR {Number(item.amount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          {item.deduction_status === 'pending_payroll' ? (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                              Pending Payroll
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                              Deducted
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-xs text-slate-400 max-w-xs truncate">
-                          {item.notes || 'End-of-day drawer discrepancy'}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {item.deduction_status === 'pending_payroll' ? (
-                            <button
-                              onClick={() => handleMarkDeducted(item.id)}
-                              className="px-3 py-1 rounded bg-slate-800 hover:bg-emerald-600 hover:text-white border border-slate-700 text-xs font-bold text-emerald-400 transition"
-                            >
-                              Mark Deducted
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-slate-500">
-                              {item.deducted_at ? new Date(item.deducted_at).toLocaleDateString() : 'Settled'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="py-3 px-4 text-right text-slate-300 font-bold whitespace-nowrap">
+                            LKR {item.expectedCash.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right text-slate-200 font-bold whitespace-nowrap">
+                            LKR {item.actualCash.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            {isShortage ? (
+                              <span className="px-2 py-1 rounded-md text-xs font-black bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                -LKR {item.shortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : isExcess ? (
+                              <span className="px-2 py-1 rounded-md text-xs font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                +LKR {item.excessAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded-md text-xs font-bold text-slate-400 bg-slate-800">
+                                Balanced (0.00)
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 font-sans text-xs text-slate-400 max-w-xs truncate" title={item.notes}>
+                            {item.notes || '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap font-sans">
+                            {isShortage ? (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkDeducted(item.id)}
+                                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-600 hover:text-white border border-slate-700 text-xs font-bold text-emerald-400 transition cursor-pointer"
+                              >
+                                Mark Deducted
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-500">Verified</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -4358,11 +4948,95 @@ export default function CashReconciliationPage() {
       <div className="hidden print:block text-black bg-white p-6 font-sans">
         <div className="text-center border-b pb-4 mb-4">
           <h2 className="text-2xl font-black tracking-tight">{business?.name || 'Deegayu Weda Madhura'}</h2>
-          <p className="text-sm font-semibold">DAILY CASH RECONCILIATION & DEPOSIT SLIP</p>
-          <p className="text-xs text-gray-600">
-            Branch: {currentBranchName} • Date: {selectedDate} • Printed on: {new Date().toLocaleString()}
+          <p className="text-sm font-semibold tracking-wide">EXECUTIVE CASH RECONCILIATION & BANKING REPORT</p>
+          <p className="text-xs text-gray-600 mt-1">
+            Branch: {activeBranchFilter === 'ALL' ? 'All Retail Branches' : currentBranchName} • Date Range: {selectedDate === selectedEndDate ? selectedDate : `${selectedDate} to ${selectedEndDate}`} • Printed on: {new Date().toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })}
           </p>
         </div>
+
+        {/* Executive Shift Tally Summary Block */}
+        <div className="border p-3 rounded mb-4 text-xs">
+          <h4 className="font-bold border-b pb-1 mb-2">PERIOD SUMMARY & CASH INFLOW OVERVIEW</h4>
+          <div className="grid grid-cols-4 gap-3 text-xs">
+            <div>
+              <span className="text-gray-600 block">Total Cash Inflow:</span>
+              <strong className="text-sm">LKR {shiftTallyKPIs.totalCashInflow.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">POS Cash Sales:</span>
+              <strong className="text-sm">LKR {shiftTallyKPIs.totalPosCash.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Special Stock Sales:</span>
+              <strong className="text-sm">LKR {shiftTallyKPIs.totalSpecialSales.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Bank Deposits Total:</span>
+              <strong className="text-sm">LKR {shiftTallyKPIs.totalBanked.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Expenses Paid Out:</span>
+              <strong>LKR {(shiftTallyKPIs.totalGoodsPaid + shiftTallyKPIs.totalOtherExpenses).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Drawer Cash Counted:</span>
+              <strong>LKR {shiftTallyKPIs.totalCountedRemaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Cash Shortages:</span>
+              <strong className="text-rose-700">{shiftTallyKPIs.totalShortageAmount > 0 ? `-LKR ${shiftTallyKPIs.totalShortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}` : 'LKR 0.00'}</strong>
+            </div>
+            <div>
+              <span className="text-gray-600 block">Cash Excess:</span>
+              <strong className="text-emerald-700">{shiftTallyKPIs.totalExcessAmount > 0 ? `+LKR ${shiftTallyKPIs.totalExcessAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}` : 'LKR 0.00'}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Shift-by-Shift Ledger if shifts exist */}
+        {shiftTallyKPIs.filteredShifts.length > 0 && (
+          <div className="border rounded mb-4 overflow-hidden text-xs">
+            <div className="bg-gray-100 font-bold px-3 py-1.5 border-b">SHIFT HANDOVER LEDGER ({shiftTallyKPIs.filteredShifts.length} SHIFTS)</div>
+            <table className="w-full text-left border-collapse text-[11px]">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="p-1.5">Date</th>
+                  <th className="p-1.5">Branch</th>
+                  <th className="p-1.5">Shift</th>
+                  <th className="p-1.5">Cashier</th>
+                  <th className="p-1.5 text-right">Inflow (LKR)</th>
+                  <th className="p-1.5 text-right">Paid Out (LKR)</th>
+                  <th className="p-1.5 text-right">Banked (LKR)</th>
+                  <th className="p-1.5 text-right">Counted Drawer</th>
+                  <th className="p-1.5 text-right">Variance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y font-mono">
+                {shiftTallyKPIs.filteredShifts.map((sh) => {
+                  const inflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
+                  const paid = (sh.goods_purchased_paid || 0) + (sh.other_expenses || 0);
+                  const counted = sh.counted_remaining_drawer_cash || sh.counted_drawer_cash || 0;
+                  const variance = sh.cash_variance !== undefined ? sh.cash_variance : 0;
+                  return (
+                    <tr key={sh.id}>
+                      <td className="p-1.5 font-sans">{sh.shift_date}</td>
+                      <td className="p-1.5 font-sans">{sh.branch_name}</td>
+                      <td className="p-1.5 font-sans font-bold">{formatShiftLabel(sh.shift_number)}</td>
+                      <td className="p-1.5 font-sans">{sh.cashier_name}</td>
+                      <td className="p-1.5 text-right">{inflow.toFixed(2)}</td>
+                      <td className="p-1.5 text-right">{paid.toFixed(2)}</td>
+                      <td className="p-1.5 text-right">{(sh.banked_amount || 0).toFixed(2)}</td>
+                      <td className="p-1.5 text-right">{counted.toFixed(2)}</td>
+                      <td className="p-1.5 text-right font-bold">
+                        {variance < -0.01 ? `-${Math.abs(variance).toFixed(2)}` : variance > 0.01 ? `+${variance.toFixed(2)}` : '0.00'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 mb-4 text-xs">
           <div className="border p-2 rounded">

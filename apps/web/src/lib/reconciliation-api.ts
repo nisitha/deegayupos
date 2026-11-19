@@ -238,9 +238,9 @@ export interface ReconciliationPayload {
 /**
  * Returns date bounds in Sri Lanka Timezone (UTC+05:30) for a given YYYY-MM-DD string.
  */
-export function getSriLankaDateBounds(dateStr: string) {
+export function getSriLankaDateBounds(dateStr: string, endDateStr?: string) {
   const start = new Date(`${dateStr}T00:00:00+05:30`).toISOString();
-  const end = new Date(`${dateStr}T23:59:59.999+05:30`).toISOString();
+  const end = new Date(`${endDateStr || dateStr}T23:59:59.999+05:30`).toISOString();
   return { start, end };
 }
 
@@ -311,9 +311,10 @@ export const reconciliationApi = {
    * Aggregates live & historical sales across payment methods (Cash, Card, QR, Credit)
    * and queries shift handovers (cashier_shifts) for the selected date and branch.
    */
-  async loadReconciliationWorksheet(branchId: string, dateStr: string): Promise<ReconciliationWorksheetData> {
-    const { start, end } = getSriLankaDateBounds(dateStr);
+  async loadReconciliationWorksheet(branchId: string, dateStr: string, endDateStr?: string): Promise<ReconciliationWorksheetData> {
+    const { start, end } = getSriLankaDateBounds(dateStr, endDateStr);
     const isAllBranches = !branchId || branchId === 'ALL';
+    const isRange = Boolean(endDateStr && endDateStr !== dateStr);
 
     try {
       // 1. Fetch branches & users for enrichment
@@ -327,10 +328,12 @@ export const reconciliationApi = {
       (usersData || []).forEach((u: any) => userMap.set(u.id, u.full_name || u.email || 'Staff Cashier'));
 
       // 2. Check if reconciliation already exists for this branch/all and date
-      let recQuery = supabase
-        .from('daily_cash_reconciliations')
-        .select('*')
-        .eq('reconciliation_date', dateStr);
+      let recQuery = supabase.from('daily_cash_reconciliations').select('*');
+      if (isRange) {
+        recQuery = recQuery.gte('reconciliation_date', dateStr).lte('reconciliation_date', endDateStr!);
+      } else {
+        recQuery = recQuery.eq('reconciliation_date', dateStr);
+      }
       if (!isAllBranches) {
         recQuery = recQuery.eq('branch_id', branchId);
       }
@@ -454,9 +457,18 @@ export const reconciliationApi = {
       // 6. Query cashier_shifts for that date + branch
       let shiftQuery = supabase
         .from('cashier_shifts')
-        .select('*')
-        .eq('shift_date', dateStr)
-        .order('shift_number', { ascending: true });
+        .select('*');
+      if (isRange) {
+        shiftQuery = shiftQuery
+          .gte('shift_date', dateStr)
+          .lte('shift_date', endDateStr!)
+          .order('shift_date', { ascending: false })
+          .order('shift_number', { ascending: true });
+      } else {
+        shiftQuery = shiftQuery
+          .eq('shift_date', dateStr)
+          .order('shift_number', { ascending: true });
+      }
       if (!isAllBranches) {
         shiftQuery = shiftQuery.eq('branch_id', branchId);
       }
