@@ -3,8 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { Activity } from 'lucide-react';
+import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
 
 export default function LiveMonitorPage() {
+  useRealtimePosSync(() => {}, { showToast: true });
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="flex items-center justify-between">

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import { shiftsApi, type ShiftFinancialAdjustmentDto } from '../../../../lib/api-client';
+import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
 import {
   reconciliationApi,
   SRI_LANKA_DENOMINATIONS,
@@ -791,6 +792,9 @@ export default function CashReconciliationPage() {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  // Wire Real-time sync for live bill & shift events
+  useRealtimePosSync(loadAllData);
 
   // Shortage split calculation for worksheet
   useEffect(() => {

@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import type { SaleDto, SalePaymentMethod, SaleStatus } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
+import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
 import { posApi, type SalesSummaryKPI } from '../../../lib/api-client';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
@@ -215,6 +216,9 @@ export default function SalesOrdersPage() {
   useEffect(() => {
     fetchSales();
   }, [fetchSales]);
+
+  // Wire Real-time sync for live bill & shift events
+  useRealtimePosSync(fetchSales);
 
   // Instant 0ms Filter Handlers
   const handlePeriodChange = (newPeriod: PeriodFilter) => {

@@ -3723,7 +3723,7 @@ export const shiftsApi = {
         modakaTotalSoldQty += sold;
         modakaTotalAmount += amt;
 
-        await supabase
+        const { error: smeErr } = await supabase
           .from('shift_modaka_entries')
           .upsert({
             shift_id: payload.shiftId,
@@ -3738,6 +3738,11 @@ export const shiftsApi = {
             total_amount: amt,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'shift_id,product_id' });
+
+        if (smeErr) {
+          console.error('[shiftsApi] shift_modaka_entries upsert error:', smeErr);
+          throw new Error(`Failed to save Special Stock entry for item: ${smeErr.message}`);
+        }
       }
 
       // 3. Exact Shift Cash Tally Math & Financial Adjustments
@@ -3873,6 +3878,7 @@ export const shiftsApi = {
       const { data: updatedShift, error: updateErr } = await supabase
         .from('cashier_shifts')
         .update({
+          shift_date: shiftDate,
           status: 'closed',
           ended_at: new Date().toISOString(),
           pos_total_bills: posBills,

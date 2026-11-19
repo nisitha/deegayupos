@@ -37,6 +37,7 @@ import type {
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { dashboardApi, posApi, legacySyncApi, type LegacySyncConfigDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
+import { useRealtimePosSync } from '../../hooks/use-realtime-pos-sync';
 
 interface AnalyticsData {
   period: string;
@@ -187,12 +188,13 @@ export default function DashboardPage() {
 
     try {
       setLoading(true);
+      const effectiveBranch = selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined;
       const [metricsRes, activityRes, analyticsRes] = await Promise.all([
-        dashboardApi.getMetrics(selectedBranchId || undefined),
-        dashboardApi.getActivity(10, selectedBranchId || undefined),
+        dashboardApi.getMetrics(effectiveBranch),
+        dashboardApi.getActivity(10, effectiveBranch),
         posApi.getAnalytics<AnalyticsData>({
           period,
-          branchId: selectedBranchId && selectedBranchId !== 'ALL' ? selectedBranchId : undefined,
+          branchId: effectiveBranch,
         }).catch(() => ({ data: null })),
       ]);
 
@@ -211,6 +213,9 @@ export default function DashboardPage() {
       loadDashboardData();
     }
   }, [isOwner, loadDashboardData]);
+
+  // Wire Real-time sync for live bill & shift events
+  useRealtimePosSync(loadDashboardData);
 
   // Loading state during initial context hydration
   if (!isMounted || isTenantLoading) {

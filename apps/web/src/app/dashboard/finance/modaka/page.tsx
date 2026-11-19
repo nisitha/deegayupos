@@ -28,6 +28,7 @@ import {
   CashierShiftDto,
   ModakaItemConfigDto,
 } from '../../../../lib/api-client';
+import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
 
 function getTodaySriLanka(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -102,6 +103,9 @@ export default function ModakaLedgerPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Wire Real-time sync for live bill & shift events
+  useRealtimePosSync(loadData);
 
   // Load catalog products for config modal
   useEffect(() => {

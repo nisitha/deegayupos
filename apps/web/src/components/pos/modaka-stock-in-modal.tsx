@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, PackagePlus, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { CashierShiftDto, shiftsApi } from '../../lib/api-client';
+import { supabase } from '../../lib/supabase';
 
 interface ModakaItemRow {
   productId: string;
@@ -10,6 +11,7 @@ interface ModakaItemRow {
   openingQty: number;
   currentInQty: number;
   appliedRate: number;
+  branchStock: number;
 }
 
 interface ModakaStockInModalProps {
@@ -45,26 +47,51 @@ export function ModakaStockInModal({
     setInQuantities({});
 
     try {
+      const effectiveBranchId =
+        branchId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
+      const effectiveCashierId =
+        cashierId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
+
+      // Query live branch stock levels
+      const stockMap = new Map<string, number>();
+      if (effectiveBranchId) {
+        try {
+          const { data: stockLevels } = await supabase
+            .from('stock_levels')
+            .select('product_id, quantity_on_hand')
+            .eq('branch_id', effectiveBranchId);
+          (stockLevels || []).forEach((sl: any) => {
+            stockMap.set(sl.product_id, Number(sl.quantity_on_hand || 0));
+          });
+        } catch (e) {
+          console.warn('[ModakaStockInModal] stock_levels query error:', e);
+        }
+      }
+
       // 1. If activeShift with entries is passed, use it directly
       if (activeShift && activeShift.modakaEntries && activeShift.modakaEntries.length > 0) {
         setResolvedShiftId(activeShift.id);
         setItems(
-          activeShift.modakaEntries.map((e) => ({
-            productId: e.productId,
-            productName: e.productName || 'Special Item',
-            openingQty: Number(e.openingQty || 0),
-            currentInQty: Number(e.inQty || 0),
-            appliedRate: Number(e.appliedRate || 250),
-          }))
+          activeShift.modakaEntries.map((e) => {
+            const bStock = stockMap.get(e.productId) || 0;
+            const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+            return {
+              productId: e.productId,
+              productName: e.productName || 'Special Item',
+              openingQty: open,
+              currentInQty: Number(e.inQty || 0),
+              appliedRate: Number(e.appliedRate || 250),
+              branchStock: bStock,
+            };
+          })
         );
         setIsLoading(false);
         return;
       }
 
       // 2. If activeShift is missing, resolve or open shift via API
-      const effectiveBranchId = branchId || (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
-      const effectiveCashierId = cashierId || (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
-
       if (effectiveBranchId && effectiveCashierId) {
         const shiftRes = await shiftsApi.getOrCreateActiveShift(
           effectiveBranchId,
@@ -76,13 +103,18 @@ export function ModakaStockInModal({
           const entries = shiftRes.data.modakaEntries || [];
           if (entries.length > 0) {
             setItems(
-              entries.map((e) => ({
-                productId: e.productId,
-                productName: e.productName || 'Special Item',
-                openingQty: Number(e.openingQty || 0),
-                currentInQty: Number(e.inQty || 0),
-                appliedRate: Number(e.appliedRate || 250),
-              }))
+              entries.map((e) => {
+                const bStock = stockMap.get(e.productId) || 0;
+                const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+                return {
+                  productId: e.productId,
+                  productName: e.productName || 'Special Item',
+                  openingQty: open,
+                  currentInQty: Number(e.inQty || 0),
+                  appliedRate: Number(e.appliedRate || 250),
+                  branchStock: bStock,
+                };
+              })
             );
             setIsLoading(false);
             return;
@@ -95,13 +127,17 @@ export function ModakaStockInModal({
       if (configsRes.success && configsRes.data) {
         const activeConfigs = configsRes.data.filter((c) => c.isActive);
         setItems(
-          activeConfigs.map((c) => ({
-            productId: c.productId,
-            productName: c.productName,
-            openingQty: 0,
-            currentInQty: 0,
-            appliedRate: c.customRate,
-          }))
+          activeConfigs.map((c) => {
+            const bStock = stockMap.get(c.productId) || 0;
+            return {
+              productId: c.productId,
+              productName: c.productName,
+              openingQty: bStock,
+              currentInQty: 0,
+              appliedRate: c.customRate,
+              branchStock: bStock,
+            };
+          })
         );
       }
     } catch (err: any) {
@@ -250,6 +286,7 @@ export function ModakaStockInModal({
                     <tr>
                       <th className="py-2.5 px-2.5 w-8 text-center">#</th>
                       <th className="py-2.5 px-3 sticky left-0 bg-slate-100 z-10 shadow-[1px_0_3px_rgba(0,0,0,0.05)]">Special Item</th>
+                      <th className="py-2.5 px-2 text-center w-24 bg-slate-50 text-slate-700 font-bold">Branch Stock</th>
                       <th className="py-2.5 px-2 text-center w-24">Opening (A)</th>
                       <th className="py-2.5 px-3 text-center w-28 bg-rose-100/70 text-rose-950 font-black">
                         Add In (B)
@@ -275,6 +312,9 @@ export function ModakaStockInModal({
                                 In today: {item.currentInQty}
                               </span>
                             )}
+                          </td>
+                          <td className="py-3 px-2 text-center font-mono font-bold text-slate-700 bg-slate-50/60">
+                            {item.branchStock}
                           </td>
                           <td className="py-3 px-2 text-center font-mono font-bold text-slate-600">
                             {item.openingQty}

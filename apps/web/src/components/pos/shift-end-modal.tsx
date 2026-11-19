@@ -20,6 +20,7 @@ import {
   EndShiftPayload,
   shiftsApi,
 } from '../../lib/api-client';
+import { supabase } from '../../lib/supabase';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 
 interface ShiftEndModalProps {
@@ -117,15 +118,31 @@ export function ShiftEndModal({
 
     const initShift = async () => {
       let shift = activeShift;
+      const effectiveBranchId =
+        branchId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
+      const effectiveCashierId =
+        cashierId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
+
+      // Query live branch stock levels
+      const stockMap = new Map<string, number>();
+      if (effectiveBranchId) {
+        try {
+          const { data: stockLevels } = await supabase
+            .from('stock_levels')
+            .select('product_id, quantity_on_hand')
+            .eq('branch_id', effectiveBranchId);
+          (stockLevels || []).forEach((sl: any) => {
+            stockMap.set(sl.product_id, Number(sl.quantity_on_hand || 0));
+          });
+        } catch (e) {
+          console.warn('[ShiftEndModal] stock_levels query error:', e);
+        }
+      }
+
       if (!shift) {
         setIsLoadingShift(true);
-        const effectiveBranchId =
-          branchId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
-        const effectiveCashierId =
-          cashierId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
-
         if (effectiveBranchId && effectiveCashierId) {
           const shiftRes = await shiftsApi.getOrCreateActiveShift(
             effectiveBranchId,
@@ -143,16 +160,44 @@ export function ShiftEndModal({
       }
 
       if (shift) {
-        // Initialize Modaka rows
-        const rows = (shift.modakaEntries || []).map((e) => ({
-          productId: e.productId,
-          productName: e.productName || 'Special Item',
-          productSku: e.productSku || '',
-          openingQty: Number(e.openingQty || 0),
-          inQty: Number(e.inQty || 0),
-          soldQty: Number(e.soldQty || 0),
-          appliedRate: Number(e.appliedRate || 250),
-        }));
+        // Initialize Modaka rows with fallback to branch stock when openingQty === 0
+        let rows = (shift.modakaEntries || []).map((e) => {
+          const bStock = stockMap.get(e.productId) || 0;
+          const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+          return {
+            productId: e.productId,
+            productName: e.productName || 'Special Item',
+            productSku: e.productSku || '',
+            openingQty: open,
+            inQty: Number(e.inQty || 0),
+            soldQty: Number(e.soldQty || 0),
+            appliedRate: Number(e.appliedRate || 250),
+          };
+        });
+
+        if (rows.length === 0) {
+          try {
+            const configsRes = await shiftsApi.getModakaConfigs();
+            if (configsRes.success && configsRes.data) {
+              const activeConfigs = configsRes.data.filter((c) => c.isActive);
+              rows = activeConfigs.map((c) => {
+                const bStock = stockMap.get(c.productId) || 0;
+                return {
+                  productId: c.productId,
+                  productName: c.productName,
+                  productSku: '',
+                  openingQty: bStock,
+                  inQty: 0,
+                  soldQty: 0,
+                  appliedRate: c.customRate,
+                };
+              });
+            }
+          } catch (e) {
+            console.warn('[ShiftEndModal] configs query error:', e);
+          }
+        }
+
         setModakaRows(rows);
 
         // Initialize denominations from JSON or 0 (including 2000 LKR notes)
