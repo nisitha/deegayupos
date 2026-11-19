@@ -27,12 +27,16 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   History,
   User,
   Clock,
   Layers,
+  Scale,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
+import { shiftsApi, type ShiftFinancialAdjustmentDto } from '../../../../lib/api-client';
 import {
   reconciliationApi,
   SRI_LANKA_DENOMINATIONS,
@@ -50,6 +54,7 @@ import {
 } from '../../../../lib/reconciliation-api';
 
 type TabView =
+  | 'shift_tally'
   | 'admin_summary'
   | 'bank_register'
   | 'shortages'
@@ -87,16 +92,16 @@ export default function CashReconciliationPage() {
     return datePart || new Date().toISOString().slice(0, 10);
   };
 
-  // Set default tab based on role and URL params (Strictly locked to worksheet for Staff)
+  // Set default tab based on role and URL params (Strictly locked to worksheet for Staff, Shift Tally for Owner)
   const [activeTab, setActiveTab] = useState<TabView>(() => {
     if (!isOwner) return 'worksheet';
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('tab');
-      if (p && ['admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
+      if (p && ['shift_tally', 'admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
         return p as TabView;
       }
     }
-    return 'admin_summary';
+    return 'shift_tally';
   });
 
   useEffect(() => {
@@ -106,7 +111,7 @@ export default function CashReconciliationPage() {
     }
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('tab');
-      if (p && ['admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
+      if (p && ['shift_tally', 'admin_summary', 'bank_register', 'shortages', 'ledger', 'worksheet', 'bank_accounts'].includes(p)) {
         setActiveTab(p as TabView);
       }
     }
@@ -176,6 +181,13 @@ export default function CashReconciliationPage() {
     const dateStr = d.toISOString().split('T')[0] || selectedDate;
     setSelectedDate(dateStr);
   };
+
+  // ==========================================
+  // TAB 0: OWNER SHIFT TALLY & ADJUSTMENTS STATE
+  // ==========================================
+  const [shiftAdjustments, setShiftAdjustments] = useState<ShiftFinancialAdjustmentDto[]>([]);
+  const [expandedDenomsShiftId, setExpandedDenomsShiftId] = useState<string | null>(null);
+  const [adjustmentDateScope, setAdjustmentDateScope] = useState<'selected_date' | 'all'>('selected_date');
 
   // ==========================================
   // TAB 1: ADMIN MULTI-BRANCH SUMMARY STATE
@@ -344,6 +356,175 @@ export default function CashReconciliationPage() {
     if (Math.abs(varianceAmount) < 0.01) return 'balanced';
     return varianceAmount > 0 ? 'shortage' : 'overage';
   }, [varianceAmount]);
+
+  // Branch display name helper
+  const getBranchName = useCallback(
+    (bId?: string | null) => {
+      if (!bId) return 'Main Branch';
+      const b = branches.find((item) => item.id === bId);
+      return b?.name || 'Main Branch';
+    },
+    [branches]
+  );
+
+  // 5 Executive Shift Tally KPIs (calculated for the selected branch & date)
+  const shiftTallyKPIs = useMemo(() => {
+    const shifts = worksheetData.shifts || [];
+
+    const filteredShifts =
+      activeBranchFilter === 'ALL'
+        ? shifts
+        : shifts.filter((s) => s.branch_id === activeBranchFilter);
+
+    // 1. Total Cash Inflow: Opening Float + POS Cash Sales + Special Stock Sales
+    const totalOpeningFloat = filteredShifts.reduce((sum, s) => sum + (s.opening_float || 0), 0);
+    const totalPosCash = filteredShifts.reduce((sum, s) => sum + (s.pos_cash_sales || 0), 0);
+    const totalSpecialSales = filteredShifts.reduce((sum, s) => sum + (s.modaka_total_amount || 0), 0);
+
+    const totalCashInflow =
+      filteredShifts.length > 0
+        ? totalOpeningFloat + totalPosCash + totalSpecialSales
+        : (worksheetData.previousClosingF || 0) + worksheetData.systemCashSales + worksheetData.modakaSalesTotal;
+
+    // 2. Banked & Paid Out: Bank Deposits + Goods Purchased Paid Out + Other Expenses
+    const totalBanked = filteredShifts.reduce((sum, s) => sum + (s.banked_amount || 0), 0);
+    const totalGoodsPaid = filteredShifts.reduce((sum, s) => sum + (s.goods_purchased_paid || 0), 0);
+    const totalOtherExpenses = filteredShifts.reduce((sum, s) => sum + (s.other_expenses || 0), 0);
+    const totalPaidOut = totalBanked + totalGoodsPaid + totalOtherExpenses;
+
+    // 3. Counted Remaining Drawer: Physical notes counted (carried forward to next shift)
+    const totalCountedRemaining = filteredShifts.reduce(
+      (sum, s) => sum + (s.counted_remaining_drawer_cash || s.counted_drawer_cash || 0),
+      0
+    );
+
+    // 4. Staff Salary Deductions (Shortages)
+    const shortageShifts = filteredShifts.filter((s) => (s.cash_variance || 0) < -0.01);
+    const totalShortageAmount = shortageShifts.reduce(
+      (sum, s) => sum + Math.abs(s.salary_deduction_amount || s.cash_variance || 0),
+      0
+    );
+
+    // 5. Extra Income (Cash Excess)
+    const excessShifts = filteredShifts.filter((s) => (s.cash_variance || 0) > 0.01);
+    const totalExcessAmount = excessShifts.reduce(
+      (sum, s) => sum + (s.extra_income_amount || s.cash_variance || 0),
+      0
+    );
+
+    return {
+      filteredShifts,
+      totalOpeningFloat,
+      totalPosCash,
+      totalSpecialSales,
+      totalCashInflow,
+      totalBanked,
+      totalGoodsPaid,
+      totalOtherExpenses,
+      totalPaidOut,
+      totalCountedRemaining,
+      totalShortageAmount,
+      shortageShiftsCount: shortageShifts.length,
+      totalExcessAmount,
+      excessShiftsCount: excessShifts.length,
+    };
+  }, [worksheetData, activeBranchFilter]);
+
+  // Aggregated Salary Deductions Log
+  const salaryDeductionsLog = useMemo(() => {
+    // 1. From recorded shift financial adjustments
+    const adjItems = shiftAdjustments
+      .filter((a) => a.adjustmentType === 'salary_deduction')
+      .map((a) => ({
+        id: a.id,
+        date: a.adjustmentDate,
+        branchId: a.branchId,
+        branchName: getBranchName(a.branchId),
+        shiftNumber: a.shiftNumber || 1,
+        employeeName: a.employeeName || 'Staff Cashier',
+        amount: a.amount,
+        notes: a.notes || 'Recorded via shift cash shortage',
+        shiftId: a.shiftId,
+      }));
+
+    // 2. From shifts on the selected date that might not have a formal adjustment row yet
+    const shiftDeductions = (worksheetData.shifts || [])
+      .filter((s) => (s.cash_variance || 0) < -0.01)
+      .filter((s) => !adjItems.some((a) => a.shiftId === s.id))
+      .map((s) => ({
+        id: `shift-${s.id}`,
+        date: s.shift_date,
+        branchId: s.branch_id,
+        branchName: s.branch_name || getBranchName(s.branch_id),
+        shiftNumber: s.shift_number,
+        employeeName: s.cashier_name,
+        amount: Math.abs(s.salary_deduction_amount || s.cash_variance),
+        notes: s.handover_notes || 'Shift cash shortage recorded at shift handover',
+        shiftId: s.id,
+      }));
+
+    const combined = [...adjItems, ...shiftDeductions];
+
+    // Filter by branch
+    const branchFiltered =
+      activeBranchFilter === 'ALL'
+        ? combined
+        : combined.filter((i) => i.branchId === activeBranchFilter);
+
+    // Filter by date scope
+    if (adjustmentDateScope === 'selected_date') {
+      return branchFiltered.filter((i) => i.date === selectedDate);
+    }
+    return branchFiltered;
+  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, getBranchName]);
+
+  // Aggregated Extra Income Log
+  const extraIncomeLog = useMemo(() => {
+    // 1. From recorded shift financial adjustments
+    const adjItems = shiftAdjustments
+      .filter((a) => a.adjustmentType === 'extra_income')
+      .map((a) => ({
+        id: a.id,
+        date: a.adjustmentDate,
+        branchId: a.branchId,
+        branchName: getBranchName(a.branchId),
+        shiftNumber: a.shiftNumber || 1,
+        employeeName: a.employeeName || 'Staff Cashier',
+        amount: a.amount,
+        notes: a.notes || 'Recorded via shift cash excess',
+        shiftId: a.shiftId,
+      }));
+
+    // 2. From shifts on the selected date that might not have a formal adjustment row yet
+    const shiftExcesses = (worksheetData.shifts || [])
+      .filter((s) => (s.cash_variance || 0) > 0.01)
+      .filter((s) => !adjItems.some((a) => a.shiftId === s.id))
+      .map((s) => ({
+        id: `shift-excess-${s.id}`,
+        date: s.shift_date,
+        branchId: s.branch_id,
+        branchName: s.branch_name || getBranchName(s.branch_id),
+        shiftNumber: s.shift_number,
+        employeeName: s.cashier_name,
+        amount: s.extra_income_amount || s.cash_variance,
+        notes: s.handover_notes || 'Shift cash excess recorded at shift handover',
+        shiftId: s.id,
+      }));
+
+    const combined = [...adjItems, ...shiftExcesses];
+
+    // Filter by branch
+    const branchFiltered =
+      activeBranchFilter === 'ALL'
+        ? combined
+        : combined.filter((i) => i.branchId === activeBranchFilter);
+
+    // Filter by date scope
+    if (adjustmentDateScope === 'selected_date') {
+      return branchFiltered.filter((i) => i.date === selectedDate);
+    }
+    return branchFiltered;
+  }, [shiftAdjustments, worksheetData.shifts, activeBranchFilter, adjustmentDateScope, selectedDate, getBranchName]);
 
   // ==========================================
   // DATA LOADING ENGINE
@@ -567,6 +748,19 @@ export default function CashReconciliationPage() {
             ]);
           }
         }
+      }
+
+      // 7. Load Shift Financial Adjustments (Shortages & Extra Income for Owner)
+      try {
+        const adjRes = await shiftsApi.getShiftFinancialAdjustments({
+          branchId: activeBranchFilter !== 'ALL' ? activeBranchFilter : undefined,
+        });
+        if (fetchId !== fetchIdRef.current) return;
+        if (adjRes.success && adjRes.data) {
+          setShiftAdjustments(adjRes.data);
+        }
+      } catch (e) {
+        console.warn('[Reconciliation] Error loading shift financial adjustments:', e);
       }
     } catch (err) {
       console.error('Error loading consolidated reconciliation data:', err);
@@ -1000,6 +1194,22 @@ export default function CashReconciliationPage() {
       {/* ========================================================= */}
       {isOwner && (
         <div className="flex items-center gap-2 mb-6 border-b border-slate-800/80 pb-2 overflow-x-auto">
+          {/* Shift Tally & Adjustments Hub (Executive Owner View) */}
+          <button
+            onClick={() => setActiveTab('shift_tally')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+              activeTab === 'shift_tally'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-purple-300" />
+            <span>Shift Tally & Adjustments Hub</span>
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-purple-200 font-mono font-bold">
+              {shiftTallyKPIs.filteredShifts.length}
+            </span>
+          </button>
+
           {/* Admin Multi-Branch Summary */}
           <button
             onClick={() => setActiveTab('admin_summary')}
@@ -1088,6 +1298,537 @@ export default function CashReconciliationPage() {
             <CreditCard className="w-4 h-4" />
             Bank Accounts ({companyBankAccounts.length})
           </button>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* VIEW 0: OWNER'S SHIFT TALLY & ADJUSTMENTS HUB */}
+      {/* ========================================================= */}
+      {activeTab === 'shift_tally' && isOwner && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          {/* Active Context Banner */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center border border-purple-500/30">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Shift Drawer Tally, Shortage Deductions & Extra Income Hub</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Operational shifts for{' '}
+                  <strong className="text-purple-300 font-semibold">{activeBranchFilter === 'ALL' ? 'All Retail Branches' : getBranchName(activeBranchFilter)}</strong> on{' '}
+                  <strong className="text-amber-300 font-mono font-semibold">{selectedDate}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end md:self-auto text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                {shiftTallyKPIs.filteredShifts.length} {shiftTallyKPIs.filteredShifts.length === 1 ? 'Shift Recorded' : 'Shifts Recorded'}
+              </span>
+            </div>
+          </div>
+
+          {/* 1. 5 Executive KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {/* 1. Total Cash Inflow */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cash Inflow</span>
+                <Coins className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div className="text-xl font-black text-slate-100 font-mono mt-1.5">
+                LKR {shiftTallyKPIs.totalCashInflow.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
+                <span>Opening (LKR {shiftTallyKPIs.totalOpeningFloat.toLocaleString('en-LK', { minimumFractionDigits: 0 })}) + POS Cash (LKR {shiftTallyKPIs.totalPosCash.toLocaleString('en-LK', { minimumFractionDigits: 0 })})</span>
+                <span className="text-purple-300 font-medium">+ Special Sales (LKR {shiftTallyKPIs.totalSpecialSales.toLocaleString('en-LK', { minimumFractionDigits: 0 })})</span>
+              </div>
+            </div>
+
+            {/* 2. Banked & Paid Out */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Banked & Paid Out</span>
+                <Wallet className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="text-xl font-black text-amber-400 font-mono mt-1.5">
+                LKR {shiftTallyKPIs.totalPaidOut.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
+                <span>Bank Deposits: LKR {shiftTallyKPIs.totalBanked.toLocaleString('en-LK', { minimumFractionDigits: 0 })}</span>
+                <span>Purchases + Expenses: LKR {(shiftTallyKPIs.totalGoodsPaid + shiftTallyKPIs.totalOtherExpenses).toLocaleString('en-LK', { minimumFractionDigits: 0 })}</span>
+              </div>
+            </div>
+
+            {/* 3. Counted Remaining Drawer */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Counted Remaining Drawer</span>
+                <Banknote className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="text-xl font-black text-emerald-400 font-mono mt-1.5">
+                LKR {shiftTallyKPIs.totalCountedRemaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Physical Notes Counted → Next Shift Opening
+              </p>
+            </div>
+
+            {/* 4. Staff Salary Deductions (Shortages) */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-rose-900/40 bg-rose-950/20 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Salary Deductions</span>
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+              </div>
+              <div className="text-xl font-black text-rose-400 font-mono mt-1.5">
+                {shiftTallyKPIs.totalShortageAmount > 0 ? '-' : ''}
+                LKR {shiftTallyKPIs.totalShortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-rose-300/80 mt-1">
+                {shiftTallyKPIs.shortageShiftsCount} {shiftTallyKPIs.shortageShiftsCount === 1 ? 'shift shortage' : 'shift shortages'} recorded
+              </p>
+            </div>
+
+            {/* 5. Extra Income (Cash Excess) */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-900/40 bg-emerald-950/20 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Extra Income (Excess)</span>
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="text-xl font-black text-emerald-400 font-mono mt-1.5">
+                {shiftTallyKPIs.totalExcessAmount > 0 ? '+' : ''}
+                LKR {shiftTallyKPIs.totalExcessAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-emerald-300/80 mt-1">
+                {shiftTallyKPIs.excessShiftsCount} {shiftTallyKPIs.excessShiftsCount === 1 ? 'shift excess' : 'shift excesses'} recorded
+              </p>
+            </div>
+          </div>
+
+          {/* 2. Detailed Per-Shift Tally Cards (Shift 1, Shift 2) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <Scale className="w-4 h-4 text-purple-400" />
+                <span>Shift Tally Worksheets ({shiftTallyKPIs.filteredShifts.length})</span>
+              </h4>
+              <span className="text-xs text-slate-500">
+                Detailed cash ledger verification per operating shift
+              </span>
+            </div>
+
+            {shiftTallyKPIs.filteredShifts.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-center space-y-2">
+                <Clock className="w-8 h-8 text-slate-600 mx-auto" />
+                <div className="text-sm font-bold text-slate-300">
+                  No Cashier Shift Sheets Recorded for {selectedDate}
+                </div>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  When cashiers submit their shift end handovers via the POS terminal, their live drawer tally, receipts, expenses, bank deposits, and cash variances will immediately appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {shiftTallyKPIs.filteredShifts.map((sh) => {
+                  const shiftInflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
+                  const countedDrawer = sh.counted_remaining_drawer_cash || sh.counted_drawer_cash || 0;
+                  const shiftAccounted = (sh.goods_purchased_paid || 0) + (sh.other_expenses || 0) + (sh.banked_amount || 0) + countedDrawer;
+                  const variance = sh.cash_variance !== undefined ? sh.cash_variance : (countedDrawer - (shiftInflow - (sh.goods_purchased_paid || 0) - (sh.other_expenses || 0) - (sh.banked_amount || 0)));
+                  const isExpanded = expandedDenomsShiftId === sh.id;
+                  const denoms = sh.denominations_json || {};
+                  const denomEntries = Object.entries(denoms).filter(([_, count]) => Number(count) > 0);
+
+                  return (
+                    <div key={sh.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+                      {/* Shift Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 font-bold flex items-center justify-center text-sm border border-purple-500/30">
+                            {sh.cashier_name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-slate-100">{sh.cashier_name}</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                Shift {sh.shift_number}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                {sh.branch_name}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <Clock className="w-3.5 h-3.5 text-slate-500" />
+                              <span>
+                                {sh.started_at ? new Date(sh.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                {' → '}
+                                {sh.ended_at ? new Date(sh.ended_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active Shift'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border ${
+                            sh.status === 'closed'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          }`}>
+                            {sh.status === 'closed' ? 'Closed & Verified' : 'Open / In-Progress'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Inflows vs Outflows & Remaining Drawer Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Column 1: Cash Inflows */}
+                        <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/90 space-y-2.5 text-xs">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                            <span>Cash Inflows</span>
+                            <span className="text-purple-400 font-mono">Drawer Receipts</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Opening Float:</span>
+                            <span className="font-mono font-bold text-slate-200">
+                              LKR {(sh.opening_float || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">POS Cash Sales:</span>
+                            <span className="font-mono font-bold text-slate-200">
+                              LKR {(sh.pos_cash_sales || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Special Stock Sales:</span>
+                            <span className="font-mono font-bold text-purple-300">
+                              LKR {(sh.modaka_total_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 font-bold">
+                            <span className="text-slate-200 uppercase text-[11px]">Total Cash Inflow:</span>
+                            <span className="font-mono text-sm text-indigo-400">
+                              LKR {shiftInflow.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Column 2: Outflows & Remaining Drawer */}
+                        <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/90 space-y-2.5 text-xs">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                            <span>Outflows & Remaining Drawer</span>
+                            <span className="text-amber-400 font-mono">Disbursements & Float</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Goods Purchased Paid Out:</span>
+                            <span className="font-mono font-bold text-rose-300">
+                              - LKR {(sh.goods_purchased_paid || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Other Expenses:</span>
+                            <span className="font-mono font-bold text-rose-300">
+                              - LKR {(sh.other_expenses || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Banked Amount:</span>
+                            <span className="font-mono font-bold text-indigo-300">
+                              - LKR {(sh.banked_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
+                            <span className="text-slate-300 font-semibold">Counted Remaining Drawer Cash:</span>
+                            <span className="font-mono font-bold text-emerald-400">
+                              LKR {countedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          {/* Expandable Denominations */}
+                          {denomEntries.length > 0 && (
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedDenomsShiftId(isExpanded ? null : sh.id)}
+                                className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
+                              >
+                                <Coins className="w-3 h-3" />
+                                <span>{isExpanded ? 'Hide Physical Denominations' : 'View Physical Denomination Breakdown'}</span>
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                              {isExpanded && (
+                                <div className="mt-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-mono text-[10px]">
+                                  {denomEntries.map(([denom, count]) => (
+                                    <div key={denom} className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/80 border border-slate-800">
+                                      <span className="text-slate-400">{denom} ×</span>
+                                      <span className="text-slate-200 font-bold">{count}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 font-bold">
+                            <span className="text-slate-200 uppercase text-[11px]">Total Accounted:</span>
+                            <span className="font-mono text-sm text-amber-400">
+                              LKR {shiftAccounted.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Verdict Banner */}
+                      <div className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold ${
+                        Math.abs(variance) < 0.01
+                          ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+                          : variance < 0
+                          ? 'bg-rose-950/50 text-rose-200 border-rose-500/40'
+                          : 'bg-emerald-950/40 text-emerald-200 border-emerald-500/30'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          {Math.abs(variance) < 0.01 ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>BALANCED • Zero Variance (Drawer cash tallies perfectly with calculated expectation)</span>
+                            </>
+                          ) : variance < 0 ? (
+                            <>
+                              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                              <span>
+                                SHORTAGE: -LKR {Math.abs(variance).toLocaleString('en-LK', { minimumFractionDigits: 2 })} — Deduct from {sh.cashier_name}&apos;s Daily Salary
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>
+                                EXCESS: +LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })} — Recorded as Daily Extra Income
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <span className="font-mono text-sm font-black shrink-0">
+                          Variance: {variance > 0 ? '+' : ''}LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Handover Remarks */}
+                      {sh.handover_notes && (
+                        <div className="text-xs text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 italic">
+                          <span className="text-slate-500 not-italic font-bold mr-1.5">Handover Remarks:</span>
+                          &ldquo;{sh.handover_notes}&rdquo;
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Dedicated Owner Log Tables */}
+          <div className="space-y-6 pt-4 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span>Salary Deductions & Extra Income Audit Logs</span>
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Automated financial adjustment tracking across all cashier shifts
+                </p>
+              </div>
+
+              {/* Date Scope Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setAdjustmentDateScope('selected_date')}
+                  className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    adjustmentDateScope === 'selected_date'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Selected Date ({selectedDate})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdjustmentDateScope('all')}
+                  className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    adjustmentDateScope === 'all'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  All History
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* TABLE 1: Staff Salary Deductions (Shift Shortages) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-md">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      Staff Salary Deductions (Shift Shortages)
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 font-mono">
+                      {salaryDeductionsLog.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Date', 'Branch', 'Shift', 'Employee Name', 'Shortage Amount (LKR)', 'Notes'];
+                      const rows = salaryDeductionsLog.map((r) => [
+                        r.date,
+                        r.branchName,
+                        `Shift ${r.shiftNumber}`,
+                        r.employeeName,
+                        r.amount,
+                        r.notes,
+                      ]);
+                      exportCsv('staff-salary-deductions', headers, rows);
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition text-[11px] flex items-center gap-1 cursor-pointer"
+                    title="Export CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">CSV</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Branch</th>
+                        <th className="py-2 px-2 text-center">Shift</th>
+                        <th className="py-2 px-3">Employee Name</th>
+                        <th className="py-2 px-3 text-right">Shortage (LKR)</th>
+                        <th className="py-2 px-3">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {salaryDeductionsLog.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-500 font-sans text-xs">
+                            ✓ No salary deduction shortages recorded for this scope.
+                          </td>
+                        </tr>
+                      ) : (
+                        salaryDeductionsLog.map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-800/40 transition">
+                            <td className="py-2.5 px-3 text-slate-300 font-sans">{r.date}</td>
+                            <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
+                            <td className="py-2.5 px-2 text-center">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
+                                S{r.shiftNumber}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
+                            <td className="py-2.5 px-3 text-right text-rose-400 font-black">
+                              -LKR {Number(r.amount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-400 text-[11px] font-sans truncate max-w-[150px]" title={r.notes}>
+                              {r.notes}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* TABLE 2: Daily Extra Income (Shift Cash Excess) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-md">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      Daily Extra Income (Shift Cash Excess)
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 font-mono">
+                      {extraIncomeLog.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Date', 'Branch', 'Shift', 'Employee Name', 'Extra Income Amount (LKR)', 'Notes'];
+                      const rows = extraIncomeLog.map((r) => [
+                        r.date,
+                        r.branchName,
+                        `Shift ${r.shiftNumber}`,
+                        r.employeeName,
+                        r.amount,
+                        r.notes,
+                      ]);
+                      exportCsv('daily-extra-income', headers, rows);
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition text-[11px] flex items-center gap-1 cursor-pointer"
+                    title="Export CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">CSV</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Branch</th>
+                        <th className="py-2 px-2 text-center">Shift</th>
+                        <th className="py-2 px-3">Employee Name</th>
+                        <th className="py-2 px-3 text-right">Extra Income (LKR)</th>
+                        <th className="py-2 px-3">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {extraIncomeLog.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-500 font-sans text-xs">
+                            No shift cash excesses recorded for this scope.
+                          </td>
+                        </tr>
+                      ) : (
+                        extraIncomeLog.map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-800/40 transition">
+                            <td className="py-2.5 px-3 text-slate-300 font-sans">{r.date}</td>
+                            <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
+                            <td className="py-2.5 px-2 text-center">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
+                                S{r.shiftNumber}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
+                            <td className="py-2.5 px-3 text-right text-emerald-400 font-black">
+                              +LKR {Number(r.amount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-400 text-[11px] font-sans truncate max-w-[150px]" title={r.notes}>
+                              {r.notes}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

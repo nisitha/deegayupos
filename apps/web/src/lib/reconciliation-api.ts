@@ -94,6 +94,11 @@ export interface ShiftHandoverSummary {
   banked_amount: number;
   closing_drawer_float: number;
   cash_variance: number;
+  expected_remaining_drawer_cash?: number;
+  counted_remaining_drawer_cash?: number;
+  tally_status?: string;
+  salary_deduction_amount?: number;
+  extra_income_amount?: number;
   denominations_json: Record<string, number>;
   handover_notes: string | null;
 }
@@ -489,6 +494,11 @@ export const reconciliationApi = {
         banked_amount: Number(sh.banked_amount) || 0,
         closing_drawer_float: Number(sh.closing_drawer_float) || 0,
         cash_variance: Number(sh.cash_variance) || 0,
+        expected_remaining_drawer_cash: Number(sh.expected_remaining_drawer_cash ?? sh.expected_cash_before_bank) || 0,
+        counted_remaining_drawer_cash: Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash) || 0,
+        tally_status: sh.tally_status || 'open',
+        salary_deduction_amount: Number(sh.salary_deduction_amount) || 0,
+        extra_income_amount: Number(sh.extra_income_amount) || 0,
         denominations_json: (sh.denominations_json || {}) as Record<string, number>,
         handover_notes: sh.handover_notes || null,
       }));
