@@ -3755,13 +3755,19 @@ export const shiftsApi = {
 
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
-      const bankedAmount = Number(payload.bankedAmount || 0);
+      let bankedAmount = Number(payload.bankedAmount || 0);
+      if (bankedAmount === 0 && payload.denominationsJson && typeof payload.denominationsJson === 'object') {
+        const denomSum = Object.entries(payload.denominationsJson).reduce((acc, [denom, cnt]) => {
+          return acc + (Number(denom) * (Number(cnt) || 0));
+        }, 0);
+        if (denomSum > 0) bankedAmount = denomSum;
+      }
 
       // Expected Remaining Drawer Cash = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
       const expectedRemainingDrawerCash =
         totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount;
 
-      // Counted Remaining Drawer Cash = Sum of counted remaining drawer notes/coins from Denominations
+      // Counted Remaining Drawer Cash = entered directly in Tab 3 (physical cash left in drawer)
       const countedRemainingDrawerCash = Number(
         payload.countedRemainingDrawerCash !== undefined
           ? payload.countedRemainingDrawerCash

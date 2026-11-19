@@ -1545,7 +1545,7 @@ export default function CashReconciliationPage() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
-                            <span className="text-slate-300 font-semibold">Counted Remaining Drawer Cash:</span>
+                            <span className="text-slate-300 font-semibold">Remaining Drawer Float (Next Opening):</span>
                             <span className="font-mono font-bold text-emerald-400">
                               LKR {countedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
@@ -1560,17 +1560,23 @@ export default function CashReconciliationPage() {
                                 className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
                               >
                                 <Coins className="w-3 h-3" />
-                                <span>{isExpanded ? 'Hide Physical Denominations' : 'View Physical Denomination Breakdown'}</span>
+                                <span>{isExpanded ? 'Hide Bank Deposit Denominations' : 'View Bank Deposit Denominations'}</span>
                                 {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </button>
                               {isExpanded && (
-                                <div className="mt-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-mono text-[10px]">
-                                  {denomEntries.map(([denom, count]) => (
-                                    <div key={denom} className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/80 border border-slate-800">
-                                      <span className="text-slate-400">{denom} ×</span>
-                                      <span className="text-slate-200 font-bold">{count}</span>
-                                    </div>
-                                  ))}
+                                <div className="mt-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                    <span>Bank Deposit Denominations</span>
+                                    <span className="text-indigo-400 font-mono">Banked: LKR {(sh.banked_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-mono text-[10px]">
+                                    {denomEntries.map(([denom, count]) => (
+                                      <div key={denom} className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/80 border border-slate-800">
+                                        <span className="text-slate-400">{denom} ×</span>
+                                        <span className="text-slate-200 font-bold">{count}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
