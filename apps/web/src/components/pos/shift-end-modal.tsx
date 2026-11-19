@@ -96,6 +96,7 @@ export function ShiftEndModal({
   const [openingFloat, setOpeningFloat] = useState<number>(0);
   const [isEditingOpeningFloat, setIsEditingOpeningFloat] = useState<boolean>(false);
   const [declaredShiftSale, setDeclaredShiftSale] = useState<number>(0);
+  const [livePosBillCount, setLivePosBillCount] = useState<number>(0);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
   const [remainingDrawerCash, setRemainingDrawerCash] = useState<number>(0);
@@ -250,16 +251,15 @@ export function ShiftEndModal({
             shift.startedAt
           );
           if (liveSalesRes.success && liveSalesRes.data) {
-            setDeclaredShiftSale(liveSalesRes.data.posCashSales);
+            setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
+            setLivePosBillCount(Number(liveSalesRes.data.posBills || 0));
           } else {
-            setDeclaredShiftSale(
-              Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
-            );
+            setDeclaredShiftSale(0);
+            setLivePosBillCount(0);
           }
         } catch {
-          setDeclaredShiftSale(
-            Number(shift.declaredShiftSale > 0 ? shift.declaredShiftSale : shift.posCashSales)
-          );
+          setDeclaredShiftSale(0);
+          setLivePosBillCount(0);
         }
 
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
@@ -452,7 +452,7 @@ export function ShiftEndModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="max-w-4xl w-full bg-[#0B101D] border border-slate-800 text-slate-100 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
+      <div className="max-w-4xl w-full bg-[#0B101D] border border-slate-800 text-slate-100 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[85vh]">
         {/* Header: Vibrant Indigo/Violet/Purple Gradient */}
         <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-3.5">
@@ -553,7 +553,7 @@ export function ShiftEndModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#0B101D]">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 pb-8 bg-[#0B101D]">
           {errorMessage && (
             <div className="mb-4 p-4 rounded-2xl bg-rose-950/60 border border-rose-600/50 text-rose-300 text-sm flex items-center gap-2.5">
               <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400" />
@@ -895,7 +895,9 @@ export function ShiftEndModal({
                             POS Cash Sales
                           </span>
                           <span className="text-xs text-slate-400 block mt-0.5">
-                            Auto-pulled from completed cash bills in this shift
+                            {livePosBillCount > 0
+                              ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift`
+                              : 'Auto-pulled from completed cash bills in this shift'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -1198,33 +1200,15 @@ export function ShiftEndModal({
                     </div>
                   </div>
 
-                  {/* Submit Actions */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3">
+                  {/* Back Action */}
+                  <div className="flex items-center justify-start pt-2">
                     <button
                       type="button"
                       onClick={() => setActiveTab('DENOMINATIONS')}
-                      className="min-h-[48px] px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-700"
+                      className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-700"
                     >
                       <ArrowLeft className="w-4 h-4" />
                       <span>Back to Denominations</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleFinalSubmit}
-                      disabled={isSubmitting}
-                      className="min-h-[48px] px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-[15px] font-bold flex items-center justify-center gap-2.5 shadow-xl shadow-purple-900/40 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Closing Shift & Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <LogOut className="w-5 h-5" />
-                          <span>Submit Shift Handover &amp; Sign Out</span>
-                        </>
-                      )}
                     </button>
                   </div>
                 </div>
@@ -1233,31 +1217,78 @@ export function ShiftEndModal({
           )}
         </div>
 
-        {/* Persistent Mini Footer */}
+        {/* Sticky Footer Bar (Guaranteed Never Clipped at Bottom) */}
         {!isSuccess && (
-          <div className="px-4 sm:px-6 py-3 bg-[#0B101D] border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs sm:text-sm text-slate-300 shrink-0">
-            <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-5 flex-wrap">
-              <span>
-                Bank Deposit: <strong className="font-mono text-indigo-300 font-extrabold">LKR {denominationsTotal.toFixed(2)}</strong>
+          <div className="shrink-0 border-t border-slate-800 bg-[#0B101D] px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs sm:text-sm text-slate-300">
+            {/* Left: Summary Tally Pills */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-4 flex-wrap">
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-700/60 text-indigo-200 font-medium">
+                Bank Deposit: <strong className="font-mono text-white font-extrabold ml-1">LKR {denominationsTotal.toFixed(2)}</strong>
               </span>
-              <span>
-                Next Float:{' '}
-                <strong className="font-mono text-emerald-300 font-extrabold">LKR {remainingDrawerCash.toFixed(2)}</strong>
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-700/60 text-emerald-200 font-medium">
+                Next Float: <strong className="font-mono text-white font-extrabold ml-1">LKR {remainingDrawerCash.toFixed(2)}</strong>
               </span>
               {isOwner && (
-                <span>
-                  Expected: <strong className="font-mono text-slate-200 font-extrabold">LKR {expectedRemainingDrawerCash.toFixed(2)}</strong>
+                <span className="hidden md:inline-flex px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 font-medium">
+                  Expected: <strong className="font-mono text-white font-extrabold ml-1">LKR {expectedRemainingDrawerCash.toFixed(2)}</strong>
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="min-h-[36px] sm:min-h-0 text-xs font-semibold text-slate-400 hover:text-white transition-colors py-1 px-3 rounded-lg bg-slate-800/60 sm:bg-transparent text-center cursor-pointer"
-            >
-              Cancel / Return to POS
-            </button>
+
+            {/* Right: Actions (Sticky Submit & Navigation) */}
+            <div className="flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="min-h-[44px] sm:min-h-0 text-xs sm:text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2 px-3.5 rounded-xl bg-slate-800/80 sm:bg-transparent text-center cursor-pointer border border-slate-700/60 sm:border-transparent"
+              >
+                Cancel / Return to POS
+              </button>
+
+              {activeTab === 'MODAKA' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('DENOMINATIONS')}
+                  className="min-h-[44px] px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span>Proceed to Denominations</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+
+              {activeTab === 'DENOMINATIONS' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('SUMMARY')}
+                  className="min-h-[44px] px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span>Proceed to Shift Tally</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+
+              {activeTab === 'SUMMARY' && (
+                <button
+                  type="button"
+                  onClick={handleFinalSubmit}
+                  disabled={isSubmitting}
+                  className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-xl shadow-purple-900/40 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Closing Shift...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="w-5 h-5" />
+                      <span>Submit Shift Handover &amp; Sign Out</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

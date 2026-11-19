@@ -1032,14 +1032,17 @@ export default function ConfidencyPosPage() {
             : selectedCustomer.name
           : 'Walk-in Customer';
 
+        const effectiveCashierId = activeCashier?.id || user?.id || cashierId;
+        const effectiveCashierName = activeCashier?.fullName || user?.fullName || cashierName;
+        const effectiveBranchId = selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
+
         let currentShiftId = activeShift?.id;
-        if (!currentShiftId && selectedBranchId) {
+        if (!currentShiftId && effectiveBranchId) {
           try {
-            const curCashierId = activeCashier?.id || user?.id || cashierId;
             const shiftRes = await shiftsApi.getOrCreateActiveShift(
-              selectedBranchId,
-              curCashierId,
-              cashierName
+              effectiveBranchId,
+              effectiveCashierId,
+              effectiveCashierName
             );
             if (shiftRes.success && shiftRes.data) {
               currentShiftId = shiftRes.data.id;
@@ -1051,10 +1054,10 @@ export default function ConfidencyPosPage() {
         }
 
         const payload: CheckoutPayload = {
-          branchId: selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+          branchId: effectiveBranchId,
           shiftId: currentShiftId || activeShift?.id || undefined,
-          cashierId,
-          cashierName,
+          cashierId: effectiveCashierId,
+          cashierName: effectiveCashierName,
           customerId: selectedCustomer?.id || undefined,
           customerName: formattedCustomer,
           orderType: 'RETAIL_WALKIN',

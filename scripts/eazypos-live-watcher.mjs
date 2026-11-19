@@ -310,25 +310,6 @@ async function main() {
     console.log(`[SYNC ENGINE] Verified ${discoveredLocations.length} active stock locations:`, discoveredLocations.map(l => `${l.osposLocId}:${l.locationName}`));
 
     // -------------------------------------------------------------------------
-    // CLEAN UP PRE-GO-LIVE POS TEST BILLS (INV-2026-*)
-    // -------------------------------------------------------------------------
-    console.log(`[SYNC ENGINE] Cleaning up pre-go-live POS test bills (INV-2026-*)...`);
-    const testSales = await retry(() => prisma.sale.findMany({
-      where: {
-        tenantId: TENANT_ID,
-        invoiceNumber: { startsWith: 'INV-2026-' }
-      },
-      select: { id: true, invoiceNumber: true }
-    }));
-    if (testSales.length > 0) {
-      const testIds = testSales.map(s => s.id);
-      await retry(() => prisma.salePayment.deleteMany({ where: { saleId: { in: testIds } } }));
-      await retry(() => prisma.saleItem.deleteMany({ where: { saleId: { in: testIds } } }));
-      await retry(() => prisma.sale.deleteMany({ where: { id: { in: testIds } } }));
-      console.log(`[SYNC ENGINE] ✓ Removed ${testSales.length} pre-go-live test sales.`);
-    }
-
-    // -------------------------------------------------------------------------
     // STEP A: Fetch & Upsert Suppliers
     // -------------------------------------------------------------------------
     console.log(`[SYNC ENGINE] Checking suppliers...`);

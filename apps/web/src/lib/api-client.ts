@@ -1084,8 +1084,17 @@ export const posApi = {
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (activeShiftRow?.id) shiftId = activeShiftRow.id;
-      } catch {}
+        if (activeShiftRow?.id) {
+          shiftId = activeShiftRow.id;
+        } else {
+          const newShiftRes = await shiftsApi.getOrCreateActiveShift(branchId, cashierId, cashierName);
+          if (newShiftRes.success && newShiftRes.data?.id) {
+            shiftId = newShiftRes.data.id;
+          }
+        }
+      } catch (e) {
+        console.warn('[posApi.checkout] Shift auto-resolution warning:', e);
+      }
     }
 
     // 5. Generate clean, unique invoice number
@@ -3454,8 +3463,11 @@ export const shiftsApi = {
       // Live POS sales calculation
       const { data: shiftSales } = await supabase
         .from('sales')
-        .select('id, total_amount, paid_amount, status, sale_payments(payment_method, amount)')
-        .or(`shift_id.eq.${openShift.id},and(branch_id.eq.${branchId},cashier_id.eq.${cashierId},created_at.gte.${openShift.started_at})`);
+        .select('id, invoice_number, total_amount, paid_amount, status, sale_payments(payment_method, amount)')
+        .eq('branch_id', branchId)
+        .eq('status', 'COMPLETED')
+        .not('invoice_number', 'ilike', 'LEG-SALE-%')
+        .or(`shift_id.eq.${openShift.id},and(cashier_id.eq.${cashierId},created_at.gte.${openShift.started_at})`);
 
       let posBills = 0;
       let posGross = 0;
@@ -4308,13 +4320,16 @@ export const shiftsApi = {
     startedAt?: string | null
   ): Promise<ApiResponse<{ posBills: number; posCashSales: number; posGrossSales: number }>> => {
     try {
+      if (!branchId) {
+        return { success: true, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
+      }
+
       let query = supabase
         .from('sales')
-        .select('id, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount, status)');
-
-      if (branchId) {
-        query = query.eq('branch_id', branchId);
-      }
+        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount, status)')
+        .eq('branch_id', branchId)
+        .eq('status', 'COMPLETED')
+        .not('invoice_number', 'ilike', 'LEG-SALE-%');
 
       if (shiftId && startedAt) {
         query = query.or(`shift_id.eq.${shiftId},sold_at.gte.${startedAt},created_at.gte.${startedAt}`);
@@ -4334,11 +4349,14 @@ export const shiftsApi = {
       let posCashSales = 0;
 
       (sales || []).forEach((s: any) => {
+        const inv = String(s.invoice_number || '');
+        if (inv.startsWith('LEG-SALE-')) return;
+
         const st = String(s.status || '').toUpperCase();
         if (st === 'COMPLETED') {
-          posBills += 1;
           const tot = Number(s.total_amount || s.paid_amount || 0);
-          posGrossSales += tot;
+          let billHasCash = false;
+          let billCashPortion = 0;
 
           if (s.sale_payments && Array.isArray(s.sale_payments) && s.sale_payments.length > 0) {
             let foundMethod = false;
@@ -4346,24 +4364,39 @@ export const shiftsApi = {
               const pm = String(p.payment_method || '').toUpperCase();
               const amt = Number(p.amount || 0);
               if (pm === 'CASH') {
-                posCashSales += amt;
+                billCashPortion += amt;
+                billHasCash = true;
                 foundMethod = true;
               } else if (pm === 'CARD' || pm === 'QR_PAYMENT' || pm.includes('CREDIT') || pm.includes('BANK')) {
                 foundMethod = true;
               }
             });
             if (!foundMethod) {
-              posCashSales += tot;
+              billCashPortion = tot;
+              billHasCash = true;
             }
           } else {
-            posCashSales += tot;
+            billCashPortion = tot;
+            billHasCash = true;
+          }
+
+          if (billHasCash && billCashPortion > 0) {
+            posBills += 1;
+            posCashSales += billCashPortion;
+            posGrossSales += tot;
+          } else if (tot > 0) {
+            posGrossSales += tot;
           }
         }
       });
 
       return {
         success: true,
-        data: { posBills, posCashSales, posGrossSales },
+        data: {
+          posBills,
+          posCashSales: Number(posCashSales || 0),
+          posGrossSales: Number(posGrossSales || 0),
+        },
       };
     } catch (err: any) {
       console.error('[shiftsApi] getLiveShiftPosSales fatal:', err);
