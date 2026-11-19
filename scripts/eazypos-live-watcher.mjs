@@ -267,6 +267,68 @@ async function main() {
     console.log(`[SYNC ENGINE] ✓ Authenticated successfully with eazypos99.`);
 
     // -------------------------------------------------------------------------
+    // DISCOVER 4 STOCK LOCATIONS DYNAMICALLY FROM EAZYPOS99
+    // -------------------------------------------------------------------------
+    console.log(`[SYNC ENGINE] Discovering stock locations live from eazypos99...`);
+    const rSalesPage = await client.fetchWithPacing(`${EAZYPOS_URL}/sales`);
+    const salesPageHtml = await rSalesPage.text();
+    const locMatch = salesPageHtml.match(/<select[^>]*name=["']stock_location["'][^>]*>([\s\S]*?)<\/select>/i);
+
+    const discoveredLocations = [];
+    if (locMatch) {
+      const optRegex = /<option\s+value=["'](\d+)["'][^>]*>([^<]+)<\/option>/gi;
+      let m;
+      while ((m = optRegex.exec(locMatch[1])) !== null) {
+        const osposLocId = m[1];
+        const rawName = m[2].trim();
+        let branchInfo = null;
+        const lower = rawName.toLowerCase();
+        if (lower.includes('alaw')) branchInfo = BRANCH_MAP['Alawwa'];
+        else if (lower.includes('daba') || lower.includes('damba')) branchInfo = BRANCH_MAP['Dabadeniya'];
+        else if (lower.includes('giri')) branchInfo = BRANCH_MAP['Giriulla'];
+        else if (lower.includes('main')) branchInfo = BRANCH_MAP['Main store'];
+
+        if (branchInfo) {
+          discoveredLocations.push({
+            osposLocId,
+            locationName: rawName,
+            branchId: branchInfo.branchId,
+            warehouseId: branchInfo.warehouseId
+          });
+        }
+      }
+    }
+
+    if (discoveredLocations.length === 0) {
+      discoveredLocations.push(
+        { osposLocId: '3', locationName: 'Alawwa', branchId: BRANCH_MAP['Alawwa'].branchId, warehouseId: BRANCH_MAP['Alawwa'].warehouseId },
+        { osposLocId: '1', locationName: 'Dabadeniya', branchId: BRANCH_MAP['Dabadeniya'].branchId, warehouseId: BRANCH_MAP['Dabadeniya'].warehouseId },
+        { osposLocId: '4', locationName: 'Giriulla', branchId: BRANCH_MAP['Giriulla'].branchId, warehouseId: BRANCH_MAP['Giriulla'].warehouseId },
+        { osposLocId: '2', locationName: 'Main store', branchId: BRANCH_MAP['Main store'].branchId, warehouseId: BRANCH_MAP['Main store'].warehouseId }
+      );
+    }
+    console.log(`[SYNC ENGINE] Verified ${discoveredLocations.length} active stock locations:`, discoveredLocations.map(l => `${l.osposLocId}:${l.locationName}`));
+
+    // -------------------------------------------------------------------------
+    // CLEAN UP PRE-GO-LIVE POS TEST BILLS (INV-2026-*)
+    // -------------------------------------------------------------------------
+    console.log(`[SYNC ENGINE] Cleaning up pre-go-live POS test bills (INV-2026-*)...`);
+    const testSales = await retry(() => prisma.sale.findMany({
+      where: {
+        tenantId: TENANT_ID,
+        invoiceNumber: { startsWith: 'INV-2026-' }
+      },
+      select: { id: true, invoiceNumber: true }
+    }));
+    if (testSales.length > 0) {
+      const testIds = testSales.map(s => s.id);
+      await retry(() => prisma.salePayment.deleteMany({ where: { saleId: { in: testIds } } }));
+      await retry(() => prisma.saleItem.deleteMany({ where: { saleId: { in: testIds } } }));
+      await retry(() => prisma.sale.deleteMany({ where: { id: { in: testIds } } }));
+      console.log(`[SYNC ENGINE] ✓ Removed ${testSales.length} pre-go-live test sales.`);
+    }
+
+    // -------------------------------------------------------------------------
     // STEP A: Fetch & Upsert Suppliers
     // -------------------------------------------------------------------------
     console.log(`[SYNC ENGINE] Checking suppliers...`);
@@ -448,46 +510,184 @@ async function main() {
     console.log(`[SYNC ENGINE] ✓ Per-branch stock sync completed. (${stocksUpdated} stock levels synchronized)`);
 
     // -------------------------------------------------------------------------
-    // STEP C: Incremental Sales Bills & Line Items (INV-{id})
+    // STEP C: Strict Per-Location Sales Scraping, Branch Reconcile & Missing Ingestion
     // -------------------------------------------------------------------------
-    console.log(`[SYNC ENGINE] Checking incremental sales bills...`);
-    const rSales = await client.fetchWithPacing(`${EAZYPOS_URL}/reports/detailed_sales/2026-11-01/2026-11-25/all/all`);
-    const salesHtml = await rSales.text();
-    const salesDataMatch = salesHtml.match(/data:\s*(\[.*?\])\s*,\s*iconSize/s);
-    const salesDetMatch = salesHtml.match(/details_data\s*=\s*(\{.*?\});\s*(?:var|\$\(|columns)/s);
+    console.log(`[SYNC ENGINE] Querying sales strictly per stock location across all 4 branches...`);
 
-    const salesRows = salesDataMatch ? JSON.parse(salesDataMatch[1]) : [];
-    const salesDetails = salesDetMatch ? JSON.parse(salesDetMatch[1]) : {};
-    console.log(`[SYNC ENGINE] Total sales in November date span: ${salesRows.length}`);
-    if (salesRows.length > 0) {
-      console.log(`[SYNC ENGINE] Latest sale row:`, JSON.stringify(salesRows[salesRows.length - 1]));
+    // Pre-cache all existing sales in DB for quick matching
+    const existingSalesList = await retry(() => prisma.sale.findMany({
+      where: { tenantId: TENANT_ID },
+      select: { id: true, invoiceNumber: true, branchId: true, cashierName: true }
+    }));
+    const saleByInvoice = new Map();
+    for (const s of existingSalesList) {
+      saleByInvoice.set(s.invoiceNumber, s);
     }
 
-    // Check which invoiceNumbers already exist in DB
-    const existingSales = await retry(() => prisma.sale.findMany({
-      where: {
-        tenantId: TENANT_ID,
-      },
-      select: { invoiceNumber: true }
-    }));
-    const salesExists = new Set(existingSales.map(s => s.invoiceNumber));
+    let reassignedBranchCount = 0;
+    const handledSaleIds = new Set();
 
-    // Sort by id asc
-    salesRows.sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
+    // Loop through each discovered OSPOS stock location individually
+    for (const loc of discoveredLocations) {
+      console.log(`[SYNC ENGINE] Fetching detailed sales for location "${loc.locationName}" (OSPOS ID ${loc.osposLocId})...`);
+      const rLocSales = await client.fetchWithPacing(`${EAZYPOS_URL}/reports/detailed_sales/2026-11-01/2026-11-25/all/${loc.osposLocId}`);
+      const locSalesHtml = await rLocSales.text();
+      const locSalesMatch = locSalesHtml.match(/data:\s*(\[.*?\])\s*,\s*iconSize/s);
+      const locDetMatch = locSalesHtml.match(/details_data\s*=\s*(\{.*?\});\s*(?:var|\$\(|columns)/s);
 
-    for (const row of salesRows) {
+      const locSalesRows = locSalesMatch ? JSON.parse(locSalesMatch[1]) : [];
+      const locSalesDetails = locDetMatch ? JSON.parse(locDetMatch[1]) : {};
+      console.log(`[SYNC ENGINE] -> Location "${loc.locationName}": ${locSalesRows.length} sales found in eazypos99.`);
+
+      locSalesRows.sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
+
+      for (const row of locSalesRows) {
+        const saleIntId = parseInt(row.id, 10);
+        if (saleIntId > maxSaleId) maxSaleId = saleIntId;
+        handledSaleIds.add(String(row.id));
+
+        const invNum = `INV-${row.id}`;
+        const legNum = `LEG-SALE-${row.id}`;
+        const existingSale = saleByInvoice.get(invNum) || saleByInvoice.get(legNum);
+
+        const cashierName = row.employee_name || 'Sale Admin';
+        const cashierId = CASHIER_MAP[cashierName] || DEFAULT_CASHIER_ID;
+        const saleDate = parseLegacyDate(row.sale_time);
+        const subtotal = Math.max(0, cleanMoney(row.subtotal));
+        const tax = cleanMoney(row.tax);
+        const total = cleanMoney(row.total);
+        const isReturn = (row.type_code === 'Return' || total < 0);
+
+        if (existingSale) {
+          // If already-synced row was assigned to the wrong branch, update it!
+          if (existingSale.branchId !== loc.branchId) {
+            await retry(() => prisma.sale.update({
+              where: { id: existingSale.id },
+              data: {
+                branchId: loc.branchId,
+                cashierName,
+                cashierId,
+                totalAmount: total,
+                subtotal,
+                soldAt: saleDate,
+                updatedAt: new Date()
+              }
+            }));
+            existingSale.branchId = loc.branchId;
+            reassignedBranchCount++;
+          }
+          continue;
+        }
+
+        // Sale does not exist in DB -> Insert cleanly with zero duplicates!
+        const saleId = crypto.randomUUID();
+
+        // 1. Sale Header
+        await retry(() => prisma.sale.create({
+          data: {
+            id: saleId,
+            tenantId: TENANT_ID,
+            branchId: loc.branchId,
+            cashierId,
+            cashierName,
+            invoiceNumber: invNum,
+            orderType: 'RETAIL_WALKIN',
+            status: isReturn ? 'VOIDED' : 'COMPLETED',
+            subtotal,
+            discountAmount: 0.00,
+            taxAmount: tax,
+            totalAmount: total,
+            paidAmount: total,
+            changeDue: 0.00,
+            createdAt: saleDate,
+            updatedAt: saleDate,
+            soldAt: saleDate,
+          }
+        }));
+
+        // 2. Sale Payment
+        await retry(() => prisma.salePayment.create({
+          data: {
+            id: crypto.randomUUID(),
+            tenantId: TENANT_ID,
+            saleId,
+            paymentMethod: 'CASH',
+            amount: total,
+            status: 'SUCCESS',
+            createdAt: saleDate,
+            updatedAt: saleDate,
+          }
+        }));
+
+        // 3. Line Items
+        const lineItems = locSalesDetails[String(row.id)] || [];
+        if (lineItems.length > 0) {
+          const itemBatch = [];
+          for (let idx = 0; idx < lineItems.length; idx++) {
+            const itemArr = lineItems[idx];
+            const prodName = itemArr[0] || 'Ayurvedic Medicine';
+            const barcode = itemArr[2] ? itemArr[2].trim().toLowerCase() : '';
+            const nameClean = prodName.trim().toLowerCase();
+            const productId = (barcode ? prodByBarcode.get(barcode) : null) || prodByName.get(nameClean) || allProducts[0]?.id;
+
+            const qtyStr = itemArr[4] || '1';
+            const qtyMatch = qtyStr.match(/([\d.]+)/);
+            const quantity = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
+
+            const itemSubtotal = cleanMoney(itemArr[5]);
+            const itemCost = cleanMoney(itemArr[8]);
+            const unitPrice = quantity > 0 ? (itemSubtotal / quantity) : itemSubtotal;
+            const unitCost = quantity > 0 ? (itemCost / quantity) : itemCost;
+
+            itemBatch.push({
+              id: crypto.randomUUID(),
+              tenantId: TENANT_ID,
+              saleId,
+              productId,
+              productName: prodName,
+              sku: barcode || `ITEM-${row.id}-${idx + 1}`,
+              unitPrice,
+              costPrice: unitCost,
+              quantity,
+              discountAmount: 0.00,
+              taxAmount: 0.00,
+              subtotal: itemSubtotal,
+              createdAt: saleDate,
+              updatedAt: saleDate,
+            });
+          }
+          if (itemBatch.length > 0) {
+            await retry(() => prisma.saleItem.createMany({ data: itemBatch }));
+          }
+        }
+
+        saleByInvoice.set(invNum, { id: saleId, invoiceNumber: invNum, branchId: loc.branchId });
+        newSalesCount++;
+      }
+    }
+
+    // Master Catch-Up: Also check /reports/detailed_sales/.../all/all to catch any remaining unassigned bills
+    console.log(`[SYNC ENGINE] Verifying master sales report (/all/all) for any remaining unassigned bills...`);
+    const rMasterSales = await client.fetchWithPacing(`${EAZYPOS_URL}/reports/detailed_sales/2026-11-01/2026-11-25/all/all`);
+    const masterSalesHtml = await rMasterSales.text();
+    const masterDataMatch = masterSalesHtml.match(/data:\s*(\[.*?\])\s*,\s*iconSize/s);
+    const masterDetMatch = masterSalesHtml.match(/details_data\s*=\s*(\{.*?\});\s*(?:var|\$\(|columns)/s);
+
+    const masterSalesRows = masterDataMatch ? JSON.parse(masterDataMatch[1]) : [];
+    const masterSalesDetails = masterDetMatch ? JSON.parse(masterDetMatch[1]) : {};
+
+    for (const row of masterSalesRows) {
+      if (handledSaleIds.has(String(row.id))) continue;
+
       const saleIntId = parseInt(row.id, 10);
       if (saleIntId > maxSaleId) maxSaleId = saleIntId;
 
-      const invoiceNumber = `INV-${row.id}`;
-      if (salesExists.has(invoiceNumber) || salesExists.has(`LEG-SALE-${row.id}`)) continue;
-
-      const saleId = crypto.randomUUID();
-      const saleDate = parseLegacyDate(row.sale_time);
+      const invNum = `INV-${row.id}`;
+      const legNum = `LEG-SALE-${row.id}`;
+      if (saleByInvoice.has(invNum) || saleByInvoice.has(legNum)) continue;
 
       const cashierName = row.employee_name || 'Sale Admin';
       const cashierId = CASHIER_MAP[cashierName] || DEFAULT_CASHIER_ID;
-
       let branchInfo = BRANCH_MAP['Main store'];
       const empLower = cashierName.toLowerCase();
       if (empLower.includes('daba') || empLower.includes('damba')) branchInfo = BRANCH_MAP['Dabadeniya'];
@@ -496,12 +696,13 @@ async function main() {
       else if (empLower.includes('admin') || empLower.includes('main')) branchInfo = BRANCH_MAP['Main store'];
       else if (empLower.includes('user1')) branchInfo = BRANCH_MAP['Dabadeniya'];
 
+      const saleDate = parseLegacyDate(row.sale_time);
       const subtotal = Math.max(0, cleanMoney(row.subtotal));
       const tax = cleanMoney(row.tax);
       const total = cleanMoney(row.total);
       const isReturn = (row.type_code === 'Return' || total < 0);
+      const saleId = crypto.randomUUID();
 
-      // Create Sale Header
       await retry(() => prisma.sale.create({
         data: {
           id: saleId,
@@ -509,7 +710,7 @@ async function main() {
           branchId: branchInfo.branchId,
           cashierId,
           cashierName,
-          invoiceNumber,
+          invoiceNumber: invNum,
           orderType: 'RETAIL_WALKIN',
           status: isReturn ? 'VOIDED' : 'COMPLETED',
           subtotal,
@@ -524,7 +725,6 @@ async function main() {
         }
       }));
 
-      // Create Payment
       await retry(() => prisma.salePayment.create({
         data: {
           id: crypto.randomUUID(),
@@ -538,8 +738,7 @@ async function main() {
         }
       }));
 
-      // Create Line Items
-      const lineItems = salesDetails[String(row.id)] || [];
+      const lineItems = masterSalesDetails[String(row.id)] || [];
       if (lineItems.length > 0) {
         const itemBatch = [];
         for (let idx = 0; idx < lineItems.length; idx++) {
@@ -580,10 +779,11 @@ async function main() {
         }
       }
 
-      salesExists.add(invoiceNumber);
+      saleByInvoice.set(invNum, { id: saleId, invoiceNumber: invNum, branchId: branchInfo.branchId });
       newSalesCount++;
     }
-    console.log(`[SYNC ENGINE] ✓ Sales sync complete. (${newSalesCount} new bills ingested, Highest ID: ${maxSaleId})`);
+
+    console.log(`[SYNC ENGINE] ✓ Per-location sales processing complete: ${newSalesCount} new bills ingested, ${reassignedBranchCount} bills reassigned to correct branches.`);
 
     // -------------------------------------------------------------------------
     // STEP D: Incremental Receivings / GRNs (GRN-{id})
@@ -728,10 +928,28 @@ async function main() {
     console.log(`\n[SYNC ENGINE] ========================================================`);
     console.log(`[SYNC ENGINE] ✅ SYNC COMPLETED SUCCESSFULLY IN ${durationSec}s`);
     console.log(`[SYNC ENGINE] - New Sales Bills Added:   ${newSalesCount}`);
+    console.log(`[SYNC ENGINE] - Bills Reassigned Branch: ${reassignedBranchCount}`);
     console.log(`[SYNC ENGINE] - New GRNs Added:          ${newGrnsCount}`);
     console.log(`[SYNC ENGINE] - Products Synced/Created: ${productsSynced}`);
     console.log(`[SYNC ENGINE] - Branch Stocks Updated:   ${stocksUpdated}`);
     console.log(`[SYNC ENGINE] - Highest Legacy Sale ID:  INV-${maxSaleId}`);
+    console.log(`[SYNC ENGINE] --------------------------------------------------------`);
+    console.log(`[SYNC ENGINE] 📊 LIVE RECONCILED PER-BRANCH BILL COUNTS & TOTALS:`);
+    for (const [branchName, info] of Object.entries(BRANCH_MAP)) {
+      const agg = await retry(() => prisma.sale.aggregate({
+        where: {
+          tenantId: TENANT_ID,
+          branchId: info.branchId,
+          status: { not: 'VOIDED' },
+          soldAt: { gte: new Date('2026-11-01T00:00:00Z') }
+        },
+        _count: { id: true },
+        _sum: { totalAmount: true }
+      }));
+      const count = agg._count.id;
+      const total = Number(agg._sum.totalAmount || 0);
+      console.log(`[SYNC ENGINE]   • ${branchName.padEnd(12)}: ${String(count).padStart(4)} bills | LKR ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    }
     console.log(`[SYNC ENGINE] ========================================================\n`);
 
     await prisma.$disconnect();
