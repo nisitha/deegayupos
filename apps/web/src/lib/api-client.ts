@@ -220,7 +220,7 @@ export const superAdminApi = {
           createdAt: b.created_at || new Date().toISOString(),
         } as any));
       }
-    } catch {}
+    } catch { }
 
     if (items.length === 0) {
       items = [
@@ -436,17 +436,17 @@ export const dashboardApi = {
           activities.length > 0
             ? activities
             : [
-                {
-                  id: 'act-1',
-                  action: 'SALE_COMPLETED',
-                  entity: 'Sale',
-                  type: 'SALE_COMPLETED',
-                  description: 'Sale DGM-0042 completed for LKR 14,500',
-                  timestamp: new Date().toISOString(),
-                  createdAt: new Date().toISOString(),
-                  actorName: 'Dr. Deegayu (Owner)',
-                },
-              ],
+              {
+                id: 'act-1',
+                action: 'SALE_COMPLETED',
+                entity: 'Sale',
+                type: 'SALE_COMPLETED',
+                description: 'Sale DGM-0042 completed for LKR 14,500',
+                timestamp: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                actorName: 'Dr. Deegayu (Owner)',
+              },
+            ],
       };
     } catch {
       return {
@@ -540,7 +540,7 @@ export const tenantSettingsApi = {
       if (stored) {
         try {
           settings = { ...settings, ...JSON.parse(stored) };
-        } catch {}
+        } catch { }
       }
     }
 
@@ -562,7 +562,7 @@ export const tenantSettingsApi = {
           address: sbBiz.address || settings.address,
         };
       }
-    } catch {}
+    } catch { }
 
     return { success: true, data: settings as TenantStoreSettingsDto };
   },
@@ -588,7 +588,7 @@ export const tenantSettingsApi = {
           address: data.address,
         })
         .eq('slug', slug);
-    } catch {}
+    } catch { }
 
     const cur = await tenantSettingsApi.getSettings(slug);
     return { success: true, data: cur.data };
@@ -622,7 +622,7 @@ export const productsApi = {
           updatedAt: p.updated_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
 
     return {
       success: true,
@@ -664,7 +664,7 @@ export const productsApi = {
           },
         };
       }
-    } catch {}
+    } catch { }
 
     throw new Error('Product not found');
   },
@@ -700,7 +700,7 @@ export const productsApi = {
           },
         };
       }
-    } catch {}
+    } catch { }
     return { success: true, data: { found: false } };
   },
   create: async (data: CreateProductPayload): Promise<ApiResponse<ProductDto>> => {
@@ -744,7 +744,7 @@ export const productsApi = {
       if (inserted) {
         newProd.id = inserted.id;
       }
-    } catch {}
+    } catch { }
 
     return { success: true, data: newProd };
   },
@@ -761,7 +761,7 @@ export const productsApi = {
           is_active: data.isActive,
         })
         .eq('id', id);
-    } catch {}
+    } catch { }
 
     return {
       success: true,
@@ -780,7 +780,7 @@ export const productsApi = {
   delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
     try {
       await supabase.from('products').update({ is_active: false }).eq('id', id);
-    } catch {}
+    } catch { }
     return { success: true, data: { success: true } };
   },
   getCategories: async (): Promise<ApiResponse<CategoryDto[]>> => {
@@ -800,7 +800,7 @@ export const productsApi = {
           productCount: c.product_count,
         }));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: cats };
   },
   createCategory: async (data: CreateCategoryPayload): Promise<ApiResponse<CategoryDto>> => {
@@ -818,7 +818,7 @@ export const productsApi = {
         name: data.name,
         slug: newCat.slug,
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newCat };
   },
   getBrands: async (): Promise<ApiResponse<BrandDto[]>> => {
@@ -835,7 +835,7 @@ export const productsApi = {
           updatedAt: b.updated_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: brands };
   },
   createBrand: async (data: CreateBrandPayload): Promise<ApiResponse<BrandDto>> => {
@@ -853,7 +853,7 @@ export const productsApi = {
         name: data.name,
         slug: newBrand.slug,
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newBrand };
   },
   getUnits: async (): Promise<ApiResponse<UnitDto[]>> => {
@@ -870,7 +870,7 @@ export const productsApi = {
           updatedAt: u.updated_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: units };
   },
   createUnit: async (data: CreateUnitPayload): Promise<ApiResponse<UnitDto>> => {
@@ -888,7 +888,7 @@ export const productsApi = {
         name: data.name,
         short_code: newUnit.shortCode,
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newUnit };
   },
   bulkImport: async (products: CreateProductPayload[]): Promise<ApiResponse<BulkImportResult>> => {
@@ -1288,7 +1288,7 @@ export const posApi = {
         const stored = JSON.parse(localStorage.getItem('pixelcraft_held_carts') || '[]');
         stored.unshift(heldItem);
         localStorage.setItem('pixelcraft_held_carts', JSON.stringify(stored));
-      } catch {}
+      } catch { }
     }
     return { success: true, data: heldItem };
   },
@@ -1300,7 +1300,7 @@ export const posApi = {
         if (branchId) {
           list = list.filter((c: any) => !c.branchId || c.branchId === branchId);
         }
-      } catch {}
+      } catch { }
     }
     return { success: true, data: list };
   },
@@ -1315,7 +1315,7 @@ export const posApi = {
           stored.splice(idx, 1);
           localStorage.setItem('pixelcraft_held_carts', JSON.stringify(stored));
         }
-      } catch {}
+      } catch { }
     }
     if (found) return { success: true, data: found };
     return {
@@ -1512,7 +1512,7 @@ export const posApi = {
           const list: SaleDto[] = JSON.parse(stored);
           sale = list.find((s) => s.id === id || s.invoiceNumber === id) || null;
         }
-      } catch {}
+      } catch { }
     }
 
     if (!sale) {
@@ -1583,7 +1583,7 @@ export const posApi = {
         settings: {
           taxNumber: 'VAT-10928392-8000',
           receiptHeader: 'DEEGAYU WEDA MADURA\nAyurvedic Pharmacy & Healthcare Store',
-          receiptFooter: 'නිරෝගී සුවය පතමු! / Thank You Come Again',
+          receiptFooter: 'Thank You Come Again',
           returnPolicyText: 'Authentic ayurvedic medicine once opened is non-refundable.',
           showBarcode: true,
           showTaxDetails: true,
@@ -2112,7 +2112,7 @@ export const inventoryApi = {
           else if (qty <= min) lowStock++;
         });
       }
-    } catch {}
+    } catch { }
 
     return {
       success: true,
@@ -2160,7 +2160,7 @@ export const inventoryApi = {
           };
         });
       }
-    } catch {}
+    } catch { }
 
     if (params?.status) {
       items = items.filter((i) => i.status === params.status);
@@ -2187,7 +2187,7 @@ export const inventoryApi = {
       if (item) {
         await supabase.from('stock_levels').update({ quantity_on_hand: item.countedQuantity }).eq('product_id', item.productId);
       }
-    } catch {}
+    } catch { }
     return {
       success: true,
       data: {
@@ -2276,7 +2276,7 @@ export const suppliersApi = {
           updatedAt: s.updated_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
     return {
       success: true,
       data: { items, total: items.length, page: 1, limit: items.length || 50, totalPages: 1 },
@@ -2329,7 +2329,7 @@ export const suppliersApi = {
         tax_number: payload.taxNumber,
         lead_time_days: payload.leadTimeDays,
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newSup };
   },
   updateSupplier: async (id: string, payload: UpdateSupplierDto): Promise<ApiResponse<SupplierDto>> => {
@@ -2345,7 +2345,7 @@ export const suppliersApi = {
         lead_time_days: payload.leadTimeDays,
         is_active: payload.isActive,
       }).eq('id', id);
-    } catch {}
+    } catch { }
     return {
       success: true,
       data: {
@@ -2363,7 +2363,7 @@ export const suppliersApi = {
   deleteSupplier: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
     try {
       await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
-    } catch {}
+    } catch { }
     return { success: true, data: { success: true } };
   },
 };
@@ -2374,7 +2374,7 @@ export const procurementApi = {
     if (typeof window !== 'undefined') {
       try {
         items = JSON.parse(localStorage.getItem('pixelcraft_purchase_orders') || '[]');
-      } catch {}
+      } catch { }
     }
     return { success: true, data: { items, total: items.length, page: 1, limit: 50, totalPages: 1 } };
   },
@@ -2397,7 +2397,7 @@ export const procurementApi = {
         const stored = JSON.parse(localStorage.getItem('pixelcraft_purchase_orders') || '[]');
         stored.unshift(po);
         localStorage.setItem('pixelcraft_purchase_orders', JSON.stringify(stored));
-      } catch {}
+      } catch { }
     }
     return { success: true, data: po };
   },
@@ -2418,7 +2418,7 @@ export const procurementApi = {
           createdAt: g.created_at,
         } as any));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: { items, total: items.length, page: 1, limit: items.length || 50, totalPages: 1 } };
   },
   getGrnById: async (id: string): Promise<ApiResponse<GoodsReceivedNoteDto>> => {
@@ -2486,7 +2486,7 @@ export const customersApi = {
           updatedAt: c.updated_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: { items, total: items.length, page: 1, limit: items.length || 50, totalPages: 1 } };
   },
   getTelemetry: async (): Promise<ApiResponse<CustomerTelemetryDto>> => {
@@ -2548,7 +2548,7 @@ export const customersApi = {
           createdAt: l.created_at || new Date().toISOString(),
         }));
       }
-    } catch {}
+    } catch { }
     return { success: true, data: { customer: custRes.data, ledger } };
   },
   createCustomer: async (payload: CreateCustomerDto): Promise<ApiResponse<CustomerDto>> => {
@@ -2577,7 +2577,7 @@ export const customersApi = {
         current_balance: 0,
         status: 'ACTIVE',
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newCust };
   },
   updateCustomer: async (id: string, payload: UpdateCustomerDto): Promise<ApiResponse<CustomerDto>> => {
@@ -2590,7 +2590,7 @@ export const customersApi = {
         credit_limit: payload.creditLimit,
         status: payload.status,
       }).eq('id', id);
-    } catch {}
+    } catch { }
     return {
       success: true,
       data: {
@@ -2619,7 +2619,7 @@ export const customersApi = {
         payment_method: payload.paymentMethod,
         notes: payload.notes,
       });
-    } catch {}
+    } catch { }
     const payment: CustomerPaymentDto = {
       id: `pay-${Date.now()}`,
       tenantId: '0fef1423-5d89-4147-8af8-17c7e641c88a',
@@ -2829,7 +2829,7 @@ export const staffApi = {
         pin_code: payload.pinCode,
         is_active: true,
       });
-    } catch {}
+    } catch { }
     return { success: true, data: newStaff };
   },
   update: async (id: string, payload: UpdateStaffUserDto): Promise<ApiResponse<StaffUserDto>> => {
@@ -2852,7 +2852,7 @@ export const staffApi = {
   delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
     try {
       await supabase.from('users').update({ is_active: false }).eq('id', id);
-    } catch {}
+    } catch { }
     return { success: true, data: { success: true } };
   },
   verifyPin: async (pinCode: string): Promise<ApiResponse<StaffUserDto | null>> => {
@@ -2886,21 +2886,21 @@ export const staffApi = {
             assignedBranches: Array.isArray(found.assigned_branches)
               ? found.assigned_branches
               : (isOwner ? [
-                  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-                  '133eeaec-5726-4702-a819-8423750db203',
-                  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-                  'fa68e4a0-a515-44c8-a082-5b5590366658',
-                  '197693d6-4247-48df-b614-6fcde9e34f7d',
-                ] : []),
+                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                '133eeaec-5726-4702-a819-8423750db203',
+                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                'fa68e4a0-a515-44c8-a082-5b5590366658',
+                '197693d6-4247-48df-b614-6fcde9e34f7d',
+              ] : []),
             grnBranches: Array.isArray(found.grn_branches)
               ? found.grn_branches
               : (isOwner ? [
-                  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-                  '133eeaec-5726-4702-a819-8423750db203',
-                  '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
-                  'fa68e4a0-a515-44c8-a082-5b5590366658',
-                  '197693d6-4247-48df-b614-6fcde9e34f7d',
-                ] : []),
+                '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+                '133eeaec-5726-4702-a819-8423750db203',
+                '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+                'fa68e4a0-a515-44c8-a082-5b5590366658',
+                '197693d6-4247-48df-b614-6fcde9e34f7d',
+              ] : []),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
@@ -4319,21 +4319,54 @@ export const shiftsApi = {
   getLiveShiftPosSales: async (
     branchId: string,
     shiftId?: string | null,
-    _startedAt?: string | null
+    startedAt?: string | null,
+    cashierId?: string | null,
+    cashierName?: string | null
   ): Promise<ApiResponse<{ posBills: number; posCashSales: number; posGrossSales: number }>> => {
     try {
       if (!branchId || !shiftId) {
         return { success: true, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
       }
 
+      // Compute Sri Lanka (Asia/Colombo, UTC+05:30) business day date bounds
+      const refDate = startedAt ? new Date(startedAt) : new Date();
+      const colomboFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Colombo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = colomboFormatter.formatToParts(refDate);
+      let year = '', month = '', day = '';
+      for (const p of parts) {
+        if (p.type === 'year') year = p.value;
+        if (p.type === 'month') month = p.value;
+        if (p.type === 'day') day = p.value;
+      }
+      const slDateStr = `${year}-${month}-${day}`;
+      const dayStartIso = new Date(`${slDateStr}T00:00:00+05:30`).toISOString();
+      const dayEndIso = new Date(`${slDateStr}T23:59:59.999+05:30`).toISOString();
+
       let query = supabase
         .from('sales')
-        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, legacy_sale_id, sale_payments(payment_method, amount, status)')
+        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, cashier_id, cashier_name, legacy_sale_id, sale_payments(payment_method, amount, status)')
         .eq('branch_id', branchId)
         .eq('status', 'COMPLETED')
         .is('legacy_sale_id', null)
         .not('invoice_number', 'ilike', 'LEG-SALE-%')
-        .eq('shift_id', shiftId);
+        .eq('shift_id', shiftId)
+        .gte('sold_at', dayStartIso)
+        .lte('sold_at', dayEndIso);
+
+      if (startedAt) {
+        query = query.gte('sold_at', startedAt);
+      }
+
+      if (cashierId) {
+        query = query.eq('cashier_id', cashierId);
+      } else if (cashierName) {
+        query = query.eq('cashier_name', cashierName);
+      }
 
       const { data: sales, error } = await query;
       if (error) {

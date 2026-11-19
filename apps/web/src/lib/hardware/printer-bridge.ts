@@ -45,7 +45,7 @@ export const DEFAULT_HARDWARE_SETTINGS: HardwareSettings = {
   printBarcode: true,
   printQrCode: true,
   printLogo: true,
-  footerMessage: 'නිරෝගී සුවය පතමු! / Thank You Come Again',
+  footerMessage: 'Thank You Come Again',
   bluetoothDeviceName: null,
 };
 
@@ -555,7 +555,6 @@ export class PrinterBridge {
     const escposOptions: EscPosReceiptOptions = {
       paperWidth: settings.paperWidth,
       storeName: storeDetails?.storeName || 'DEEGAYU WEDA MADURA',
-      storeNameNative: 'දීගායු වෙද මැදුර',
       branchName: storeDetails?.branchName || (sale as any).branchName || 'Main Store',
       address: storeDetails?.address,
       phone: storeDetails?.phone,

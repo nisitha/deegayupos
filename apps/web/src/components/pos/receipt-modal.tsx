@@ -317,7 +317,7 @@ export function ReceiptModal({
   const taxNumber = receiptData?.settings?.taxNumber || 'VAT-10928392-8000';
   const receiptHeader = receiptData?.settings?.receiptHeader;
   const receiptFooter =
-    receiptData?.settings?.receiptFooter || 'නිරෝගී සුවය පතමු! / Thank You Come Again';
+    receiptData?.settings?.receiptFooter || 'Thank You Come Again';
   const returnPolicy = receiptData?.settings?.returnPolicyText;
   const showBarcode = receiptData?.settings ? (receiptData.settings.showBarcode ?? true) : true;
   const showTax = receiptData?.settings ? (receiptData.settings.showTaxDetails ?? true) : true;

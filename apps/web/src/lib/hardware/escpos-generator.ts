@@ -281,10 +281,6 @@ export function generateEscPosReceipt(
   builder.textLine(options.storeName || 'DEEGAYU WEDA MADURA');
   builder.size('normal');
 
-  if (options.storeNameNative) {
-    builder.textLine(options.storeNameNative);
-  }
-
   const outletDisplayName = options.branchName || (sale as any).branchName || 'Main Store';
   builder.bold(true).textLine(`Outlet: ${outletDisplayName}`).bold(false);
 
@@ -387,7 +383,7 @@ export function generateEscPosReceipt(
     for (const p of sale.payments) {
       const pMethod =
         p.paymentMethod === 'CUSTOMER_CREDIT' || p.paymentMethod === 'STORE_CREDIT'
-          ? 'Store Credit (ණය)'
+          ? 'Store Credit'
           : p.paymentMethod;
       builder.row(`Paid via ${pMethod}:`, `${currency} ${Number(p.amount).toFixed(2)}`);
     }
@@ -418,7 +414,7 @@ export function generateEscPosReceipt(
 
   // 9. Footer & Cut
   builder.align('center');
-  builder.textLine(options.footerMessage || 'නිරෝගී සුවය පතමු! / Thank You Come Again');
+  builder.textLine(options.footerMessage || 'Thank You Come Again');
   builder.textLine('PixelCraft POS Engine • pos.pixelcraftlk.com');
   builder.cut(true);
 
@@ -449,7 +445,7 @@ export function generateTestReceiptBuffer(width: PrinterPaperWidth = '80mm'): Ui
   builder.row('Printer Width:', width);
   builder.row('Columns:', String(builder.columnCount));
   builder.row('Protocol:', 'ESC/POS Standard (UTF-8)');
-  builder.row('Timestamp:', new Date().toLocaleTimeString());
+  builder.row('Timestamp:', formatSriLankaReceiptTime(new Date()));
   builder.divider('-');
   builder.align('center');
   builder.textLine('Line Wrap Diagnostic Check:');

@@ -34,7 +34,7 @@ export default function SettingsDocumentPage() {
   const { business, refreshProfile, hasPermission } = useTenantBranch();
 
   // 1. Store Identity & Contact States
-  const [storeName, setStoreName] = useState('දීගායු වෙද මැදුර / Deegayu Weda Madura');
+  const [storeName, setStoreName] = useState('DEEGAYU WEDA MADURA');
   const [legalName, setLegalName] = useState('Deegayu Ayurvedic Products & Health Care (Pvt) Ltd');
   const [branchName, setBranchName] = useState('Kalutara Flagship Dispensary');
   const [logoUrl, setLogoUrl] = useState('');
@@ -55,7 +55,7 @@ export default function SettingsDocumentPage() {
     'Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary',
   );
   const [receiptFooterNote, setReceiptFooterNote] = useState(
-    'නිරෝගී සුවය පතමු! / Wishing you healthy living! Return within 7 days.',
+    'Thank You Come Again! Return within 7 days.',
   );
   const [returnPolicy, setReturnPolicy] = useState(
     'Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.',
@@ -344,7 +344,7 @@ export default function SettingsDocumentPage() {
   const applyPreset = (preset: 'deegayu-kalutara' | 'deegayu-colombo' | 'compact-58mm') => {
     setIsDirty(true);
     if (preset === 'deegayu-kalutara') {
-      setStoreName('දීගායු වෙද මැදුර / Deegayu Weda Madura');
+      setStoreName('DEEGAYU WEDA MADURA');
       setLegalName('Deegayu Ayurvedic Products & Health Care (Pvt) Ltd');
       setBranchName('Kalutara Flagship Dispensary');
       setAddress('Main Street, Kalutara, Western Province, Sri Lanka');
@@ -357,10 +357,10 @@ export default function SettingsDocumentPage() {
       setShowBarcode(true);
       setShowQr(true);
       setReceiptHeaderNote('Welcome to Deegayu Weda Madura • Traditional Ayurvedic Dispensary');
-      setReceiptFooterNote('නිරෝගී සුවය පතමු! / Wishing you healthy living! Return within 7 days.');
+      setReceiptFooterNote('Wishing you healthy living! Return within 7 days.');
       setReturnPolicy('Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.');
     } else if (preset === 'deegayu-colombo') {
-      setStoreName('දීගායු වෙද මැදුර / Deegayu Express');
+      setStoreName('DEEGAYU EXPRESS');
       setLegalName('Deegayu Ayurvedic Health Care (Pvt) Ltd');
       setBranchName('Colombo Central Clinic & Store');
       setAddress('142 Galle Road, Bambalapitiya, Colombo 04');
@@ -373,7 +373,7 @@ export default function SettingsDocumentPage() {
       setShowBarcode(true);
       setShowQr(true);
       setReceiptHeaderNote('Deegayu Express Wellness Hub • Colombo 04');
-      setReceiptFooterNote('නිරෝගී දිවියකට ආයුර්වේද සත්කාරය • Thank you!');
+      setReceiptFooterNote('Ayurvedic Healthcare for a Healthy Life • Thank You!');
       setReturnPolicy('Valid invoice required for exchanges within 7 business days.');
     } else if (preset === 'compact-58mm') {
       setPaperWidth('58mm');
@@ -382,7 +382,7 @@ export default function SettingsDocumentPage() {
       setShowBarcode(true);
       setShowQr(false);
       setReceiptHeaderNote('Deegayu Weda Madura (Quick Dispense)');
-      setReceiptFooterNote('නිරෝගී සුවය පතමු! Thank you!');
+      setReceiptFooterNote('Thank You Come Again!');
     }
   };
 
@@ -520,11 +520,11 @@ export default function SettingsDocumentPage() {
                       setStoreName(e.target.value);
                       setIsDirty(true);
                     }}
-                    placeholder="e.g. දීගායු වෙද මැදුර / Deegayu Weda Madura"
+                    placeholder="e.g. DEEGAYU WEDA MADURA"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#7052FF] focus:bg-white transition-colors"
                     required
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Sinhala & English bilingual name</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Official English brand name</p>
                 </div>
 
                 <div>
@@ -1018,8 +1018,6 @@ export default function SettingsDocumentPage() {
                 {storeName || 'DEEGAYU WEDA MADURA'}
               </div>
 
-              <div className="text-[11px] font-bold text-indigo-700">දීගායු වෙද මැදුර</div>
-
               <div className="text-[10px] text-slate-600 font-sans font-medium flex items-center justify-center gap-1">
                 <Building2 className="w-3 h-3 text-slate-400" />
                 <span>{branchName || 'Kalutara Flagship Dispensary'}</span>
@@ -1080,7 +1078,7 @@ export default function SettingsDocumentPage() {
               </div>
               <div className="flex justify-between">
                 <span>Customer:</span>
-                <span className="font-semibold text-slate-800">Walk-in Client (සාමාන්‍ය පාරිභෝගික)</span>
+                <span className="font-semibold text-slate-800">Walk-in Client</span>
               </div>
             </div>
 
@@ -1091,7 +1089,7 @@ export default function SettingsDocumentPage() {
               <div>
                 <div className="flex justify-between">
                   <span className="font-medium text-slate-900 truncate max-w-[200px]">
-                    දසමූලාරිෂ්ටය (Dasamoolarishta 375ml)
+                    Dasamoolarishta 375ml
                   </span>
                   <span className="font-bold">LKR 1,900.00</span>
                 </div>
@@ -1104,7 +1102,7 @@ export default function SettingsDocumentPage() {
               <div>
                 <div className="flex justify-between">
                   <span className="font-medium text-slate-900 truncate max-w-[200px]">
-                    සිද්ධාලේප බාම් (Siddhalepa Balm 50g)
+                    Siddhalepa Balm 50g
                   </span>
                   <span className="font-bold">LKR 420.00</span>
                 </div>
@@ -1116,7 +1114,7 @@ export default function SettingsDocumentPage() {
               <div>
                 <div className="flex justify-between">
                   <span className="font-medium text-slate-900 truncate max-w-[200px]">
-                    සුවධරණී තේ (Suwadharani 20 Bags)
+                    Suwadharani 20 Bags
                   </span>
                   <span className="font-bold">LKR 650.00</span>
                 </div>

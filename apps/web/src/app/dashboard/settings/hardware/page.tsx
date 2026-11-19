@@ -451,7 +451,7 @@ export default function HardwareSettingsPage() {
             type="text"
             value={settings.footerMessage}
             onChange={(e) => setSettings((prev) => ({ ...prev, footerMessage: e.target.value }))}
-            placeholder="නිරෝගී සුවය පතමු! / Thank You Come Again"
+            placeholder="Thank You Come Again"
             className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 font-medium"
           />
         </div>

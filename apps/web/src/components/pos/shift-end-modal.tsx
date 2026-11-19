@@ -264,12 +264,14 @@ export function ShiftEndModal({
         // Initialize expenses & float
         setOpeningFloat(Number(shift.openingFloat || 0));
 
-        // Auto-pull live completed POS cash sales for this active shift window
+        // Auto-pull live completed POS cash sales strictly for this same-day active shift window
         try {
           const liveSalesRes = await shiftsApi.getLiveShiftPosSales(
             effectiveBranchId || shift.branchId,
             shift.id,
-            shift.startedAt
+            shift.startedAt,
+            shift.cashierId || effectiveCashierId,
+            shift.cashierName || cashierName
           );
           if (liveSalesRes.success && liveSalesRes.data) {
             setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
