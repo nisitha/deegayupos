@@ -280,7 +280,7 @@ export function ShiftEndModal({
           const liveSalesRes = await shiftsApi.getLiveShiftPosSales(
             effectiveBranchId || shift.branchId,
             shift.id,
-            shift.startedAt,
+            shift.startedAt || (shift as any)?.started_at,
             shift.cashierId || effectiveCashierId,
             shift.cashierName || cashierName
           );
@@ -358,13 +358,19 @@ export function ShiftEndModal({
 
   // 1. Total Cash Inflow = openingFloat + declaredShiftSale (POS cash) + modakaSalesTotal (Special stock sales)
   const totalCashInflow = useMemo(() => {
-    return openingFloat + declaredShiftSale + modakaSalesTotal;
+    return Math.round((openingFloat + declaredShiftSale + modakaSalesTotal) * 100) / 100;
   }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
   const currentShift = activeShift || localShift;
 
   const formattedShiftStartTime = useMemo(() => {
-    const rawTime = currentShift?.startedAt || localShift?.startedAt || activeShift?.startedAt;
+    const rawTime =
+      currentShift?.startedAt ||
+      (currentShift as any)?.started_at ||
+      localShift?.startedAt ||
+      (localShift as any)?.started_at ||
+      activeShift?.startedAt ||
+      (activeShift as any)?.started_at;
     if (!rawTime) return null;
     try {
       const d = new Date(rawTime);
@@ -378,7 +384,14 @@ export function ShiftEndModal({
     } catch {
       return null;
     }
-  }, [currentShift?.startedAt, localShift?.startedAt, activeShift?.startedAt]);
+  }, [
+    currentShift?.startedAt,
+    (currentShift as any)?.started_at,
+    localShift?.startedAt,
+    (localShift as any)?.started_at,
+    activeShift?.startedAt,
+    (activeShift as any)?.started_at,
+  ]);
 
   if (!isOpen) return null;
 
@@ -397,7 +410,7 @@ export function ShiftEndModal({
       const liveSalesRes = await shiftsApi.getLiveShiftPosSales(
         effectiveBranchId || targetShift.branchId,
         targetShift.id,
-        targetShift.startedAt,
+        targetShift.startedAt || (targetShift as any)?.started_at,
         effectiveCashierId,
         cashierName
       );

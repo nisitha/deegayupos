@@ -1235,7 +1235,7 @@ export default function ConfidencyPosPage() {
 
         const payload: CheckoutPayload = {
           branchId: effectiveBranchId,
-          shiftId: currentShiftId || activeShift?.id || undefined,
+          shiftId: activeShift?.id || currentShiftId || undefined,
           cashierId: effectiveCashierId,
           cashierName: effectiveCashierName,
           customerId: selectedCustomer?.id || undefined,

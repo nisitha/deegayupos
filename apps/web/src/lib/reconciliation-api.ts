@@ -385,7 +385,7 @@ export const reconciliationApi = {
       // 5. Query live & historical sales for that date + branch (using sold_at index)
       let salesQuery = supabase
         .from('sales')
-        .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, legacy_sale_id, sale_payments(payment_method, amount)')
+        .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, paid_amount, status, sold_at, created_at, shift_id, legacy_sale_id, sale_payments(payment_method, amount)')
         .gte('sold_at', start)
         .lte('sold_at', end)
         .is('legacy_sale_id', null)
@@ -438,12 +438,7 @@ export const reconciliationApi = {
             }
             saleCash = Math.min(saleCash, tot);
           } else {
-            const pm = String(s.payment_method || 'CASH').toUpperCase();
-            if (pm === 'CASH') saleCash = tot;
-            else if (pm === 'CARD') saleCard = tot;
-            else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') saleQr = tot;
-            else if (pm === 'CUSTOMER_CREDIT' || pm === 'STORE_CREDIT') saleCredit = tot;
-            else saleCash = tot;
+            saleCash = tot;
           }
 
           systemCashSales += saleCash;
@@ -539,9 +534,7 @@ export const reconciliationApi = {
               });
               bCash = Math.min(bCash, tot);
             } else {
-              if (String(s.payment_method || 'CASH').toUpperCase() === 'CASH') {
-                bCash = tot;
-              }
+              bCash = tot;
             }
 
             if (bCash > 0) {
@@ -616,7 +609,7 @@ export const reconciliationApi = {
               if (parsed.handover_variance !== undefined) handoverVariance = parsed.handover_variance;
               if (parsed.opening_confirmed) openingConfirmed = true;
             }
-          } catch {}
+          } catch { }
         }
 
         // If not stored in notes, look for preceding closed shift for this branch in shiftRows

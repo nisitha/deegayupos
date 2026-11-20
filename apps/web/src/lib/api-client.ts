@@ -3582,7 +3582,7 @@ export const shiftsApi = {
             if (parsed.handover_variance !== undefined) handoverVariance = parsed.handover_variance;
             if (parsed.opening_confirmed) openingConfirmed = true;
           }
-        } catch {}
+        } catch { }
       }
 
       // Check if any prior closed shift exists for this branch to mark locked status
@@ -3696,10 +3696,10 @@ export const shiftsApi = {
 
       const previousClosingFloat = prevShift
         ? Math.round(
-            Number(
-              prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
-            ) * 100
-          ) / 100
+          Number(
+            prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
+          ) * 100
+        ) / 100
         : null;
 
       const previousShiftLabel = prevShift ? formatShiftLabel(prevShift.shift_number) : undefined;
@@ -3919,7 +3919,7 @@ export const shiftsApi = {
             if (parsed.previous_closing_float !== undefined) previousClosingFloat = parsed.previous_closing_float;
             if (parsed.previous_shift_label) previousShiftLabel = parsed.previous_shift_label;
           }
-        } catch {}
+        } catch { }
       }
 
       if (previousClosingFloat === null && shiftRow.branch_id) {
@@ -4098,7 +4098,7 @@ export const shiftsApi = {
 
       let salesQuery = supabase
         .from('sales')
-        .select('id, invoice_number, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, branch_id, legacy_sale_id, sale_payments(payment_method, amount)');
+        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, legacy_sale_id, sale_payments(payment_method, amount)');
 
       if (payload.branchId) {
         salesQuery = salesQuery.eq('branch_id', payload.branchId);
@@ -4135,9 +4135,8 @@ export const shiftsApi = {
           return;
         }
         if (['CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
-        if (st !== 'COMPLETED' && st !== 'PAID') return;
 
-        // Shift matching check using epoch milliseconds
+        // Shift matching check using exact epoch milliseconds (UTC / Asia/Colombo agnostic)
         let belongs = false;
         if (payload.shiftId && s.shift_id === payload.shiftId) {
           belongs = true;
@@ -4145,7 +4144,7 @@ export const shiftsApi = {
           const saleTimeStr = s.sold_at || s.created_at;
           const saleEpoch = saleTimeStr ? Date.parse(saleTimeStr) : NaN;
           if (!isNaN(saleEpoch)) {
-            const minTime = shiftOpenEpoch - 30000;
+            const minTime = shiftOpenEpoch - 60000;
             const maxTime = nowEpoch + 300000;
             if (saleEpoch >= minTime && saleEpoch <= maxTime) {
               belongs = true;
@@ -4156,7 +4155,7 @@ export const shiftsApi = {
 
         if (!belongs) return;
 
-        const grandTotal = Number(s.total_amount ?? s.paid_amount ?? 0);
+        const grandTotal = Math.round(Number(s.total_amount ?? s.paid_amount ?? 0) * 100) / 100;
         posGross += grandTotal;
 
         const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
@@ -4164,28 +4163,16 @@ export const shiftsApi = {
         let billHasCash = false;
 
         if (payments.length === 0) {
-          const pm = String(s.payment_method || 'CASH').toUpperCase();
-          if (pm === 'CASH') {
-            billCashPortion = grandTotal;
-            billHasCash = true;
-            posCash += grandTotal;
-          } else if (pm === 'CARD') {
-            posCard += grandTotal;
-          } else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') {
-            posQr += grandTotal;
-          } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
-            posCredit += grandTotal;
-          } else {
-            posCash += grandTotal;
-            billCashPortion = grandTotal;
-            billHasCash = true;
-          }
+          billCashPortion = grandTotal;
+          billHasCash = true;
+          posCash += grandTotal;
         } else {
+          let cashSum = 0;
           payments.forEach((p: any) => {
             const pm = String(p.payment_method || '').toUpperCase();
             const amt = Number(p.amount || 0);
             if (pm === 'CASH') {
-              billCashPortion += amt;
+              cashSum += amt;
               billHasCash = true;
             } else if (pm === 'CARD') {
               posCard += amt;
@@ -4194,11 +4181,11 @@ export const shiftsApi = {
             } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
               posCredit += amt;
             } else {
-              billCashPortion += amt;
+              cashSum += amt;
               billHasCash = true;
             }
           });
-          billCashPortion = Math.min(billCashPortion, grandTotal);
+          billCashPortion = Math.min(Math.round(cashSum * 100) / 100, grandTotal);
           posCash += billCashPortion;
         }
 
@@ -4701,7 +4688,7 @@ export const shiftsApi = {
 
       let query = supabase
         .from('sales')
-        .select('id, invoice_number, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, branch_id, cashier_id, cashier_name, legacy_sale_id, sale_payments(payment_method, amount, status)')
+        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, cashier_id, cashier_name, legacy_sale_id, sale_payments(payment_method, amount, status)')
         .eq('branch_id', branchId)
         .is('legacy_sale_id', null)
         .not('invoice_number', 'ilike', 'LEG-SALE-%')
@@ -4729,7 +4716,6 @@ export const shiftsApi = {
 
         const st = String(s.status || '').toUpperCase();
         if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
-        if (st !== 'COMPLETED' && st !== 'PAID') return;
 
         // Shift matching check using exact epoch milliseconds (UTC / Asia/Colombo agnostic)
         let belongsToShift = false;
@@ -4739,8 +4725,8 @@ export const shiftsApi = {
           const saleTimeStr = s.sold_at || s.created_at;
           const saleEpoch = saleTimeStr ? Date.parse(saleTimeStr) : NaN;
           if (!isNaN(saleEpoch)) {
-            // Leeway: 30 seconds before shift started to 5 minutes after now
-            const minTime = shiftOpenEpoch - 30000;
+            // Leeway: 60 seconds before shift started to 5 minutes after now
+            const minTime = shiftOpenEpoch - 60000;
             const maxTime = nowEpoch + 300000;
             if (saleEpoch >= minTime && saleEpoch <= maxTime) {
               belongsToShift = true;
@@ -4750,30 +4736,16 @@ export const shiftsApi = {
 
         if (!belongsToShift) return;
 
-        const grandTotal = Number(s.total_amount ?? s.paid_amount ?? 0);
+        const grandTotal = Math.round(Number(s.total_amount ?? s.paid_amount ?? 0) * 100) / 100;
         let billCashPortion = 0;
         let billHasCash = false;
 
         const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
 
         if (payments.length === 0) {
-          // Default single payment: check payment_method field
-          const pm = String(s.payment_method || 'CASH').toUpperCase();
-          if (pm === 'CASH') {
-            billCashPortion = grandTotal;
-            billHasCash = true;
-          }
-        } else if (payments.length === 1) {
-          const p = payments[0];
-          const pm = String(p.payment_method || '').toUpperCase();
-          if (pm === 'CASH') {
-            // Single-payment 'CASH' sale: sum grandTotal (never cash_received / amount_tendered)
-            billCashPortion = grandTotal;
-            billHasCash = true;
-          }
+          billCashPortion = grandTotal;
+          billHasCash = true;
         } else {
-          // Split sale with multiple payment methods:
-          // Sum the 'CASH' payment rows' net settled amount (capped at grandTotal)
           let cashSum = 0;
           payments.forEach((p: any) => {
             const pm = String(p.payment_method || '').toUpperCase();
@@ -4782,7 +4754,12 @@ export const shiftsApi = {
               billHasCash = true;
             }
           });
-          billCashPortion = Math.min(cashSum, grandTotal);
+
+          if (payments.length === 1 && billHasCash) {
+            billCashPortion = grandTotal;
+          } else if (billHasCash) {
+            billCashPortion = Math.min(Math.round(cashSum * 100) / 100, grandTotal);
+          }
         }
 
         if (billHasCash && billCashPortion > 0) {
@@ -4792,7 +4769,7 @@ export const shiftsApi = {
             id: s.id,
             invoiceNumber: s.invoice_number || `INV-${s.id.slice(0, 8)}`,
             soldAt: s.sold_at || s.created_at || new Date().toISOString(),
-            cashAmount: billCashPortion,
+            cashAmount: Math.round(billCashPortion * 100) / 100,
             totalAmount: grandTotal,
             isSplit: payments.length > 1,
           });
@@ -4807,8 +4784,8 @@ export const shiftsApi = {
         success: true,
         data: {
           posBills,
-          posCashSales: Number(posCashSales || 0),
-          posGrossSales: Number(posGrossSales || 0),
+          posCashSales: Math.round(Number(posCashSales || 0) * 100) / 100,
+          posGrossSales: Math.round(Number(posGrossSales || 0) * 100) / 100,
           bills,
         },
       };
