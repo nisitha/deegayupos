@@ -26,6 +26,10 @@ import {
   BarChart3,
   Banknote,
   FileSpreadsheet,
+  Calendar,
+  CalendarCheck,
+  Coins,
+  Briefcase,
   ChevronLeft,
   ChevronRight,
   X,
@@ -75,6 +79,15 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Reports Suite', href: '/dashboard/reports', icon: BarChart3, badge: '30' },
       { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },
       { name: 'Tax Engine', href: '/dashboard/finance/tax', icon: FileText },
+    ],
+  },
+  {
+    title: 'PAYROLL & HR',
+    items: [
+      { name: 'Payroll & Salary Slips', href: '/dashboard/payroll', icon: Coins, badge: 'EPF' },
+      { name: 'Daily & CSV Attendance', href: '/dashboard/payroll/attendance', icon: CalendarCheck },
+      { name: 'Employees & Wages', href: '/dashboard/payroll/employees', icon: Briefcase },
+      { name: 'SL Holiday Calendar', href: '/dashboard/payroll/special-days', icon: Calendar },
     ],
   },
   {
