@@ -1179,35 +1179,35 @@ export const posApi = {
 
     const paymentsToInsert = (data.payments && data.payments.length > 0)
       ? data.payments.map((p: any) => {
-          const rawM = String(p.paymentMethod || 'CASH').toUpperCase();
-          let m: SalePaymentMethod = 'CASH';
-          if (rawM.includes('CARD')) m = 'CARD';
-          else if (rawM.includes('QR') || rawM.includes('LANKA')) m = 'QR_PAYMENT';
-          else if (rawM.includes('BANK')) m = 'BANK_TRANSFER';
-          else if (rawM.includes('CREDIT')) m = 'STORE_CREDIT';
-          else m = 'CASH';
+        const rawM = String(p.paymentMethod || 'CASH').toUpperCase();
+        let m: SalePaymentMethod = 'CASH';
+        if (rawM.includes('CARD')) m = 'CARD';
+        else if (rawM.includes('QR') || rawM.includes('LANKA')) m = 'QR_PAYMENT';
+        else if (rawM.includes('BANK')) m = 'BANK_TRANSFER';
+        else if (rawM.includes('CREDIT')) m = 'STORE_CREDIT';
+        else m = 'CASH';
 
-          let amt = Number(p.amount || 0);
-          if (m === 'CASH') {
-            amt = Math.min(amt > 0 ? amt : netCashSettled, grandTotal);
-          }
-          return {
-            tenant_id: tenantId,
-            sale_id: saleId,
-            payment_method: m,
-            amount: amt,
-            status: 'SUCCESS',
-          };
-        })
+        let amt = Number(p.amount || 0);
+        if (m === 'CASH') {
+          amt = Math.min(amt > 0 ? amt : netCashSettled, grandTotal);
+        }
+        return {
+          tenant_id: tenantId,
+          sale_id: saleId,
+          payment_method: m,
+          amount: amt,
+          status: 'SUCCESS',
+        };
+      })
       : [
-          {
-            tenant_id: tenantId,
-            sale_id: saleId,
-            payment_method: mappedMethod,
-            amount: netAmount,
-            status: 'SUCCESS',
-          },
-        ];
+        {
+          tenant_id: tenantId,
+          sale_id: saleId,
+          payment_method: mappedMethod,
+          amount: netAmount,
+          status: 'SUCCESS',
+        },
+      ];
 
     const { error: payErr } = await supabase.from('sale_payments').insert(paymentsToInsert);
     if (payErr) {
@@ -3285,6 +3285,22 @@ export function formatShiftLabel(shiftNumber?: number | null): string {
 
 export const formatShiftLetterLabel = formatShiftLabel;
 
+export interface ShiftCashBillItem {
+  id: string;
+  invoiceNumber: string;
+  soldAt: string;
+  cashAmount: number;
+  totalAmount: number;
+  isSplit?: boolean;
+}
+
+export interface LiveShiftPosSalesData {
+  posBills: number;
+  posCashSales: number;
+  posGrossSales: number;
+  bills: ShiftCashBillItem[];
+}
+
 export const shiftsApi = {
   getModakaConfigs: async (): Promise<ApiResponse<ModakaItemConfigDto[]>> => {
     try {
@@ -3626,16 +3642,16 @@ export const shiftsApi = {
       const carriedOpeningFloat =
         shiftNumber > 1 && prevShift
           ? Number(
-              prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
-            )
+            prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
+          )
           : 0;
 
       const hasLockedOpeningFloat = shiftNumber > 1 && !!prevShift;
       const previousShiftLabel = prevShift
         ? formatShiftLabel(prevShift.shift_number)
         : shiftNumber > 1
-        ? formatShiftLabel(shiftNumber - 1)
-        : undefined;
+          ? formatShiftLabel(shiftNumber - 1)
+          : undefined;
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
@@ -3887,30 +3903,30 @@ export const shiftsApi = {
       const shiftNumber = shiftRow?.shift_number || 1;
       const shiftStartedAt = shiftRow?.started_at;
 
-      // 1. Fetch live sales for this shift window
+      // 1. Fetch live sales for this shift window using epoch timestamps (UTC/+05:30 agnostic)
+      const shiftOpenEpoch = shiftStartedAt && !isNaN(Date.parse(shiftStartedAt))
+        ? Date.parse(shiftStartedAt)
+        : Date.now() - 86400000;
+      const fetchStartEpoch = shiftOpenEpoch - 120000;
+      const fetchStartIso = new Date(fetchStartEpoch).toISOString();
+
       let salesQuery = supabase
         .from('sales')
-        .select('id, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, sale_payments(payment_method, amount)');
+        .select('id, invoice_number, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, branch_id, legacy_sale_id, sale_payments(payment_method, amount)');
 
       if (payload.branchId) {
         salesQuery = salesQuery.eq('branch_id', payload.branchId);
       }
 
-      if (payload.shiftId && shiftStartedAt) {
-        salesQuery = salesQuery.or(`shift_id.eq.${payload.shiftId},sold_at.gte.${shiftStartedAt},created_at.gte.${shiftStartedAt}`);
-      } else if (payload.shiftId) {
-        salesQuery = salesQuery.eq('shift_id', payload.shiftId);
+      salesQuery = salesQuery.is('legacy_sale_id', null).not('invoice_number', 'ilike', 'LEG-SALE-%');
+
+      if (payload.shiftId) {
+        salesQuery = salesQuery.or(`shift_id.eq.${payload.shiftId},created_at.gte.${fetchStartIso},sold_at.gte.${fetchStartIso}`);
+      } else {
+        salesQuery = salesQuery.or(`created_at.gte.${fetchStartIso},sold_at.gte.${fetchStartIso}`);
       }
 
       const { data: shiftSales } = await salesQuery;
-
-      // Retroactively link any completed sales that occurred in this shift window
-      if (shiftSales && shiftSales.length > 0 && payload.shiftId) {
-        const unlinked = shiftSales.filter((s: any) => !s.shift_id).map((s: any) => s.id);
-        if (unlinked.length > 0) {
-          await supabase.from('sales').update({ shift_id: payload.shiftId }).in('id', unlinked);
-        }
-      }
 
       let posBills = 0;
       let posVoided = 0;
@@ -3920,42 +3936,95 @@ export const shiftsApi = {
       let posQr = 0;
       let posCredit = 0;
 
+      const unlinkedSalesToTag: string[] = [];
+      const nowEpoch = Date.now();
+
       (shiftSales || []).forEach((s: any) => {
+        const inv = String(s.invoice_number || '');
+        if (inv.startsWith('LEG-SALE-') || s.legacy_sale_id) return;
+
         const st = String(s.status || '').toUpperCase();
-        if (st === 'COMPLETED') {
-          posBills += 1;
-          const tot = Number(s.total_amount || s.paid_amount || 0);
-          posGross += tot;
-          if (s.sale_payments && Array.isArray(s.sale_payments) && s.sale_payments.length > 0) {
-            let foundMethod = false;
-            s.sale_payments.forEach((p: any) => {
-              const pm = String(p.payment_method || '').toUpperCase();
-              const amt = Number(p.amount || 0);
-              if (pm === 'CASH') {
-                posCash += amt;
-                foundMethod = true;
-              } else if (pm === 'CARD') {
-                posCard += amt;
-                foundMethod = true;
-              } else if (pm === 'QR_PAYMENT') {
-                posQr += amt;
-                foundMethod = true;
-              } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
-                posCredit += amt;
-                foundMethod = true;
-              } else {
-                posCash += amt;
-                foundMethod = true;
-              }
-            });
-            if (!foundMethod) posCash += tot;
-          } else {
-            posCash += tot;
-          }
-        } else if (st === 'VOIDED') {
+        if (st === 'VOIDED' || st === 'VOID') {
           posVoided += 1;
+          return;
+        }
+        if (['CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
+        if (st !== 'COMPLETED' && st !== 'PAID') return;
+
+        // Shift matching check using epoch milliseconds
+        let belongs = false;
+        if (payload.shiftId && s.shift_id === payload.shiftId) {
+          belongs = true;
+        } else if (!s.shift_id) {
+          const saleTimeStr = s.sold_at || s.created_at;
+          const saleEpoch = saleTimeStr ? Date.parse(saleTimeStr) : NaN;
+          if (!isNaN(saleEpoch)) {
+            const minTime = shiftOpenEpoch - 30000;
+            const maxTime = nowEpoch + 300000;
+            if (saleEpoch >= minTime && saleEpoch <= maxTime) {
+              belongs = true;
+              unlinkedSalesToTag.push(s.id);
+            }
+          }
+        }
+
+        if (!belongs) return;
+
+        const grandTotal = Number(s.total_amount ?? s.paid_amount ?? 0);
+        posGross += grandTotal;
+
+        const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
+        let billCashPortion = 0;
+        let billHasCash = false;
+
+        if (payments.length === 0) {
+          const pm = String(s.payment_method || 'CASH').toUpperCase();
+          if (pm === 'CASH') {
+            billCashPortion = grandTotal;
+            billHasCash = true;
+            posCash += grandTotal;
+          } else if (pm === 'CARD') {
+            posCard += grandTotal;
+          } else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') {
+            posQr += grandTotal;
+          } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
+            posCredit += grandTotal;
+          } else {
+            posCash += grandTotal;
+            billCashPortion = grandTotal;
+            billHasCash = true;
+          }
+        } else {
+          payments.forEach((p: any) => {
+            const pm = String(p.payment_method || '').toUpperCase();
+            const amt = Number(p.amount || 0);
+            if (pm === 'CASH') {
+              billCashPortion += amt;
+              billHasCash = true;
+            } else if (pm === 'CARD') {
+              posCard += amt;
+            } else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') {
+              posQr += amt;
+            } else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') {
+              posCredit += amt;
+            } else {
+              billCashPortion += amt;
+              billHasCash = true;
+            }
+          });
+          billCashPortion = Math.min(billCashPortion, grandTotal);
+          posCash += billCashPortion;
+        }
+
+        if (billHasCash && billCashPortion > 0) {
+          posBills += 1;
         }
       });
+
+      // Retroactively link any completed sales that occurred in this shift window
+      if (unlinkedSalesToTag.length > 0 && payload.shiftId) {
+        await supabase.from('sales').update({ shift_id: payload.shiftId }).in('id', unlinkedSalesToTag);
+      }
 
       // 2. Modaka calculations
       let modakaTotalSoldQty = 0;
@@ -4130,7 +4199,7 @@ export const shiftsApi = {
           ended_at: new Date().toISOString(),
           pos_total_bills: posBills,
           pos_voided_bills: posVoided,
-          pos_cash_sales: posCash,
+          pos_cash_sales: systemPosCashSales,
           pos_card_sales: posCard,
           pos_qr_sales: posQr,
           pos_credit_sales: posCredit,
@@ -4380,15 +4449,15 @@ export const shiftsApi = {
     branchId: string,
     shiftId?: string | null,
     startedAt?: string | null,
-    cashierId?: string | null,
-    cashierName?: string | null
-  ): Promise<ApiResponse<{ posBills: number; posCashSales: number; posGrossSales: number }>> => {
+    _cashierId?: string | null,
+    _cashierName?: string | null
+  ): Promise<ApiResponse<LiveShiftPosSalesData>> => {
     try {
-      if (!branchId || !shiftId) {
-        return { success: true, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
+      if (!branchId) {
+        return { success: true, data: { posBills: 0, posCashSales: 0, posGrossSales: 0, bills: [] } };
       }
 
-      // Compute Sri Lanka (Asia/Colombo, UTC+05:30) business day date bounds
+      // Compute Sri Lanka (Asia/Colombo, UTC+05:30) reference date and epoch boundaries
       const refDate = startedAt ? new Date(startedAt) : new Date();
       const colomboFormatter = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Asia/Colombo',
@@ -4405,27 +4474,29 @@ export const shiftsApi = {
       }
       const slDateStr = `${year}-${month}-${day}`;
       const dayStartIso = new Date(`${slDateStr}T00:00:00+05:30`).toISOString();
-      const dayEndIso = new Date(`${slDateStr}T23:59:59.999+05:30`).toISOString();
+      const dayStartEpoch = Date.parse(dayStartIso);
+
+      const shiftOpenEpoch = startedAt && !isNaN(Date.parse(startedAt))
+        ? Date.parse(startedAt)
+        : dayStartEpoch;
+      const nowEpoch = Date.now();
+
+      // Leeway window for database fetch: 2 minutes before the earlier of shiftOpenEpoch or dayStartEpoch
+      const fetchStartEpoch = Math.min(shiftOpenEpoch - 120000, dayStartEpoch);
+      const fetchStartIso = new Date(fetchStartEpoch).toISOString();
 
       let query = supabase
         .from('sales')
-        .select('id, invoice_number, total_amount, paid_amount, status, sold_at, created_at, shift_id, branch_id, cashier_id, cashier_name, legacy_sale_id, sale_payments(payment_method, amount, status)')
+        .select('id, invoice_number, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, branch_id, cashier_id, cashier_name, legacy_sale_id, sale_payments(payment_method, amount, status)')
         .eq('branch_id', branchId)
-        .eq('status', 'COMPLETED')
         .is('legacy_sale_id', null)
         .not('invoice_number', 'ilike', 'LEG-SALE-%')
-        .eq('shift_id', shiftId)
-        .gte('sold_at', dayStartIso)
-        .lte('sold_at', dayEndIso);
+        .order('sold_at', { ascending: false });
 
-      if (startedAt) {
-        query = query.gte('sold_at', startedAt);
-      }
-
-      if (cashierId) {
-        query = query.eq('cashier_id', cashierId);
-      } else if (cashierName) {
-        query = query.eq('cashier_name', cashierName);
+      if (shiftId) {
+        query = query.or(`shift_id.eq.${shiftId},created_at.gte.${fetchStartIso},sold_at.gte.${fetchStartIso}`);
+      } else {
+        query = query.or(`created_at.gte.${fetchStartIso},sold_at.gte.${fetchStartIso}`);
       }
 
       const { data: sales, error } = await query;
@@ -4436,52 +4507,85 @@ export const shiftsApi = {
       let posBills = 0;
       let posGrossSales = 0;
       let posCashSales = 0;
+      const bills: ShiftCashBillItem[] = [];
 
       (sales || []).forEach((s: any) => {
         const inv = String(s.invoice_number || '');
-        if (inv.startsWith('LEG-SALE-') || /^INV-\d+$/.test(inv) || s.legacy_sale_id) return;
+        if (inv.startsWith('LEG-SALE-') || s.legacy_sale_id) return;
 
         const st = String(s.status || '').toUpperCase();
-        if (st === 'COMPLETED') {
-          const grandTotal = Number(s.total_amount ?? s.grand_total ?? 0);
-          let billCashPortion = 0;
-          let billHasCash = false;
+        if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
+        if (st !== 'COMPLETED' && st !== 'PAID') return;
 
-          const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
+        // Shift matching check using exact epoch milliseconds (UTC / Asia/Colombo agnostic)
+        let belongsToShift = false;
+        if (shiftId && s.shift_id === shiftId) {
+          belongsToShift = true;
+        } else if (!s.shift_id) {
+          const saleTimeStr = s.sold_at || s.created_at;
+          const saleEpoch = saleTimeStr ? Date.parse(saleTimeStr) : NaN;
+          if (!isNaN(saleEpoch)) {
+            // Leeway: 30 seconds before shift started to 5 minutes after now
+            const minTime = shiftOpenEpoch - 30000;
+            const maxTime = nowEpoch + 300000;
+            if (saleEpoch >= minTime && saleEpoch <= maxTime) {
+              belongsToShift = true;
+            }
+          }
+        }
 
-          if (payments.length === 0) {
-            // Default single-payment CASH sale
+        if (!belongsToShift) return;
+
+        const grandTotal = Number(s.total_amount ?? s.paid_amount ?? 0);
+        let billCashPortion = 0;
+        let billHasCash = false;
+
+        const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
+
+        if (payments.length === 0) {
+          // Default single payment: check payment_method field
+          const pm = String(s.payment_method || 'CASH').toUpperCase();
+          if (pm === 'CASH') {
             billCashPortion = grandTotal;
             billHasCash = true;
-          } else if (payments.length === 1) {
-            const p = payments[0];
+          }
+        } else if (payments.length === 1) {
+          const p = payments[0];
+          const pm = String(p.payment_method || '').toUpperCase();
+          if (pm === 'CASH') {
+            // Single-payment 'CASH' sale: sum grandTotal (never cash_received / amount_tendered)
+            billCashPortion = grandTotal;
+            billHasCash = true;
+          }
+        } else {
+          // Split sale with multiple payment methods:
+          // Sum the 'CASH' payment rows' net settled amount (capped at grandTotal)
+          let cashSum = 0;
+          payments.forEach((p: any) => {
             const pm = String(p.payment_method || '').toUpperCase();
             if (pm === 'CASH') {
-              // Single-payment 'CASH' sale: sum grandTotal (never cash_received / amount_tendered)
-              billCashPortion = grandTotal;
+              cashSum += Number(p.amount || 0);
               billHasCash = true;
             }
-          } else {
-            // Split sale with multiple payment methods:
-            // Sum the 'CASH' payment rows' net settled amount (capped at grandTotal)
-            let cashSum = 0;
-            payments.forEach((p: any) => {
-              const pm = String(p.payment_method || '').toUpperCase();
-              if (pm === 'CASH') {
-                cashSum += Number(p.amount || 0);
-                billHasCash = true;
-              }
-            });
-            billCashPortion = Math.min(cashSum, grandTotal);
-          }
+          });
+          billCashPortion = Math.min(cashSum, grandTotal);
+        }
 
-          if (billHasCash && billCashPortion > 0) {
-            posBills += 1;
-            posCashSales += billCashPortion;
-            posGrossSales += grandTotal;
-          } else if (grandTotal > 0) {
-            posGrossSales += grandTotal;
-          }
+        if (billHasCash && billCashPortion > 0) {
+          posBills += 1;
+          posCashSales += billCashPortion;
+          bills.push({
+            id: s.id,
+            invoiceNumber: s.invoice_number || `INV-${s.id.slice(0, 8)}`,
+            soldAt: s.sold_at || s.created_at || new Date().toISOString(),
+            cashAmount: billCashPortion,
+            totalAmount: grandTotal,
+            isSplit: payments.length > 1,
+          });
+        }
+
+        if (grandTotal > 0) {
+          posGrossSales += grandTotal;
         }
       });
 
@@ -4491,11 +4595,12 @@ export const shiftsApi = {
           posBills,
           posCashSales: Number(posCashSales || 0),
           posGrossSales: Number(posGrossSales || 0),
+          bills,
         },
       };
     } catch (err: any) {
       console.error('[shiftsApi] getLiveShiftPosSales fatal:', err);
-      return { success: false, data: { posBills: 0, posCashSales: 0, posGrossSales: 0 } };
+      return { success: false, data: { posBills: 0, posCashSales: 0, posGrossSales: 0, bills: [] } };
     }
   },
 

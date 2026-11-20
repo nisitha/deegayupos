@@ -380,10 +380,11 @@ export const reconciliationApi = {
       // 5. Query live & historical sales for that date + branch (using sold_at index)
       let salesQuery = supabase
         .from('sales')
-        .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, status, sold_at, created_at, sale_payments(payment_method, amount)')
+        .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, paid_amount, payment_method, status, sold_at, created_at, shift_id, legacy_sale_id, sale_payments(payment_method, amount)')
         .gte('sold_at', start)
         .lte('sold_at', end)
-        .neq('status', 'VOIDED');
+        .is('legacy_sale_id', null)
+        .not('invoice_number', 'ilike', 'LEG-SALE-%');
       if (!isAllBranches) {
         salesQuery = salesQuery.eq('branch_id', branchId);
       }
@@ -403,8 +404,15 @@ export const reconciliationApi = {
 
       if (salesData && salesData.length > 0) {
         for (const s of salesData) {
+          const inv = String(s.invoice_number || '');
+          if (inv.startsWith('LEG-SALE-') || s.legacy_sale_id) continue;
+
+          const st = String(s.status || '').toUpperCase();
+          if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) continue;
+          if (st !== 'COMPLETED' && st !== 'PAID') continue;
+
           totalCompletedBills++;
-          const tot = Number(s.total_amount) || 0;
+          const tot = Number(s.total_amount ?? s.paid_amount ?? 0);
           totalGrossSales += tot;
 
           const payments = (s as any).sale_payments || [];
@@ -419,12 +427,18 @@ export const reconciliationApi = {
               const pAmt = Number(p.amount) || 0;
               if (pm === 'CASH') saleCash += pAmt;
               else if (pm === 'CARD') saleCard += pAmt;
-              else if (pm === 'QR_PAYMENT') saleQr += pAmt;
+              else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') saleQr += pAmt;
               else if (pm === 'CUSTOMER_CREDIT' || pm === 'STORE_CREDIT') saleCredit += pAmt;
               else saleCash += pAmt;
             }
+            saleCash = Math.min(saleCash, tot);
           } else {
-            saleCash = tot;
+            const pm = String(s.payment_method || 'CASH').toUpperCase();
+            if (pm === 'CASH') saleCash = tot;
+            else if (pm === 'CARD') saleCard = tot;
+            else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') saleQr = tot;
+            else if (pm === 'CUSTOMER_CREDIT' || pm === 'STORE_CREDIT') saleCredit = tot;
+            else saleCash = tot;
           }
 
           systemCashSales += saleCash;
@@ -477,43 +491,105 @@ export const reconciliationApi = {
         console.warn('[ReconciliationApi] cashier_shifts error:', shiftErr.message);
       }
 
-      const shifts: ShiftHandoverSummary[] = (shiftRows || []).map((sh: any) => ({
-        id: sh.id,
-        shift_number: Number(sh.shift_number) || 1,
-        shift_date: sh.shift_date,
-        cashier_id: sh.cashier_id,
-        cashier_name: userMap.get(sh.cashier_id) || sh.cashier_name || 'Staff Cashier',
-        branch_id: sh.branch_id,
-        branch_name: branchMap.get(sh.branch_id) || 'Main Branch',
-        status: sh.status || 'open',
-        started_at: sh.started_at,
-        ended_at: sh.ended_at,
-        pos_total_bills: Number(sh.pos_total_bills) || 0,
-        pos_cash_sales: Number(sh.pos_cash_sales) || 0,
-        pos_card_sales: Number(sh.pos_card_sales) || 0,
-        pos_qr_sales: Number(sh.pos_qr_sales) || 0,
-        pos_credit_sales: Number(sh.pos_credit_sales) || 0,
-        pos_gross_sales: Number(sh.pos_gross_sales) || 0,
-        modaka_total_sold_qty: Number(sh.modaka_total_sold_qty) || 0,
-        modaka_total_amount: Number(sh.modaka_total_amount) || 0,
-        opening_float: Number(sh.opening_float) || 0,
-        declared_shift_sale: Number(sh.declared_shift_sale) || 0,
-        total_cash_available: Number(sh.total_cash_available) || 0,
-        goods_purchased_paid: Number(sh.goods_purchased_paid) || 0,
-        other_expenses: Number(sh.other_expenses) || 0,
-        expected_cash_before_bank: Number(sh.expected_cash_before_bank) || 0,
-        counted_drawer_cash: Number(sh.counted_drawer_cash) || 0,
-        banked_amount: Number(sh.banked_amount) || 0,
-        closing_drawer_float: Number(sh.closing_drawer_float) || 0,
-        cash_variance: Number(sh.cash_variance) || 0,
-        expected_remaining_drawer_cash: Number(sh.expected_remaining_drawer_cash ?? sh.expected_cash_before_bank) || 0,
-        counted_remaining_drawer_cash: Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash) || 0,
-        tally_status: sh.tally_status || 'open',
-        salary_deduction_amount: Number(sh.salary_deduction_amount) || 0,
-        extra_income_amount: Number(sh.extra_income_amount) || 0,
-        denominations_json: (sh.denominations_json || {}) as Record<string, number>,
-        handover_notes: sh.handover_notes || null,
-      }));
+      const shifts: ShiftHandoverSummary[] = (shiftRows || []).map((sh: any) => {
+        let posCash = Number(sh.pos_cash_sales) || 0;
+        let posBills = Number(sh.pos_total_bills) || 0;
+        let posGross = Number(sh.pos_gross_sales) || 0;
+
+        // If shift is currently open and salesData exists, calculate live POS cash accurately
+        if (sh.status === 'open' && salesData && salesData.length > 0) {
+          const shiftStartEpoch = sh.started_at ? Date.parse(sh.started_at) : NaN;
+          const shiftEndEpoch = sh.ended_at ? Date.parse(sh.ended_at) : Infinity;
+          let openCash = 0;
+          let openBills = 0;
+          let openGross = 0;
+
+          salesData.forEach((s: any) => {
+            const st = String(s.status || '').toUpperCase();
+            if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
+            if (st !== 'COMPLETED' && st !== 'PAID') return;
+
+            let belongs = false;
+            if (s.shift_id === sh.id) {
+              belongs = true;
+            } else if (!s.shift_id && !isNaN(shiftStartEpoch)) {
+              const saleEpoch = Date.parse(s.sold_at || s.created_at || '');
+              if (!isNaN(saleEpoch) && saleEpoch >= shiftStartEpoch - 30000 && saleEpoch <= shiftEndEpoch + 30000) {
+                belongs = true;
+              }
+            }
+
+            if (!belongs) return;
+
+            const tot = Number(s.total_amount ?? s.paid_amount ?? 0);
+            openGross += tot;
+
+            const payments = (s as any).sale_payments || [];
+            let bCash = 0;
+            if (payments.length > 0) {
+              payments.forEach((p: any) => {
+                if (String(p.payment_method || '').toUpperCase() === 'CASH') {
+                  bCash += Number(p.amount || 0);
+                }
+              });
+              bCash = Math.min(bCash, tot);
+            } else {
+              if (String(s.payment_method || 'CASH').toUpperCase() === 'CASH') {
+                bCash = tot;
+              }
+            }
+
+            if (bCash > 0) {
+              openCash += bCash;
+              openBills += 1;
+            }
+          });
+
+          if (openCash > 0 || openBills > 0) {
+            posCash = openCash;
+            posBills = openBills;
+            posGross = openGross;
+          }
+        }
+
+        return {
+          id: sh.id,
+          shift_number: Number(sh.shift_number) || 1,
+          shift_date: sh.shift_date,
+          cashier_id: sh.cashier_id,
+          cashier_name: userMap.get(sh.cashier_id) || sh.cashier_name || 'Staff Cashier',
+          branch_id: sh.branch_id,
+          branch_name: branchMap.get(sh.branch_id) || 'Main Branch',
+          status: sh.status || 'open',
+          started_at: sh.started_at,
+          ended_at: sh.ended_at,
+          pos_total_bills: posBills,
+          pos_cash_sales: posCash,
+          pos_card_sales: Number(sh.pos_card_sales) || 0,
+          pos_qr_sales: Number(sh.pos_qr_sales) || 0,
+          pos_credit_sales: Number(sh.pos_credit_sales) || 0,
+          pos_gross_sales: posGross,
+          modaka_total_sold_qty: Number(sh.modaka_total_sold_qty) || 0,
+          modaka_total_amount: Number(sh.modaka_total_amount) || 0,
+          opening_float: Number(sh.opening_float) || 0,
+          declared_shift_sale: Number(sh.declared_shift_sale) || posCash,
+          total_cash_available: Number(sh.total_cash_available) || 0,
+          goods_purchased_paid: Number(sh.goods_purchased_paid) || 0,
+          other_expenses: Number(sh.other_expenses) || 0,
+          expected_cash_before_bank: Number(sh.expected_cash_before_bank) || 0,
+          counted_drawer_cash: Number(sh.counted_drawer_cash) || 0,
+          banked_amount: Number(sh.banked_amount) || 0,
+          closing_drawer_float: Number(sh.closing_drawer_float) || 0,
+          cash_variance: Number(sh.cash_variance) || 0,
+          expected_remaining_drawer_cash: Number(sh.expected_remaining_drawer_cash ?? sh.expected_cash_before_bank) || 0,
+          counted_remaining_drawer_cash: Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash) || 0,
+          tally_status: sh.tally_status || 'open',
+          salary_deduction_amount: Number(sh.salary_deduction_amount) || 0,
+          extra_income_amount: Number(sh.extra_income_amount) || 0,
+          denominations_json: (sh.denominations_json || {}) as Record<string, number>,
+          handover_notes: sh.handover_notes || null,
+        };
+      });
 
       // 7. Modaka Sales Aggregation across shifts & shift_modaka_entries
       let modakaSalesTotal = shifts.reduce((acc, sh) => acc + (sh.modaka_total_amount || 0), 0);

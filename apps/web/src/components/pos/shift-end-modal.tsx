@@ -15,12 +15,16 @@ import {
   Layers,
   Banknote,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 import {
   CashierShiftDto,
   EndShiftPayload,
   shiftsApi,
   formatShiftLabel,
+  ShiftCashBillItem,
 } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
 import { useTenantBranch } from '../../context/tenant-branch-context';
@@ -119,6 +123,9 @@ export function ShiftEndModal({
   const [isEditingOpeningFloat, setIsEditingOpeningFloat] = useState<boolean>(false);
   const [declaredShiftSale, setDeclaredShiftSale] = useState<number>(0);
   const [livePosBillCount, setLivePosBillCount] = useState<number>(0);
+  const [liveCashBills, setLiveCashBills] = useState<ShiftCashBillItem[]>([]);
+  const [isCashBillsExpanded, setIsCashBillsExpanded] = useState<boolean>(false);
+  const [isRefreshingSales, setIsRefreshingSales] = useState<boolean>(false);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
   const [remainingDrawerCash, setRemainingDrawerCash] = useState<number>(0);
@@ -281,13 +288,16 @@ export function ShiftEndModal({
           if (liveSalesRes.success && liveSalesRes.data) {
             setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
             setLivePosBillCount(Number(liveSalesRes.data.posBills || 0));
+            setLiveCashBills(liveSalesRes.data.bills || []);
           } else {
             setDeclaredShiftSale(0);
             setLivePosBillCount(0);
+            setLiveCashBills([]);
           }
         } catch {
           setDeclaredShiftSale(0);
           setLivePosBillCount(0);
+          setLiveCashBills([]);
         }
 
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
@@ -390,6 +400,54 @@ export function ShiftEndModal({
 
   if (!isOpen) return null;
   const currentShift = activeShift || localShift;
+
+  const formattedShiftStartTime = useMemo(() => {
+    const rawTime = currentShift?.startedAt || localShift?.startedAt || activeShift?.startedAt;
+    if (!rawTime) return null;
+    try {
+      const d = new Date(rawTime);
+      if (isNaN(d.getTime())) return null;
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Colombo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(d);
+    } catch {
+      return null;
+    }
+  }, [currentShift?.startedAt, localShift?.startedAt, activeShift?.startedAt]);
+
+  const refreshLiveSales = async () => {
+    const targetShift = activeShift || localShift;
+    if (!targetShift) return;
+    setIsRefreshingSales(true);
+    try {
+      const effectiveBranchId =
+        branchId || targetShift.branchId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_selected_branch') : null);
+      const effectiveCashierId =
+        cashierId || targetShift.cashierId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('pixelcraft_cashier_id') : null);
+
+      const liveSalesRes = await shiftsApi.getLiveShiftPosSales(
+        effectiveBranchId || targetShift.branchId,
+        targetShift.id,
+        targetShift.startedAt,
+        effectiveCashierId,
+        cashierName
+      );
+      if (liveSalesRes.success && liveSalesRes.data) {
+        setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
+        setLivePosBillCount(Number(liveSalesRes.data.posBills || 0));
+        setLiveCashBills(liveSalesRes.data.bills || []);
+      }
+    } catch (err) {
+      console.warn('[ShiftEndModal] refreshLiveSales error:', err);
+    } finally {
+      setIsRefreshingSales(false);
+    }
+  };
 
   // Handlers
   const handleModakaChange = (index: number, field: 'inQty' | 'soldQty', valueStr: string) => {
@@ -498,6 +556,11 @@ export function ShiftEndModal({
               </div>
               <p className="text-sm text-slate-400 mt-0.5">
                 {branchName} • Cashier: <strong className="text-slate-200 font-semibold">{cashierName}</strong>
+                {formattedShiftStartTime && (
+                  <span className="text-slate-400 font-normal">
+                    {' '}• Shift started at <strong className="text-indigo-300 font-semibold">{formattedShiftStartTime}</strong> (Asia/Colombo)
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -936,23 +999,97 @@ export function ShiftEndModal({
                       </div>
 
                       {/* 2. POS Cash Sales */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <div>
-                          <span className="font-semibold text-[15px] text-slate-900 block">
-                            POS Cash Sales
-                          </span>
-                          <span className="text-xs text-slate-500 block mt-0.5">
-                            {livePosBillCount > 0
-                              ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift`
-                              : 'Auto-pulled from completed cash bills in this shift'}
-                          </span>
+                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[15px] text-slate-900 block">
+                                POS Cash Sales
+                              </span>
+                              {livePosBillCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCashBillsExpanded((prev) => !prev)}
+                                  className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-100/80 hover:bg-indigo-200/80 px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  title="Toggle cash bills breakdown"
+                                >
+                                  {isCashBillsExpanded ? (
+                                    <>
+                                      <span>Hide bills</span>
+                                      <ChevronUp className="w-3 h-3" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>View {livePosBillCount} bill{livePosBillCount > 1 ? 's' : ''}</span>
+                                      <ChevronDown className="w-3 h-3" />
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={refreshLiveSales}
+                                disabled={isRefreshingSales}
+                                className="text-slate-400 hover:text-indigo-600 transition-colors p-0.5 rounded cursor-pointer disabled:opacity-50"
+                                title="Refresh shift sales"
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingSales ? 'animate-spin text-indigo-600' : ''}`} />
+                              </button>
+                            </div>
+                            <span className="text-xs text-slate-500 block mt-0.5">
+                              {livePosBillCount > 0
+                                ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift`
+                                : 'Auto-pulled from completed cash bills in this shift'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-bold text-slate-400">LKR</span>
+                            <span className="w-36 h-11 px-3 flex items-center justify-end font-mono text-lg font-bold tabular-nums rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200">
+                              {declaredShiftSale.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-bold text-slate-400">LKR</span>
-                          <span className="w-36 h-11 px-3 flex items-center justify-end font-mono text-lg font-bold tabular-nums rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200">
-                            {declaredShiftSale.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
+
+                        {/* Expandable Breakdown of Included Cash Invoices */}
+                        {isCashBillsExpanded && liveCashBills.length > 0 && (
+                          <div className="mt-2.5 pt-2.5 border-t border-indigo-100/80 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {liveCashBills.map((b) => {
+                              const timeStr = (() => {
+                                try {
+                                  return new Intl.DateTimeFormat('en-US', {
+                                    timeZone: 'Asia/Colombo',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  }).format(new Date(b.soldAt));
+                                } catch {
+                                  return '';
+                                }
+                              })();
+
+                              return (
+                                <div
+                                  key={b.id}
+                                  className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/90 border border-indigo-100 shadow-2xs font-mono"
+                                >
+                                  <div className="flex items-center gap-2 text-slate-700">
+                                    <span className="font-semibold text-slate-900">{b.invoiceNumber}</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-slate-500 text-[11px]">{timeStr}</span>
+                                    {b.isSplit && (
+                                      <span className="bg-amber-100 text-amber-800 text-[10px] font-sans px-1.5 py-0.5 rounded font-medium">
+                                        Split Cash
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-slate-900">
+                                    LKR {b.cashAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* 3. Special Stock Sales */}
