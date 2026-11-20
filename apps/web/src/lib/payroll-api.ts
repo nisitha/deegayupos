@@ -98,6 +98,67 @@ export interface CashierShortageLedgerDto {
   created_at?: string;
 }
 
+export interface ShortageItemBreakdown {
+  id: string;
+  date: string;
+  branch_name: string;
+  shift_label: string;
+  shift_id: string;
+  amount: number;
+  notes?: string;
+}
+
+export interface PayrollRunItemDto {
+  id: string;
+  payroll_run_id: string;
+  user_id: string;
+  branch_id?: string | null;
+  basic_salary: number;
+  fixed_allowance: number;
+  attendance_bonus: number;
+  present_days: number;
+  no_pay_days: number;
+  normal_ot_hours: number;
+  normal_ot_pay: number;
+  double_ot_hours: number;
+  double_ot_pay: number;
+  gross_pay: number;
+  epf_employee_8: number;
+  no_pay_deduction: number;
+  salary_advance_deduction: number;
+  shortage_deduction_total: number;
+  shortage_items_json: ShortageItemBreakdown[];
+  other_deductions: number;
+  total_deductions: number;
+  net_pay: number;
+  epf_employer_12: number;
+  etf_employer_3: number;
+  // Joined fields for Pay Slip rendering & Table
+  full_name?: string;
+  employee_code?: string;
+  designation?: string;
+  branch_name?: string;
+  bank_name?: string | null;
+  bank_branch?: string | null;
+  bank_account_no?: string | null;
+}
+
+export interface MasterPayrollRunDto {
+  id: string;
+  payroll_month: string;
+  branch_id: string | null;
+  status: 'draft' | 'approved' | 'paid' | 'DRAFT' | 'APPROVED' | 'PAID';
+  total_gross: number;
+  total_deductions: number;
+  total_net: number;
+  created_by?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  branch_name?: string;
+  items: PayrollRunItemDto[];
+}
+
 // ============================================================================
 // 1. SALARY PROFILES SERVICE
 // ============================================================================
@@ -562,6 +623,556 @@ export async function updateSalaryAdvanceStatus(
   return true;
 }
 
+// ============================================================================
+// 4. MONTHLY GROSS-TO-NET PAYROLL GENERATOR & APPROVAL LIFECYCLE (PART 2)
+// ============================================================================
+
+export async function generateMonthlyPayrollRun(
+  payrollMonth: string,
+  branchId?: string | null,
+  createdBy?: string | null
+): Promise<MasterPayrollRunDto> {
+  // 1. Fetch active employee profiles, branches, and users
+  const [profilesRes, usersRes, branchesRes] = await Promise.all([
+    supabase
+      .from('employee_salary_profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('employee_code', { ascending: true }),
+    supabase.from('users').select('id, full_name, email'),
+    supabase.from('branches').select('id, name, code'),
+  ]);
+
+  if (profilesRes.error) {
+    console.error('[payrollApi] generateMonthlyPayrollRun error fetching profiles:', profilesRes.error.message);
+    throw profilesRes.error;
+  }
+
+  const userMap = new Map<string, { full_name: string; email: string }>();
+  (usersRes.data || []).forEach((u: any) => userMap.set(u.id, u));
+
+  const branchMap = new Map<string, { name: string; code: string }>();
+  (branchesRes.data || []).forEach((b: any) => branchMap.set(b.id, b));
+
+  let profiles = profilesRes.data || [];
+  if (branchId && branchId !== 'ALL' && branchId !== 'all') {
+    profiles = profiles.filter((p: any) => p.branch_id === branchId);
+  }
+
+  // 2. Date window for the month
+  const startDate = `${payrollMonth}-01`;
+  const parts = payrollMonth.split('-');
+  const y = parseInt(parts[0] || '2026', 10);
+  const m = parseInt(parts[1] || '1', 10);
+  const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+
+  // 3. Fetch attendance logs, pending shortages, and pending salary advances in parallel
+  const [attendanceRes, shortagesRes, advancesRes] = await Promise.all([
+    supabase
+      .from('staff_attendance_logs')
+      .select('*')
+      .gte('work_date', startDate)
+      .lt('work_date', nextMonth),
+    supabase
+      .from('shift_financial_adjustments')
+      .select('*')
+      .gte('adjustment_date', startDate)
+      .lt('adjustment_date', nextMonth),
+    supabase
+      .from('salary_advances')
+      .select('*')
+      .gte('advance_date', startDate)
+      .lt('advance_date', nextMonth),
+  ]);
+
+  const allAttendance = attendanceRes.data || [];
+  const allShortages = (shortagesRes.data || []).filter(
+    (s: any) => s.status !== 'deducted' && s.status !== 'waived' && Number(s.amount || 0) !== 0
+  );
+  const allAdvances = (advancesRes.data || []).filter(
+    (a: any) => a.status !== 'deducted' && Number(a.amount || 0) > 0
+  );
+
+  // 4. Compute line items for each active employee
+  const itemsToInsert: any[] = [];
+  let sumGross = 0;
+  let sumDeductions = 0;
+  let sumNet = 0;
+
+  for (const prof of profiles) {
+    const basic = Number(prof.basic_salary || 0);
+    const allowance = Number(prof.fixed_allowance || 0);
+    const standardBonus = Number(prof.attendance_bonus || 0);
+    const hourlyBase = basic / 240;
+    const normalOtRate = prof.ot_hourly_rate ? Number(prof.ot_hourly_rate) : Math.round(hourlyBase * 1.5 * 100) / 100;
+    const doubleOtRate = prof.ot_hourly_rate ? Number(prof.ot_hourly_rate) * (2.0 / 1.5) : Math.round(hourlyBase * 2.0 * 100) / 100;
+
+    // Attendance aggregation
+    const empAttendance = allAttendance.filter((att: any) => att.user_id === prof.user_id);
+    let presentDays = 0;
+    let noPayDays = 0;
+    let normalOtHours = 0;
+    let doubleOtHours = 0;
+
+    for (const att of empAttendance) {
+      if (att.status === 'present') presentDays += 1;
+      else if (att.status === 'half_day') presentDays += 0.5;
+      else if (att.status === 'no_pay') noPayDays += 1;
+
+      normalOtHours += Number(att.normal_ot_hours || 0);
+      doubleOtHours += Number(att.double_ot_hours || 0);
+    }
+
+    // Sri Lanka standard overtime pay calculation
+    const normalOtPay = Math.round(normalOtHours * normalOtRate * 100) / 100;
+    const doubleOtPay = Math.round(doubleOtHours * doubleOtRate * 100) / 100;
+
+    // Attendance bonus: forfeited if any no-pay leave taken
+    const attendanceBonus = noPayDays > 0 ? 0 : standardBonus;
+
+    // Gross Pay
+    const grossPay = Math.round((basic + allowance + attendanceBonus + normalOtPay + doubleOtPay) * 100) / 100;
+
+    // No-Pay leave deduction (basic / 26 days)
+    const dailyWageRate = basic / 26;
+    const noPayDeduction = Math.round(noPayDays * dailyWageRate * 100) / 100;
+
+    // Statutory EPF base = max(0, Basic - NoPay)
+    const epfBase = Math.max(0, basic - noPayDeduction);
+    const epfEmployee8 = prof.epf_eligible ? Math.round(epfBase * 0.08 * 100) / 100 : 0;
+    const epfEmployer12 = prof.epf_eligible ? Math.round(epfBase * 0.12 * 100) / 100 : 0;
+    const etfEmployer3 = prof.epf_eligible ? Math.round(epfBase * 0.03 * 100) / 100 : 0;
+
+    // Pending salary advances
+    const empAdvances = allAdvances.filter((adv: any) => adv.user_id === prof.user_id);
+    const salaryAdvanceDeduction = empAdvances.reduce((acc: number, adv: any) => acc + Number(adv.amount || 0), 0);
+
+    // Itemized cashier shift shortages
+    const uInfo = userMap.get(prof.user_id);
+    const empShortages = allShortages.filter((s: any) => {
+      if (s.user_id && s.user_id === prof.user_id) return true;
+      if (s.employee_id && s.employee_id === prof.id) return true;
+      if (uInfo && s.employee_name && s.employee_name.toLowerCase().includes(uInfo.full_name.toLowerCase())) return true;
+      if (prof.employee_code && s.employee_name && s.employee_name.includes(prof.employee_code)) return true;
+      return false;
+    });
+
+    const shortageBreakdowns: ShortageItemBreakdown[] = empShortages.map((s: any) => {
+      const bObj = s.branch_id ? branchMap.get(s.branch_id) : undefined;
+      const bName = bObj ? bObj.name : 'Main Store';
+      const shiftNum = Number(s.shift_number || 1);
+      const shiftLabel = shiftNum === 1 ? 'Shift A' : shiftNum === 2 ? 'Shift B' : `Shift ${shiftNum}`;
+      return {
+        id: s.id,
+        date: String(s.adjustment_date).split('T')[0] || String(s.adjustment_date || ''),
+        branch_name: bName,
+        shift_label: shiftLabel,
+        shift_id: s.shift_id || '',
+        amount: Math.abs(Number(s.amount || 0)),
+        notes: s.notes || undefined,
+      };
+    });
+
+    const shortageDeductionTotal = shortageBreakdowns.reduce((acc, sb) => acc + sb.amount, 0);
+    const otherDeductions = 0;
+
+    // Total deductions & Net Pay
+    const totalDeductions = Math.round((epfEmployee8 + noPayDeduction + salaryAdvanceDeduction + shortageDeductionTotal + otherDeductions) * 100) / 100;
+    const netPay = Math.max(0, Math.round((grossPay - totalDeductions) * 100) / 100);
+
+    sumGross += grossPay;
+    sumDeductions += totalDeductions;
+    sumNet += netPay;
+
+    itemsToInsert.push({
+      user_id: prof.user_id,
+      branch_id: prof.branch_id || null,
+      basic_salary: basic,
+      fixed_allowance: allowance,
+      attendance_bonus: attendanceBonus,
+      present_days: presentDays,
+      no_pay_days: noPayDays,
+      normal_ot_hours: normalOtHours,
+      normal_ot_pay: normalOtPay,
+      double_ot_hours: doubleOtHours,
+      double_ot_pay: doubleOtPay,
+      gross_pay: grossPay,
+      epf_employee_8: epfEmployee8,
+      no_pay_deduction: noPayDeduction,
+      salary_advance_deduction: salaryAdvanceDeduction,
+      shortage_deduction_total: shortageDeductionTotal,
+      shortage_items_json: shortageBreakdowns,
+      other_deductions: otherDeductions,
+      total_deductions: totalDeductions,
+      net_pay: netPay,
+      epf_employer_12: epfEmployer12,
+      etf_employer_3: etfEmployer3,
+      // Metadata for presentation
+      full_name: uInfo?.full_name || 'Staff Member',
+      employee_code: prof.employee_code || 'EMP',
+      designation: prof.designation || 'Staff',
+      branch_name: (prof.branch_id && branchMap.get(prof.branch_id)?.name) || 'Main Store',
+      bank_name: prof.bank_name,
+      bank_branch: prof.bank_branch,
+      bank_account_no: prof.bank_account_no,
+    });
+  }
+
+  // 5. Check if draft run already exists for this month & branch
+  let existingQuery = supabase
+    .from('payroll_runs')
+    .select('id, status')
+    .eq('payroll_month', payrollMonth);
+
+  if (branchId && branchId !== 'ALL' && branchId !== 'all') {
+    existingQuery = existingQuery.eq('branch_id', branchId);
+  } else {
+    existingQuery = existingQuery.is('branch_id', null);
+  }
+
+  const { data: existingRuns } = await existingQuery;
+  let runId: string;
+
+  if (existingRuns && existingRuns.length > 0) {
+    const existing = existingRuns[0];
+    if (existing?.status && (existing.status.toLowerCase() === 'paid' || existing.status.toLowerCase() === 'approved')) {
+      throw new Error(`A finalized/paid payroll run for ${payrollMonth} already exists.`);
+    }
+    runId = existing!.id;
+    // Update existing master record
+    await supabase
+      .from('payroll_runs')
+      .update({
+        total_gross: Math.round(sumGross * 100) / 100,
+        total_deductions: Math.round(sumDeductions * 100) / 100,
+        total_net: Math.round(sumNet * 100) / 100,
+        status: 'draft',
+      })
+      .eq('id', runId);
+
+    // Delete previous items to replace with fresh calculation
+    await supabase.from('payroll_run_items').delete().eq('payroll_run_id', runId);
+  } else {
+    // Insert new master run
+    const { data: newRun, error: runErr } = await supabase
+      .from('payroll_runs')
+      .insert({
+        payroll_month: payrollMonth,
+        branch_id: branchId && branchId !== 'ALL' && branchId !== 'all' ? branchId : null,
+        total_gross: Math.round(sumGross * 100) / 100,
+        total_deductions: Math.round(sumDeductions * 100) / 100,
+        total_net: Math.round(sumNet * 100) / 100,
+        status: 'draft',
+        created_by: createdBy || null,
+      })
+      .select()
+      .single();
+
+    if (runErr || !newRun) {
+      console.error('[payrollApi] Error inserting master payroll_run:', runErr?.message);
+      throw runErr || new Error('Failed to create payroll run record.');
+    }
+    runId = newRun.id;
+  }
+
+  // 6. Insert child payroll_run_items
+  const itemsToDb = itemsToInsert.map((item) => ({
+    payroll_run_id: runId,
+    user_id: item.user_id,
+    branch_id: item.branch_id,
+    basic_salary: item.basic_salary,
+    fixed_allowance: item.fixed_allowance,
+    attendance_bonus: item.attendance_bonus,
+    present_days: item.present_days,
+    no_pay_days: item.no_pay_days,
+    normal_ot_hours: item.normal_ot_hours,
+    normal_ot_pay: item.normal_ot_pay,
+    double_ot_hours: item.double_ot_hours,
+    double_ot_pay: item.double_ot_pay,
+    gross_pay: item.gross_pay,
+    epf_employee_8: item.epf_employee_8,
+    no_pay_deduction: item.no_pay_deduction,
+    salary_advance_deduction: item.salary_advance_deduction,
+    shortage_deduction_total: item.shortage_deduction_total,
+    shortage_items_json: item.shortage_items_json,
+    other_deductions: item.other_deductions,
+    total_deductions: item.total_deductions,
+    net_pay: item.net_pay,
+    epf_employer_12: item.epf_employer_12,
+    etf_employer_3: item.etf_employer_3,
+  }));
+
+  const { data: insertedItems, error: itemsErr } = await supabase
+    .from('payroll_run_items')
+    .insert(itemsToDb)
+    .select();
+
+  if (itemsErr) {
+    console.error('[payrollApi] Error inserting payroll_run_items:', itemsErr.message);
+    throw itemsErr;
+  }
+
+  // Stitch back joined metadata with newly generated item IDs
+  const fullItems: PayrollRunItemDto[] = (insertedItems || []).map((row: any, idx: number) => {
+    const meta = itemsToInsert[idx];
+    return {
+      ...row,
+      full_name: meta?.full_name || 'Staff Member',
+      employee_code: meta?.employee_code || 'EMP',
+      designation: meta?.designation || 'Staff',
+      branch_name: meta?.branch_name || 'Main Store',
+      bank_name: meta?.bank_name,
+      bank_branch: meta?.bank_branch,
+      bank_account_no: meta?.bank_account_no,
+      shortage_items_json: row.shortage_items_json || [],
+    };
+  });
+
+  return {
+    id: runId,
+    payroll_month: payrollMonth,
+    branch_id: branchId && branchId !== 'ALL' && branchId !== 'all' ? branchId : null,
+    status: 'draft',
+    total_gross: Math.round(sumGross * 100) / 100,
+    total_deductions: Math.round(sumDeductions * 100) / 100,
+    total_net: Math.round(sumNet * 100) / 100,
+    created_by: createdBy || null,
+    items: fullItems,
+  };
+}
+
+export async function getPayrollRuns(
+  payrollMonth?: string,
+  branchId?: string | null
+): Promise<MasterPayrollRunDto[]> {
+  let query = supabase
+    .from('payroll_runs')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (payrollMonth) {
+    query = query.eq('payroll_month', payrollMonth);
+  }
+  if (branchId && branchId !== 'ALL' && branchId !== 'all') {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const [runsRes, usersRes, branchesRes, profilesRes] = await Promise.all([
+    query,
+    supabase.from('users').select('id, full_name, email'),
+    supabase.from('branches').select('id, name, code'),
+    supabase.from('employee_salary_profiles').select('*'),
+  ]);
+
+  if (runsRes.error) {
+    console.error('[payrollApi] getPayrollRuns error:', runsRes.error.message);
+    throw runsRes.error;
+  }
+
+  const runs = runsRes.data || [];
+  if (runs.length === 0) return [];
+
+  const runIds = runs.map((r: any) => r.id);
+  const { data: itemsData, error: itemsErr } = await supabase
+    .from('payroll_run_items')
+    .select('*')
+    .in('payroll_run_id', runIds)
+    .order('created_at', { ascending: true });
+
+  if (itemsErr) {
+    console.error('[payrollApi] getPayrollRuns items error:', itemsErr.message);
+    throw itemsErr;
+  }
+
+  const userMap = new Map<string, { full_name: string; email: string }>();
+  (usersRes.data || []).forEach((u: any) => userMap.set(u.id, u));
+
+  const branchMap = new Map<string, { name: string; code: string }>();
+  (branchesRes.data || []).forEach((b: any) => branchMap.set(b.id, b));
+
+  const profileMap = new Map<string, any>();
+  (profilesRes.data || []).forEach((p: any) => profileMap.set(p.user_id, p));
+
+  const itemsByRun = new Map<string, PayrollRunItemDto[]>();
+  (itemsData || []).forEach((item: any) => {
+    const u = userMap.get(item.user_id);
+    const p = profileMap.get(item.user_id);
+    const b = item.branch_id ? branchMap.get(item.branch_id) : (p?.branch_id ? branchMap.get(p.branch_id) : undefined);
+
+    const dtoItem: PayrollRunItemDto = {
+      ...item,
+      basic_salary: Number(item.basic_salary || 0),
+      fixed_allowance: Number(item.fixed_allowance || 0),
+      attendance_bonus: Number(item.attendance_bonus || 0),
+      present_days: Number(item.present_days || 0),
+      no_pay_days: Number(item.no_pay_days || 0),
+      normal_ot_hours: Number(item.normal_ot_hours || 0),
+      normal_ot_pay: Number(item.normal_ot_pay || 0),
+      double_ot_hours: Number(item.double_ot_hours || 0),
+      double_ot_pay: Number(item.double_ot_pay || 0),
+      gross_pay: Number(item.gross_pay || 0),
+      epf_employee_8: Number(item.epf_employee_8 || 0),
+      no_pay_deduction: Number(item.no_pay_deduction || 0),
+      salary_advance_deduction: Number(item.salary_advance_deduction || 0),
+      shortage_deduction_total: Number(item.shortage_deduction_total || 0),
+      shortage_items_json: Array.isArray(item.shortage_items_json) ? item.shortage_items_json : [],
+      other_deductions: Number(item.other_deductions || 0),
+      total_deductions: Number(item.total_deductions || 0),
+      net_pay: Number(item.net_pay || 0),
+      epf_employer_12: Number(item.epf_employer_12 || 0),
+      etf_employer_3: Number(item.etf_employer_3 || 0),
+      full_name: u?.full_name || 'Staff Member',
+      employee_code: p?.employee_code || 'EMP',
+      designation: p?.designation || 'Staff',
+      branch_name: b?.name || 'Main Store',
+      bank_name: p?.bank_name,
+      bank_branch: p?.bank_branch,
+      bank_account_no: p?.bank_account_no,
+    };
+
+    const arr = itemsByRun.get(item.payroll_run_id) || [];
+    arr.push(dtoItem);
+    itemsByRun.set(item.payroll_run_id, arr);
+  });
+
+  return runs.map((r: any) => ({
+    id: r.id,
+    payroll_month: r.payroll_month || '',
+    branch_id: r.branch_id,
+    status: r.status ? (r.status.toLowerCase() as any) : 'draft',
+    total_gross: Number(r.total_gross || 0),
+    total_deductions: Number(r.total_deductions || 0),
+    total_net: Number(r.total_net || 0),
+    created_by: r.created_by,
+    approved_at: r.approved_at,
+    paid_at: r.paid_at,
+    created_at: r.created_at,
+    branch_name: r.branch_id ? branchMap.get(r.branch_id)?.name : 'All Branches Combined',
+    items: itemsByRun.get(r.id) || [],
+  }));
+}
+
+export async function updatePayrollItemOtherDeduction(
+  itemId: string,
+  otherDeductions: number
+): Promise<boolean> {
+  const { data: item, error: fetchErr } = await supabase
+    .from('payroll_run_items')
+    .select('*')
+    .eq('id', itemId)
+    .single();
+
+  if (fetchErr || !item) {
+    console.error('[payrollApi] updatePayrollItemOtherDeduction item not found:', fetchErr?.message);
+    throw fetchErr || new Error('Payroll item not found.');
+  }
+
+  const epf = Number(item.epf_employee_8 || 0);
+  const noPay = Number(item.no_pay_deduction || 0);
+  const adv = Number(item.salary_advance_deduction || 0);
+  const shortages = Number(item.shortage_deduction_total || 0);
+  const newOther = Math.max(0, Number(otherDeductions || 0));
+  const newTotalDeductions = Math.round((epf + noPay + adv + shortages + newOther) * 100) / 100;
+  const gross = Number(item.gross_pay || 0);
+  const newNetPay = Math.max(0, Math.round((gross - newTotalDeductions) * 100) / 100);
+
+  const { error: updateErr } = await supabase
+    .from('payroll_run_items')
+    .update({
+      other_deductions: newOther,
+      total_deductions: newTotalDeductions,
+      net_pay: newNetPay,
+    })
+    .eq('id', itemId);
+
+  if (updateErr) {
+    console.error('[payrollApi] updatePayrollItemOtherDeduction update error:', updateErr.message);
+    throw updateErr;
+  }
+
+  const runId = item.payroll_run_id;
+  const { data: allItems } = await supabase
+    .from('payroll_run_items')
+    .select('gross_pay, total_deductions, net_pay')
+    .eq('payroll_run_id', runId);
+
+  if (allItems) {
+    const sumGross = allItems.reduce((acc, i) => acc + Number(i.gross_pay || 0), 0);
+    const sumDeductions = allItems.reduce((acc, i) => acc + Number(i.total_deductions || 0), 0);
+    const sumNet = allItems.reduce((acc, i) => acc + Number(i.net_pay || 0), 0);
+
+    await supabase
+      .from('payroll_runs')
+      .update({
+        total_gross: Math.round(sumGross * 100) / 100,
+        total_deductions: Math.round(sumDeductions * 100) / 100,
+        total_net: Math.round(sumNet * 100) / 100,
+      })
+      .eq('id', runId);
+  }
+
+  return true;
+}
+
+export async function approveAndPayPayrollRun(runId: string): Promise<boolean> {
+  const timestamp = new Date().toISOString();
+
+  const { error: runErr } = await supabase
+    .from('payroll_runs')
+    .update({
+      status: 'PAID',
+      approved_at: timestamp,
+      paid_at: timestamp,
+    })
+    .eq('id', runId);
+
+  if (runErr) {
+    console.error('[payrollApi] approveAndPayPayrollRun error updating run:', runErr.message);
+    throw runErr;
+  }
+
+  const { data: items, error: itemsErr } = await supabase
+    .from('payroll_run_items')
+    .select('id, user_id, shortage_items_json, salary_advance_deduction')
+    .eq('payroll_run_id', runId);
+
+  if (itemsErr) {
+    console.error('[payrollApi] approveAndPayPayrollRun error fetching items:', itemsErr.message);
+    throw itemsErr;
+  }
+
+  for (const item of (items || [])) {
+    if (Array.isArray(item.shortage_items_json) && item.shortage_items_json.length > 0) {
+      const shortageIds = item.shortage_items_json
+        .map((s: any) => s.id)
+        .filter(Boolean);
+
+      if (shortageIds.length > 0) {
+        await supabase
+          .from('shift_financial_adjustments')
+          .update({
+            status: 'deducted',
+            payroll_item_id: item.id,
+          })
+          .in('id', shortageIds);
+      }
+    }
+
+    if (Number(item.salary_advance_deduction || 0) > 0 && item.user_id) {
+      await supabase
+        .from('salary_advances')
+        .update({
+          status: 'deducted',
+          payroll_item_id: item.id,
+        })
+        .eq('user_id', item.user_id)
+        .eq('status', 'pending');
+    }
+  }
+
+  return true;
+}
+
 // Grouped object export
 export const payrollApi = {
   getEmployeeSalaryProfiles,
@@ -577,6 +1188,10 @@ export const payrollApi = {
   getSalaryAdvances,
   createSalaryAdvance,
   updateSalaryAdvanceStatus,
+  generateMonthlyPayrollRun,
+  getPayrollRuns,
+  updatePayrollItemOtherDeduction,
+  approveAndPayPayrollRun,
 };
 
 // ============================================================================
