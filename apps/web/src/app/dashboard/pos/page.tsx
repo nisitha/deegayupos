@@ -46,7 +46,7 @@ import type {
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi, shiftsApi, formatShiftLabel, type CashierShiftDto } from '../../../lib/api-client';
+import { posApi, shiftsApi, formatShiftLabel, isOwnerUser, type CashierShiftDto } from '../../../lib/api-client';
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
@@ -348,7 +348,8 @@ export default function ConfidencyPosPage() {
     }
   }, [editingItemId]);
 
-  // Cashier Session Details
+  // Cashier & Owner Session Details
+  const isOwner = useMemo(() => isOwnerUser(user), [user]);
   const cashierId = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
   const cashierName = activeCashier?.fullName || user?.fullName || 'Dr. Deegayu (Owner)';
 
@@ -364,14 +365,21 @@ export default function ConfidencyPosPage() {
     if (!currentCashierId) return;
 
     try {
-      const res = await shiftsApi.getOrCreateActiveShift(selectedBranchId, currentCashierId, cashierName);
+      const res = await shiftsApi.getOrCreateActiveShift(
+        selectedBranchId,
+        currentCashierId,
+        cashierName,
+        { isOwner }
+      );
       if (res.success && res.data) {
         setActiveShift(res.data);
+      } else if (res.success && !res.data) {
+        setActiveShift(null);
       }
     } catch (err) {
       console.warn('[POS] refreshActiveShift error:', err);
     }
-  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName]);
+  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
 
   useEffect(() => {
     refreshActiveShift();
@@ -383,19 +391,25 @@ export default function ConfidencyPosPage() {
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('action') === 'shift-handover') {
-          setIsEndShiftModalOpen(true);
+          if (!isOwner) {
+            setIsEndShiftModalOpen(true);
+          }
         }
       }
     };
     checkAction();
     window.addEventListener('popstate', checkAction);
-    const handleCustomOpen = () => setIsEndShiftModalOpen(true);
+    const handleCustomOpen = () => {
+      if (!isOwner) {
+        setIsEndShiftModalOpen(true);
+      }
+    };
     window.addEventListener('open-shift-handover', handleCustomOpen);
     return () => {
       window.removeEventListener('popstate', checkAction);
       window.removeEventListener('open-shift-handover', handleCustomOpen);
     };
-  }, []);
+  }, [isOwner]);
 
   // Instant 0ms Hydration via IndexedDB (< 15ms) + Decoupled Flat Background Sync
   const initCatalog = useCallback(async () => {
@@ -1222,7 +1236,7 @@ export default function ConfidencyPosPage() {
         const effectiveBranchId = selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
 
         let currentShiftId = activeShift?.id;
-        if (!currentShiftId && effectiveBranchId) {
+        if (!currentShiftId && effectiveBranchId && !isOwner) {
           try {
             const shiftRes = await shiftsApi.getOrCreateActiveShift(
               effectiveBranchId,
@@ -1516,20 +1530,39 @@ export default function ConfidencyPosPage() {
               <span className="whitespace-nowrap truncate max-w-[90px] sm:max-w-none">{currentBranchName}</span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsCashierModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-1.5 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[13px] sm:text-sm group shrink-0 whitespace-nowrap text-slate-800 shadow-2xs"
-              title="Click or press to switch cashier profile via 4-digit PIN"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
-                Cashier: {cashierName}
-              </span>
-              <span className="hidden sm:inline-block text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
-                PIN Switch
-              </span>
-            </button>
+            {isOwner ? (
+              <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                <span className="flex items-center gap-1.5 bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-1 rounded-lg text-[13px] sm:text-sm font-bold shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
+                  Owner • All Branches
+                </span>
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
+                  {activeShift ? (
+                    <>
+                      <span className="font-semibold text-slate-900">Branch Shift:</span>{' '}
+                      {formatShiftLabel(activeShift.shiftNumber)} ({activeShift.cashierName || 'Cashier'})
+                    </>
+                  ) : (
+                    <span className="text-slate-500 italic">No Active Cashier Shift</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsCashierModalOpen(true)}
+                className="flex items-center gap-1 sm:gap-1.5 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[13px] sm:text-sm group shrink-0 whitespace-nowrap text-slate-800 shadow-2xs"
+                title="Click or press to switch cashier profile via 4-digit PIN"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
+                  Cashier: {cashierName}
+                </span>
+                <span className="hidden sm:inline-block text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0 whitespace-nowrap">
+                  PIN Switch
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Right Group: Clock, Qty Toggle, End Shift, Switch Shop, Logout */}
@@ -1570,21 +1603,23 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
 
-            {/* End Shift (Shift Off) Button */}
-            <button
-              type="button"
-              onClick={() => setIsEndShiftModalOpen(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13px] sm:text-sm px-3 py-1.5 rounded-lg shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="whitespace-nowrap">End Shift</span>
-              {activeShift && (
-                <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
-                  {formatShiftLabel(activeShift.shiftNumber)}
-                </span>
-              )}
-            </button>
+            {/* End Shift (Shift Off) Button - only shown for regular cashiers */}
+            {!isOwner && (
+              <button
+                type="button"
+                onClick={() => setIsEndShiftModalOpen(true)}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13px] sm:text-sm px-3 py-1.5 rounded-lg shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                title="Close shift, complete Special Stock ledger, count cash, and hand over to next employee"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="whitespace-nowrap">End Shift</span>
+                {activeShift && (
+                  <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
+                    {formatShiftLabel(activeShift.shiftNumber)}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Switch Shop (Logout) Button */}
             <button
@@ -3041,12 +3076,13 @@ export default function ConfidencyPosPage() {
         }}
       />
 
-      {/* 1. Start Shift Opening Drawer Count Modal (Mandatory Blind Count) */}
+      {/* 1. Start Shift Opening Drawer Count Modal (Mandatory Blind Count - Cashiers Only) */}
       <ShiftStartModal
-        isOpen={Boolean(activeShift?.needsOpeningCount && activeShift?.branchId === selectedBranchId)}
+        isOpen={Boolean(!isOwner && activeShift?.needsOpeningCount && activeShift?.branchId === selectedBranchId)}
         activeShift={activeShift}
         branchName={currentBranchName}
         cashierName={cashierName}
+        isOwner={isOwner}
         onConfirmSuccess={(confirmedFloat) => {
           setActiveShift((prev) =>
             prev
@@ -3068,7 +3104,7 @@ export default function ConfidencyPosPage() {
 
       {/* 2. End Shift Modal */}
       <ShiftEndModal
-        isOpen={Boolean(isEndShiftModalOpen && activeShift && activeShift.branchId === selectedBranchId)}
+        isOpen={Boolean(!isOwner && isEndShiftModalOpen && activeShift && activeShift.branchId === selectedBranchId)}
         onClose={() => setIsEndShiftModalOpen(false)}
         activeShift={activeShift}
         branchId={selectedBranchId}

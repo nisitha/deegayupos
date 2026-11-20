@@ -20,6 +20,7 @@ interface ShiftStartModalProps {
   branchName: string;
   cashierName: string;
   onConfirmSuccess: (confirmedOpeningFloat: number) => void;
+  isOwner?: boolean;
 }
 
 const SRI_LANKA_DENOMINATIONS = [
@@ -39,6 +40,7 @@ export function ShiftStartModal({
   branchName,
   cashierName,
   onConfirmSuccess,
+  isOwner,
 }: ShiftStartModalProps) {
   const [countedCashInput, setCountedCashInput] = useState<string>('');
   const [showDenomCounter, setShowDenomCounter] = useState<boolean>(false);
@@ -122,7 +124,7 @@ export function ShiftStartModal({
     }
   };
 
-  if (!isOpen || !activeShift) return null;
+  if (!isOpen || !activeShift || isOwner) return null;
 
   const shiftLabel = formatShiftLabel(activeShift.shiftNumber || 1);
 

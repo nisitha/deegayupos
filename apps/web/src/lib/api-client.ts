@@ -3384,10 +3384,25 @@ export const shiftsApi = {
     }
   },
 
+  isOwnerUser: (user?: any | null): boolean => {
+    if (!user) return false;
+    const role = String(user.role || '').toLowerCase();
+    if (['owner', 'admin', 'super_admin', 'superadmin'].includes(role)) {
+      return true;
+    }
+    const name = String(user.fullName || user.full_name || user.name || '').toLowerCase();
+    const email = String(user.email || '').toLowerCase();
+    if (name.includes('deegayu') || email.includes('deegayu') || email.includes('owner')) {
+      return true;
+    }
+    return false;
+  },
+
   getActiveShift: async (
     branchId: string,
-    cashierId: string,
-    cashierName?: string
+    cashierId?: string,
+    cashierName?: string,
+    isOwner?: boolean
   ): Promise<ApiResponse<CashierShiftDto | null>> => {
     try {
       if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
@@ -3408,8 +3423,8 @@ export const shiftsApi = {
         return { success: true, data: null };
       }
 
-      // If switched cashier PIN within the same branch, update cashier_id on active shift
-      if (cashierId && isValidUuid(cashierId) && openShift.cashier_id !== cashierId) {
+      // If switched cashier PIN within the same branch, update cashier_id on active shift (ONLY for non-owner!)
+      if (!isOwner && cashierId && isValidUuid(cashierId) && openShift.cashier_id !== cashierId) {
         await supabase
           .from('cashier_shifts')
           .update({ cashier_id: cashierId })
@@ -3603,10 +3618,23 @@ export const shiftsApi = {
         ) / 100;
       }
 
-      const needsOpeningCount =
-        openShift.opening_float == null ||
-        Boolean((openShift as any).notes?.includes('[PENDING_OPENING_COUNT]')) ||
-        Boolean(openShift.handover_notes?.includes('[PENDING_OPENING_COUNT]'));
+      const needsOpeningCount = isOwner
+        ? false
+        : (
+          openShift.opening_float == null ||
+          Boolean((openShift as any).notes?.includes('[PENDING_OPENING_COUNT]')) ||
+          Boolean(openShift.handover_notes?.includes('[PENDING_OPENING_COUNT]'))
+        );
+
+      let effectiveCashierName = cashierName;
+      if (isOwner && openShift.cashier_id) {
+        try {
+          const { data: u } = await supabase.from('users').select('full_name').eq('id', openShift.cashier_id).maybeSingle();
+          if (u?.full_name) {
+            effectiveCashierName = u.full_name;
+          }
+        } catch { }
+      }
 
       return {
         success: true,
@@ -3615,7 +3643,7 @@ export const shiftsApi = {
           tenantId: openShift.tenant_id,
           branchId: openShift.branch_id,
           cashierId: openShift.cashier_id,
-          cashierName,
+          cashierName: effectiveCashierName,
           shiftDate: openShift.shift_date,
           shiftNumber: openShift.shift_number || 1,
           hasLockedOpeningFloat,
@@ -3623,7 +3651,7 @@ export const shiftsApi = {
           previousClosingFloat,
           handoverVariance,
           needsOpeningCount,
-          openingConfirmed,
+          openingConfirmed: isOwner ? true : openingConfirmed,
           notes: (openShift as any).notes || openShift.handover_notes,
           startedAt: openShift.started_at,
           endedAt: openShift.ended_at,
@@ -3662,9 +3690,12 @@ export const shiftsApi = {
   getOrCreateActiveShift: async (
     branchId: string,
     cashierId: string,
-    cashierName?: string
+    cashierName?: string,
+    options?: { isOwner?: boolean } | boolean
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
+      const isOwner = typeof options === 'boolean' ? options : Boolean(options?.isOwner);
+
       if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
         return {
           success: false,
@@ -3672,8 +3703,29 @@ export const shiftsApi = {
           error: { code: 'INVALID_BRANCH', message: 'Specific branch ID is required', statusCode: 400 },
         };
       }
-      // 1. Try get active shift
-      const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName);
+
+      // If Owner, strictly perform read-only lookup for existing open shift
+      if (isOwner) {
+        const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName, true);
+        if (active.success && active.data) {
+          return {
+            success: true,
+            data: {
+              ...active.data,
+              needsOpeningCount: false,
+              openingConfirmed: true,
+            },
+          };
+        }
+        // If no open shift exists, Owner NEVER creates a shift!
+        return {
+          success: true,
+          data: null as any,
+        };
+      }
+
+      // 1. Try get active shift (regular cashier)
+      const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName, false);
       if (active.success && active.data) {
         return { success: true, data: active.data };
       }
@@ -4936,6 +4988,8 @@ export const shiftsApi = {
     }
   },
 };
+
+export const isOwnerUser = shiftsApi.isOwnerUser;
 
 export interface LegacySyncConfigDto {
   id: number;
