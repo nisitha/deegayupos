@@ -293,7 +293,7 @@ export default function ConfidencyPosPage() {
 
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH' | 'STORE_CREDIT' | 'SPLIT'>('CARD');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH' | 'STORE_CREDIT' | 'SPLIT'>('CASH');
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   // Customer Management
@@ -706,6 +706,7 @@ export default function ConfidencyPosPage() {
 
   // Add Item to Cart
   const addToCart = useCallback((product: RetailProductItem & { departmentId?: string }) => {
+    setPaymentMethod('CASH');
     const config = detectUnitConfig(product);
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.productId === product.id);
@@ -851,6 +852,7 @@ export default function ConfidencyPosPage() {
       baseQuantity: number;
       unitPrice: number;
     }) => {
+      setPaymentMethod('CASH');
       setCart((prevCart) => {
         if (cartItemId) {
           return prevCart.map((it) =>
@@ -923,6 +925,7 @@ export default function ConfidencyPosPage() {
     quantity: number;
     note?: string;
   }) => {
+    setPaymentMethod('CASH');
     const customTitle = customItem.name + (customItem.note ? ` (${customItem.note})` : '');
     setCart((prev) => [
       ...prev,
@@ -1011,6 +1014,7 @@ export default function ConfidencyPosPage() {
     setEditingItemId(null);
     setEditingPriceInput('');
     setCart([]);
+    setPaymentMethod('CASH');
     setIsMobileCartOpen(false);
     setSearchQuery('');
     setIsSearchDropdownOpen(false);
@@ -1784,6 +1788,7 @@ export default function ConfidencyPosPage() {
                     (filteredProducts.length === 1 ? filteredProducts[0] : null);
 
                   if (targetItem) {
+                    setPaymentMethod('CASH');
                     handleProductClick(targetItem);
                     setSearchQuery('');
                     setIsSearchDropdownOpen(false);
@@ -2188,7 +2193,7 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (>= lg screens)
       ===================================================================== */}
-      <aside className="hidden lg:flex w-[340px] xl:w-[380px] bg-slate-50/95 border-l border-slate-200/90 shadow-2xl flex-col h-full shrink-0 select-none text-slate-800">
+      <aside className="hidden lg:flex w-full lg:w-[400px] xl:w-[440px] 2xl:w-[470px] bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] border-l border-indigo-200/80 shadow-2xl flex-col h-full shrink-0 select-none text-slate-800">
         {/* 1. Colorful Top Cart Header */}
         <div className="h-14 px-4 sm:px-5 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-2">
@@ -2212,7 +2217,7 @@ export default function ConfidencyPosPage() {
 
         {/* 2. Customer Pill in Cart (if attached) */}
         {selectedCustomer && (
-          <div className="px-5 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between">
+          <div className="px-5 py-2.5 bg-white/95 border-b border-indigo-100 flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center shrink-0">
                 <User className="w-4 h-4" />
@@ -2240,9 +2245,9 @@ export default function ConfidencyPosPage() {
         )}
 
         {/* 3. Scrollable Cart Items List */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-2.5 bg-slate-50/90">
+        <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-2.5">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/95 border border-indigo-100/90 rounded-2xl shadow-sm">
               <ShoppingBag className="w-10 h-10 mb-2 text-indigo-400/60" />
               <p className="text-sm font-bold text-slate-700">No items selected</p>
               <p className="text-xs text-slate-500 mt-0.5">Click any product in the catalog</p>
@@ -2428,68 +2433,70 @@ export default function ConfidencyPosPage() {
         </div>
 
         {/* 4. Financial Breakdown Summary & Bottom Checkout Dock */}
-        <div className="p-3.5 sm:p-4 border-t border-slate-200/90 bg-white shadow-2xl space-y-3 shrink-0">
-          <div className="space-y-1.5 font-mono">
-            <div className="flex justify-between text-sm font-semibold text-slate-700">
-              <span className="font-sans font-semibold">Subtotal</span>
-              <span className="font-bold text-slate-900">LKR {subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm font-semibold text-slate-500">
-              <span className="font-sans font-semibold">Tax (0% / Ex)</span>
-              <span>LKR 0.00</span>
-            </div>
+        <div className="p-3.5 sm:p-4 border-t border-indigo-200/80 bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] shadow-2xl space-y-3 shrink-0">
+          <div className="bg-white/95 border border-indigo-100/90 rounded-2xl p-3 sm:p-3.5 shadow-sm space-y-2.5">
+            <div className="space-y-1.5 font-mono">
+              <div className="flex justify-between text-sm font-semibold text-slate-700">
+                <span className="font-sans font-semibold">Subtotal</span>
+                <span className="font-bold text-slate-900">LKR {subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-slate-500">
+                <span className="font-sans font-semibold">Tax (0% / Ex)</span>
+                <span>LKR 0.00</span>
+              </div>
 
-            {/* Discount Line */}
-            {discountType !== 'NONE' && (
-              <div className="flex justify-between items-center text-emerald-700 font-semibold text-sm">
-                <span className="flex items-center gap-1 font-sans">
-                  <Percent className="w-3.5 h-3.5" />
-                  <span>
-                    Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})
+              {/* Discount Line */}
+              {discountType !== 'NONE' && (
+                <div className="flex justify-between items-center text-emerald-700 font-semibold text-sm">
+                  <span className="flex items-center gap-1 font-sans">
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>
+                      Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})
+                    </span>
                   </span>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span>- LKR {discountAmount.toFixed(2)}</span>
-                  <button
-                    type="button"
-                    onClick={resetDiscount}
-                    className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
-                    title="Remove discount"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <span>- LKR {discountAmount.toFixed(2)}</span>
+                    <button
+                      type="button"
+                      onClick={resetDiscount}
+                      className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
+                      title="Remove discount"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Quick Add Discount Pill (if no discount active) */}
-            {discountType === 'NONE' && cart.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsDiscountModalOpen(true)}
-                className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100/80 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-              >
-                <Percent className="w-3.5 h-3.5" />
-                <span>+ Add Order Discount</span>
-              </button>
-            )}
+              {/* Quick Add Discount Pill (if no discount active) */}
+              {discountType === 'NONE' && cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsDiscountModalOpen(true)}
+                  className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100/80 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Percent className="w-3.5 h-3.5" />
+                  <span>+ Add Order Discount</span>
+                </button>
+              )}
 
-            {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
-            <div className="mt-2 rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3.5 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
-                  TOTAL PAYABLE
+              {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
+              <div className="mt-2 rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3.5 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
+                    TOTAL PAYABLE
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">Net Payable (LKR)</span>
+                </div>
+                <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
+                  LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-xs text-slate-400 font-medium">Net Payable (LKR)</span>
               </div>
-              <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
-                LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
             </div>
           </div>
 
           {/* 5. Payment Method Segmented Control */}
-          <div className="pt-1">
+          <div className="pt-0.5">
             <label className="text-xs font-bold text-slate-700 block mb-1.5">
               Payment Method
             </label>
@@ -2499,28 +2506,28 @@ export default function ConfidencyPosPage() {
                   id: 'CASH',
                   label: 'Cash',
                   icon: Banknote,
-                  inactiveCls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/80',
-                  activeCls: 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-500/25 scale-[1.02]',
+                  inactiveCls: 'bg-white border-emerald-200 text-emerald-800 hover:bg-emerald-50',
+                  activeCls: 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-[1.02]',
                 },
                 {
                   id: 'CARD',
                   label: 'Card',
                   icon: CreditCard,
-                  inactiveCls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100/80',
+                  inactiveCls: 'bg-white border-blue-200 text-blue-800 hover:bg-blue-50',
                   activeCls: 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/25 scale-[1.02]',
                 },
                 {
                   id: 'STORE_CREDIT',
                   label: 'Credit',
                   icon: BookOpen,
-                  inactiveCls: 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100/80',
+                  inactiveCls: 'bg-white border-amber-200 text-amber-900 hover:bg-amber-50',
                   activeCls: 'bg-amber-500 border-amber-400 text-slate-950 shadow-md shadow-amber-500/25 scale-[1.02] font-black',
                 },
                 {
                   id: 'SPLIT',
                   label: 'Split',
                   icon: Split,
-                  inactiveCls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100/80',
+                  inactiveCls: 'bg-white border-purple-200 text-purple-800 hover:bg-purple-50',
                   activeCls: 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/25 scale-[1.02]',
                 },
               ].map((tab) => {
@@ -2652,7 +2659,7 @@ export default function ConfidencyPosPage() {
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
           />
 
-          <div className="relative bg-slate-50 border-t border-slate-200 text-slate-800 rounded-t-3xl shadow-bottom-sheet z-10 max-h-[92dvh] h-full sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden">
+          <div className="relative bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] border-t border-indigo-200/80 text-slate-800 rounded-t-3xl shadow-bottom-sheet z-10 max-h-[92dvh] h-full sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden">
             {/* Header */}
             <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white flex items-center justify-between shrink-0 shadow-md">
               <div className="flex items-center gap-2">
@@ -2860,51 +2867,53 @@ export default function ConfidencyPosPage() {
             </div>
 
             {/* Financial breakdown & Charge */}
-            <div className="p-4 sm:p-5 bg-white border-t border-slate-200/90 space-y-3 shrink-0 shadow-2xl">
-              {/* Discount line if applied */}
-              {discountType !== 'NONE' && (
-                <div className="flex justify-between items-center text-emerald-700 font-semibold text-xs">
-                  <span className="flex items-center gap-1 font-sans">
-                    <Percent className="w-3.5 h-3.5" />
-                    <span>Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})</span>
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span>- LKR {discountAmount.toFixed(2)}</span>
-                    <button
-                      type="button"
-                      onClick={resetDiscount}
-                      className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
-                      title="Remove discount"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+            <div className="p-4 sm:p-5 bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] border-t border-indigo-200/80 space-y-3 shrink-0 shadow-2xl">
+              <div className="bg-white/95 border border-indigo-100/90 rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                {/* Discount line if applied */}
+                {discountType !== 'NONE' && (
+                  <div className="flex justify-between items-center text-emerald-700 font-semibold text-xs">
+                    <span className="flex items-center gap-1 font-sans">
+                      <Percent className="w-3.5 h-3.5" />
+                      <span>Discount ({discountType === 'PERCENT' ? `${discountPercent}%` : 'Flat'})</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span>- LKR {discountAmount.toFixed(2)}</span>
+                      <button
+                        type="button"
+                        onClick={resetDiscount}
+                        className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
+                        title="Remove discount"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Quick Add Discount Pill (if no discount active) */}
-              {discountType === 'NONE' && cart.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsDiscountModalOpen(true)}
-                  className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                >
-                  <Percent className="w-3.5 h-3.5" />
-                  <span>+ Add Order Discount</span>
-                </button>
-              )}
+                {/* Quick Add Discount Pill (if no discount active) */}
+                {discountType === 'NONE' && cart.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDiscountModalOpen(true)}
+                    className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>+ Add Order Discount</span>
+                  </button>
+                )}
 
-              {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
-              <div className="rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
-                    TOTAL PAYABLE
+                {/* Hero TOTAL PAYABLE: Rich Shopify POS Gradient Card */}
+                <div className="rounded-2xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-900 p-3 text-white shadow-xl border border-indigo-500/40 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold tracking-wider uppercase text-indigo-300">
+                      TOTAL PAYABLE
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">Net Due (LKR)</span>
+                  </div>
+                  <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
+                    LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span className="text-xs text-slate-400 font-medium">Net Due (LKR)</span>
                 </div>
-                <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
-                  LKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
               </div>
 
               {/* Payment selector */}
@@ -2914,28 +2923,28 @@ export default function ConfidencyPosPage() {
                     id: 'CASH',
                     label: 'Cash',
                     icon: Banknote,
-                    inactiveCls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/80',
-                    activeCls: 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-500/25 scale-[1.02]',
+                    inactiveCls: 'bg-white border-emerald-200 text-emerald-800 hover:bg-emerald-50',
+                    activeCls: 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-[1.02]',
                   },
                   {
                     id: 'CARD',
                     label: 'Card',
                     icon: CreditCard,
-                    inactiveCls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100/80',
+                    inactiveCls: 'bg-white border-blue-200 text-blue-800 hover:bg-blue-50',
                     activeCls: 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/25 scale-[1.02]',
                   },
                   {
                     id: 'STORE_CREDIT',
                     label: 'Credit',
                     icon: BookOpen,
-                    inactiveCls: 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100/80',
+                    inactiveCls: 'bg-white border-amber-200 text-amber-900 hover:bg-amber-50',
                     activeCls: 'bg-amber-500 border-amber-400 text-slate-950 shadow-md shadow-amber-500/25 scale-[1.02] font-black',
                   },
                   {
                     id: 'SPLIT',
                     label: 'Split',
                     icon: Split,
-                    inactiveCls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100/80',
+                    inactiveCls: 'bg-white border-purple-200 text-purple-800 hover:bg-purple-50',
                     activeCls: 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/25 scale-[1.02]',
                   },
                 ].map((tab) => {
@@ -3174,10 +3183,13 @@ export default function ConfidencyPosPage() {
                           setCheckoutPaymentMethod(m.id);
                           setCheckoutError(null);
                         }}
-                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${isActive
-                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/30'
-                          : 'bg-[#131B2E] text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-[#18233C]'
-                          }`}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? m.id === 'CASH'
+                              ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/30'
+                              : 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/30'
+                            : 'bg-[#131B2E] text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-[#18233C]'
+                        }`}
                       >
                         <Icon className="w-4 h-4 mb-1" />
                         <span>{m.label}</span>
