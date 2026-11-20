@@ -77,6 +77,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
     title: 'FINANCE & REPORTS',
     items: [
       { name: 'Cash Reconciliation', href: '/dashboard/finance/reconciliation', icon: Banknote, badge: 'Daily' },
+      { name: 'Payroll & HR', href: '/dashboard/payroll', icon: Coins, badge: 'HR' },
       { name: 'Special Sales & Stock Summary', href: '/dashboard/finance/modaka', icon: FileSpreadsheet, badge: 'A-F' },
       { name: 'Reports Suite', href: '/dashboard/reports', icon: BarChart3, badge: '30' },
       { name: 'Revenue Desk', href: '/dashboard/finance/revenue', icon: Receipt },

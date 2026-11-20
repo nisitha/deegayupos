@@ -1806,9 +1806,9 @@ export default function CashReconciliationPage() {
             </span>
           </button>
 
-          {/* Cashier Shortages */}
+          {/* Cashier Shortages & Payroll Link */}
           <button
-            onClick={() => setActiveTab('shortages')}
+            onClick={() => { window.location.href = '/dashboard/payroll?tab=deductions'; }}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition whitespace-nowrap ${
               activeTab === 'shortages'
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
