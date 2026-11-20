@@ -99,13 +99,13 @@ export interface CategoryValuation {
 
 // 7 Known Core Special Stock (Rasayana) Items
 const SPECIAL_STOCK_CATALOG = [
-  { sku: 'SKU-3377', name: 'Kameshwari Rasayanaya Chathuri Rathu 300', rate: 300, sortOrder: 1, productId: '7b6d032c-dee9-424a-8889-934bcd305452' },
-  { sku: 'SKU-3325', name: 'Kameshwari Rasayanaya Chathuri Kola 250', rate: 250, sortOrder: 2, productId: '80f22f7b-eec9-49e3-9523-9781d5815b00' },
-  { sku: 'SKU-1805', name: 'Kameshwari Rasayanaya Rawana 300', rate: 300, sortOrder: 3, productId: '40e939d6-e7eb-4bf6-8650-c5b22fcbf5ee' },
-  { sku: 'SKU-106', name: 'Kameshwari Rasayanaya Chathuri Kola', rate: 200, sortOrder: 4, productId: '0378f34b-85cd-46ac-93b1-2cae574a7e32' },
+  { sku: 'SKU-1805', name: 'Kameshwari Rasayanaya Rawana 300', rate: 300, sortOrder: 1, productId: '40e939d6-e7eb-4bf6-8650-c5b22fcbf5ee' },
+  { sku: 'SKU-108', name: 'Kameshwari Rasayanaya Rawana Rathu', rate: 250, sortOrder: 2, productId: 'a17f95d5-4932-480f-85d2-ff4704800cbb' },
+  { sku: 'SKU-3268', name: 'Kameshwari Rasayanaya Sewanagala Gold 300', rate: 300, sortOrder: 3, productId: 'b12673e1-b24b-4c1c-92e9-673e0768e6d9' },
+  { sku: 'SKU-105', name: 'Rawana Kaha 200', rate: 200, sortOrder: 4, productId: '0ce976cc-6660-41a6-b4fa-7b3c81283dbc' },
   { sku: 'SKU-3252', name: 'Kameshwari Rasayanaya Sewanagala Kaha 250', rate: 250, sortOrder: 5, productId: '05cca1b9-9f01-46de-ab63-74ee0909242e' },
-  { sku: 'SKU-108', name: 'Kameshwari Rasayanaya Rawana Rathu', rate: 250, sortOrder: 6, productId: 'a17f95d5-4932-480f-85d2-ff4704800cbb' },
-  { sku: 'SKU-3268', name: 'Kameshwari Rasayanaya Sewanagala Gold 300', rate: 300, sortOrder: 7, productId: 'b12673e1-b24b-4c1c-92e9-673e0768e6d9' },
+  { sku: 'SKU-3325', name: 'Kameshwari Rasayanaya Chathuri Kola 250', rate: 250, sortOrder: 6, productId: '80f22f7b-eec9-49e3-9523-9781d5815b00' },
+  { sku: 'SKU-3377', name: 'Kameshwari Rasayanaya Chathuri Rathu 300', rate: 300, sortOrder: 7, productId: '7b6d032c-dee9-424a-8889-934bcd305452' },
 ];
 
 function formatCurrency(amount: number): string {

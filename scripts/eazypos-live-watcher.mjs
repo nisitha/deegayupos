@@ -493,7 +493,7 @@ async function main() {
     // -------------------------------------------------------------------------
     // VERIFY & LOG EXACT 4-BRANCH STOCK FOR 7 SPECIAL STOCK ITEMS
     // -------------------------------------------------------------------------
-    const specialSkus = ['SKU-3377', 'SKU-3325', 'SKU-1805', 'SKU-106', 'SKU-3252', 'SKU-108', 'SKU-3268'];
+    const specialSkus = ['SKU-1805', 'SKU-108', 'SKU-3268', 'SKU-105', 'SKU-3252', 'SKU-3325', 'SKU-3377'];
     const specialProducts = await retry(() => prisma.product.findMany({
       where: {
         tenantId: TENANT_ID,
