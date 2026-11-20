@@ -105,7 +105,8 @@ export function ShiftStartModal({
       const res = await shiftsApi.confirmShiftOpeningCount(
         activeShift.id,
         parsedCash,
-        Object.keys(breakdown).length > 0 ? breakdown : undefined
+        Object.keys(breakdown).length > 0 ? breakdown : undefined,
+        activeShift.branchId
       );
 
       if (res.success) {

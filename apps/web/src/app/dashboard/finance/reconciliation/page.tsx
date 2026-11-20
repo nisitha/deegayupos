@@ -1454,8 +1454,8 @@ export default function CashReconciliationPage() {
 
   const handleSetBranchOpeningFloat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetFloatBranchId) {
-      setBranchFloatError('Please select a branch.');
+    if (!targetFloatBranchId || targetFloatBranchId === 'ALL' || targetFloatBranchId === 'all') {
+      setBranchFloatError('Please select a specific branch.');
       return;
     }
     const amt = parseFloat(newOpeningFloatAmount);

@@ -3390,7 +3390,7 @@ export const shiftsApi = {
     cashierName?: string
   ): Promise<ApiResponse<CashierShiftDto | null>> => {
     try {
-      if (!isValidUuid(branchId)) {
+      if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
         return { success: false, data: null };
       }
 
@@ -3665,6 +3665,13 @@ export const shiftsApi = {
     cashierName?: string
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
+      if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INVALID_BRANCH', message: 'Specific branch ID is required', statusCode: 400 },
+        };
+      }
       // 1. Try get active shift
       const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName);
       if (active.success && active.data) {
@@ -3882,7 +3889,8 @@ export const shiftsApi = {
   confirmShiftOpeningCount: async (
     shiftId: string,
     countedOpeningFloat: number,
-    denominationBreakdown?: Record<string, number>
+    denominationBreakdown?: Record<string, number>,
+    branchId?: string
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
       if (!isValidUuid(shiftId)) {
@@ -3893,11 +3901,16 @@ export const shiftsApi = {
         };
       }
 
-      const { data: shiftRow, error: fetchErr } = await supabase
+      let fetchQuery = supabase
         .from('cashier_shifts')
         .select('*')
-        .eq('id', shiftId)
-        .maybeSingle();
+        .eq('id', shiftId);
+
+      if (branchId && isValidUuid(branchId)) {
+        fetchQuery = fetchQuery.eq('branch_id', branchId);
+      }
+
+      const { data: shiftRow, error: fetchErr } = await fetchQuery.maybeSingle();
 
       if (fetchErr || !shiftRow) {
         return {
@@ -3906,6 +3919,8 @@ export const shiftsApi = {
           error: { code: 'NOT_FOUND', message: 'Shift not found', statusCode: 404 },
         };
       }
+
+      const targetBranchId = (branchId && isValidUuid(branchId)) ? branchId : shiftRow.branch_id;
 
       let previousClosingFloat: number | null = null;
       let previousShiftLabel: string | undefined = undefined;
@@ -3924,11 +3939,11 @@ export const shiftsApi = {
         } catch { }
       }
 
-      if (previousClosingFloat === null && shiftRow.branch_id) {
+      if (previousClosingFloat === null && targetBranchId) {
         const { data: priorShift } = await supabase
           .from('cashier_shifts')
           .select('shift_number, closing_float, closing_drawer_float, counted_remaining_drawer_cash')
-          .eq('branch_id', shiftRow.branch_id)
+          .eq('branch_id', targetBranchId)
           .eq('status', 'closed')
           .order('ended_at', { ascending: false })
           .limit(1)
@@ -3956,7 +3971,7 @@ export const shiftsApi = {
         denomination_breakdown: denominationBreakdown || null,
       });
 
-      const { data: updated, error: updErr } = await supabase
+      let updQuery = supabase
         .from('cashier_shifts')
         .update({
           opening_float: countedFloat,
@@ -3964,9 +3979,13 @@ export const shiftsApi = {
           handover_notes: notesPayload,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', shiftId)
-        .select()
-        .single();
+        .eq('id', shiftId);
+
+      if (targetBranchId) {
+        updQuery = updQuery.eq('branch_id', targetBranchId);
+      }
+
+      const { data: updated, error: updErr } = await updQuery.select().single();
 
       if (updErr) {
         console.error('[shiftsApi] confirmShiftOpeningCount update error:', updErr);
@@ -3975,6 +3994,26 @@ export const shiftsApi = {
           data: null as any,
           error: { code: 'UPDATE_ERROR', message: updErr.message, statusCode: 500 },
         };
+      }
+
+      // Upsert daily_cash_reconciliations strictly on (branch_id, reconciliation_date)
+      if (targetBranchId && shiftRow.shift_date) {
+        try {
+          await supabase
+            .from('daily_cash_reconciliations')
+            .upsert(
+              {
+                tenant_id: shiftRow.tenant_id,
+                branch_id: targetBranchId,
+                reconciliation_date: shiftRow.shift_date,
+                opening_cash_b: countedFloat,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'branch_id,reconciliation_date' }
+            );
+        } catch (recErr) {
+          console.warn('[shiftsApi] confirmShiftOpeningCount daily_cash_reconciliations upsert error:', recErr);
+        }
       }
 
       return {
@@ -4080,10 +4119,17 @@ export const shiftsApi = {
 
   closeShiftHandover: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
     try {
+      if (!payload.branchId || payload.branchId === 'all' || payload.branchId === 'ALL' || !isValidUuid(payload.branchId)) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INVALID_BRANCH', message: 'Valid branch ID is required for shift closing', statusCode: 400 },
+        };
+      }
       // Fetch shift metadata upfront for started_at window and financial adjustments audit
       const { data: shiftRow } = await supabase
         .from('cashier_shifts')
-        .select('shift_date, shift_number, cashier_id, branch_id, started_at')
+        .select('tenant_id, shift_date, shift_number, cashier_id, branch_id, started_at')
         .eq('id', payload.shiftId)
         .maybeSingle();
 
@@ -4406,6 +4452,7 @@ export const shiftsApi = {
           handover_notes: formattedNotes || null,
         })
         .eq('id', payload.shiftId)
+        .eq('branch_id', payload.branchId)
         .select()
         .single();
 
@@ -4418,27 +4465,25 @@ export const shiftsApi = {
         };
       }
 
-      // Sync daily_cash_reconciliations if a record exists for this branch and shift date
-      try {
-        const { data: recRow } = await supabase
-          .from('daily_cash_reconciliations')
-          .select('id')
-          .eq('branch_id', payload.branchId)
-          .eq('reconciliation_date', shiftDate)
-          .maybeSingle();
-
-        if (recRow?.id) {
+      // Sync daily_cash_reconciliations strictly on (branch_id, reconciliation_date)
+      if (payload.branchId && shiftDate) {
+        try {
           await supabase
             .from('daily_cash_reconciliations')
-            .update({
-              closing_cash_f: closingFloat,
-              physical_cash_c: closingFloat,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', recRow.id);
+            .upsert(
+              {
+                tenant_id: shiftRow?.tenant_id || DEEGAYU_TENANT_ID,
+                branch_id: payload.branchId,
+                reconciliation_date: shiftDate,
+                closing_cash_f: closingFloat,
+                physical_cash_c: closingFloat,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'branch_id,reconciliation_date' }
+            );
+        } catch (recErr) {
+          console.warn('[shiftsApi] daily_cash_reconciliations upsert error:', recErr);
         }
-      } catch (recErr) {
-        console.warn('[shiftsApi] daily_cash_reconciliations sync warning:', recErr);
       }
 
       return {
@@ -4802,6 +4847,21 @@ export const shiftsApi = {
     amount: number
   ): Promise<ApiResponse<boolean>> => {
     try {
+      if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
+        return {
+          success: false,
+          data: false,
+          error: { code: 'INVALID_BRANCH', message: 'Specific valid branch ID is required', statusCode: 400 },
+        };
+      }
+
+      const todayDate = getSriLankaDateStr();
+      let tenantId = DEEGAYU_TENANT_ID;
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('pixelcraft_tenant_id');
+        if (isValidUuid(stored)) tenantId = stored!;
+      }
+
       // 1. Look for an active open shift for this branch
       const { data: openShift } = await supabase
         .from('cashier_shifts')
@@ -4819,24 +4879,17 @@ export const shiftsApi = {
             opening_float: amount,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', openShift.id);
+          .eq('id', openShift.id)
+          .eq('branch_id', branchId);
 
         if (updErr) throw updErr;
-        return { success: true, data: true };
       } else {
         // 2. If no open shift exists, initialize one with this opening float
-        const todayDate = getSriLankaDateStr();
         const { count } = await supabase
           .from('cashier_shifts')
           .select('id', { count: 'exact', head: true })
           .eq('branch_id', branchId)
           .eq('shift_date', todayDate);
-
-        let tenantId = DEEGAYU_TENANT_ID;
-        if (typeof window !== 'undefined') {
-          const stored = localStorage.getItem('pixelcraft_tenant_id');
-          if (isValidUuid(stored)) tenantId = stored!;
-        }
 
         const { error: insErr } = await supabase
           .from('cashier_shifts')
@@ -4852,8 +4905,27 @@ export const shiftsApi = {
           });
 
         if (insErr) throw insErr;
-        return { success: true, data: true };
       }
+
+      // Upsert daily_cash_reconciliations strictly on (branch_id, reconciliation_date)
+      try {
+        await supabase
+          .from('daily_cash_reconciliations')
+          .upsert(
+            {
+              tenant_id: tenantId,
+              branch_id: branchId,
+              reconciliation_date: todayDate,
+              opening_float_a: amount,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'branch_id,reconciliation_date' }
+          );
+      } catch (recErr) {
+        console.warn('[shiftsApi] setBranchOpeningFloat daily_cash_reconciliations upsert error:', recErr);
+      }
+
+      return { success: true, data: true };
     } catch (err: any) {
       console.error('[shiftsApi] setBranchOpeningFloat fatal:', err);
       return {

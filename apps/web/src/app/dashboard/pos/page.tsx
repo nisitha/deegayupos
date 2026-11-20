@@ -352,6 +352,11 @@ export default function ConfidencyPosPage() {
   const cashierId = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
   const cashierName = activeCashier?.fullName || user?.fullName || 'Dr. Deegayu (Owner)';
 
+  // Reset active shift immediately upon switching branches to avoid cross-branch leak
+  useEffect(() => {
+    setActiveShift(null);
+  }, [selectedBranchId]);
+
   // Active Cashier Shift Lifecycle
   const refreshActiveShift = useCallback(async () => {
     if (!selectedBranchId) return;
@@ -3038,7 +3043,7 @@ export default function ConfidencyPosPage() {
 
       {/* 1. Start Shift Opening Drawer Count Modal (Mandatory Blind Count) */}
       <ShiftStartModal
-        isOpen={Boolean(activeShift?.needsOpeningCount)}
+        isOpen={Boolean(activeShift?.needsOpeningCount && activeShift?.branchId === selectedBranchId)}
         activeShift={activeShift}
         branchName={currentBranchName}
         cashierName={cashierName}
@@ -3063,7 +3068,7 @@ export default function ConfidencyPosPage() {
 
       {/* 2. End Shift Modal */}
       <ShiftEndModal
-        isOpen={isEndShiftModalOpen}
+        isOpen={Boolean(isEndShiftModalOpen && activeShift && activeShift.branchId === selectedBranchId)}
         onClose={() => setIsEndShiftModalOpen(false)}
         activeShift={activeShift}
         branchId={selectedBranchId}
