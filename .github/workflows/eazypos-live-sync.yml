@@ -1,8 +1,9 @@
 name: Legacy POS Automated Live Watcher (5-Min Sync)
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  # Automated cron schedule disabled post-launch to prevent legacy EazyPOS sync from overwriting native POS stock levels
+  # schedule:
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       force:
