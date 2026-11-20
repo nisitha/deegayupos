@@ -361,8 +361,6 @@ export function ShiftEndModal({
     return openingFloat + declaredShiftSale + modakaSalesTotal;
   }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
-
-  if (!isOpen) return null;
   const currentShift = activeShift || localShift;
 
   const formattedShiftStartTime = useMemo(() => {
@@ -381,6 +379,8 @@ export function ShiftEndModal({
       return null;
     }
   }, [currentShift?.startedAt, localShift?.startedAt, activeShift?.startedAt]);
+
+  if (!isOpen) return null;
 
   const refreshLiveSales = async () => {
     const targetShift = activeShift || localShift;
