@@ -1757,7 +1757,7 @@ export default function CashReconciliationPage() {
       {/* TABS NAVIGATION (Executive Admin Only) */}
       {/* ========================================================= */}
       {isOwner && (
-        <div className="flex items-center gap-2 mb-6 border-b border-slate-800/80 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-2 mb-6 border-b border-slate-800/80 pb-2 overflow-x-auto w-full no-scrollbar scroll-smooth">
           {/* Shift Tally & Adjustments Hub (Executive Owner View) */}
           <button
             onClick={() => setActiveTab('shift_tally')}
@@ -1896,7 +1896,7 @@ export default function CashReconciliationPage() {
           </div>
 
           {/* 1. 5 Executive KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {/* 1. Total Cash Inflow */}
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
               <div className="flex items-center justify-between">

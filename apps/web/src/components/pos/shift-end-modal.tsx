@@ -480,7 +480,7 @@ export function ShiftEndModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="max-w-6xl w-[95vw] max-h-[90vh] flex flex-col bg-[#F8FAFC] border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="max-w-6xl w-[95vw] max-h-[92vh] flex flex-col bg-[#F8FAFC] border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden">
         {/* Refined Deep-Slate Executive Header */}
         <div className="bg-[#0F172A] px-6 py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3.5">
@@ -1284,7 +1284,7 @@ export function ShiftEndModal({
             </div>
 
             {/* Right: Actions (Sticky Submit & Navigation) */}
-            <div className="flex items-center justify-end gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={onClose}

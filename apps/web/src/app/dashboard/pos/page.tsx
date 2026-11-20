@@ -2944,9 +2944,9 @@ export default function ConfidencyPosPage() {
           aria-modal="true"
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
-          <div className="bg-[#0F1626] rounded-3xl shadow-2xl border border-slate-800 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-150 text-slate-100">
+          <div className="bg-[#0F1626] rounded-3xl shadow-2xl border border-slate-800 w-[95vw] max-w-lg max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150 text-slate-100">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800/90 flex items-center justify-between bg-[#0B101D]">
+            <div className="p-4 sm:p-6 border-b border-slate-800/90 flex items-center justify-between bg-[#0B101D] shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-white">Confirm & Complete Sale</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -2962,7 +2962,7 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
               {/* Total Payable Card */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/80 via-violet-950/60 to-slate-900 border border-indigo-500/40 flex items-baseline justify-between shadow-lg">
                 <div>
@@ -3214,7 +3214,7 @@ export default function ConfidencyPosPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-6 border-t border-slate-800 bg-[#0B101D] space-y-2.5">
+            <div className="p-4 sm:p-6 border-t border-slate-800 bg-[#0B101D] space-y-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => executeCheckout(true)}

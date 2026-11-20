@@ -700,7 +700,7 @@ export default function ModakaLedgerPage() {
                       </span>
                     </div>
 
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
                       <table className="w-full text-xs text-left">
                         <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                           <tr>
@@ -963,8 +963,8 @@ export default function ModakaLedgerPage() {
 
       {/* Edit Modaka Rates & Items Modal (OWNER ONLY) */}
       {isConfigModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-[95vw] max-w-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh]">
             <div className="px-6 py-4.5 bg-gradient-to-r from-purple-700 to-indigo-700 text-white flex items-center justify-between shrink-0 shadow-xs">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shadow-inner">
@@ -1000,7 +1000,7 @@ export default function ModakaLedgerPage() {
                 These items populate the Special Stock Ledger on all cashier terminals. Updating rates here applies to new shift handovers and calculations.
               </p>
 
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>

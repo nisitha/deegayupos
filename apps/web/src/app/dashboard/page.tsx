@@ -541,9 +541,9 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Main Analytics Grid: Sales & Profit Trend Chart + Payment Mix */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Sales & Profit Timeline (2 Cols) */}
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
+        <div className="xl:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-sm font-bold text-slate-900">Sales & Profit Timeline</h2>
@@ -803,7 +803,7 @@ export default function DashboardPage() {
       )}
 
       {/* 4. Quick Actions & Live Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Quick Action Shortcuts (1 Col) */}
         <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card space-y-4">
           <div>
@@ -811,7 +811,7 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-500 mt-0.5">Common operational shortcuts</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
             {/* Action 1: Open POS Terminal (Visible to All) */}
             <Link
               href="/dashboard/pos"
@@ -951,7 +951,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Live Recent Activity Feed (2 Cols) */}
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
+        <div className="xl:col-span-2 p-6 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>

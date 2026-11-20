@@ -1083,7 +1083,7 @@ export default function BranchInventoryAnalyticsPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {branchSummaries.map((summary) => {
               const isSelected = selectedBranchId === summary.branchId;
               const isGlobal = summary.branchId === 'all';
@@ -1160,7 +1160,7 @@ export default function BranchInventoryAnalyticsPage() {
         {/* ==========================================
             2. EXECUTIVE BRANCH KPI STRIP (5 CARDS)
         ========================================== */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
           {/* 1. Retail Valuation */}
           <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between mb-2">
@@ -1265,7 +1265,7 @@ export default function BranchInventoryAnalyticsPage() {
         {/* ==========================================
             3. INTERACTIVE VISUAL GRAPHS & ANALYTICS
         ========================================== */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           {/* Chart 1: Stock Health & Multi-Branch Comparison */}
           <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs flex flex-col justify-between">
             <div>
@@ -1971,10 +1971,10 @@ export default function BranchInventoryAnalyticsPage() {
           6. INLINE QUICK STOCK ADJUSTMENT MODAL
       ========================================== */}
       {adjustmentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-[95vw] max-w-lg max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                   <Sliders className="w-4 h-4 text-indigo-600" />
@@ -1993,7 +1993,7 @@ export default function BranchInventoryAnalyticsPage() {
             </div>
 
             {/* Modal Form */}
-            <div className="space-y-4 py-4 text-xs">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
               {/* Product Info Display */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target Item</p>
@@ -2125,7 +2125,7 @@ export default function BranchInventoryAnalyticsPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+            <div className="shrink-0 p-4 sm:p-5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/50">
               <button
                 type="button"
                 onClick={() => setAdjustmentModalOpen(false)}

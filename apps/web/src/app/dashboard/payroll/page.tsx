@@ -1002,10 +1002,10 @@ export default function MonthlyPayrollDashboardPage() {
       {/* OFFICIAL PRINTABLE SALARY SLIP MODAL                                 */}
       {/* ==================================================================== */}
       {isSlipModalOpen && selectedSlipRun && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full border border-slate-200 overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-3xl max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Action Bar (Hidden on Print) */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 no-print">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 no-print shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-emerald-600" />
                 <h3 className="font-bold text-slate-900 text-sm">
@@ -1034,7 +1034,7 @@ export default function MonthlyPayrollDashboardPage() {
             {/* PRINT CONTAINER (#printable-salary-slip) */}
             <div
               id="printable-salary-slip"
-              className="p-8 sm:p-10 bg-white text-slate-900 page-break-avoid"
+              className="flex-1 overflow-y-auto p-6 sm:p-10 bg-white text-slate-900 page-break-avoid"
             >
               {/* Official Letterhead */}
               <div className="text-center pb-6 border-b-2 border-slate-900 mb-6">

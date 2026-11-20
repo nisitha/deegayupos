@@ -113,7 +113,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* Page Content Viewport */}
           <main
-            className={`flex-1 ${
+            className={`flex-1 min-w-0 overflow-x-hidden ${
               isPosPage
                 ? 'overflow-hidden p-0 h-full bg-[#E6EAF2]'
                 : 'overflow-y-auto p-3 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'

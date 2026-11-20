@@ -103,7 +103,7 @@ export function Header() {
 
   return (
     <>
-      <header className="h-14 bg-white border-b border-slate-200/90 px-3 sm:px-5 flex items-center justify-between shrink-0 z-30 shadow-2xs">
+      <header className="min-h-[56px] sm:min-h-[60px] h-auto bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2.5 shrink-0 z-30 shadow-2xs">
         {/* Left: Mobile Drawer Trigger + Store Monogram & Active Status */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* 44x44px Touch-Target Hamburger Menu Button (< lg screens) */}
@@ -114,7 +114,7 @@ export function Header() {
                 window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
               }
             }}
-            className="lg:hidden w-11 h-11 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
+            className="lg:hidden w-10 h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
             aria-label="Open mobile navigation menu"
             title="Menu"
           >
@@ -137,7 +137,7 @@ export function Header() {
 
         {/* Center: Global Search Bar (Non-POS pages only) */}
         {!isPosPage && (
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
+          <div className="hidden md:flex items-center flex-1 min-w-[180px] max-w-md mx-2 lg:mx-4">
             <div className="relative w-full">
               <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
               <input
@@ -150,7 +150,7 @@ export function Header() {
         )}
 
         {/* Right: Launch POS CTA, Branch Switcher, Live Date, User Profile Menu */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto">
           {/* High-Visibility "Launch POS" CTA Button (Hidden on POS route) */}
           {!isPosPage && (
             <Link
