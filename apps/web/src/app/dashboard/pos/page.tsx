@@ -700,6 +700,13 @@ export default function ConfidencyPosPage() {
 
     setScanFeedback(`Added: ${product.name}`);
     setTimeout(() => setScanFeedback(null), 1500);
+
+    // Auto-clear search query, close dropdown & refocus search input for rapid consecutive scans
+    setSearchQuery('');
+    setIsSearchDropdownOpen(false);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 30);
   }, []);
 
   // Handle clicking product in catalog or search (respects Qty Popup toggle)
@@ -726,6 +733,7 @@ export default function ConfidencyPosPage() {
                 ? (defaultUnit === 'L' ? 1 : 250)
                 : 1;
 
+        setIsSearchDropdownOpen(false);
         setQuantityModalTarget({
           product: {
             id: product.id,
@@ -850,6 +858,11 @@ export default function ConfidencyPosPage() {
       });
 
       setQuantityModalTarget(null);
+      setSearchQuery('');
+      setIsSearchDropdownOpen(false);
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
     },
     [products, quantityModalTarget],
   );
@@ -882,6 +895,11 @@ export default function ConfidencyPosPage() {
     ]);
     setScanFeedback(`Custom Item Added: ${customTitle}`);
     setTimeout(() => setScanFeedback(null), 2000);
+    setSearchQuery('');
+    setIsSearchDropdownOpen(false);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 50);
   };
 
   // Inline Unit Price Handlers
@@ -945,6 +963,11 @@ export default function ConfidencyPosPage() {
     setEditingPriceInput('');
     setCart([]);
     setIsMobileCartOpen(false);
+    setSearchQuery('');
+    setIsSearchDropdownOpen(false);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 30);
   }, []);
 
   const resetDiscount = useCallback(() => {
@@ -1037,6 +1060,11 @@ export default function ConfidencyPosPage() {
     setDiscountPercent(held.discountPercent);
     setDiscountFlat(held.discountFlat);
     setHeldTickets((prev) => prev.filter((t) => t.id !== held.id));
+    setSearchQuery('');
+    setIsSearchDropdownOpen(false);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 50);
     setScanFeedback(`Restored ticket (${held.items.length} items)`);
     setTimeout(() => setScanFeedback(null), 2000);
   };
@@ -1272,7 +1300,12 @@ export default function ConfidencyPosPage() {
 
         clearCart();
         resetDiscount();
+        setSearchQuery('');
+        setIsSearchDropdownOpen(false);
         setIsCheckoutModalOpen(false);
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 50);
 
         if (shouldPrintReceipt) {
           setCompletedSale(finalizedSale);
@@ -1696,9 +1729,18 @@ export default function ConfidencyPosPage() {
                   setSelectedSearchIndex((prev) => (prev > 0 ? prev - 1 : liveSearchResults.length - 1));
                 } else if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (isSearchDropdownOpen && liveSearchResults.length > 0 && liveSearchResults[selectedSearchIndex]) {
-                    handleProductClick(liveSearchResults[selectedSearchIndex]);
-                    searchInputRef.current?.focus();
+                  const targetItem =
+                    (isSearchDropdownOpen && liveSearchResults[selectedSearchIndex]) ||
+                    (liveSearchResults.length > 0 ? liveSearchResults[0] : null) ||
+                    (filteredProducts.length === 1 ? filteredProducts[0] : null);
+
+                  if (targetItem) {
+                    handleProductClick(targetItem);
+                    setSearchQuery('');
+                    setIsSearchDropdownOpen(false);
+                    setTimeout(() => {
+                      searchInputRef.current?.focus();
+                    }, 50);
                   }
                 } else if (e.key === 'Escape') {
                   e.preventDefault();
@@ -1751,7 +1793,11 @@ export default function ConfidencyPosPage() {
                         onMouseEnter={() => setSelectedSearchIndex(idx)}
                         onClick={() => {
                           handleProductClick(item);
-                          searchInputRef.current?.focus();
+                          setSearchQuery('');
+                          setIsSearchDropdownOpen(false);
+                          setTimeout(() => {
+                            searchInputRef.current?.focus();
+                          }, 50);
                         }}
                         className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-950' : 'hover:bg-slate-50 text-slate-800'
                           }`}
@@ -1808,7 +1854,11 @@ export default function ConfidencyPosPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               handleProductClick(item);
-                              searchInputRef.current?.focus();
+                              setSearchQuery('');
+                              setIsSearchDropdownOpen(false);
+                              setTimeout(() => {
+                                searchInputRef.current?.focus();
+                              }, 50);
                             }}
                             className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors active:scale-95 flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
@@ -2836,6 +2886,21 @@ export default function ConfidencyPosPage() {
           onClose={() => {
             setShowReceiptModal(false);
             setCompletedSale(null);
+            setSearchQuery('');
+            setIsSearchDropdownOpen(false);
+            setTimeout(() => {
+              searchInputRef.current?.focus();
+            }, 100);
+          }}
+          onNewSale={() => {
+            setShowReceiptModal(false);
+            setCompletedSale(null);
+            clearCart();
+            setSearchQuery('');
+            setIsSearchDropdownOpen(false);
+            setTimeout(() => {
+              searchInputRef.current?.focus();
+            }, 100);
           }}
         />
       )}
