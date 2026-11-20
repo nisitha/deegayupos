@@ -998,9 +998,14 @@ export function ShiftEndModal({
                             </div>
                             <span className="text-xs text-slate-500 block mt-0.5">
                               {livePosBillCount > 0
-                                ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift`
-                                : 'Auto-pulled from completed cash bills in this shift'}
+                                ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`
+                                : `Auto-pulled from completed cash bills in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`}
                             </span>
+                            {Number(currentShift?.shiftNumber || localShift?.shiftNumber || 1) > 1 && (
+                              <span className="text-[11px] text-amber-700/90 block mt-0.5 font-medium">
+                                Earlier bills from today belong to {formatShiftLabel(Number(currentShift?.shiftNumber || localShift?.shiftNumber || 2) - 1)} and are accounted for in that shift&apos;s handover.
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs font-bold text-slate-400">LKR</span>
