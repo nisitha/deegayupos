@@ -3749,6 +3749,8 @@ export const shiftsApi = {
       });
       const pendingNotes = `[PENDING_OPENING_COUNT] ${pendingMeta}`;
 
+      const defaultOpeningFloat = previousClosingFloat !== null ? previousClosingFloat : 0;
+
       const { data: newShift, error: createErr } = await supabase
         .from('cashier_shifts')
         .insert({
@@ -3759,7 +3761,7 @@ export const shiftsApi = {
           shift_number: shiftNumber,
           started_at: new Date().toISOString(),
           status: 'open',
-          opening_float: 0,
+          opening_float: defaultOpeningFloat,
           notes: pendingNotes,
           handover_notes: pendingNotes,
         })
@@ -3852,9 +3854,9 @@ export const shiftsApi = {
           posGrossSales: 0,
           modakaTotalSoldQty: 0,
           modakaTotalAmount: 0,
-          openingFloat: 0,
+          openingFloat: defaultOpeningFloat,
           declaredShiftSale: 0,
-          totalCashAvailable: 0,
+          totalCashAvailable: defaultOpeningFloat,
           goodsPurchasedPaid: 0,
           otherExpenses: 0,
           expectedCashBeforeBank: 0,

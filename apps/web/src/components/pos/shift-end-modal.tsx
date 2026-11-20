@@ -1292,7 +1292,7 @@ export function ShiftEndModal({
                 Bank Deposit: <strong className="font-mono text-indigo-950 font-bold ml-1">LKR {denominationsTotal.toFixed(2)}</strong>
               </span>
               <span className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium text-xs sm:text-sm">
-                Next Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {enteredRemainingCash.toFixed(2)}</strong>
+                Declared Closing Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {enteredRemainingCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
               </span>
             </div>
 
