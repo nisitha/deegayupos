@@ -538,7 +538,7 @@ export default function CashReconciliationPage() {
   const salaryDeductionsLog = useMemo(() => {
     // 1. From recorded shift financial adjustments
     const adjItems = shiftAdjustments
-      .filter((a) => a.adjustmentType === 'salary_deduction')
+      .filter((a) => a.adjustmentType === 'salary_deduction' || (a.adjustmentType as any) === 'SHORTAGE')
       .map((a) => ({
         id: a.id,
         date: a.adjustmentDate,
@@ -586,7 +586,7 @@ export default function CashReconciliationPage() {
   const extraIncomeLog = useMemo(() => {
     // 1. From recorded shift financial adjustments
     const adjItems = shiftAdjustments
-      .filter((a) => a.adjustmentType === 'extra_income')
+      .filter((a) => a.adjustmentType === 'extra_income' || (a.adjustmentType as any) === 'EXCESS')
       .map((a) => ({
         id: a.id,
         date: a.adjustmentDate,
@@ -2009,9 +2009,14 @@ export default function CashReconciliationPage() {
               <div className="space-y-4">
                 {shiftTallyKPIs.filteredShifts.map((sh) => {
                   const shiftInflow = (sh.opening_float || 0) + (sh.pos_cash_sales || 0) + (sh.modaka_total_amount || 0);
-                  const countedDrawer = sh.counted_remaining_drawer_cash || sh.counted_drawer_cash || 0;
+                  const expectedDrawer = sh.expected_remaining_drawer_cash !== undefined
+                    ? Number(sh.expected_remaining_drawer_cash)
+                    : Math.round((shiftInflow - (sh.goods_purchased_paid || 0) - (sh.other_expenses || 0) - (sh.banked_amount || 0)) * 100) / 100;
+                  const countedDrawer = Math.round(Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash ?? 0) * 100) / 100;
                   const shiftAccounted = (sh.goods_purchased_paid || 0) + (sh.other_expenses || 0) + (sh.banked_amount || 0) + countedDrawer;
-                  const variance = sh.cash_variance !== undefined ? sh.cash_variance : (countedDrawer - (shiftInflow - (sh.goods_purchased_paid || 0) - (sh.other_expenses || 0) - (sh.banked_amount || 0)));
+                  const variance = sh.cash_variance !== undefined
+                    ? Number(sh.cash_variance)
+                    : Math.round((countedDrawer - expectedDrawer) * 100) / 100;
                   const isExpanded = expandedDenomsShiftId === sh.id;
                   const denoms = sh.denominations_json || {};
                   const denomEntries = Object.entries(denoms).filter(([_, count]) => Number(count) > 0);
@@ -2119,7 +2124,13 @@ export default function CashReconciliationPage() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
-                            <span className="text-slate-300 font-semibold">Remaining Drawer Float (Next Opening):</span>
+                            <span className="text-slate-400">System Expected Remaining Drawer:</span>
+                            <span className="font-mono font-bold text-amber-300">
+                              LKR {expectedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-300 font-semibold">Cashier Declared Remaining Drawer (Carried Forward):</span>
                             <span className="font-mono font-bold text-emerald-400">
                               LKR {countedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
@@ -2166,7 +2177,7 @@ export default function CashReconciliationPage() {
                       </div>
 
                       {/* Verdict Banner */}
-                      <div className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold ${
+                      <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-bold ${
                         Math.abs(variance) < 0.01
                           ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
                           : variance < 0
@@ -2183,21 +2194,27 @@ export default function CashReconciliationPage() {
                             <>
                               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                               <span>
-                                SHORTAGE: -LKR {Math.abs(variance).toLocaleString('en-LK', { minimumFractionDigits: 2 })} — Deduct from {sh.cashier_name}&apos;s Daily Salary
+                                CASH SHORTAGE: -LKR {Math.abs(variance).toLocaleString('en-LK', { minimumFractionDigits: 2 })} (Salary Deduction = LKR {Math.abs(variance).toLocaleString('en-LK', { minimumFractionDigits: 2 })} for {sh.cashier_name})
                               </span>
                             </>
                           ) : (
                             <>
                               <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
                               <span>
-                                EXCESS: +LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })} — Recorded as Daily Extra Income
+                                EXTRA INCOME / EXCESS: +LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })} (Credited to Business)
                               </span>
                             </>
                           )}
                         </div>
 
-                        <span className="font-mono text-sm font-black shrink-0">
-                          Variance: {variance > 0 ? '+' : ''}LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                        <span className={`font-mono text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ${
+                          Math.abs(variance) < 0.01
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : variance < 0
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        }`}>
+                          {Math.abs(variance) < 0.01 ? 'BALANCED • ZERO VARIANCE' : variance < 0 ? 'SHORTAGE' : 'EXCESS'}: {variance > 0 ? '+' : ''}LKR {variance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
 

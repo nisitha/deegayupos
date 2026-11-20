@@ -3558,6 +3558,19 @@ export const shiftsApi = {
         }
       });
 
+      // Check if any prior closed shift exists for this branch to mark locked status
+      const { data: priorShift } = await supabase
+        .from('cashier_shifts')
+        .select('id, shift_number, closing_float, closing_drawer_float, counted_remaining_drawer_cash')
+        .eq('branch_id', branchId)
+        .eq('status', 'closed')
+        .order('ended_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const hasLockedOpeningFloat = !!priorShift;
+      const previousShiftLabel = priorShift ? formatShiftLabel(priorShift.shift_number) : undefined;
+
       return {
         success: true,
         data: {
@@ -3568,8 +3581,8 @@ export const shiftsApi = {
           cashierName,
           shiftDate: openShift.shift_date,
           shiftNumber: openShift.shift_number || 1,
-          hasLockedOpeningFloat: (openShift.shift_number || 1) > 1,
-          previousShiftLabel: (openShift.shift_number || 1) > 1 ? formatShiftLabel((openShift.shift_number || 2) - 1) : undefined,
+          hasLockedOpeningFloat,
+          previousShiftLabel,
           startedAt: openShift.started_at,
           endedAt: openShift.ended_at,
           status: 'open',
@@ -3629,7 +3642,7 @@ export const shiftsApi = {
 
       const shiftNumber = (closedCount || 0) + 1;
 
-      // Find previous closed shift for this branch
+      // Find previous closed shift for this branch (whether same-day Shift B/C or next-day Shift A)
       const { data: prevShift } = await supabase
         .from('cashier_shifts')
         .select('id, shift_number, closing_drawer_float, closing_float, counted_remaining_drawer_cash')
@@ -3639,19 +3652,16 @@ export const shiftsApi = {
         .limit(1)
         .maybeSingle();
 
-      const carriedOpeningFloat =
-        shiftNumber > 1 && prevShift
-          ? Number(
-            prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
-          )
-          : 0;
+      const carriedOpeningFloat = prevShift
+        ? Math.round(
+            Number(
+              prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
+            ) * 100
+          ) / 100
+        : 0;
 
-      const hasLockedOpeningFloat = shiftNumber > 1 && !!prevShift;
-      const previousShiftLabel = prevShift
-        ? formatShiftLabel(prevShift.shift_number)
-        : shiftNumber > 1
-          ? formatShiftLabel(shiftNumber - 1)
-          : undefined;
+      const hasLockedOpeningFloat = !!prevShift;
+      const previousShiftLabel = prevShift ? formatShiftLabel(prevShift.shift_number) : undefined;
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
@@ -4067,10 +4077,12 @@ export const shiftsApi = {
       // 3. Exact Shift Cash Tally Math & Financial Adjustments
       const openingFloat = Number(payload.openingFloat || 0);
       const systemPosCashSales = Number(
-        payload.declaredShiftSale > 0 ? payload.declaredShiftSale : posCash
+        payload.declaredShiftSale !== undefined && payload.declaredShiftSale >= 0
+          ? payload.declaredShiftSale
+          : posCash
       );
       const specialStockSalesTotal = modakaTotalAmount;
-      const totalCashInflow = openingFloat + systemPosCashSales + specialStockSalesTotal;
+      const totalCashInflow = Math.round((openingFloat + systemPosCashSales + specialStockSalesTotal) * 100) / 100;
 
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
@@ -4083,18 +4095,21 @@ export const shiftsApi = {
       }
 
       // Expected Remaining Drawer Cash = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
-      const expectedRemainingDrawerCash =
-        totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount;
+      const expectedRemainingDrawerCash = Math.round(
+        (totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount) * 100
+      ) / 100;
 
       // Counted Remaining Drawer Cash = entered directly in Tab 3 (physical cash left in drawer)
-      const countedRemainingDrawerCash = Number(
-        payload.countedRemainingDrawerCash !== undefined
-          ? payload.countedRemainingDrawerCash
-          : payload.countedDrawerCash || 0
-      );
+      const countedRemainingDrawerCash = Math.round(
+        Number(
+          payload.countedRemainingDrawerCash !== undefined
+            ? payload.countedRemainingDrawerCash
+            : payload.countedDrawerCash || 0
+        ) * 100
+      ) / 100;
 
       // Cash Variance = Counted Remaining Drawer Cash - Expected Remaining Drawer Cash
-      const cashVariance = countedRemainingDrawerCash - expectedRemainingDrawerCash;
+      const cashVariance = Math.round((countedRemainingDrawerCash - expectedRemainingDrawerCash) * 100) / 100;
 
       // Carry-Forward to Next Shift: Save closing_float = Counted Remaining Drawer Cash
       const closingFloat = countedRemainingDrawerCash;
@@ -4105,10 +4120,10 @@ export const shiftsApi = {
       let salaryDeductionAmount = 0;
       let extraIncomeAmount = 0;
 
-      if (cashVariance < 0) {
+      if (cashVariance < -0.01) {
         tallyStatus = 'shortage';
         salaryDeductionAmount = Math.abs(cashVariance);
-      } else if (cashVariance > 0) {
+      } else if (cashVariance > 0.01) {
         tallyStatus = 'excess';
         extraIncomeAmount = cashVariance;
       } else {
@@ -4236,6 +4251,29 @@ export const shiftsApi = {
           data: null as any,
           error: { code: 'UPDATE_ERROR', message: updateErr.message, statusCode: 500 },
         };
+      }
+
+      // Sync daily_cash_reconciliations if a record exists for this branch and shift date
+      try {
+        const { data: recRow } = await supabase
+          .from('daily_cash_reconciliations')
+          .select('id')
+          .eq('branch_id', payload.branchId)
+          .eq('reconciliation_date', shiftDate)
+          .maybeSingle();
+
+        if (recRow?.id) {
+          await supabase
+            .from('daily_cash_reconciliations')
+            .update({
+              closing_cash_f: closingFloat,
+              physical_cash_c: closingFloat,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', recRow.id);
+        }
+      } catch (recErr) {
+        console.warn('[shiftsApi] daily_cash_reconciliations sync warning:', recErr);
       }
 
       return {

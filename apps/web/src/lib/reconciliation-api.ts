@@ -552,6 +552,47 @@ export const reconciliationApi = {
           }
         }
 
+        const openingF = Number(sh.opening_float || 0);
+        const specialStockAmt = Number(sh.modaka_total_amount || 0);
+        const goodsPaid = Number(sh.goods_purchased_paid || 0);
+        const expenses = Number(sh.other_expenses || 0);
+        const banked = Number(sh.banked_amount || 0);
+
+        // Expected Remaining Drawer Cash: round2((opening + pos_cash + special) - (purchases + expenses + banked))
+        const expectedRemainingCash = Math.round(
+          ((openingF + posCash + specialStockAmt) - (goodsPaid + expenses + banked)) * 100
+        ) / 100;
+
+        // Cashier Declared Remaining Drawer: round2(closing_float)
+        const declaredRemainingCash = Math.round(
+          Number(sh.closing_float ?? sh.closing_drawer_float ?? sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash ?? 0) * 100
+        ) / 100;
+
+        // Variance: round2(declared - expected)
+        const variance = sh.status === 'closed'
+          ? Math.round((declaredRemainingCash - expectedRemainingCash) * 100) / 100
+          : 0;
+
+        let tallyStatus = sh.tally_status || (sh.status === 'closed' ? 'balanced' : 'open');
+        let salaryDeduction = Number(sh.salary_deduction_amount) || 0;
+        let extraIncome = Number(sh.extra_income_amount) || 0;
+
+        if (sh.status === 'closed') {
+          if (variance < -0.01) {
+            tallyStatus = 'shortage';
+            salaryDeduction = Math.abs(variance);
+            extraIncome = 0;
+          } else if (variance > 0.01) {
+            tallyStatus = 'excess';
+            extraIncome = variance;
+            salaryDeduction = 0;
+          } else {
+            tallyStatus = 'balanced';
+            salaryDeduction = 0;
+            extraIncome = 0;
+          }
+        }
+
         return {
           id: sh.id,
           shift_number: Number(sh.shift_number) || 1,
@@ -571,21 +612,21 @@ export const reconciliationApi = {
           pos_gross_sales: posGross,
           modaka_total_sold_qty: Number(sh.modaka_total_sold_qty) || 0,
           modaka_total_amount: Number(sh.modaka_total_amount) || 0,
-          opening_float: Number(sh.opening_float) || 0,
+          opening_float: openingF,
           declared_shift_sale: Number(sh.declared_shift_sale) || posCash,
-          total_cash_available: Number(sh.total_cash_available) || 0,
-          goods_purchased_paid: Number(sh.goods_purchased_paid) || 0,
-          other_expenses: Number(sh.other_expenses) || 0,
-          expected_cash_before_bank: Number(sh.expected_cash_before_bank) || 0,
-          counted_drawer_cash: Number(sh.counted_drawer_cash) || 0,
-          banked_amount: Number(sh.banked_amount) || 0,
-          closing_drawer_float: Number(sh.closing_drawer_float) || 0,
-          cash_variance: Number(sh.cash_variance) || 0,
-          expected_remaining_drawer_cash: Number(sh.expected_remaining_drawer_cash ?? sh.expected_cash_before_bank) || 0,
-          counted_remaining_drawer_cash: Number(sh.counted_remaining_drawer_cash ?? sh.counted_drawer_cash) || 0,
-          tally_status: sh.tally_status || 'open',
-          salary_deduction_amount: Number(sh.salary_deduction_amount) || 0,
-          extra_income_amount: Number(sh.extra_income_amount) || 0,
+          total_cash_available: Math.round((openingF + posCash + specialStockAmt) * 100) / 100,
+          goods_purchased_paid: goodsPaid,
+          other_expenses: expenses,
+          expected_cash_before_bank: Math.round(((openingF + posCash + specialStockAmt) - (goodsPaid + expenses)) * 100) / 100,
+          counted_drawer_cash: declaredRemainingCash,
+          banked_amount: banked,
+          closing_drawer_float: declaredRemainingCash,
+          cash_variance: variance,
+          expected_remaining_drawer_cash: expectedRemainingCash,
+          counted_remaining_drawer_cash: declaredRemainingCash,
+          tally_status: tallyStatus,
+          salary_deduction_amount: salaryDeduction,
+          extra_income_amount: extraIncome,
           denominations_json: (sh.denominations_json || {}) as Record<string, number>,
           handover_notes: sh.handover_notes || null,
         };

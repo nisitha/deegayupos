@@ -14,7 +14,6 @@ import {
   LogOut,
   Layers,
   Banknote,
-  RotateCcw,
   ChevronDown,
   ChevronUp,
   RefreshCw,
@@ -128,11 +127,24 @@ export function ShiftEndModal({
   const [isRefreshingSales, setIsRefreshingSales] = useState<boolean>(false);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
-  const [remainingDrawerCash, setRemainingDrawerCash] = useState<number>(0);
-  const [isDrawerManuallyEdited, setIsDrawerManuallyEdited] = useState<boolean>(false);
+  const [countedRemainingCashInput, setCountedRemainingCashInput] = useState<string>('');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
+
+  const enteredRemainingCash = useMemo(() => {
+    const trimmed = countedRemainingCashInput.trim();
+    if (!trimmed) return 0;
+    const num = Number(trimmed);
+    return !isNaN(num) && num >= 0 ? Math.round(num * 100) / 100 : 0;
+  }, [countedRemainingCashInput]);
+
+  const isRemainingCashValid = useMemo(() => {
+    const trimmed = countedRemainingCashInput.trim();
+    if (!trimmed) return false;
+    const num = Number(trimmed);
+    return !isNaN(num) && num >= 0;
+  }, [countedRemainingCashInput]);
 
   const isInitialZeroFloat = Number(localShift?.openingFloat || activeShift?.openingFloat || 0) === 0;
   const isLockedOpeningFloat = Boolean(
@@ -155,7 +167,7 @@ export function ShiftEndModal({
     setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMessage(null);
-    setIsDrawerManuallyEdited(false);
+    setCountedRemainingCashInput('');
 
     const initShift = async () => {
       let shift = activeShift;
@@ -361,42 +373,6 @@ export function ShiftEndModal({
     return openingFloat + declaredShiftSale + modakaSalesTotal;
   }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
 
-  // 2. Expected Remaining Drawer Cash (Closing Float) = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - denominationsTotal
-  const expectedClosingDrawerFloat = useMemo(() => {
-    return Math.max(
-      0,
-      Number(
-        (
-          totalCashInflow -
-          goodsPurchasedPaid -
-          otherExpenses -
-          denominationsTotal
-        ).toFixed(2)
-      )
-    );
-  }, [totalCashInflow, goodsPurchasedPaid, otherExpenses, denominationsTotal]);
-
-  // Auto-sync remainingDrawerCash to expectedClosingDrawerFloat unless manually overridden
-  useEffect(() => {
-    if (!isDrawerManuallyEdited) {
-      setRemainingDrawerCash(expectedClosingDrawerFloat);
-    }
-  }, [expectedClosingDrawerFloat, isDrawerManuallyEdited]);
-
-  // 3. Expected Remaining Drawer Cash for variance comparison
-  const expectedRemainingDrawerCash = useMemo(() => {
-    return totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount;
-  }, [totalCashInflow, goodsPurchasedPaid, otherExpenses, bankedAmount]);
-
-  // 4. Cash Variance = Counted Remaining Drawer Cash - Expected Remaining Drawer Cash
-  const cashVariance = useMemo(() => {
-    return remainingDrawerCash - expectedRemainingDrawerCash;
-  }, [remainingDrawerCash, expectedRemainingDrawerCash]);
-
-  // 5. Carry-Forward Float for next shift: Save closing_float = remainingDrawerCash
-  const closingDrawerFloat = useMemo(() => {
-    return remainingDrawerCash;
-  }, [remainingDrawerCash]);
 
   if (!isOpen) return null;
   const currentShift = activeShift || localShift;
@@ -479,6 +455,14 @@ export function ShiftEndModal({
       return;
     }
 
+    if (!isRemainingCashValid) {
+      setErrorMessage('Please enter a valid numeric amount for Remaining Cash Left in Drawer.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const countedCash = Math.round(Number(countedRemainingCashInput) * 100) / 100;
+
     let selectedBankStr = '';
     if (bankedAmount > 0) {
       const foundBank = bankAccounts.find((b) => b.id === selectedBankId);
@@ -501,9 +485,9 @@ export function ShiftEndModal({
       otherExpenses,
       bankedAmount: denominationsTotal,
       bankAccountDetails: selectedBankStr,
-      countedDrawerCash: remainingDrawerCash,
-      countedRemainingDrawerCash: remainingDrawerCash,
-      closingDrawerFloat,
+      countedDrawerCash: countedCash,
+      countedRemainingDrawerCash: countedCash,
+      closingDrawerFloat: countedCash,
       denominationsJson: counts,
       handoverNotes: handoverNotes.trim(),
       modakaEntries: modakaRows.map((r) => ({
@@ -596,7 +580,9 @@ export function ShiftEndModal({
                 id: 'SUMMARY',
                 stepNum: '03',
                 label: 'Cash & Reconciliation',
-                badge: `Next Float: LKR ${remainingDrawerCash.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+                badge: isRemainingCashValid
+                  ? `Next Float: LKR ${enteredRemainingCash.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                  : 'Manual Entry',
                 icon: Receipt,
               },
             ].map((step) => {
@@ -1245,33 +1231,14 @@ export function ShiftEndModal({
                         )}
                       </div>
 
-                      {/* Remaining Cash Left in Drawer */}
+                      {/* Remaining Cash Left in Drawer (Strict Blind Manual Input) */}
                       <div className="flex items-center justify-between gap-3 pt-1">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[15px] text-slate-900 block">
-                              Remaining Cash Left in Drawer
-                            </span>
-                            {isDrawerManuallyEdited ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsDrawerManuallyEdited(false);
-                                  setRemainingDrawerCash(expectedClosingDrawerFloat);
-                                }}
-                                className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-0.5 bg-emerald-50 border border-emerald-300 rounded-md transition-colors cursor-pointer flex items-center gap-1"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>Reset to Auto</span>
-                              </button>
-                            ) : (
-                              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                                Auto-Calculated
-                              </span>
-                            )}
-                          </div>
+                          <span className="font-semibold text-[15px] text-slate-900 block">
+                            Remaining Cash Left in Drawer (LKR)
+                          </span>
                           <span className="text-xs text-slate-500 block mt-0.5">
-                            Physical cash remaining in drawer after removing bank deposit
+                            Count physical cash remaining in drawer after bank deposit and enter exact total
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -1279,13 +1246,11 @@ export function ShiftEndModal({
                           <input
                             type="number"
                             step="0.01"
+                            min="0"
                             inputMode="decimal"
                             placeholder="0.00"
-                            value={remainingDrawerCash || ''}
-                            onChange={(e) => {
-                              setIsDrawerManuallyEdited(true);
-                              setRemainingDrawerCash(parseFloat(e.target.value) || 0);
-                            }}
+                            value={countedRemainingCashInput}
+                            onChange={(e) => setCountedRemainingCashInput(e.target.value)}
                             className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-emerald-50/40 text-emerald-950 border border-emerald-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
                           />
                         </div>
@@ -1295,79 +1260,16 @@ export function ShiftEndModal({
                       <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white flex items-center justify-between shadow-md">
                         <div>
                           <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-100 block">
-                            CLOSING DRAWER FLOAT (CARRIED TO NEXT SHIFT)
+                            DECLARED CLOSING DRAWER FLOAT (CARRIED TO NEXT SHIFT)
                           </span>
                           <span className="text-xs text-emerald-100 font-medium block mt-0.5">
                             Auto carries forward as next shift Opening Float
                           </span>
                         </div>
                         <span className="text-2xl sm:text-3xl font-black font-mono text-white tabular-nums">
-                          LKR {remainingDrawerCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          LKR {enteredRemainingCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
-
-                      {/* Drawer Tally Variance & Metrics (Exclusively visible to OWNER) */}
-                      {isOwner && (
-                        <div className="space-y-3 pt-2">
-                          {/* Expected Remaining Drawer Cash */}
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-200 font-bold">
-                            <div>
-                              <span className="text-amber-900 block text-xs sm:text-sm">
-                                Expected Remaining Drawer Cash:
-                              </span>
-                              <span className="text-[11px] text-amber-700 font-medium">
-                                Total Inflow - Purchases - Expenses - Bank Deposit
-                              </span>
-                            </div>
-                            <span className="font-mono text-lg font-bold text-amber-900">
-                              LKR {expectedRemainingDrawerCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-
-                          {/* Cash Variance Display & Automatic Action Notice */}
-                          <div
-                            className={`p-3.5 rounded-xl font-bold border transition-all ${
-                              cashVariance === 0
-                                ? 'bg-slate-50 text-slate-800 border-slate-200'
-                                : cashVariance > 0
-                                ? 'bg-emerald-50 text-emerald-900 border-emerald-200 shadow-2xs'
-                                : 'bg-rose-50 text-rose-900 border-rose-200 shadow-2xs'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs uppercase tracking-wider">
-                                Cash Variance:{' '}
-                                {cashVariance === 0
-                                  ? 'Balanced'
-                                  : cashVariance > 0
-                                  ? 'Excess / Over (+)'
-                                  : 'Shortage / Deficit (-)'}
-                              </span>
-                              <span className="font-mono text-lg font-bold">
-                                {cashVariance > 0 ? '+' : ''}
-                                LKR {cashVariance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div className="text-xs font-medium mt-1.5">
-                              {cashVariance === 0 && (
-                                <span className="text-emerald-700">
-                                  ✓ Drawer cash tallies perfectly with calculated expectation.
-                                </span>
-                              )}
-                              {cashVariance < 0 && (
-                                <span className="text-rose-700 font-semibold">
-                                  ⚠️ Shortage of LKR {Math.abs(cashVariance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} will be automatically recorded as a Salary Deduction for {cashierName}.
-                                </span>
-                              )}
-                              {cashVariance > 0 && (
-                                <span className="text-emerald-700 font-semibold">
-                                  ✓ Excess of LKR {cashVariance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} will be automatically recorded as Extra Income for the business.
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Handover Notes */}
                       <div className="pt-2">
@@ -1376,7 +1278,7 @@ export function ShiftEndModal({
                         </label>
                         <textarea
                           rows={2}
-                          placeholder="Any notes for the next shift cashier or owner regarding shortages, cash, or branch inventory..."
+                          placeholder="Any notes for the next shift cashier or owner regarding cash or branch inventory..."
                           value={handoverNotes}
                           onChange={(e) => setHandoverNotes(e.target.value)}
                           className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/15"
@@ -1411,13 +1313,8 @@ export function ShiftEndModal({
                 Bank Deposit: <strong className="font-mono text-indigo-950 font-bold ml-1">LKR {denominationsTotal.toFixed(2)}</strong>
               </span>
               <span className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium text-xs sm:text-sm">
-                Next Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {remainingDrawerCash.toFixed(2)}</strong>
+                Next Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {enteredRemainingCash.toFixed(2)}</strong>
               </span>
-              {isOwner && (
-                <span className="hidden md:inline-flex px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-medium text-xs sm:text-sm">
-                  Expected: <strong className="font-mono text-slate-900 font-bold ml-1">LKR {expectedRemainingDrawerCash.toFixed(2)}</strong>
-                </span>
-              )}
             </div>
 
             {/* Right: Actions (Sticky Submit & Navigation) */}
@@ -1457,8 +1354,8 @@ export function ShiftEndModal({
                 <button
                   type="button"
                   onClick={handleFinalSubmit}
-                  disabled={isSubmitting}
-                  className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  disabled={isSubmitting || !isRemainingCashValid}
+                  className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
