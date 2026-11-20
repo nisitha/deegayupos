@@ -1,9 +1,9 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Grid,
   Lock,
   Mail,
   ArrowRight,
@@ -25,51 +25,6 @@ const ALL_BRANCH_IDS = [
   '197693d6-4247-48df-b614-6fcde9e34f7d',
 ];
 
-const PRESET_STAFF = [
-  {
-    name: 'Dr. Deegayu (Owner)',
-    email: 'owner@deegayu.pixelcraftlk.com',
-    role: 'OWNER',
-    branchLabel: 'All Branches • Full Admin',
-    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-  },
-  {
-    name: 'Shashini',
-    email: 'shashini@deegayu.pixelcraftlk.com',
-    role: 'STAFF',
-    branchLabel: 'Alawwa (Stock & GRN Officer)',
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-  {
-    name: 'Tharindu',
-    email: 'tharindu@deegayu.pixelcraftlk.com',
-    role: 'STAFF',
-    branchLabel: 'Alawwa & Dambadeniya (GRN Dambadeniya)',
-    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    name: 'Anusha',
-    email: 'anusha@deegayu.pixelcraftlk.com',
-    role: 'STAFF',
-    branchLabel: 'Dambadeniya (Staff Cashier)',
-    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
-  },
-  {
-    name: 'Kumari',
-    email: 'kumari@deegayu.pixelcraftlk.com',
-    role: 'STAFF',
-    branchLabel: 'Giriulla (Stock & GRN Officer)',
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-  {
-    name: 'Gindika',
-    email: 'gindika@deegayu.pixelcraftlk.com',
-    role: 'STAFF',
-    branchLabel: 'Giriulla (Staff Cashier)',
-    badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
-  },
-];
-
 interface PendingGateUser {
   userRecord?: any;
   email: string;
@@ -84,12 +39,10 @@ const MULTI_BRANCH_OPTIONS = [
   {
     id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
     name: 'Alawwa Branch',
-    nameSi: 'ඇලව්ව ශාඛාව',
     code: 'ALW-01',
     address: 'Deegayu Weda Madhura, Alawwa Road, Alawwa',
     phone: '037-2241088',
     rolesBadge: 'POS Billing & Daily Cash Reconciliation',
-    rolesBadgeSi: 'POS බිල්පත් සහ දෛනික මුදල් සමථකරණය',
     canGrn: false,
     colorScheme: 'from-blue-600 to-indigo-700',
     borderHover: 'hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20',
@@ -98,12 +51,10 @@ const MULTI_BRANCH_OPTIONS = [
   {
     id: 'fa68e4a0-a515-44c8-a082-5b5590366658',
     name: 'Dambadeniya Branch',
-    nameSi: 'දඹදෙණිය ශාඛාව',
     code: 'DMB-01',
     address: 'Deegayu Weda Madhura, Kurunegala Road, Dambadeniya',
     phone: '037-2287411',
     rolesBadge: 'POS Billing, Cash Reconciliation & Supplier GRN Officer',
-    rolesBadgeSi: 'POS බිල්පත්, දෛනික මුදල් සමථකරණය සහ සැපයුම්කරු GRN නිලධාරී',
     canGrn: true,
     colorScheme: 'from-emerald-600 to-teal-700',
     borderHover: 'hover:border-emerald-500 hover:ring-2 hover:ring-emerald-500/20',
@@ -115,7 +66,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   const [authMode, setAuthMode] = useState<'password' | 'pin'>('password');
-  const [email, setEmail] = useState('owner@deegayu.pixelcraftlk.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -418,7 +369,7 @@ export default function LoginPage() {
 
         let authUserRecord: any = null;
 
-        // 1. Primary: Authenticate with Supabase Auth GoTrue
+        // 1. Primary: Authenticate with Auth GoTrue
         const { data: authData, error: authErr } =
           await supabase.auth.signInWithPassword({
             email: cleanEmail,
@@ -426,7 +377,6 @@ export default function LoginPage() {
           });
 
         if (!authErr && authData?.user) {
-          // Fetch user profile with RLS active
           try {
             const { data: uData } = await supabase
               .from('users')
@@ -445,7 +395,7 @@ export default function LoginPage() {
             };
           }
         } else {
-          // If GoTrue returned genuine invalid credentials
+          // If GoTrue returned invalid credentials
           if (authErr && authErr.message === 'Invalid login credentials') {
             const nextFailed = failedAttempts + 1;
             setFailedAttempts(nextFailed);
@@ -476,7 +426,7 @@ export default function LoginPage() {
               throw new Error('Too many failed login attempts. Terminal locked for 30 seconds.');
             }
             if (authErr?.message?.toLowerCase().includes('api key')) {
-              throw new Error('Authentication gateway error: Invalid or missing Supabase API key.');
+              throw new Error('Authentication gateway error: Invalid or missing API key.');
             }
             throw new Error('Invalid email or password.');
           }
@@ -524,60 +474,56 @@ export default function LoginPage() {
     }
   };
 
-  const handleFillPreset = (staff: typeof PRESET_STAFF[0]) => {
-    setEmail(staff.email);
-    setPassword('');
-    setPin('');
-    setError(null);
-  };
-
   return (
-    <div className="min-h-screen w-full bg-[#F4F6F9] flex flex-col items-center justify-center p-4 selection:bg-[#005BD3] selection:text-white">
-      {/* Background radial soft ambient glow */}
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 px-4 py-8 selection:bg-indigo-600 selection:text-white">
+      {/* Background ambient decorative glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-blue-100/60 blur-[100px] rounded-full" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[650px] h-[380px] bg-indigo-100/50 blur-[110px] rounded-full" />
       </div>
 
       {pendingGateUser ? (
         <div className="w-full max-w-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
           {/* Brand Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#005BD3] text-white shadow-lg shadow-blue-500/25 mb-3 group hover:scale-105 transition-transform">
-              <Grid className="w-6 h-6" />
+            <div className="flex justify-center mb-3">
+              <div className="w-20 h-20 rounded-2xl shadow-md border border-slate-200/80 bg-white p-1.5 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/deegayu-dp.png"
+                  alt="Deegayu Weda Madhura"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              PixelCraft <span className="text-[#005BD3]">POS</span>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">
+              Deegayu Weda Madhura
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Multi-Branch Cashier Decision Terminal
+            <p className="text-xs font-semibold text-slate-500 mt-1">
+              Multi-Branch Cashier Authorization Gate
             </p>
           </div>
 
           {/* Decision Gate Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08)] p-6 sm:p-8">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/70 p-6 sm:p-8">
             <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60 mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 mb-2">
                 <Store className="w-3.5 h-3.5" />
                 <span>Multi-Branch Authorization Gate</span>
               </div>
               <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
                 Select Active Shop / Branch
               </h2>
-              <p className="text-sm font-bold text-[#005BD3] mt-0.5">
-                ක්‍රියාකාරී ශාඛාව තෝරන්න
-              </p>
               <p className="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
                 Welcome back, <strong className="text-slate-900 font-bold">{pendingGateUser.name}</strong>. You are authorized to operate at 2 branches. Please select the shop you are operating today:
               </p>
             </div>
 
-            {/* 2 Interactive Branch Selection Cards */}
+            {/* Interactive Branch Selection Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               {MULTI_BRANCH_OPTIONS.map((opt) => (
                 <div
                   key={opt.id}
                   onClick={() => selectBranchAndProceed(opt.id, opt.name)}
-                  className="group relative flex flex-col justify-between p-5 rounded-2xl border-2 border-slate-200 hover:border-[#005BD3] bg-slate-50/60 hover:bg-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer text-left"
+                  className="group relative flex flex-col justify-between p-5 rounded-2xl border-2 border-slate-200 hover:border-indigo-600 bg-slate-50/60 hover:bg-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer text-left"
                 >
                   <div>
                     {/* Top row: badge & code */}
@@ -597,13 +543,10 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    {/* Branch Title & Sinhala */}
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
+                    {/* Branch Title */}
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                       {opt.name}
                     </h3>
-                    <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                      {opt.nameSi}
-                    </p>
 
                     {/* Address */}
                     <div className="mt-3 text-[11px] text-slate-500 flex items-start gap-1.5">
@@ -619,9 +562,6 @@ export default function LoginPage() {
                       <div className="text-xs font-semibold text-slate-700 leading-snug">
                         {opt.rolesBadge}
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {opt.rolesBadgeSi}
-                      </div>
                     </div>
                   </div>
 
@@ -630,7 +570,7 @@ export default function LoginPage() {
                     <button
                       type="button"
                       disabled={loading}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-slate-900 group-hover:bg-[#005BD3] text-white shadow-sm transition-all"
+                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-slate-900 group-hover:bg-indigo-600 text-white shadow-sm transition-all"
                     >
                       <span>Enter {opt.name.replace(' Branch', '')}</span>
                       <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -658,29 +598,35 @@ export default function LoginPage() {
       ) : (
         <div className="w-full max-w-md relative z-10">
           {/* Brand Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#005BD3] text-white shadow-lg shadow-blue-500/25 mb-3 group hover:scale-105 transition-transform">
-              <Grid className="w-6 h-6" />
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="flex justify-center mb-3">
+              <div className="w-20 h-20 rounded-2xl shadow-md border border-slate-200/80 bg-white p-1.5 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/deegayu-dp.png"
+                  alt="Deegayu Weda Madhura"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              PixelCraft <span className="text-[#005BD3]">POS</span>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">
+              Deegayu Weda Madhura
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Enterprise Cloud Point-of-Sale Terminal
+            <p className="text-xs font-semibold text-slate-500 mt-1">
+              Ayurvedic Pharmacy & Retail Management System
             </p>
           </div>
 
           {/* Main Login Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.05)] p-6 sm:p-8">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/70 p-7 sm:p-8">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div>
                 <h2 className="text-base font-bold text-slate-900">Terminal Sign In</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Authorized Cashier & Admin Access
+                  Authorized Staff & Admin Access
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-[#005BD3] border border-blue-200/60">
-                <Store className="w-3 h-3" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs">
+                <Store className="w-3.5 h-3.5" />
                 Deegayu
               </span>
             </div>
@@ -693,7 +639,7 @@ export default function LoginPage() {
                   setAuthMode('password');
                   setError(null);
                 }}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   authMode === 'password'
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -708,7 +654,7 @@ export default function LoginPage() {
                   setAuthMode('pin');
                   setError(null);
                 }}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   authMode === 'pin'
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -748,10 +694,11 @@ export default function LoginPage() {
                       <input
                         type="email"
                         required
+                        autoComplete="off"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@business.lk"
-                        className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
+                        placeholder="Enter your staff email"
+                        className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 focus:bg-white transition-all font-medium"
                       />
                     </div>
                   </div>
@@ -766,15 +713,17 @@ export default function LoginPage() {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        autoComplete="off"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all font-medium"
+                        placeholder="Enter your password"
+                        className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 focus:bg-white transition-all font-medium"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                        title={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? (
                           <EyeOff className="w-4 h-4" />
@@ -797,10 +746,11 @@ export default function LoginPage() {
                       type="password"
                       maxLength={6}
                       required
+                      autoComplete="off"
                       value={pin}
                       onChange={(e) => setPin(e.target.value)}
                       placeholder="••••"
-                      className="w-full pl-10 pr-4 py-3 text-center tracking-widest text-lg font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005BD3]/20 focus:border-[#005BD3] focus:bg-white transition-all"
+                      className="w-full pl-10 pr-4 py-3 text-center tracking-widest text-lg font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 focus:bg-white transition-all"
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 text-center mt-1.5">
@@ -813,7 +763,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || lockoutTimer > 0}
-                className="w-full mt-2 py-3 rounded-xl bg-[#005BD3] hover:bg-[#004bb5] text-white font-semibold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                className="w-full mt-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {lockoutTimer > 0 ? (
                   <span>Terminal Locked ({lockoutTimer}s)</span>
@@ -834,52 +784,11 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Quick Staff Team 1-Click Selectors */}
-            <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Authorized Branch Team
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  Select staff account
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
-                {PRESET_STAFF.map((staff) => (
-                  <button
-                    key={staff.email}
-                    type="button"
-                    onClick={() => handleFillPreset(staff)}
-                    className="w-full py-2 px-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-left transition-all flex items-center justify-between group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 group-hover:border-blue-400">
-                        {staff.name[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[11px] font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors truncate">
-                          {staff.name}
-                        </div>
-                        <div className="text-[10px] text-slate-500 truncate">
-                          {staff.branchLabel}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-semibold">
-                        {staff.role}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
-          {/* Footer Notice */}
-          <div className="text-center mt-6 text-xs text-slate-400 font-mono">
-            <span>Protected by Row Level Security (RLS) • Multi-Tenant Partition</span>
+          {/* Clean Corporate Footer Notice */}
+          <div className="text-center mt-6 text-xs text-slate-500 font-medium">
+            <span>© 2026 Deegayu Weda Madhura • Authorized Staff Portal</span>
           </div>
         </div>
       )}
