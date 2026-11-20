@@ -218,7 +218,7 @@ export function ShiftEndModal({
             productName: e.productName || 'Special Item',
             productSku: e.productSku || '',
             openingQty: open,
-            inQty: Number(e.inQty || 0),
+            inQty: Number(e.inQty || 0) > 0 ? Math.round(Number(e.inQty || 0) / 25) : 0,
             soldQty: Number(e.soldQty || 0),
             appliedRate: Number(e.appliedRate || 250),
           };
@@ -328,12 +328,13 @@ export function ShiftEndModal({
     let sumF = 0;
 
     modakaRows.forEach((r) => {
-      const c = r.openingQty + r.inQty;
-      const e = c - r.soldQty;
+      const actualStockInUnits = Math.max(0, Math.floor(Number(r.inQty) || 0)) * 25;
+      const c = r.openingQty + actualStockInUnits;
+      const e = Math.max(0, c - r.soldQty);
       const f = r.soldQty * r.appliedRate;
 
       sumA += r.openingQty;
-      sumB += r.inQty;
+      sumB += actualStockInUnits;
       sumC += c;
       sumD += r.soldQty;
       sumE += e;
@@ -480,7 +481,7 @@ export function ShiftEndModal({
       modakaEntries: modakaRows.map((r) => ({
         productId: r.productId,
         openingQty: r.openingQty,
-        inQty: r.inQty,
+        inQty: Math.max(0, Math.floor(Number(r.inQty) || 0)) * 25,
         soldQty: r.soldQty,
         appliedRate: r.appliedRate,
       })),
@@ -580,17 +581,15 @@ export function ShiftEndModal({
                   key={step.id}
                   type="button"
                   onClick={() => setActiveTab(step.id as any)}
-                  className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/90'
-                  }`}
+                  className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${isActive
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/90'
+                    }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs shrink-0 ${
-                        isActive ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}
+                      className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs shrink-0 ${isActive ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
                     >
                       {step.stepNum}
                     </span>
@@ -599,18 +598,16 @@ export function ShiftEndModal({
                         {step.label}
                       </span>
                       <span
-                        className={`text-[11px] font-mono block truncate ${
-                          isActive ? 'text-indigo-200' : 'text-slate-500'
-                        }`}
+                        className={`text-[11px] font-mono block truncate ${isActive ? 'text-indigo-200' : 'text-slate-500'
+                          }`}
                       >
                         {step.badge}
                       </span>
                     </div>
                   </div>
                   <Icon
-                    className={`w-4 h-4 shrink-0 hidden md:block ${
-                      isActive ? 'text-indigo-400' : 'text-slate-400'
-                    }`}
+                    className={`w-4 h-4 shrink-0 hidden md:block ${isActive ? 'text-indigo-400' : 'text-slate-400'
+                      }`}
                   />
                 </button>
               );
@@ -699,8 +696,9 @@ export function ShiftEndModal({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {modakaRows.map((row, idx) => {
-                          const totalAvail = row.openingQty + row.inQty;
-                          const closing = totalAvail - row.soldQty;
+                          const actualStockInUnits = Math.max(0, Math.floor(Number(row.inQty) || 0)) * 25;
+                          const totalAvail = row.openingQty + actualStockInUnits;
+                          const closing = Math.max(0, totalAvail - row.soldQty);
                           const lineSales = row.soldQty * row.appliedRate;
                           return (
                             <tr key={row.productId} className="hover:bg-slate-50/80 transition-colors">

@@ -163,7 +163,7 @@ export function ModakaStockInModal({
   };
 
   const totalInQty = Object.values(inQuantities).reduce(
-    (acc, v) => acc + (parseInt(v, 10) || 0),
+    (acc, v) => acc + (parseInt(v, 10) || 0) * 25,
     0
   );
 
@@ -207,7 +207,7 @@ export function ModakaStockInModal({
       const updates = Object.entries(inQuantities)
         .map(([productId, qtyStr]) => ({
           productId,
-          inQty: parseInt(qtyStr, 10) || 0,
+          inQty: Math.max(0, parseInt(qtyStr, 10) || 0) * 25,
         }))
         .filter((u) => u.inQty > 0);
 
@@ -296,8 +296,9 @@ export function ModakaStockInModal({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {items.map((item, idx) => {
-                      const entering = parseInt(inQuantities[item.productId] || '0', 10);
-                      const totalIn = item.currentInQty + entering;
+                      const enteringPacks = parseInt(inQuantities[item.productId] || '0', 10) || 0;
+                      const enteringUnits = Math.max(0, enteringPacks) * 25;
+                      const totalIn = item.currentInQty + enteringUnits;
                       const newTotalAvail = item.openingQty + totalIn;
 
                       return (
