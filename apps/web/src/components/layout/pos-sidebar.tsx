@@ -32,6 +32,7 @@ import {
   Briefcase,
   ChevronLeft,
   ChevronRight,
+  ArrowLeftRight,
   X,
 } from 'lucide-react';
 import { useTenantBranch } from '../../context/tenant-branch-context';
@@ -64,6 +65,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Sales & Bills', href: '/dashboard/orders', icon: Receipt },
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
       { name: 'Branch Inventory', href: '/dashboard/inventory', icon: Boxes },
+      { name: 'Stock Transfers', href: '/dashboard/inventory/transfers', icon: ArrowLeftRight },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
       { name: 'Special Stock & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
