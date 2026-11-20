@@ -303,14 +303,26 @@ export const payrollAttendanceApi = {
 // 4. PAYROLL RUNS API
 // ============================================================================
 
+export interface DetailedPayrollRun extends PayrollRun {
+  employee_name?: string;
+  emp_code?: string;
+  employee_nic?: string;
+  salary_type?: string;
+  branch_name?: string;
+  normal_daily_rate?: number;
+  holiday_daily_rate?: number;
+  basic_salary?: number;
+  epf_etf_eligible?: boolean;
+}
+
 export const payrollRunsApi = {
   /**
-   * Fetches all payroll runs for a given month (YYYY-MM).
+   * Fetches all payroll runs for a given month (YYYY-MM) with full employee and branch details.
    */
-  getByMonth: async (monthYear: string): Promise<(PayrollRun & { employee_name?: string; emp_code?: string; salary_type?: string })[]> => {
+  getByMonth: async (monthYear: string): Promise<DetailedPayrollRun[]> => {
     const { data, error } = await supabase
       .from('payroll_runs')
-      .select('*, payroll_employees(id, emp_code, full_name, salary_type)')
+      .select('*, payroll_employees(id, emp_code, full_name, nic, phone, salary_type, normal_daily_rate, holiday_daily_rate, basic_salary, epf_etf_eligible, branch_id, branches(id, name, code))')
       .eq('month_year', monthYear)
       .order('created_at', { ascending: false });
 
@@ -319,12 +331,21 @@ export const payrollRunsApi = {
       throw error;
     }
 
-    return (data || []).map((row: any) => ({
-      ...row,
-      employee_name: row.payroll_employees?.full_name,
-      emp_code: row.payroll_employees?.emp_code,
-      salary_type: row.payroll_employees?.salary_type,
-    }));
+    return (data || []).map((row: any) => {
+      const emp = row.payroll_employees;
+      return {
+        ...row,
+        employee_name: emp?.full_name,
+        emp_code: emp?.emp_code,
+        employee_nic: emp?.nic || '',
+        salary_type: emp?.salary_type || 'DAILY',
+        branch_name: emp?.branches?.name || 'Main Dispensary',
+        normal_daily_rate: emp?.normal_daily_rate ? Number(emp.normal_daily_rate) : 1200,
+        holiday_daily_rate: emp?.holiday_daily_rate ? Number(emp.holiday_daily_rate) : 2800,
+        basic_salary: emp?.basic_salary ? Number(emp.basic_salary) : 0,
+        epf_etf_eligible: emp?.epf_etf_eligible !== false,
+      };
+    });
   },
 
   /**
@@ -419,18 +440,91 @@ export const payrollRunsApi = {
   },
 
   /**
-   * Marks a payroll run as PAID.
+   * Updates advances and recalculates net salary for a run.
    */
-  markAsPaid: async (id: string): Promise<boolean> => {
+  updateAdvances: async (
+    id: string,
+    advancesDeducted: number,
+    netSalary: number
+  ): Promise<boolean> => {
     const { error } = await supabase
       .from('payroll_runs')
-      .update({ status: 'PAID' })
+      .update({
+        advances_deducted: Math.max(0, advancesDeducted),
+        net_salary: Math.max(0, netSalary),
+      })
       .eq('id', id);
 
     if (error) {
-      console.error('[payrollRunsApi] markAsPaid error:', error.message);
+      console.error('[payrollRunsApi] updateAdvances error:', error.message);
       throw error;
     }
     return true;
+  },
+
+  /**
+   * Updates the status of a payroll run ('DRAFT' | 'PAID').
+   */
+  updateStatus: async (id: string, status: 'DRAFT' | 'PAID'): Promise<boolean> => {
+    const { error } = await supabase
+      .from('payroll_runs')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[payrollRunsApi] updateStatus error:', error.message);
+      throw error;
+    }
+    return true;
+  },
+
+  /**
+   * Marks a payroll run as PAID.
+   */
+  markAsPaid: async (id: string): Promise<boolean> => {
+    return payrollRunsApi.updateStatus(id, 'PAID');
+  },
+
+  /**
+   * Helper to query recorded POS cash shortages for an employee in a given month.
+   */
+  getPendingShortages: async (
+    employeeName: string,
+    monthYear: string
+  ): Promise<{ totalShortage: number; records: { id: string; date: string; amount: number; notes?: string }[] }> => {
+    if (!monthYear) return { totalShortage: 0, records: [] };
+    const startDate = `${monthYear}-01`;
+    const parts = monthYear.split('-');
+    const y = parseInt(parts[0] || '2026', 10);
+    const m = parseInt(parts[1] || '1', 10);
+    const nextY = m === 12 ? y + 1 : y;
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextMonth = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+
+    try {
+      const { data, error } = await supabase
+        .from('cashier_shortages')
+        .select('id, shortage_date, amount, notes, cashier_name, deduction_status')
+        .ilike('cashier_name', `%${employeeName.trim()}%`)
+        .gte('shortage_date', startDate)
+        .lt('shortage_date', nextMonth);
+
+      if (error || !data) {
+        return { totalShortage: 0, records: [] };
+      }
+
+      const matching = data.filter((row: any) => row.deduction_status !== 'deducted');
+      const totalShortage = matching.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
+      const records = matching.map((r: any) => ({
+        id: r.id,
+        date: r.shortage_date,
+        amount: Number(r.amount || 0),
+        notes: r.notes || undefined,
+      }));
+
+      return { totalShortage, records };
+    } catch {
+      return { totalShortage: 0, records: [] };
+    }
   },
 };
