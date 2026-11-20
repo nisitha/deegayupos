@@ -1,1213 +1,2154 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Boxes,
-  AlertTriangle,
-  PackageCheck,
-  TrendingUp,
-  Search,
-  Filter,
-  ArrowRightLeft,
-  Sliders,
-  History,
-  Plus,
-  RefreshCw,
-  X,
-  CheckCircle2,
-  Clock,
-  Send,
-  Download,
   Building2,
-  ChevronRight,
   Warehouse,
+  Search,
+  ChevronRight,
+  ChevronLeft,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  CheckCircle2,
+  PackageCheck,
+  PackageX,
+  TrendingUp,
+  Banknote,
+  Sparkles,
+  Plus,
+  Edit2,
+  Sliders,
+  X,
+  FileSpreadsheet,
+  Clock,
+  Layers,
+  ArrowRight,
+  ShieldCheck,
+  BarChart3,
 } from 'lucide-react';
-import type {
-  StockLevelDto,
-  StockMovementDto,
-  StockTransferDto,
-  InventoryTelemetryDto,
-  StockAdjustmentReason,
-} from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { inventoryApi } from '../../../lib/api-client';
+import { supabase } from '../../../lib/supabase';
+import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
 
-// Mock sample inventory items for offline preview or immediate presentation
-const SAMPLE_STOCK_LEVELS: StockLevelDto[] = [
-  {
-    id: 'sl-1',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    branchId: 'br-colombo',
-    branchName: 'Colombo Flagship Store',
-    productId: 'p-1',
-    productName: 'Organic Basmati Rice (5kg Bag)',
-    sku: 'GRO-RIC-001',
-    barcode: '8901234567890',
-    categoryName: 'Groceries',
-    unit: 'bags',
-    quantityOnHand: 48,
-    quantityReserved: 4,
-    reorderPoint: 15,
-    status: 'IN_STOCK',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'sl-2',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    branchId: 'br-colombo',
-    branchName: 'Colombo Flagship Store',
-    productId: 'p-2',
-    productName: 'Ceylon Pure Cinnamon Quills (100g)',
-    sku: 'GRO-SP-002',
-    barcode: '8901234567891',
-    categoryName: 'Groceries',
-    unit: 'packs',
-    quantityOnHand: 8,
-    quantityReserved: 0,
-    reorderPoint: 10,
-    status: 'LOW_STOCK',
-    updatedAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: 'sl-3',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-kandy',
-    warehouseName: 'Kandy Express Storage',
-    branchId: 'br-kandy',
-    branchName: 'Kandy Branch',
-    productId: 'p-3',
-    productName: 'Wireless Bluetooth Earbuds Pro',
-    sku: 'ELE-EAR-003',
-    barcode: '8901234567892',
-    categoryName: 'Electronics',
-    unit: 'pcs',
-    quantityOnHand: 0,
-    quantityReserved: 0,
-    reorderPoint: 5,
-    status: 'OUT_OF_STOCK',
-    updatedAt: new Date(Date.now() - 7200000).toISOString(),
-  },
-  {
-    id: 'sl-4',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    branchId: 'br-colombo',
-    branchName: 'Colombo Flagship Store',
-    productId: 'p-4',
-    productName: 'Heavy Duty Cordless Drill 20V',
-    sku: 'HDW-DRL-005',
-    barcode: '8901234567894',
-    categoryName: 'Hardware',
-    unit: 'kits',
-    quantityOnHand: 14,
-    quantityReserved: 2,
-    reorderPoint: 4,
-    status: 'IN_STOCK',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'sl-5',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-kandy',
-    warehouseName: 'Kandy Express Storage',
-    branchId: 'br-kandy',
-    branchName: 'Kandy Branch',
-    productId: 'p-5',
-    productName: 'Paracetamol Tablets 500mg (10x10)',
-    sku: 'PHM-MED-007',
-    barcode: '8901234567896',
-    categoryName: 'Pharmacy',
-    unit: 'boxes',
-    quantityOnHand: 85,
-    quantityReserved: 0,
-    reorderPoint: 20,
-    status: 'IN_STOCK',
-    updatedAt: new Date().toISOString(),
-  },
+// ==========================================
+// 1. DATA MODELS & INTERFACES
+// ==========================================
+
+export interface BranchSummary {
+  branchId: string;
+  branchName: string;
+  branchCode: string;
+  warehouseId: string;
+  warehouseName: string;
+  totalSkus: number;
+  totalUnits: number;
+  retailValuation: number;
+  costValuation: number;
+  healthyCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  specialStockUnits: number;
+}
+
+export interface InventoryItem {
+  id: string; // product_id
+  name: string;
+  sku: string;
+  barcode: string;
+  categoryId: string;
+  categoryName: string;
+  costPrice: number;
+  retailPrice: number;
+  alertQuantity: number;
+  quantityOnHand: number;
+  unit: string;
+  isSpecialStock: boolean;
+  specialRate?: number;
+  soldLast30d: number;
+  warehouseId: string;
+  branchId: string;
+  branchName: string;
+  stockStatus: 'HEALTHY' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'SLOW_MOVING';
+  suggestedReorderQty: number;
+}
+
+export interface SpecialStockItem {
+  productId: string;
+  sku: string;
+  name: string;
+  rate: number;
+  sortOrder: number;
+  unitsOnHand: number;
+  totalValue: number;
+  shiftInQty: number;
+  shiftSoldQty: number;
+  status: 'HEALTHY' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+}
+
+export interface CategoryValuation {
+  name: string;
+  skuCount: number;
+  totalUnits: number;
+  totalValue: number;
+  percentage: number;
+}
+
+// 7 Known Core Special Stock (Rasayana) Items
+const SPECIAL_STOCK_CATALOG = [
+  { sku: 'SKU-3377', name: 'Kameshwari Rasayanaya Chathuri Rathu 300', rate: 300, sortOrder: 1, productId: '7b6d032c-dee9-424a-8889-934bcd305452' },
+  { sku: 'SKU-3325', name: 'Kameshwari Rasayanaya Chathuri Kola 250', rate: 250, sortOrder: 2, productId: '80f22f7b-eec9-49e3-9523-9781d5815b00' },
+  { sku: 'SKU-1805', name: 'Kameshwari Rasayanaya Rawana 300', rate: 300, sortOrder: 3, productId: '40e939d6-e7eb-4bf6-8650-c5b22fcbf5ee' },
+  { sku: 'SKU-106', name: 'Kameshwari Rasayanaya Chathuri Kola', rate: 200, sortOrder: 4, productId: '0378f34b-85cd-46ac-93b1-2cae574a7e32' },
+  { sku: 'SKU-3252', name: 'Kameshwari Rasayanaya Sewanagala Kaha 250', rate: 250, sortOrder: 5, productId: '05cca1b9-9f01-46de-ab63-74ee0909242e' },
+  { sku: 'SKU-108', name: 'Kameshwari Rasayanaya Rawana Rathu', rate: 250, sortOrder: 6, productId: 'a17f95d5-4932-480f-85d2-ff4704800cbb' },
+  { sku: 'SKU-3268', name: 'Kameshwari Rasayanaya Sewanagala Gold 300', rate: 300, sortOrder: 7, productId: 'b12673e1-b24b-4c1c-92e9-673e0768e6d9' },
 ];
 
-const SAMPLE_MOVEMENTS: StockMovementDto[] = [
-  {
-    id: 'sm-1',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    productId: 'p-1',
-    productName: 'Organic Basmati Rice (5kg Bag)',
-    sku: 'GRO-RIC-001',
-    movementType: 'SALE',
-    quantity: -2,
-    balanceBefore: 50,
-    balanceAfter: 48,
-    referenceId: 'INV-2026-00042',
-    notes: 'POS Checkout Sale',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'sm-2',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    productId: 'p-4',
-    productName: 'Heavy Duty Cordless Drill 20V',
-    sku: 'HDW-DRL-005',
-    movementType: 'TRANSFER_DISPATCH',
-    quantity: -5,
-    balanceBefore: 19,
-    balanceAfter: 14,
-    referenceId: 'TRF-20261109-A92B',
-    notes: 'Dispatched to Kandy Express Storage',
-    createdAt: new Date(Date.now() - 14400000).toISOString(),
-  },
-  {
-    id: 'sm-3',
-    tenantId: 'demo-tenant',
-    warehouseId: 'wh-main',
-    warehouseName: 'Central Logistics Hub',
-    productId: 'p-2',
-    productName: 'Ceylon Pure Cinnamon Quills (100g)',
-    sku: 'GRO-SP-002',
-    movementType: 'DAMAGE_LOSS',
-    quantity: -2,
-    balanceBefore: 10,
-    balanceAfter: 8,
-    referenceId: 'ADJ-WATER-LEAK',
-    notes: 'Damaged by humidity moisture',
-    createdAt: new Date(Date.now() - 28800000).toISOString(),
-  },
-];
+function formatCurrency(amount: number): string {
+  return `Rs. ${Number(amount || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
-export default function InventoryPage() {
-  const { hasPermission } = useTenantBranch();
-
-  // Active View Tabs: 'levels' | 'transfers'
-  const [activeTab, setActiveTab] = useState<'levels' | 'transfers'>('levels');
-
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState('ALL');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
-
-  // Data States
-  const [stockLevels, setStockLevels] = useState<StockLevelDto[]>(SAMPLE_STOCK_LEVELS);
-  const [movements, setMovements] = useState<StockMovementDto[]>(SAMPLE_MOVEMENTS);
-  const [transfers, setTransfers] = useState<StockTransferDto[]>([]);
-  const [telemetry, setTelemetry] = useState<InventoryTelemetryDto>({
-    totalItemsTracked: 5,
-    lowStockAlertsCount: 1,
-    outOfStockCount: 1,
-    totalStockUnits: 155,
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  // Modals / Drawers
-  const [adjustModalItem, setAdjustModalItem] = useState<StockLevelDto | null>(null);
-  const [adjustCountedQty, setAdjustCountedQty] = useState<number>(0);
-  const [adjustReason, setAdjustReason] = useState<StockAdjustmentReason>('PHYSICAL_COUNT');
-  const [adjustNotes, setAdjustNotes] = useState('');
-  const [isSubmittingAdjust, setIsSubmittingAdjust] = useState(false);
-
-  // Transfer Modal
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferSourceWh, setTransferSourceWh] = useState('wh-main');
-  const [transferTargetWh, setTransferTargetWh] = useState('wh-kandy');
-  const [transferProductId, setTransferProductId] = useState('p-1');
-  const [transferQty, setTransferQty] = useState(5);
-  const [transferNotes, setTransferNotes] = useState('');
-  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
-
-  // Movement Ledger Drawer
-  const [ledgerItem, setLedgerItem] = useState<StockLevelDto | null>(null);
-
-  // Fetch Inventory Data
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [levelsRes, telemRes, movRes] = await Promise.all([
-        inventoryApi.getStockLevels(),
-        inventoryApi.getTelemetry(),
-        inventoryApi.getMovements({ limit: 50 }),
-      ]);
-
-      if (levelsRes.data?.items && levelsRes.data.items.length > 0) {
-        setStockLevels(levelsRes.data.items);
-      }
-      if (telemRes.data) {
-        setTelemetry(telemRes.data);
-      }
-      if (movRes.data?.items && movRes.data.items.length > 0) {
-        setMovements(movRes.data.items);
-      }
-    } catch {
-      // Retain sample data on fallback
-    } finally {
-      setIsLoading(false);
+function formatUnits(qty: number, unit?: string): string {
+  const val = Number(qty || 0);
+  const u = (unit || 'units').toLowerCase().trim();
+  if (u === 'g' || u === 'grams') {
+    if (Math.abs(val) >= 1000) {
+      return `${(val / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} kg`;
     }
-  }, []);
+    return `${val.toLocaleString('en-US', { maximumFractionDigits: 1 })} g`;
+  }
+  if (u === 'ml' || u === 'milliliters') {
+    if (Math.abs(val) >= 1000) {
+      return `${(val / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 })} L`;
+    }
+    return `${val.toLocaleString('en-US', { maximumFractionDigits: 1 })} ml`;
+  }
+  return `${val.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${unit || 'units'}`;
+}
+
+export default function BranchInventoryAnalyticsPage() {
+  const { tenant } = useTenantBranch();
+
+  // State: Data loading
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
+
+  // Branch Selection: 'all' or branchId
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+
+  // Master Data
+  const [rawBranches, setRawBranches] = useState<any[]>([]);
+  const [rawWarehouses, setRawWarehouses] = useState<any[]>([]);
+  const [rawCategories, setRawCategories] = useState<any[]>([]);
+  const [allItems, setAllItems] = useState<InventoryItem[]>([]);
+  const [specialItems, setSpecialItems] = useState<SpecialStockItem[]>([]);
+
+  // Explorer Tabs & Filters
+  const [activeTab, setActiveTab] = useState<'all' | 'low' | 'out' | 'slow'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [sortOption, setSortOption] = useState<'lowest_stock' | 'highest_stock' | 'highest_value' | 'name_asc'>('lowest_stock');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Quick Stock Adjustment Modal State
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
+  const [adjustBranchId, setAdjustBranchId] = useState<string>('');
+  const [adjustType, setAdjustType] = useState<'ADD' | 'DEDUCT' | 'SET'>('ADD');
+  const [adjustQtyInput, setAdjustQtyInput] = useState<string>('1');
+  const [adjustNotes, setAdjustNotes] = useState<string>('');
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjustToast, setAdjustToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ==========================================
+  // 2. MASTER DATA FETCHING
+  // ==========================================
+
+  const loadInventoryData = useCallback(
+    async (isBackground = false) => {
+      if (!isBackground) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+
+      try {
+        // 1. Fetch Branches, Warehouses, Categories, Modaka Item Configs in parallel
+        const [
+          { data: bData },
+          { data: wData },
+          { data: cData },
+          { data: micData },
+        ] = await Promise.all([
+          supabase.from('branches').select('id, name, code, is_active').order('name'),
+          supabase.from('warehouses').select('id, branch_id, name, is_default').order('created_at'),
+          supabase.from('categories').select('id, name, slug').order('name'),
+          supabase.from('modaka_item_configs').select('id, product_id, sort_order, custom_rate, is_active, products(name, sku)'),
+        ]);
+
+        const branches = (bData || []).filter((b: any) => b.is_active !== false);
+        const warehouses = wData || [];
+        const categories = cData || [];
+
+        setRawBranches(branches);
+        setRawWarehouses(warehouses);
+        setRawCategories(categories);
+
+        // Branch-to-warehouse mapping
+        const branchWhMap = new Map<string, string>();
+        warehouses.forEach((w: any) => {
+          if (!branchWhMap.has(w.branch_id) || w.is_default) {
+            branchWhMap.set(w.branch_id, w.id);
+          }
+        });
+
+        const warehouseToBranchMap = new Map<string, { branchId: string; branchName: string; branchCode: string }>();
+        warehouses.forEach((w: any) => {
+          const br = branches.find((b: any) => b.id === w.branch_id);
+          warehouseToBranchMap.set(w.id, {
+            branchId: w.branch_id,
+            branchName: br?.name || 'Main store',
+            branchCode: br?.code || 'BR',
+          });
+        });
+
+        // 2. Fetch Active Products in 1,000-row chunks
+        const allProds: any[] = [];
+        let pPage = 0;
+        const pChunk = 1000;
+        let hasMoreP = true;
+        while (hasMoreP) {
+          const { data: pChunkData, error: pErr } = await supabase
+            .from('products')
+            .select('id, name, sku, barcode, cost_price, retail_price, alert_quantity, category_id, is_active')
+            .eq('is_active', true)
+            .order('name', { ascending: true })
+            .range(pPage * pChunk, (pPage + 1) * pChunk - 1);
+
+          if (pErr || !pChunkData || pChunkData.length === 0) {
+            hasMoreP = false;
+            break;
+          }
+          allProds.push(...pChunkData);
+          if (pChunkData.length < pChunk) {
+            hasMoreP = false;
+          } else {
+            pPage++;
+          }
+        }
+
+        // Product map for quick reference
+        const prodMap = new Map<string, any>();
+        allProds.forEach((p) => prodMap.set(p.id, p));
+
+        // 3. Fetch Stock Levels in 2,500-row chunks
+        const allStockRows: any[] = [];
+        let sPage = 0;
+        const sChunk = 2500;
+        let hasMoreS = true;
+        while (hasMoreS) {
+          const { data: sChunkData, error: sErr } = await supabase
+            .from('stock_levels')
+            .select('product_id, warehouse_id, quantity_on_hand, reorder_point')
+            .range(sPage * sChunk, (sPage + 1) * sChunk - 1);
+
+          if (sErr || !sChunkData || sChunkData.length === 0) {
+            hasMoreS = false;
+            break;
+          }
+          allStockRows.push(...sChunkData);
+          if (sChunkData.length < sChunk) {
+            hasMoreS = false;
+          } else {
+            sPage++;
+          }
+        }
+
+        // 4. Fetch 30-day Sold Quantities
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentSales } = await supabase
+          .from('sale_items')
+          .select('product_id, quantity, created_at')
+          .gte('created_at', thirtyDaysAgo);
+
+        const soldLast30dMap = new Map<string, number>();
+        (recentSales || []).forEach((si: any) => {
+          if (si.product_id) {
+            const cur = soldLast30dMap.get(si.product_id) || 0;
+            soldLast30dMap.set(si.product_id, cur + Number(si.quantity || 0));
+          }
+        });
+
+        // 5. Fetch Shift Modaka Entries (for Special Stock Tracker)
+        const { data: shiftModaka } = await supabase
+          .from('shift_modaka_entries')
+          .select('product_id, in_qty, sold_qty');
+
+        const modakaShiftInMap = new Map<string, number>();
+        const modakaShiftSoldMap = new Map<string, number>();
+        (shiftModaka || []).forEach((sme: any) => {
+          if (sme.product_id) {
+            modakaShiftInMap.set(sme.product_id, (modakaShiftInMap.get(sme.product_id) || 0) + Number(sme.in_qty || 0));
+            modakaShiftSoldMap.set(sme.product_id, (modakaShiftSoldMap.get(sme.product_id) || 0) + Number(sme.sold_qty || 0));
+          }
+        });
+
+        // 6. Aggregate Stock by (Warehouse, Product)
+        const whProdStockMap = new Map<string, { qty: number; reorder: number }>();
+        allStockRows.forEach((sl: any) => {
+          if (sl.product_id && sl.warehouse_id) {
+            const key = `${sl.warehouse_id}:${sl.product_id}`;
+            const existing = whProdStockMap.get(key) || { qty: 0, reorder: 0 };
+            whProdStockMap.set(key, {
+              qty: existing.qty + Number(sl.quantity_on_hand || 0),
+              reorder: Math.max(existing.reorder, Number(sl.reorder_point || 0)),
+            });
+          }
+        });
+
+        // 7. Special Stock Configurations Map
+        const specialStockConfigMap = new Map<string, { rate: number; sortOrder: number }>();
+        SPECIAL_STOCK_CATALOG.forEach((sc) => {
+          specialStockConfigMap.set(sc.productId, { rate: sc.rate, sortOrder: sc.sortOrder });
+        });
+        (micData || []).forEach((m: any) => {
+          if (m.product_id) {
+            specialStockConfigMap.set(m.product_id, {
+              rate: Number(m.custom_rate || 250),
+              sortOrder: Number(m.sort_order || 99),
+            });
+          }
+        });
+
+        // Category Map
+        const categoryMap = new Map<string, string>();
+        categories.forEach((c: any) => categoryMap.set(c.id, c.name));
+
+        // 8. Transform into Unified Inventory Items List
+        const itemsList: InventoryItem[] = [];
+
+        // For each active branch warehouse, map its stock
+        for (const branch of branches) {
+          const whId = branchWhMap.get(branch.id);
+          if (!whId) continue;
+
+          for (const prod of allProds) {
+            const key = `${whId}:${prod.id}`;
+            const stockData = whProdStockMap.get(key);
+            const qty = stockData ? stockData.qty : 0;
+            const reorderThreshold = stockData?.reorder && stockData.reorder > 0
+              ? stockData.reorder
+              : Number(prod.alert_quantity || 15);
+
+            const isSpecial = specialStockConfigMap.has(prod.id);
+            const specialCfg = specialStockConfigMap.get(prod.id);
+
+            const sold30d = soldLast30dMap.get(prod.id) || 0;
+
+            let status: 'HEALTHY' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'SLOW_MOVING' = 'HEALTHY';
+            if (qty <= 0) {
+              status = 'OUT_OF_STOCK';
+            } else if (qty <= reorderThreshold) {
+              status = 'LOW_STOCK';
+            } else if (qty > 30 && sold30d === 0) {
+              status = 'SLOW_MOVING';
+            }
+
+            const suggestedReorder = Math.max(0, Math.ceil(reorderThreshold * 2.5 - qty));
+
+            itemsList.push({
+              id: prod.id,
+              name: prod.name,
+              sku: prod.sku || `SKU-${prod.id.slice(0, 6)}`,
+              barcode: prod.barcode || '',
+              categoryId: prod.category_id || '',
+              categoryName: categoryMap.get(prod.category_id) || 'General Ayurvedic',
+              costPrice: Number(prod.cost_price || 0),
+              retailPrice: isSpecial && specialCfg?.rate ? specialCfg.rate : Number(prod.retail_price || 0),
+              alertQuantity: reorderThreshold,
+              quantityOnHand: qty,
+              unit: 'units',
+              isSpecialStock: isSpecial,
+              specialRate: specialCfg?.rate,
+              soldLast30d: sold30d,
+              warehouseId: whId,
+              branchId: branch.id,
+              branchName: branch.name,
+              stockStatus: status,
+              suggestedReorderQty: suggestedReorder,
+            });
+          }
+        }
+
+        setAllItems(itemsList);
+
+        // 9. Special Stock List (7 Rasayana Items)
+        const specialStockRows: SpecialStockItem[] = SPECIAL_STOCK_CATALOG.map((sc) => {
+          return {
+            productId: sc.productId,
+            sku: sc.sku,
+            name: sc.name,
+            rate: sc.rate,
+            sortOrder: sc.sortOrder,
+            unitsOnHand: 0, // calculated dynamically per selected branch
+            totalValue: 0,
+            shiftInQty: modakaShiftInMap.get(sc.productId) || 0,
+            shiftSoldQty: modakaShiftSoldMap.get(sc.productId) || 0,
+            status: 'OUT_OF_STOCK',
+          };
+        });
+        setSpecialItems(specialStockRows);
+
+        setLastRefreshedAt(new Date());
+      } catch (err) {
+        console.error('[BranchInventory] Data fetch error:', err);
+      } finally {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadInventoryData(false);
+  }, [loadInventoryData]);
 
-  // Categories list
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    stockLevels.forEach((item) => {
-      if (item.categoryName) set.add(item.categoryName);
+  // Silent Background Real-time Synchronization
+  useRealtimePosSync(
+    () => {
+      loadInventoryData(true);
+    },
+    { showToast: false, intervalMs: 20000, channelName: 'inventory_live_telemetry' }
+  );
+
+  // ==========================================
+  // 3. COMPUTED BRANCH SUMMARIES & KPIS
+  // ==========================================
+
+  // Filter items for the currently selected branch
+  const branchFilteredItems = useMemo(() => {
+    if (selectedBranchId === 'all') {
+      return allItems;
+    }
+    return allItems.filter((item) => item.branchId === selectedBranchId);
+  }, [allItems, selectedBranchId]);
+
+  // Distinct branch cards data for top 5-card selector
+  const branchSummaries = useMemo<BranchSummary[]>(() => {
+    // 1. All Branches Enterprise Summary
+    const allSkusSet = new Set<string>();
+    let allUnits = 0;
+    let allRetail = 0;
+    let allCost = 0;
+    let allHealthy = 0;
+    let allLow = 0;
+    let allOut = 0;
+    let allSpecialUnits = 0;
+
+    allItems.forEach((i) => {
+      allSkusSet.add(i.id);
+      allUnits += i.quantityOnHand;
+      allRetail += i.quantityOnHand * i.retailPrice;
+      allCost += i.quantityOnHand * i.costPrice;
+      if (i.quantityOnHand <= 0) allOut++;
+      else if (i.quantityOnHand <= i.alertQuantity) allLow++;
+      else allHealthy++;
+
+      if (i.isSpecialStock) {
+        allSpecialUnits += i.quantityOnHand;
+      }
     });
-    return Array.from(set);
-  }, [stockLevels]);
 
-  // Warehouses list
-  const warehouses = useMemo(() => {
-    const map = new Map<string, string>();
-    stockLevels.forEach((item) => {
-      map.set(item.warehouseId, item.warehouseName || 'Main Storage');
+    const list: BranchSummary[] = [
+      {
+        branchId: 'all',
+        branchName: 'All Branches',
+        branchCode: 'GLOBAL',
+        warehouseId: 'all',
+        warehouseName: 'Enterprise Aggregation',
+        totalSkus: allSkusSet.size,
+        totalUnits: allUnits,
+        retailValuation: allRetail,
+        costValuation: allCost,
+        healthyCount: allHealthy,
+        lowStockCount: allLow,
+        outOfStockCount: allOut,
+        specialStockUnits: allSpecialUnits,
+      },
+    ];
+
+    // 2. Individual Branches (Alawwa, Dambadeniya, Giriulla, Main Store)
+    rawBranches.forEach((b) => {
+      const bItems = allItems.filter((i) => i.branchId === b.id);
+      let units = 0;
+      let retail = 0;
+      let cost = 0;
+      let healthy = 0;
+      let low = 0;
+      let out = 0;
+      let specialUnits = 0;
+
+      bItems.forEach((i) => {
+        units += i.quantityOnHand;
+        retail += i.quantityOnHand * i.retailPrice;
+        cost += i.quantityOnHand * i.costPrice;
+        if (i.quantityOnHand <= 0) out++;
+        else if (i.quantityOnHand <= i.alertQuantity) low++;
+        else healthy++;
+
+        if (i.isSpecialStock) {
+          specialUnits += i.quantityOnHand;
+        }
+      });
+
+      const wh = rawWarehouses.find((w: any) => w.branch_id === b.id);
+
+      list.push({
+        branchId: b.id,
+        branchName: b.name,
+        branchCode: b.code || 'BR',
+        warehouseId: wh?.id || '',
+        warehouseName: wh?.name || `${b.name} Warehouse`,
+        totalSkus: bItems.length,
+        totalUnits: units,
+        retailValuation: retail,
+        costValuation: cost,
+        healthyCount: healthy,
+        lowStockCount: low,
+        outOfStockCount: out,
+        specialStockUnits: specialUnits,
+      });
     });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [stockLevels]);
 
-  // Filtered Stock Levels
-  const filteredLevels = useMemo(() => {
-    return stockLevels.filter((item) => {
-      if (selectedWarehouse !== 'ALL' && item.warehouseId !== selectedWarehouse) return false;
-      if (selectedCategory !== 'ALL' && item.categoryName !== selectedCategory) return false;
-      if (lowStockOnly && item.status === 'IN_STOCK') return false;
+    return list;
+  }, [allItems, rawBranches, rawWarehouses]);
 
+  const DEFAULT_BRANCH_SUMMARY: BranchSummary = {
+    branchId: 'all',
+    branchName: 'All Branches',
+    branchCode: 'GLOBAL',
+    warehouseId: 'all',
+    warehouseName: 'Enterprise Aggregation',
+    totalSkus: 0,
+    totalUnits: 0,
+    retailValuation: 0,
+    costValuation: 0,
+    healthyCount: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+    specialStockUnits: 0,
+  };
+
+  // Selected branch summary object
+  const currentBranchSummary: BranchSummary = useMemo(() => {
+    return branchSummaries.find((s) => s.branchId === selectedBranchId) || branchSummaries[0] || DEFAULT_BRANCH_SUMMARY;
+  }, [branchSummaries, selectedBranchId]);
+
+  // Special Stock Dynamic Computation for Selected Branch
+  const liveSpecialStockRows = useMemo<SpecialStockItem[]>(() => {
+    return specialItems.map((si) => {
+      let units = 0;
+      if (selectedBranchId === 'all') {
+        units = allItems
+          .filter((i) => i.id === si.productId)
+          .reduce((sum, item) => sum + item.quantityOnHand, 0);
+      } else {
+        const matching = allItems.find(
+          (i) => i.id === si.productId && i.branchId === selectedBranchId
+        );
+        units = matching ? matching.quantityOnHand : 0;
+      }
+
+      let status: 'HEALTHY' | 'LOW_STOCK' | 'OUT_OF_STOCK' = 'HEALTHY';
+      if (units <= 0) status = 'OUT_OF_STOCK';
+      else if (units <= 15) status = 'LOW_STOCK';
+
+      return {
+        ...si,
+        unitsOnHand: units,
+        totalValue: units * si.rate,
+        status,
+      };
+    });
+  }, [specialItems, allItems, selectedBranchId]);
+
+  // Special Stock Summary KPIs
+  const specialStockKpis = useMemo(() => {
+    let totalUnits = 0;
+    let totalValue = 0;
+    let totalIn = 0;
+    let totalSold = 0;
+
+    liveSpecialStockRows.forEach((row) => {
+      totalUnits += row.unitsOnHand;
+      totalValue += row.totalValue;
+      totalIn += row.shiftInQty;
+      totalSold += row.shiftSoldQty;
+    });
+
+    return { totalUnits, totalValue, totalIn, totalSold };
+  }, [liveSpecialStockRows]);
+
+  // Top Category Valuations for Selected Branch
+  const categoryValuations = useMemo<CategoryValuation[]>(() => {
+    const catMap = new Map<string, { skus: number; units: number; val: number }>();
+    let totalBranchVal = 0;
+
+    branchFilteredItems.forEach((item) => {
+      const cat = item.categoryName || 'Other Preparations';
+      const itemVal = item.quantityOnHand * item.retailPrice;
+      totalBranchVal += itemVal;
+
+      const existing = catMap.get(cat) || { skus: 0, units: 0, val: 0 };
+      catMap.set(cat, {
+        skus: existing.skus + 1,
+        units: existing.units + item.quantityOnHand,
+        val: existing.val + itemVal,
+      });
+    });
+
+    const list: CategoryValuation[] = [];
+    catMap.forEach((v, name) => {
+      list.push({
+        name,
+        skuCount: v.skus,
+        totalUnits: v.units,
+        totalValue: v.val,
+        percentage: totalBranchVal > 0 ? (v.val / totalBranchVal) * 100 : 0,
+      });
+    });
+
+    return list.sort((a, b) => b.totalValue - a.totalValue).slice(0, 6);
+  }, [branchFilteredItems]);
+
+  // ==========================================
+  // 4. TAB FILTERING & SEARCHING
+  // ==========================================
+
+  const filteredItems = useMemo(() => {
+    return branchFilteredItems.filter((item) => {
+      // 1. Tab condition
+      if (activeTab === 'low') {
+        if (item.stockStatus !== 'LOW_STOCK') return false;
+      } else if (activeTab === 'out') {
+        if (item.stockStatus !== 'OUT_OF_STOCK') return false;
+      } else if (activeTab === 'slow') {
+        if (item.stockStatus !== 'SLOW_MOVING') return false;
+      }
+
+      // 2. Category filter
+      if (categoryFilter !== 'ALL' && item.categoryId !== categoryFilter) {
+        return false;
+      }
+
+      // 3. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchName = item.productName.toLowerCase().includes(q);
-        const matchSku = item.sku.toLowerCase().includes(q);
-        const matchBarcode = item.barcode ? item.barcode.includes(q) : false;
-        return matchName || matchSku || matchBarcode;
+        const matchesName = item.name.toLowerCase().includes(q);
+        const matchesSku = item.sku.toLowerCase().includes(q);
+        const matchesBarcode = item.barcode.toLowerCase().includes(q);
+        if (!matchesName && !matchesSku && !matchesBarcode) {
+          return false;
+        }
       }
+
       return true;
     });
-  }, [stockLevels, selectedWarehouse, selectedCategory, lowStockOnly, searchQuery]);
+  }, [branchFilteredItems, activeTab, categoryFilter, searchQuery]);
 
-  // Handle Quick Adjustment
-  const handleOpenAdjustment = (item: StockLevelDto) => {
-    setAdjustModalItem(item);
-    setAdjustCountedQty(item.quantityOnHand);
-    setAdjustReason('PHYSICAL_COUNT');
+  // Sorting
+  const sortedItems = useMemo(() => {
+    const list = [...filteredItems];
+    list.sort((a, b) => {
+      if (sortOption === 'lowest_stock') {
+        return a.quantityOnHand - b.quantityOnHand;
+      }
+      if (sortOption === 'highest_stock') {
+        return b.quantityOnHand - a.quantityOnHand;
+      }
+      if (sortOption === 'highest_value') {
+        return b.quantityOnHand * b.retailPrice - a.quantityOnHand * a.retailPrice;
+      }
+      if (sortOption === 'name_asc') {
+        return a.name.localeCompare(b.name);
+      }
+      return 0;
+    });
+    return list;
+  }, [filteredItems, sortOption]);
+
+  // Paginated items
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return sortedItems.slice(startIndex, startIndex + pageSize);
+  }, [sortedItems, currentPage, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+
+  // Counts for tab badges
+  const tabCounts = useMemo(() => {
+    let all = 0;
+    let low = 0;
+    let out = 0;
+    let slow = 0;
+
+    branchFilteredItems.forEach((i) => {
+      all++;
+      if (i.stockStatus === 'LOW_STOCK') low++;
+      else if (i.stockStatus === 'OUT_OF_STOCK') out++;
+      else if (i.stockStatus === 'SLOW_MOVING') slow++;
+    });
+
+    return { all, low, out, slow };
+  }, [branchFilteredItems]);
+
+  // ==========================================
+  // 5. QUICK STOCK ADJUSTMENT HANDLER
+  // ==========================================
+
+  const handleOpenAdjustment = (item?: InventoryItem, preselectedBranchId?: string) => {
+    const targetBranch = preselectedBranchId || (selectedBranchId !== 'all' ? selectedBranchId : rawBranches[0]?.id || '');
+    setAdjustBranchId(targetBranch);
+    setAdjustItem(item || (branchFilteredItems[0] ?? null));
+    setAdjustType('ADD');
+    setAdjustQtyInput('1');
     setAdjustNotes('');
+    setAdjustmentModalOpen(true);
   };
 
-  const submitAdjustment = async () => {
-    if (!adjustModalItem) return;
-    setIsSubmittingAdjust(true);
+  const handleExecuteAdjustment = async () => {
+    if (!adjustItem || !adjustBranchId) return;
 
-    try {
-      await inventoryApi.createAdjustment({
-        warehouseId: adjustModalItem.warehouseId,
-        reason: adjustReason,
-        notes: adjustNotes || `Quick adjusted to ${adjustCountedQty} ${adjustModalItem.unit || 'units'}`,
-        items: [
-          {
-            productId: adjustModalItem.productId,
-            variantId: adjustModalItem.variantId,
-            countedQuantity: Number(adjustCountedQty),
-          },
-        ],
-      });
-
-      setFeedback({
-        type: 'success',
-        message: `Updated ${adjustModalItem.productName} stock to ${adjustCountedQty} ${adjustModalItem.unit || 'units'}.`,
-      });
-
-      // Optimistic update
-      setStockLevels((prev) =>
-        prev.map((s) =>
-          s.id === adjustModalItem.id
-            ? {
-                ...s,
-                quantityOnHand: Number(adjustCountedQty),
-                status:
-                  Number(adjustCountedQty) <= 0
-                    ? 'OUT_OF_STOCK'
-                    : Number(adjustCountedQty) <= s.reorderPoint
-                      ? 'LOW_STOCK'
-                      : 'IN_STOCK',
-              }
-            : s,
-        ),
-      );
-
-      setAdjustModalItem(null);
-      loadData();
-    } catch (err: unknown) {
-      const errorMsg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to record stock adjustment';
-      setFeedback({ type: 'error', message: errorMsg });
-    } finally {
-      setIsSubmittingAdjust(false);
-      setTimeout(() => setFeedback(null), 4000);
-    }
-  };
-
-  // Handle Inter-Branch Transfer Submit
-  const submitTransfer = async () => {
-    if (transferSourceWh === transferTargetWh) {
-      setFeedback({ type: 'error', message: 'Source and target warehouses must be different.' });
+    const qty = parseFloat(adjustQtyInput);
+    if (isNaN(qty) || qty <= 0) {
+      alert('Please enter a valid positive quantity.');
       return;
     }
 
-    setIsSubmittingTransfer(true);
-    try {
-      const res = await inventoryApi.createTransfer({
-        sourceWarehouseId: transferSourceWh,
-        targetWarehouseId: transferTargetWh,
-        notes: transferNotes || 'Inter-branch stock transfer',
-        items: [
-          {
-            productId: transferProductId,
-            quantity: Number(transferQty),
-          },
-        ],
-      });
+    setIsAdjusting(true);
 
-      const newTrf = res.data;
-      if (newTrf) {
-        setTransfers((prev) => [newTrf, ...prev]);
+    try {
+      // Find warehouse for selected branch
+      const wh = rawWarehouses.find((w: any) => w.branch_id === adjustBranchId);
+      if (!wh) {
+        throw new Error('Warehouse not configured for this branch.');
       }
 
-      setFeedback({
+      // Calculate new quantity on hand
+      let newQtyOnHand = adjustItem.quantityOnHand;
+      if (adjustType === 'ADD') {
+        newQtyOnHand = adjustItem.quantityOnHand + qty;
+      } else if (adjustType === 'DEDUCT') {
+        newQtyOnHand = Math.max(0, adjustItem.quantityOnHand - qty);
+      } else if (adjustType === 'SET') {
+        newQtyOnHand = qty;
+      }
+
+      // 1. Check if stock_levels record exists
+      const { data: existingSl } = await supabase
+        .from('stock_levels')
+        .select('id')
+        .eq('product_id', adjustItem.id)
+        .eq('warehouse_id', wh.id);
+
+      if (existingSl && existingSl.length > 0) {
+        const { error: upErr } = await supabase
+          .from('stock_levels')
+          .update({
+            quantity_on_hand: newQtyOnHand,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('product_id', adjustItem.id)
+          .eq('warehouse_id', wh.id);
+
+        if (upErr) throw upErr;
+      } else {
+        const { error: inErr } = await supabase.from('stock_levels').insert({
+          product_id: adjustItem.id,
+          warehouse_id: wh.id,
+          quantity_on_hand: newQtyOnHand,
+          tenant_id: tenant?.id || '0fef1423-5d89-4147-8af8-17c7e641c88a',
+          updated_at: new Date().toISOString(),
+        });
+        if (inErr) throw inErr;
+      }
+
+      // 2. Immediate local UI state update
+      setAllItems((prev) =>
+        prev.map((i) => {
+          if (i.id === adjustItem.id && i.branchId === adjustBranchId) {
+            let nextStatus: 'HEALTHY' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'SLOW_MOVING' = 'HEALTHY';
+            if (newQtyOnHand <= 0) nextStatus = 'OUT_OF_STOCK';
+            else if (newQtyOnHand <= i.alertQuantity) nextStatus = 'LOW_STOCK';
+            else if (newQtyOnHand > 30 && i.soldLast30d === 0) nextStatus = 'SLOW_MOVING';
+
+            return {
+              ...i,
+              quantityOnHand: newQtyOnHand,
+              stockStatus: nextStatus,
+              suggestedReorderQty: Math.max(0, Math.ceil(i.alertQuantity * 2.5 - newQtyOnHand)),
+            };
+          }
+          return i;
+        })
+      );
+
+      setAdjustToast({
+        message: `Successfully adjusted stock for ${adjustItem.name} to ${newQtyOnHand} units.`,
         type: 'success',
-        message: `Transfer #${newTrf?.trackingNumber || 'Created'} initiated in PENDING status.`,
       });
-      setShowTransferModal(false);
-      setActiveTab('transfers');
-    } catch (err: unknown) {
-      const errorMsg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to initiate transfer';
-      setFeedback({ type: 'error', message: errorMsg });
+      setTimeout(() => setAdjustToast(null), 3500);
+
+      setAdjustmentModalOpen(false);
+    } catch (err: any) {
+      console.error('[Adjustment] Execution failed:', err);
+      alert(`Adjustment failed: ${err.message || 'Database update error'}`);
     } finally {
-      setIsSubmittingTransfer(false);
-      setTimeout(() => setFeedback(null), 4000);
+      setIsAdjusting(false);
     }
   };
 
-  // Dispatch Transfer
-  const handleDispatch = async (transferId: string) => {
-    try {
-      const res = await inventoryApi.dispatchTransfer(transferId);
-      setTransfers((prev) =>
-        prev.map((t) => (t.id === transferId ? res.data || { ...t, status: 'DISPATCHED' } : t)),
-      );
-      setFeedback({ type: 'success', message: 'Transfer dispatched. Source inventory decremented.' });
-      loadData();
-    } catch (err: unknown) {
-      const errorMsg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to dispatch transfer';
-      setFeedback({ type: 'error', message: errorMsg });
+  // ==========================================
+  // 6. CSV EXPORTS
+  // ==========================================
+
+  const handleDownloadReorderSheet = () => {
+    const reorderItems = branchFilteredItems.filter(
+      (i) => i.stockStatus === 'LOW_STOCK' || i.stockStatus === 'OUT_OF_STOCK'
+    );
+
+    if (reorderItems.length === 0) {
+      alert('No low-stock or out-of-stock items found for this branch selection.');
+      return;
     }
+
+    const headers = [
+      'SKU',
+      'Product Name',
+      'Category',
+      'Branch',
+      'Current Stock',
+      'Reorder Alert Level',
+      'Suggested Reorder Qty',
+      'Cost Price (LKR)',
+      'Estimated Reorder Cost (LKR)',
+      'Status',
+    ];
+
+    const rows = reorderItems.map((item) => {
+      const estCost = item.suggestedReorderQty * item.costPrice;
+      return [
+        `"${item.sku.replace(/"/g, '""')}"`,
+        `"${item.name.replace(/"/g, '""')}"`,
+        `"${item.categoryName.replace(/"/g, '""')}"`,
+        `"${item.branchName.replace(/"/g, '""')}"`,
+        item.quantityOnHand,
+        item.alertQuantity,
+        item.suggestedReorderQty,
+        item.costPrice.toFixed(2),
+        estCost.toFixed(2),
+        item.stockStatus,
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const branchLabel = currentBranchSummary.branchCode.toLowerCase();
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `deegayu-reorder-sheet-${branchLabel}-${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
-  // Receive Transfer
-  const handleReceive = async (transferId: string) => {
-    try {
-      const res = await inventoryApi.receiveTransfer(transferId);
-      setTransfers((prev) =>
-        prev.map((t) => (t.id === transferId ? res.data || { ...t, status: 'RECEIVED' } : t)),
-      );
-      setFeedback({ type: 'success', message: 'Transfer received. Destination inventory updated.' });
-      loadData();
-    } catch (err: unknown) {
-      const errorMsg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to receive transfer';
-      setFeedback({ type: 'error', message: errorMsg });
+  const handleExportFullInventory = () => {
+    if (branchFilteredItems.length === 0) {
+      alert('No inventory data to export.');
+      return;
     }
+
+    const headers = [
+      'SKU',
+      'Barcode',
+      'Product Name',
+      'Category',
+      'Branch',
+      'Quantity On Hand',
+      'Unit',
+      'Cost Price (LKR)',
+      'Retail Price (LKR)',
+      'Total Retail Value (LKR)',
+      'Total Cost Value (LKR)',
+      'Stock Status',
+      'Sold Last 30 Days',
+    ];
+
+    const rows = branchFilteredItems.map((item) => {
+      const retailVal = item.quantityOnHand * item.retailPrice;
+      const costVal = item.quantityOnHand * item.costPrice;
+      return [
+        `"${item.sku.replace(/"/g, '""')}"`,
+        `"${item.barcode.replace(/"/g, '""')}"`,
+        `"${item.name.replace(/"/g, '""')}"`,
+        `"${item.categoryName.replace(/"/g, '""')}"`,
+        `"${item.branchName.replace(/"/g, '""')}"`,
+        item.quantityOnHand,
+        item.unit,
+        item.costPrice.toFixed(2),
+        item.retailPrice.toFixed(2),
+        retailVal.toFixed(2),
+        costVal.toFixed(2),
+        item.stockStatus,
+        item.soldLast30d,
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const branchLabel = currentBranchSummary.branchCode.toLowerCase();
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `deegayu-full-inventory-${branchLabel}-${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
+
+  // Gross Margin Calculation
+  const estimatedGrossMargin = useMemo(() => {
+    const retail = currentBranchSummary?.retailValuation || 0;
+    const cost = currentBranchSummary?.costValuation || 0;
+    const margin = retail - cost;
+    const marginPct = retail > 0 ? (margin / retail) * 100 : 0;
+    return { margin, marginPct };
+  }, [currentBranchSummary]);
+
+  // Donut chart angles
+  const donutData = useMemo(() => {
+    const circumference = 2 * Math.PI * 60; // r=60 => ~376.99
+    const healthy = currentBranchSummary.healthyCount || 0;
+    const low = currentBranchSummary.lowStockCount || 0;
+    const out = currentBranchSummary.outOfStockCount || 0;
+    const total = healthy + low + out;
+
+    if (total === 0) {
+      return {
+        healthyPct: 100,
+        lowPct: 0,
+        outPct: 0,
+        hDash: circumference,
+        lDash: 0,
+        oDash: 0,
+        circumference,
+      };
+    }
+
+    const hPct = (healthy / total) * 100;
+    const lPct = (low / total) * 100;
+    const oPct = (out / total) * 100;
+
+    const hDash = (hPct / 100) * circumference;
+    const lDash = (lPct / 100) * circumference;
+    const oDash = (oPct / 100) * circumference;
+
+    return {
+      healthyPct: Math.round(hPct),
+      lowPct: Math.round(lPct),
+      outPct: Math.round(oPct),
+      hDash,
+      lDash,
+      oDash,
+      circumference,
+    };
+  }, [currentBranchSummary]);
+
+  // ==========================================
+  // 7. RENDER VIEW
+  // ==========================================
 
   return (
-    <div className="flex-1 min-h-screen bg-[#F4F6F9] text-slate-900 pb-12">
-      {/* Feedback Banner */}
-      {feedback && (
-        <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold transition-all ${
-            feedback.type === 'success'
-              ? 'bg-emerald-600 text-white'
-              : 'bg-rose-600 text-white'
-          }`}
-        >
-          {feedback.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5" />
-          ) : (
-            <AlertTriangle className="w-5 h-5" />
-          )}
-          <span>{feedback.message}</span>
-          <button onClick={() => setFeedback(null)} className="ml-2 hover:opacity-80">
-            <X className="w-4 h-4" />
-          </button>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20">
+      {/* Toast Notification */}
+      {adjustToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-250">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{adjustToast.message}</span>
         </div>
       )}
 
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                <Boxes className="w-5 h-5" />
+      {/* Obsidian Executive Header Banner */}
+      <div className="bg-[#0F172A] text-white border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            {/* Title & Brand Meta */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  Deegayu Weda Madhura
+                </span>
+                <span className="text-slate-400 text-xs">•</span>
+                <span className="text-slate-400 text-xs font-medium">Enterprise Inventory & Stock Analytics Desk</span>
               </div>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                  Multi-Branch Inventory & Stock Engine
-                </h1>
-                <p className="text-xs text-slate-500 font-medium">
-                  Decimal-safe real-time stock balances, branch transfers, and immutable audit movements
-                </p>
-              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+                <Boxes className="w-8 h-8 text-indigo-400" />
+                Branch Inventory & Stock Analytics
+              </h1>
+              <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl">
+                Multi-branch stock telemetry, live inventory valuation, low-stock reorder triggers, and shift-controlled Special Stock ledger across all active dispensaries.
+              </p>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={loadData}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              Sync
-            </button>
+            {/* Quick Action Controls */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Silent Sync Status Pill */}
+              <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 rounded-lg text-xs font-medium text-slate-300 border border-slate-700/60">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Live Sync Active</span>
+              </div>
 
-            {hasPermission('inventory:manage') && (
+              {/* Manual Refresh */}
               <button
-                onClick={() => setShowTransferModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition-all"
+                onClick={() => loadInventoryData(true)}
+                disabled={isRefreshing}
+                title="Refresh inventory from cloud"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 rounded-lg text-xs font-semibold transition border border-slate-700 shadow-sm cursor-pointer disabled:opacity-50"
               >
-                <ArrowRightLeft className="w-4 h-4" />
-                Inter-Branch Transfer
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-400' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
-            )}
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-6 pt-6 space-y-6">
-        {/* 1. Telemetry KPI Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Items Tracked */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Items Tracked</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">{telemetry.totalItemsTracked}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Across all branches & warehouses</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-              <PackageCheck className="w-6 h-6" />
-            </div>
-          </div>
+              {/* Download Reorder Sheet */}
+              <button
+                onClick={handleDownloadReorderSheet}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold transition border border-amber-500/30 shadow-sm cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Reorder Sheet</span>
+              </button>
 
-          {/* Total Stock Units */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Stock Units</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">{telemetry.totalStockUnits.toLocaleString()}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Decimal-safe active inventory</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-          </div>
+              {/* Export Full Inventory */}
+              <button
+                onClick={handleExportFullInventory}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition border border-slate-700 shadow-sm cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Export CSV</span>
+              </button>
 
-          {/* Low Stock Alerts */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Low Stock Alerts</p>
-              <p className="text-2xl font-black text-amber-600 mt-1">{telemetry.lowStockAlertsCount}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">At or below reorder threshold</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-          </div>
-
-          {/* Out of Stock */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Out of Stock</p>
-              <p className="text-2xl font-black text-rose-600 mt-1">{telemetry.outOfStockCount}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Depleted inventory</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600">
-              <X className="w-6 h-6" />
+              {/* Pro Adjust Stock Action */}
+              <button
+                onClick={() => handleOpenAdjustment()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-md shadow-indigo-600/30 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Adjust Stock</span>
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-          <button
-            onClick={() => setActiveTab('levels')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'levels'
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
-            }`}
-          >
-            <Boxes className="w-4 h-4" />
-            Stock On Hand ({filteredLevels.length})
-          </button>
+      {/* Main Workspace Body */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 space-y-7">
+        {/* ==========================================
+            1. TOP INTERACTIVE BRANCH SELECTOR CARDS
+        ========================================== */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              Select Operating Branch or Global Enterprise
+            </h2>
+            <span className="text-xs text-slate-500">
+              Active: <strong className="text-slate-800">{currentBranchSummary.branchName}</strong>
+            </span>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('transfers')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'transfers'
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
-            }`}
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            Branch Transfers ({transfers.length})
-          </button>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {branchSummaries.map((summary) => {
+              const isSelected = selectedBranchId === summary.branchId;
+              const isGlobal = summary.branchId === 'all';
 
-        {/* Tab 1: Stock On Hand Table */}
-        {activeTab === 'levels' && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            {/* Filter & Search Bar */}
-            <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-              <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-                {/* Search Input */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by product name, SKU, or barcode..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-
-                {/* Warehouse Filter */}
-                <div className="flex items-center gap-1.5">
-                  <Warehouse className="w-4 h-4 text-slate-400" />
-                  <select
-                    value={selectedWarehouse}
-                    onChange={(e) => setSelectedWarehouse(e.target.value)}
-                    className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-medium focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="ALL">All Warehouses</option>
-                    {warehouses.map((wh) => (
-                      <option key={wh.id} value={wh.id}>
-                        {wh.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Category Filter */}
-                <div className="flex items-center gap-1.5">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-medium focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="ALL">All Categories</option>
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Low Stock Filter Pill */}
-              <div className="flex items-center gap-2">
+              return (
                 <button
-                  onClick={() => setLowStockOnly(!lowStockOnly)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    lowStockOnly
-                      ? 'bg-amber-500 text-white border-amber-600 shadow-sm shadow-amber-500/20'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  key={summary.branchId}
+                  onClick={() => {
+                    setSelectedBranchId(summary.branchId);
+                    setCurrentPage(1);
+                  }}
+                  className={`text-left p-4 rounded-xl transition-all duration-200 cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-white border-2 border-indigo-600 ring-4 ring-indigo-500/10 shadow-lg -translate-y-0.5'
+                      : 'bg-white/80 hover:bg-white border border-slate-200 hover:border-slate-300 shadow-xs'
                   }`}
                 >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Low Stock Only
+                  {/* Selected Indicator Pill */}
+                  {isSelected && (
+                    <span className="absolute top-3 right-3 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {isGlobal ? (
+                      <Warehouse className="w-4 h-4 text-indigo-600 shrink-0" />
+                    ) : (
+                      <Building2 className="w-4 h-4 text-slate-600 shrink-0" />
+                    )}
+                    <h3 className="font-bold text-sm text-slate-900 truncate">{summary.branchName}</h3>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-2.5">
+                    <span className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-semibold">
+                      {summary.branchCode}
+                    </span>
+                    <span className="font-semibold text-slate-700">{summary.totalSkus.toLocaleString()} SKUs</span>
+                  </div>
+
+                  {/* Retail Valuation */}
+                  <div className="mb-3">
+                    <p className="text-[11px] uppercase tracking-wider text-slate-600 font-semibold">Stock Valuation</p>
+                    <p className="text-base font-extrabold text-slate-900 tracking-tight">
+                      {formatCurrency(summary.retailValuation)}
+                    </p>
+                  </div>
+
+                  {/* Compact Status Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-[10px] font-semibold">
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {summary.healthyCount} Good
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                      {summary.lowStockCount} Low
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                      {summary.outOfStockCount} Out
+                    </span>
+                  </div>
+
+                  {/* Special Stock Pill */}
+                  <div className="mt-2 text-[10px] font-bold text-indigo-800 bg-indigo-50/80 px-2 py-0.8 rounded-md border border-indigo-100 flex items-center justify-between">
+                    <span>Special Stock</span>
+                    <span>{summary.specialStockUnits.toLocaleString()} units</span>
+                  </div>
                 </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ==========================================
+            2. EXECUTIVE BRANCH KPI STRIP (5 CARDS)
+        ========================================== */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* 1. Retail Valuation */}
+          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Retail Stock Valuation</span>
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <Banknote className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 tracking-tight">
+              {formatCurrency(currentBranchSummary.retailValuation)}
+            </div>
+            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <span>{currentBranchSummary.totalUnits.toLocaleString()} units on hand</span>
+              <span>•</span>
+              <span>{currentBranchSummary.totalSkus.toLocaleString()} SKUs</span>
+            </p>
+          </div>
+
+          {/* 2. Cost Valuation & Margin */}
+          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cost Valuation</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 tracking-tight">
+              {formatCurrency(currentBranchSummary.costValuation)}
+            </div>
+            <p className="text-xs text-emerald-600 font-semibold mt-1">
+              Est. Margin: +{formatCurrency(estimatedGrossMargin.margin)} ({estimatedGrossMargin.marginPct.toFixed(1)}%)
+            </p>
+          </div>
+
+          {/* 3. Healthy Stock Items */}
+          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Healthy Stock</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-emerald-700 tracking-tight">
+              {currentBranchSummary.healthyCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {currentBranchSummary.totalSkus > 0
+                ? `${((currentBranchSummary.healthyCount / currentBranchSummary.totalSkus) * 100).toFixed(1)}% of catalog stable`
+                : 'Optimal inventory levels'}
+            </p>
+          </div>
+
+          {/* 4. Low Stock Alerts (Clickable to switch tab) */}
+          <button
+            onClick={() => setActiveTab('low')}
+            className={`text-left p-4.5 rounded-xl border transition cursor-pointer ${
+              activeTab === 'low'
+                ? 'bg-amber-50/70 border-amber-400 ring-2 ring-amber-400/20 shadow-xs'
+                : 'bg-white hover:bg-amber-50/40 border-slate-200/90 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Low Stock Alerts</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-100/70 flex items-center justify-center text-amber-700">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-amber-700 tracking-tight">
+              {currentBranchSummary.lowStockCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
+              <span>Running out soon</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </p>
+          </button>
+
+          {/* 5. Out of Stock (Clickable to switch tab) */}
+          <button
+            onClick={() => setActiveTab('out')}
+            className={`text-left p-4.5 rounded-xl border transition cursor-pointer ${
+              activeTab === 'out'
+                ? 'bg-rose-50/70 border-rose-400 ring-2 ring-rose-400/20 shadow-xs'
+                : 'bg-white hover:bg-rose-50/40 border-slate-200/90 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-800">Out of Stock</span>
+              <div className="w-8 h-8 rounded-lg bg-rose-100/70 flex items-center justify-center text-rose-700">
+                <PackageX className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-700 tracking-tight">
+              {currentBranchSummary.outOfStockCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-rose-600 font-medium mt-1 flex items-center gap-1">
+              <span>0 remaining on hand</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </p>
+          </button>
+        </section>
+
+        {/* ==========================================
+            3. INTERACTIVE VISUAL GRAPHS & ANALYTICS
+        ========================================== */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Chart 1: Stock Health & Multi-Branch Comparison */}
+          <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                    <PieChartIcon className="w-4 h-4 text-indigo-600" />
+                    Stock Health Ratio — {currentBranchSummary.branchName}
+                  </h3>
+                  <p className="text-xs text-slate-500">Distribution of catalog health statuses</p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                  {currentBranchSummary.totalSkus} SKUs
+                </span>
+              </div>
+
+              {/* Segmented Donut Chart */}
+              <div className="flex items-center justify-center py-2">
+                <div className="relative w-44 h-44 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                    {/* Background Track */}
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="60"
+                      stroke="#E2E8F0"
+                      strokeWidth="18"
+                      fill="transparent"
+                    />
+
+                    {/* Healthy Segment (Emerald) */}
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="60"
+                      stroke="#10B981"
+                      strokeWidth="18"
+                      strokeDasharray={`${donutData.hDash} ${donutData.circumference}`}
+                      strokeDashoffset="0"
+                      fill="transparent"
+                      strokeLinecap="round"
+                      className="transition-all duration-500"
+                    />
+
+                    {/* Low Stock Segment (Amber) */}
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="60"
+                      stroke="#F59E0B"
+                      strokeWidth="18"
+                      strokeDasharray={`${donutData.lDash} ${donutData.circumference}`}
+                      strokeDashoffset={`-${donutData.hDash}`}
+                      fill="transparent"
+                      strokeLinecap="round"
+                      className="transition-all duration-500"
+                    />
+
+                    {/* Out of Stock Segment (Rose) */}
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="60"
+                      stroke="#EF4444"
+                      strokeWidth="18"
+                      strokeDasharray={`${donutData.oDash} ${donutData.circumference}`}
+                      strokeDashoffset={`-${donutData.hDash + donutData.lDash}`}
+                      fill="transparent"
+                      strokeLinecap="round"
+                      className="transition-all duration-500"
+                    />
+                  </svg>
+
+                  {/* Donut Center Legend */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight">
+                      {currentBranchSummary.totalSkus.toLocaleString()}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Catalog SKUs
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donut Legend */}
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100 text-center">
+                <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Healthy</span>
+                  </div>
+                  <div className="text-base font-extrabold text-emerald-900 mt-0.5">
+                    {donutData.healthyPct}%
+                  </div>
+                  <div className="text-[10px] text-emerald-700">{currentBranchSummary.healthyCount} items</div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-amber-50/70 border border-amber-100">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-800">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Low Stock</span>
+                  </div>
+                  <div className="text-base font-extrabold text-amber-900 mt-0.5">
+                    {donutData.lowPct}%
+                  </div>
+                  <div className="text-[10px] text-amber-700">{currentBranchSummary.lowStockCount} items</div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-100">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-rose-800">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>Out of Stock</span>
+                  </div>
+                  <div className="text-base font-extrabold text-rose-900 mt-0.5">
+                    {donutData.outPct}%
+                  </div>
+                  <div className="text-[10px] text-rose-700">{currentBranchSummary.outOfStockCount} items</div>
+                </div>
               </div>
             </div>
 
-            {/* Table */}
+            {/* Multi-Branch Comparison Bar Mini-List */}
+            <div className="mt-5 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-bold text-slate-700 mb-2.5 flex items-center justify-between">
+                <span>Branch Stock Level Comparison</span>
+                <span className="text-[11px] font-normal text-slate-500">Healthy vs Low vs Out</span>
+              </h4>
+              <div className="space-y-2">
+                {branchSummaries
+                  .filter((b) => b.branchId !== 'all')
+                  .map((b) => {
+                    const total = b.healthyCount + b.lowStockCount + b.outOfStockCount || 1;
+                    const hW = (b.healthyCount / total) * 100;
+                    const lW = (b.lowStockCount / total) * 100;
+                    const oW = (b.outOfStockCount / total) * 100;
+
+                    return (
+                      <div key={b.branchId} className="text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-slate-800">{b.branchName}</span>
+                          <span className="font-mono text-[11px] text-slate-500">
+                            {formatCurrency(b.retailValuation)}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div style={{ width: `${hW}%` }} className="bg-emerald-500" title={`Healthy: ${b.healthyCount}`} />
+                          <div style={{ width: `${lW}%` }} className="bg-amber-400" title={`Low Stock: ${b.lowStockCount}`} />
+                          <div style={{ width: `${oW}%` }} className="bg-rose-500" title={`Out of Stock: ${b.outOfStockCount}`} />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart 2: Category-Wise Stock Valuation & Unit Distribution */}
+          <div className="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                    <BarChart3 className="w-4 h-4 text-indigo-600" />
+                    Top Category Stock Valuation & Unit Distribution
+                  </h3>
+                  <p className="text-xs text-slate-500">Ranked by total retail valuation in selected branch</p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                  {categoryValuations.length} Primary Categories
+                </span>
+              </div>
+
+              {/* Ranked Category Bars */}
+              <div className="space-y-4">
+                {categoryValuations.map((cat, idx) => {
+                  const maxVal = categoryValuations[0]?.totalValue || 1;
+                  const barWidth = Math.min(100, Math.max(6, (cat.totalValue / maxVal) * 100));
+
+                  return (
+                    <div key={cat.name} className="group">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[10px]">
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-slate-900">{cat.name}</span>
+                          <span className="text-[11px] text-slate-600 font-medium">({cat.skuCount} SKUs)</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {cat.totalUnits.toLocaleString()} units
+                          </span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {formatCurrency(cat.totalValue)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual Horizontal Progress Bar */}
+                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden relative">
+                        <div
+                          style={{ width: `${barWidth}%` }}
+                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500 group-hover:from-indigo-600 group-hover:to-purple-600"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Category Valuation Footer Note */}
+            <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                Live valuation synchronized across POS cash registers
+              </span>
+              <span>Updated: {lastRefreshedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ==========================================
+            4. DEDICATED SPECIAL STOCK (7 RASAYANA ITEMS) LIVE PANEL
+        ========================================== */}
+        <section className="bg-gradient-to-br from-indigo-900/95 via-slate-900 to-[#0F172A] rounded-2xl p-6 text-white shadow-xl border border-indigo-500/20">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 pb-5 border-b border-indigo-800/40">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  Shift Controlled (A–F)
+                </span>
+                <span className="text-slate-400 text-xs font-mono">•</span>
+                <span className="text-slate-300 text-xs">Branch: <strong className="text-white">{currentBranchSummary.branchName}</strong></span>
+              </div>
+              <h3 className="text-xl font-black text-white flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                Special Stock Live Tracker & Analytics (7 Rasayana Items)
+              </h3>
+              <p className="text-slate-300 text-xs mt-1">
+                Strict audit items tracked per shift handover. Live units auto-verified against shift closing drawers and physical registers.
+              </p>
+            </div>
+
+            {/* Quick Restock Action for Special Stock */}
+            <div>
+              <button
+                onClick={() => handleOpenAdjustment()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-purple-600/30 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Adjust Special Stock</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Special Stock 4 KPI Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-6">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+              <span className="text-[11px] uppercase tracking-wider text-purple-300 font-semibold">Special Stock on Hand</span>
+              <div className="text-2xl font-black text-white mt-1">
+                {specialStockKpis.totalUnits.toLocaleString()} <span className="text-xs font-normal text-slate-300">units</span>
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+              <span className="text-[11px] uppercase tracking-wider text-purple-300 font-semibold">Total Retail Value</span>
+              <div className="text-2xl font-black text-white mt-1">
+                {formatCurrency(specialStockKpis.totalValue)}
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+              <span className="text-[11px] uppercase tracking-wider text-emerald-300 font-semibold">Recent Shift Inflow (B)</span>
+              <div className="text-2xl font-black text-emerald-400 mt-1">
+                +{specialStockKpis.totalIn.toLocaleString()} <span className="text-xs font-normal text-emerald-300">units</span>
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+              <span className="text-[11px] uppercase tracking-wider text-amber-300 font-semibold">Recent Shift Sold (D)</span>
+              <div className="text-2xl font-black text-amber-400 mt-1">
+                -{specialStockKpis.totalSold.toLocaleString()} <span className="text-xs font-normal text-amber-300">units</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 7-Row Special Stock Ledger Table */}
+          <div className="bg-slate-950/60 rounded-xl border border-indigo-500/20 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3.5 px-4">Product & SKU</th>
-                    <th className="py-3.5 px-4">Warehouse & Branch</th>
-                    <th className="py-3.5 px-4 text-right">Stock On Hand</th>
-                    <th className="py-3.5 px-4 text-right">Reserved</th>
-                    <th className="py-3.5 px-4 text-right">Reorder Pt</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
+              <table className="w-full text-left text-xs">
+                <thead className="bg-indigo-950/60 text-slate-300 uppercase tracking-wider text-[11px] font-bold border-b border-indigo-800/40">
+                  <tr>
+                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Special Item Name</th>
+                    <th className="px-4 py-3 text-right">Branch Stock</th>
+                    <th className="px-4 py-3 text-right">Rate (LKR)</th>
+                    <th className="px-4 py-3 text-right">Stock Valuation</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {filteredLevels.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-500">
-                        No inventory records matching your query criteria.
+                <tbody className="divide-y divide-indigo-900/30 text-slate-200">
+                  {liveSpecialStockRows.map((item) => (
+                    <tr key={item.sku} className="hover:bg-white/5 transition">
+                      <td className="px-4 py-3 font-mono font-bold text-purple-300">{item.sku}</td>
+                      <td className="px-4 py-3 font-semibold text-white">{item.name}</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-sm">
+                        {item.unitsOnHand.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-300">
+                        Rs. {item.rate.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-extrabold text-white">
+                        {formatCurrency(item.totalValue)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {item.status === 'HEALTHY' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Healthy
+                          </span>
+                        )}
+                        {item.status === 'LOW_STOCK' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Low Stock
+                          </span>
+                        )}
+                        {item.status === 'OUT_OF_STOCK' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                            Out of Stock
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => {
+                            const foundItem = allItems.find(
+                              (i) => i.id === item.productId && (selectedBranchId === 'all' || i.branchId === selectedBranchId)
+                            );
+                            handleOpenAdjustment(foundItem, selectedBranchId !== 'all' ? selectedBranchId : undefined);
+                          }}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white rounded text-[11px] font-semibold transition cursor-pointer"
+                        >
+                          + Adjust
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    filteredLevels.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-slate-900">
-                          <div className="text-sm font-semibold text-slate-900 leading-snug">{item.productName}</div>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-mono">
-                            <span>SKU: {item.sku}</span>
-                            {item.barcode && <span>• {item.barcode}</span>}
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        {/* ==========================================
+            5. TABBED ACTIONABLE INVENTORY EXPLORER
+        ========================================== */}
+        <section className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+          {/* Header & Tabs */}
+          <div className="p-5 border-b border-slate-100 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-600" />
+                  Inventory Explorer & Reorder Control
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Browse catalog items with stock-level health alerts, category filters, and immediate adjustment tools.
+                </p>
+              </div>
+
+              {/* Total Filtered Count */}
+              <div className="text-xs text-slate-500 font-medium">
+                Showing <strong className="text-slate-900">{filteredItems.length.toLocaleString()}</strong> matching items
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => {
+                  setActiveTab('all');
+                  setCurrentPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <span>All Stock</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                  {tabCounts.all.toLocaleString()}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('low');
+                  setCurrentPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'low'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Low Stock Alerts</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'low' ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900'}`}>
+                  {tabCounts.low.toLocaleString()}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('out');
+                  setCurrentPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'out'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                }`}
+              >
+                <PackageX className="w-3.5 h-3.5" />
+                <span>Out of Stock</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'out' ? 'bg-rose-700 text-white' : 'bg-rose-200 text-rose-900'}`}>
+                  {tabCounts.out.toLocaleString()}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('slow');
+                  setCurrentPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'slow'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Slow-Moving 30d</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === 'slow' ? 'bg-indigo-700 text-white' : 'bg-indigo-200 text-indigo-900'}`}>
+                  {tabCounts.slow.toLocaleString()}
+                </span>
+              </button>
+            </div>
+
+            {/* Search, Category Filter, and Sort Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
+              {/* Search Box */}
+              <div className="sm:col-span-6 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search by Product Name, SKU, or Barcode..."
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter */}
+              <div className="sm:col-span-3">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => {
+                    setCategoryFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-700 transition"
+                >
+                  <option value="ALL">All Categories</option>
+                  {rawCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort Selector */}
+              <div className="sm:col-span-3">
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as any)}
+                  className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-700 transition"
+                >
+                  <option value="lowest_stock">Lowest Stock First</option>
+                  <option value="highest_stock">Highest Stock First</option>
+                  <option value="highest_value">Highest Stock Value</option>
+                  <option value="name_asc">Name (A–Z)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Inventory Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3.5">Product & SKU</th>
+                  <th className="px-4 py-3.5">Branch / Warehouse</th>
+                  <th className="px-4 py-3.5 text-right">Quantity on Hand</th>
+                  <th className="px-4 py-3.5 text-right">Cost (LKR)</th>
+                  <th className="px-4 py-3.5 text-right">Retail (LKR)</th>
+                  <th className="px-4 py-3.5 text-right">Total Valuation</th>
+                  <th className="px-4 py-3.5 text-center">Status</th>
+                  {(activeTab === 'low' || activeTab === 'out') && (
+                    <th className="px-4 py-3.5 text-right text-amber-700">Suggested Reorder</th>
+                  )}
+                  <th className="px-4 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                      <div className="inline-flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
+                        <span>Loading live branch inventory data...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                      <div className="max-w-sm mx-auto text-center space-y-2">
+                        <PackageCheck className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="font-semibold text-slate-600">No inventory items matched your criteria.</p>
+                        <p className="text-xs text-slate-400">Try adjusting your search query, active tab, or category filter.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedItems.map((item) => {
+                    const retailVal = item.quantityOnHand * item.retailPrice;
+
+                    return (
+                      <tr key={`${item.warehouseId}-${item.id}`} className="hover:bg-slate-50/80 transition">
+                        {/* Product & SKU */}
+                        <td className="px-4 py-3.5">
+                          <div className="font-bold text-slate-900 leading-tight">{item.name}</div>
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                            <span className="font-mono font-medium text-slate-600">{item.sku}</span>
+                            <span>•</span>
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium text-[10px]">
+                              {item.categoryName}
+                            </span>
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-700">
-                          <div className="font-medium text-slate-900 flex items-center gap-1.5 text-sm">
-                            <Building2 className="w-4 h-4 text-slate-400" />
-                            {item.warehouseName || 'Main Storage'}
+                        {/* Branch */}
+                        <td className="px-4 py-3.5">
+                          <div className="font-semibold text-slate-800">{item.branchName}</div>
+                          <div className="text-[10px] text-slate-400">Active Stock Hub</div>
+                        </td>
+
+                        {/* Quantity on Hand */}
+                        <td className="px-4 py-3.5 text-right font-mono">
+                          <div className="font-black text-sm text-slate-900">
+                            {formatUnits(item.quantityOnHand, item.unit)}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5">
-                            {item.branchName || 'Primary Branch'}
+                          {/* Mini Stock Level Bar */}
+                          <div className="w-20 ml-auto h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                            <div
+                              style={{
+                                width: `${Math.min(100, Math.max(5, (item.quantityOnHand / Math.max(item.alertQuantity * 2, 20)) * 100))}%`,
+                              }}
+                              className={`h-full rounded-full ${
+                                item.quantityOnHand <= 0
+                                  ? 'bg-rose-500'
+                                  : item.quantityOnHand <= item.alertQuantity
+                                  ? 'bg-amber-400'
+                                  : 'bg-emerald-500'
+                              }`}
+                            />
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-black text-slate-950 text-sm md:text-base font-mono">
-                          {item.quantityOnHand} <span className="text-xs font-normal text-slate-500 font-sans">{item.unit || 'pcs'}</span>
+                        {/* Cost Price */}
+                        <td className="px-4 py-3.5 text-right font-mono text-slate-600">
+                          Rs. {item.costPrice.toFixed(2)}
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-medium text-slate-600 font-mono text-sm">
-                          {item.quantityReserved} <span className="text-xs font-normal text-slate-500 font-sans">{item.unit || 'pcs'}</span>
+                        {/* Retail Price */}
+                        <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-900">
+                          Rs. {item.retailPrice.toFixed(2)}
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono text-slate-700 font-medium text-sm">
-                          {item.reorderPoint}
+                        {/* Total Valuation */}
+                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-slate-900">
+                          {formatCurrency(retailVal)}
                         </td>
 
-                        <td className="py-3.5 px-4 text-center">
-                          {item.status === 'IN_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              In Stock
+                        {/* Status Badge */}
+                        <td className="px-4 py-3.5 text-center">
+                          {item.stockStatus === 'HEALTHY' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Healthy
                             </span>
                           )}
-                          {item.status === 'LOW_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          {item.stockStatus === 'LOW_STOCK' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               Low Stock
                             </span>
                           )}
-                          {item.status === 'OUT_OF_STOCK' && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          {item.stockStatus === 'OUT_OF_STOCK' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                               Out of Stock
+                            </span>
+                          )}
+                          {item.stockStatus === 'SLOW_MOVING' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              Slow-Moving
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3.5 px-4 text-right space-x-2">
+                        {/* Suggested Reorder Qty */}
+                        {(activeTab === 'low' || activeTab === 'out') && (
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-amber-800">
+                            +{item.suggestedReorderQty} units
+                          </td>
+                        )}
+
+                        {/* Inline Pro Adjustment Action */}
+                        <td className="px-4 py-3.5 text-right">
                           <button
-                            onClick={() => setLedgerItem(item)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all"
-                            title="View Stock Movement Audit History"
+                            onClick={() => handleOpenAdjustment(item, item.branchId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 text-slate-700 rounded text-xs font-semibold transition cursor-pointer"
                           >
-                            <History className="w-3.5 h-3.5 text-slate-500" />
-                            Ledger
+                            <Edit2 className="w-3 h-3" />
+                            <span>Adjust</span>
                           </button>
-
-                          {hasPermission('inventory:manage') && (
-                            <button
-                              onClick={() => handleOpenAdjustment(item)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-all border border-blue-200"
-                              title="Apply physical count adjustment or damage deduction"
-                            >
-                              <Sliders className="w-3.5 h-3.5 text-blue-600" />
-                              Adjust
-                            </button>
-                          )}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Tab 2: Branch Transfers Table */}
-        {activeTab === 'transfers' && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Inter-Branch Stock Transfers</h3>
-                <p className="text-xs text-slate-500">Track pending, dispatched, and received stock consignments</p>
-              </div>
-
-              {hasPermission('inventory:manage') && (
-                <button
-                  onClick={() => setShowTransferModal(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  New Transfer
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3.5 px-4">Tracking #</th>
-                    <th className="py-3.5 px-4">Source Warehouse</th>
-                    <th className="py-3.5 px-4">Destination Warehouse</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-4">Created</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {transfers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500">
-                        No active branch transfers recorded. Click &quot;New Transfer&quot; to initiate stock movement.
-                      </td>
-                    </tr>
-                  ) : (
-                    transfers.map((trf) => (
-                      <tr key={trf.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600 text-sm">
-                          {trf.trackingNumber}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-900 text-sm">
-                          {trf.sourceWarehouseName || 'Source Storage'}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-900 text-sm">
-                          {trf.targetWarehouseName || 'Destination Storage'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                              trf.status === 'PENDING'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : trf.status === 'DISPATCHED'
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : trf.status === 'RECEIVED'
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {trf.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
-                          {new Date(trf.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="py-3.5 px-4 text-right space-x-2">
-                          {trf.status === 'PENDING' && hasPermission('inventory:manage') && (
-                            <button
-                              onClick={() => handleDispatch(trf.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              Dispatch
-                            </button>
-                          )}
-                          {trf.status === 'DISPATCHED' && hasPermission('inventory:manage') && (
-                            <button
-                              onClick={() => handleReceive(trf.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              Receive
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* MODAL 1: Quick Stock Adjustment */}
-      {adjustModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Sliders className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Stock Adjustment</h3>
-                  <p className="text-xs text-slate-500">Update on-hand count with immutable ledger tracking</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setAdjustModalItem(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+          {/* Table Pagination */}
+          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <span>Rows per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="py-1 px-2 border border-slate-200 rounded bg-slate-50 font-medium text-slate-700"
               >
-                <X className="w-4 h-4" />
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>
+                Page <strong className="text-slate-800">{currentPage}</strong> of <strong className="text-slate-800">{totalPages}</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="p-1.5 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </section>
+      </div>
 
-            {/* Item Details */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-1">
-              <div className="text-xs font-bold text-slate-500 uppercase">Selected Item</div>
-              <div className="text-sm font-bold text-slate-800">{adjustModalItem.productName}</div>
-              <div className="text-xs text-slate-500 font-mono">
-                SKU: {adjustModalItem.sku} • Warehouse: {adjustModalItem.warehouseName}
-              </div>
-              <div className="text-xs text-slate-600 pt-1">
-                Current On-Hand Balance:{' '}
-                <span className="font-bold text-slate-900">
-                  {adjustModalItem.quantityOnHand} {adjustModalItem.unit || 'units'}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {/* Reason */}
+      {/* ==========================================
+          6. INLINE QUICK STOCK ADJUSTMENT MODAL
+      ========================================== */}
+      {adjustmentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Adjustment Reason
-                </label>
-                <select
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value as StockAdjustmentReason)}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
-                >
-                  <option value="PHYSICAL_COUNT">Physical Count / Stocktaking Discrepancy</option>
-                  <option value="DAMAGED">Damaged Goods (Damage Loss)</option>
-                  <option value="EXPIRED">Expired Inventory</option>
-                  <option value="LOST_STOLEN">Lost or Stolen Item</option>
-                  <option value="CORRECTION">Manual Inventory Correction</option>
-                </select>
-              </div>
-
-              {/* Counted Quantity */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  New Actual Counted Quantity
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={adjustCountedQty}
-                    onChange={(e) => setAdjustCountedQty(Number(e.target.value))}
-                    className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
-                  />
-                  <span className="text-xs font-bold text-slate-500">{adjustModalItem.unit || 'pcs'}</span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Delta Discrepancy:{' '}
-                  <span
-                    className={`font-bold ${
-                      adjustCountedQty - adjustModalItem.quantityOnHand >= 0
-                        ? 'text-emerald-600'
-                        : 'text-rose-600'
-                    }`}
-                  >
-                    {adjustCountedQty - adjustModalItem.quantityOnHand >= 0 ? '+' : ''}
-                    {(adjustCountedQty - adjustModalItem.quantityOnHand).toFixed(3)}{' '}
-                    {adjustModalItem.unit || 'units'}
-                  </span>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-indigo-600" />
+                  Quick Stock Adjustment & Physical Audit
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update inventory counts directly for active branches with immediate register synchronization.
                 </p>
               </div>
-
-              {/* Mandatory Notes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Audit Notes / Reason Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={adjustNotes}
-                  onChange={(e) => setAdjustNotes(e.target.value)}
-                  placeholder="Enter audit explanation (e.g. Month-end count, damaged water box)..."
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
               <button
-                type="button"
-                onClick={() => setAdjustModalItem(null)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                onClick={() => setAdjustmentModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitAdjustment}
-                disabled={isSubmittingAdjust}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
-              >
-                {isSubmittingAdjust ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Applying...
-                  </>
-                ) : (
-                  'Apply Adjustment'
-                )}
+                <X className="w-5 h-5" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* MODAL 2: Inter-Branch Stock Transfer */}
-      {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <ArrowRightLeft className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Inter-Branch Transfer</h3>
-                  <p className="text-xs text-slate-500">Consign inventory between branches with verified receipts</p>
+            {/* Modal Form */}
+            <div className="space-y-4 py-4 text-xs">
+              {/* Product Info Display */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target Item</p>
+                <h4 className="font-extrabold text-sm text-slate-900 mt-0.5">{adjustItem?.name}</h4>
+                <div className="flex items-center gap-2 text-slate-500 text-[11px] mt-1 font-mono">
+                  <span>SKU: {adjustItem?.sku}</span>
+                  <span>•</span>
+                  <span>Retail: Rs. {adjustItem?.retailPrice.toFixed(2)}</span>
                 </div>
               </div>
-              <button
-                onClick={() => setShowTransferModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              {/* Source Warehouse */}
+              {/* Branch Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Source Warehouse (Dispatch From)
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Target Operating Branch</label>
                 <select
-                  value={transferSourceWh}
-                  onChange={(e) => setTransferSourceWh(e.target.value)}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
+                  value={adjustBranchId}
+                  onChange={(e) => setAdjustBranchId(e.target.value)}
+                  className="w-full py-2 px-3 bg-white border border-slate-200 rounded-lg font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
-                  {warehouses.map((wh) => (
-                    <option key={wh.id} value={wh.id}>
-                      {wh.name}
+                  {rawBranches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code || 'BR'})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Target Warehouse */}
+              {/* Adjustment Mode Segmented Control */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Destination Warehouse (Consign To)
-                </label>
-                <select
-                  value={transferTargetWh}
-                  onChange={(e) => setTransferTargetWh(e.target.value)}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
-                >
-                  {warehouses.map((wh) => (
-                    <option key={wh.id} value={wh.id}>
-                      {wh.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="block font-bold text-slate-700 mb-1.5">Adjustment Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustType('ADD')}
+                    className={`py-2 px-3 rounded-lg font-bold text-xs transition border cursor-pointer ${
+                      adjustType === 'ADD'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    + Restock / GRN
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdjustType('DEDUCT')}
+                    className={`py-2 px-3 rounded-lg font-bold text-xs transition border cursor-pointer ${
+                      adjustType === 'DEDUCT'
+                        ? 'bg-rose-50 border-rose-500 text-rose-700 ring-2 ring-rose-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    - Damaged / Expired
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdjustType('SET')}
+                    className={`py-2 px-3 rounded-lg font-bold text-xs transition border cursor-pointer ${
+                      adjustType === 'SET'
+                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    = Audit Count
+                  </button>
+                </div>
               </div>
 
-              {/* Product */}
+              {/* Quantity Input */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Select Product to Transfer
-                </label>
-                <select
-                  value={transferProductId}
-                  onChange={(e) => setTransferProductId(e.target.value)}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
-                >
-                  {stockLevels.map((item) => (
-                    <option key={item.productId} value={item.productId}>
-                      {item.productName} ({item.sku}) - SOH: {item.quantityOnHand}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Transfer Quantity */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Transfer Quantity
+                <label className="block font-bold text-slate-700 mb-1">
+                  {adjustType === 'ADD' && 'Units to Add to Stock'}
+                  {adjustType === 'DEDUCT' && 'Units to Deduct from Stock'}
+                  {adjustType === 'SET' && 'Exact Physical Counted Units'}
                 </label>
                 <input
                   type="number"
-                  min="1"
-                  value={transferQty}
-                  onChange={(e) => setTransferQty(Number(e.target.value))}
-                  className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                  min="0.001"
+                  step="any"
+                  value={adjustQtyInput}
+                  onChange={(e) => setAdjustQtyInput(e.target.value)}
+                  className="w-full py-2 px-3 bg-white border border-slate-200 rounded-lg font-mono text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
-              {/* Notes */}
+              {/* Calculation Preview */}
+              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between text-xs font-semibold text-indigo-900">
+                <div>
+                  <span className="text-[11px] text-indigo-600 block">Current Stock</span>
+                  <span className="font-mono text-sm font-black">{adjustItem?.quantityOnHand || 0}</span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-indigo-400" />
+                <div>
+                  <span className="text-[11px] text-indigo-600 block">Adjustment</span>
+                  <span className="font-mono text-sm font-black">
+                    {adjustType === 'ADD' && `+${adjustQtyInput || 0}`}
+                    {adjustType === 'DEDUCT' && `-${adjustQtyInput || 0}`}
+                    {adjustType === 'SET' && `Set to ${adjustQtyInput || 0}`}
+                  </span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-indigo-400" />
+                <div>
+                  <span className="text-[11px] text-indigo-600 block">New Resulting Stock</span>
+                  <span className="font-mono text-sm font-black text-indigo-700">
+                    {(() => {
+                      const cur = adjustItem?.quantityOnHand || 0;
+                      const q = parseFloat(adjustQtyInput) || 0;
+                      if (adjustType === 'ADD') return cur + q;
+                      if (adjustType === 'DEDUCT') return Math.max(0, cur - q);
+                      if (adjustType === 'SET') return q;
+                      return cur;
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Audit Reason Notes */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Notes
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Audit Reason / Note (Optional)</label>
                 <input
                   type="text"
-                  value={transferNotes}
-                  onChange={(e) => setTransferNotes(e.target.value)}
-                  placeholder="e.g. Replenishment consignment..."
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500"
+                  value={adjustNotes}
+                  onChange={(e) => setAdjustNotes(e.target.value)}
+                  placeholder="e.g. Supplier delivery, monthly physical count, damaged packaging..."
+                  className="w-full py-2 px-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setShowTransferModal(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                onClick={() => setAdjustmentModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
               >
                 Cancel
               </button>
+
               <button
                 type="button"
-                onClick={submitTransfer}
-                disabled={isSubmittingTransfer}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
+                onClick={handleExecuteAdjustment}
+                disabled={isAdjusting}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
-                {isSubmittingTransfer ? (
+                {isAdjusting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Submitting...
+                    <span>Saving...</span>
                   </>
                 ) : (
-                  'Create Transfer'
+                  <span>Save Stock Adjustment</span>
                 )}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DRAWER: Immutable Stock Movement Ledger */}
-      {ledgerItem && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col border-l border-slate-200">
-            {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <History className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Stock Movement Ledger</h3>
-                  <p className="text-xs text-slate-500 font-medium">Immutable audit trail of stock increases & decreases</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setLedgerItem(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200/60 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Product Summary */}
-            <div className="p-6 border-b border-slate-100 bg-white">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Product Information</div>
-              <div className="text-base font-bold text-slate-900 mt-1">{ledgerItem.productName}</div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 font-mono">
-                <span>SKU: {ledgerItem.sku}</span>
-                <span>• Warehouse: {ledgerItem.warehouseName}</span>
-                <span className="font-bold text-slate-800">SOH: {ledgerItem.quantityOnHand} {ledgerItem.unit || 'pcs'}</span>
-              </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {movements
-                .filter((m) => m.productId === ledgerItem.productId || !ledgerItem.productId)
-                .map((mov) => (
-                  <div
-                    key={mov.id}
-                    className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:shadow-sm transition-all space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            mov.movementType === 'SALE'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : mov.movementType === 'TRANSFER_DISPATCH'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : mov.movementType === 'TRANSFER_RECEIPT'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : mov.movementType === 'DAMAGE_LOSS'
-                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                    : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}
-                        >
-                          {mov.movementType}
-                        </span>
-                        {mov.referenceId && (
-                          <span className="text-[11px] font-mono font-semibold text-slate-600">
-                            #{mov.referenceId}
-                          </span>
-                        )}
-                      </div>
-
-                      <span
-                        className={`text-sm font-black ${
-                          mov.quantity > 0 ? 'text-emerald-600' : 'text-rose-600'
-                        }`}
-                      >
-                        {mov.quantity > 0 ? `+${mov.quantity}` : mov.quantity}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-slate-600">{mov.notes || 'No description provided'}</div>
-
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-                      <div className="flex items-center gap-1 font-mono">
-                        <span>Balance: {mov.balanceBefore}</span>
-                        <ChevronRight className="w-3 h-3 text-slate-300" />
-                        <span className="font-bold text-slate-700">{mov.balanceAfter}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>{new Date(mov.createdAt).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
             </div>
           </div>
         </div>
@@ -1216,3 +2157,20 @@ export default function InventoryPage() {
   );
 }
 
+// Inline Helper Component for Icons
+function PieChartIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+      <path d="M22 12A10 10 0 0 0 12 2v10z" />
+    </svg>
+  );
+}

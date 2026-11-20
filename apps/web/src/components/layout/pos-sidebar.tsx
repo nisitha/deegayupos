@@ -10,6 +10,7 @@ import {
   Activity,
   Bell,
   Package,
+  Boxes,
   Tag,
   Users,
   Receipt,
@@ -58,6 +59,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
     items: [
       { name: 'Sales & Bills', href: '/dashboard/orders', icon: Receipt },
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
+      { name: 'Branch Inventory', href: '/dashboard/inventory', icon: Boxes },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
       { name: 'Special Stock & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
