@@ -2053,8 +2053,41 @@ export default function CashReconciliationPage() {
                           </div>
                         </div>
 
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-2">
+                        {/* Status Badge & Handover Verification */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {sh.previous_closing_float !== null && sh.previous_closing_float !== undefined && (
+                            (() => {
+                              const prevClosing = Number(sh.previous_closing_float);
+                              const hVar = sh.handover_variance !== null && sh.handover_variance !== undefined
+                                ? Number(sh.handover_variance)
+                                : Math.round((Number(sh.opening_float || 0) - prevClosing) * 100) / 100;
+                              const isMatch = Math.abs(hVar) < 0.01;
+                              const label = sh.previous_shift_label || 'Previous Shift';
+
+                              if (isMatch) {
+                                return (
+                                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>Handover Verified (Matches {label} Closing)</span>
+                                  </span>
+                                );
+                              } else {
+                                const isShort = hVar < 0;
+                                return (
+                                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 shadow-sm ${
+                                    isShort
+                                      ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+                                      : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                                  }`}>
+                                    <AlertTriangle className={`w-3.5 h-3.5 ${isShort ? 'text-rose-400' : 'text-amber-400'}`} />
+                                    <span>
+                                      Handover Variance vs {label} Closing: {hVar > 0 ? '+' : ''}LKR {hVar.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  </span>
+                                );
+                              }
+                            })()
+                          )}
                           <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border ${
                             sh.status === 'closed'
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
@@ -2074,7 +2107,14 @@ export default function CashReconciliationPage() {
                             <span className="text-purple-400 font-mono">Drawer Receipts</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-400">Opening Float:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-400">Opening Float:</span>
+                              {sh.previous_closing_float !== null && sh.previous_closing_float !== undefined && (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  (vs {sh.previous_shift_label || 'prev'}: LKR {Number(sh.previous_closing_float).toLocaleString('en-LK', { minimumFractionDigits: 2 })})
+                                </span>
+                              )}
+                            </div>
                             <span className="font-mono font-bold text-slate-200">
                               LKR {(sh.opening_float || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
@@ -3699,6 +3739,21 @@ export default function CashReconciliationPage() {
                             {Math.abs(shiftVar) < 0.01 ? 'Balanced' : `LKR ${shiftVar.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`}
                           </div>
                         </div>
+                        {s.previous_closing_float !== null && s.previous_closing_float !== undefined && (
+                          <div className="col-span-2 flex items-center justify-between text-[10px] pt-1 border-t border-slate-800/40">
+                            <span className="text-slate-500">Handover vs {s.previous_shift_label || 'Prev'}:</span>
+                            {Math.abs(Number(s.handover_variance ?? (s.opening_float - (s.previous_closing_float ?? 0)))) < 0.01 ? (
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Matches Closing
+                              </span>
+                            ) : (
+                              <span className="text-amber-400 font-bold flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                {Number(s.handover_variance ?? (s.opening_float - (s.previous_closing_float ?? 0))) > 0 ? '+' : ''}LKR {Number(s.handover_variance ?? (s.opening_float - (s.previous_closing_float ?? 0))).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

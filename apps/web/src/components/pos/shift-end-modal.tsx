@@ -26,7 +26,6 @@ import {
   ShiftCashBillItem,
 } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
-import { useTenantBranch } from '../../context/tenant-branch-context';
 
 interface ShiftEndModalProps {
   isOpen: boolean;
@@ -72,11 +71,7 @@ export function ShiftEndModal({
   onConfirmEndShift,
   branchId,
   cashierId,
-  isOwner: propIsOwner,
 }: ShiftEndModalProps) {
-  const { isOwner: ctxIsOwner, user } = useTenantBranch();
-  const isOwner = propIsOwner !== undefined ? propIsOwner : (ctxIsOwner && user?.role === 'OWNER');
-
   const [activeTab, setActiveTab] = useState<'MODAKA' | 'DENOMINATIONS' | 'SUMMARY'>('MODAKA');
   const [localShift, setLocalShift] = useState<CashierShiftDto | null>(activeShift);
   const [isLoadingShift, setIsLoadingShift] = useState(false);
@@ -119,7 +114,6 @@ export function ShiftEndModal({
 
   // Section 3: Shift Cash & Expense Summary state
   const [openingFloat, setOpeningFloat] = useState<number>(0);
-  const [isEditingOpeningFloat, setIsEditingOpeningFloat] = useState<boolean>(false);
   const [declaredShiftSale, setDeclaredShiftSale] = useState<number>(0);
   const [livePosBillCount, setLivePosBillCount] = useState<number>(0);
   const [liveCashBills, setLiveCashBills] = useState<ShiftCashBillItem[]>([]);
@@ -145,13 +139,6 @@ export function ShiftEndModal({
     const num = Number(trimmed);
     return !isNaN(num) && num >= 0;
   }, [countedRemainingCashInput]);
-
-  const isInitialZeroFloat = Number(localShift?.openingFloat || activeShift?.openingFloat || 0) === 0;
-  const isLockedOpeningFloat = Boolean(
-    localShift?.hasLockedOpeningFloat ?? ((localShift?.shiftNumber || activeShift?.shiftNumber || 1) > 1)
-  );
-  const prevShiftLabel = localShift?.previousShiftLabel || formatShiftLabel((localShift?.shiftNumber || 2) - 1);
-  const canEditOpeningFloat = !isLockedOpeningFloat && (isOwner || isInitialZeroFloat || isEditingOpeningFloat);
 
   useEffect(() => {
     if (activeShift) {
@@ -940,46 +927,22 @@ export function ShiftEndModal({
                             <span className="font-semibold text-[15px] text-slate-900 block">
                               Opening Float
                             </span>
-                            {isLockedOpeningFloat ? (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-300 flex items-center gap-1">
-                                <span>🔒</span> Locked
-                              </span>
-                            ) : (
-                              isOwner && !isInitialZeroFloat && (
-                                <button
-                                  type="button"
-                                  onClick={() => setIsEditingOpeningFloat(!isEditingOpeningFloat)}
-                                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer"
-                                >
-                                  {isEditingOpeningFloat ? 'Lock' : 'Edit'}
-                                </button>
-                              )
-                            )}
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-300 flex items-center gap-1">
+                              <span>🔒</span> Confirmed at Shift Start
+                            </span>
                           </div>
                           <span className="text-xs text-slate-500 block mt-0.5">
-                            {isLockedOpeningFloat
-                              ? `Auto-carried from ${prevShiftLabel} Closing Drawer Float (Read-Only)`
-                              : 'No prior closed shift — enter starting drawer cash'}
+                            Physical drawer cash verified and confirmed at shift commencement
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-bold text-slate-400">LKR</span>
                           <input
                             type="number"
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={openingFloat || ''}
-                            onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
-                            readOnly={isLockedOpeningFloat || !canEditOpeningFloat}
-                            disabled={isLockedOpeningFloat}
-                            className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg focus:outline-none ${
-                              isLockedOpeningFloat
-                                ? 'bg-slate-100 text-slate-700 border-slate-300 cursor-not-allowed select-none'
-                                : canEditOpeningFloat
-                                ? 'bg-white text-slate-900 border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15'
-                                : 'bg-slate-50 text-slate-500 border border-slate-200 cursor-not-allowed'
-                            }`}
+                            readOnly
+                            disabled
+                            value={openingFloat || 0}
+                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg bg-slate-100 text-slate-700 border border-slate-300 cursor-not-allowed select-none"
                           />
                         </div>
                       </div>

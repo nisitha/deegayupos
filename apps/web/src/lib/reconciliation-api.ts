@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { formatShiftLabel } from './api-client';
 
 export interface DenominationBreakdown {
   [key: number]: number;
@@ -101,6 +102,10 @@ export interface ShiftHandoverSummary {
   extra_income_amount?: number;
   denominations_json: Record<string, number>;
   handover_notes: string | null;
+  previous_closing_float?: number | null;
+  previous_shift_label?: string | null;
+  handover_variance?: number | null;
+  opening_confirmed?: boolean;
 }
 
 export interface ReconciliationWorksheetData {
@@ -593,6 +598,50 @@ export const reconciliationApi = {
           }
         }
 
+        let prevClosingFloat: number | null = null;
+        let prevShiftLabel: string | null = null;
+        let handoverVariance: number | null = null;
+        let openingConfirmed = false;
+
+        const rawNotes = (sh as any).notes || sh.handover_notes || '';
+        if (rawNotes) {
+          try {
+            const jsonStr = rawNotes.includes('[PENDING_OPENING_COUNT]')
+              ? rawNotes.replace('[PENDING_OPENING_COUNT]', '').trim()
+              : rawNotes;
+            if (jsonStr.startsWith('{')) {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.previous_closing_float !== undefined) prevClosingFloat = parsed.previous_closing_float;
+              if (parsed.previous_shift_label) prevShiftLabel = parsed.previous_shift_label;
+              if (parsed.handover_variance !== undefined) handoverVariance = parsed.handover_variance;
+              if (parsed.opening_confirmed) openingConfirmed = true;
+            }
+          } catch {}
+        }
+
+        // If not stored in notes, look for preceding closed shift for this branch in shiftRows
+        if (prevClosingFloat === null) {
+          const prior = (shiftRows || []).find((other: any) =>
+            other.id !== sh.id &&
+            other.branch_id === sh.branch_id &&
+            (
+              (other.shift_date === sh.shift_date && (other.shift_number || 1) < (sh.shift_number || 1)) ||
+              (other.shift_date < sh.shift_date)
+            ) &&
+            other.status === 'closed'
+          );
+          if (prior) {
+            prevClosingFloat = Math.round(
+              Number(prior.closing_float ?? prior.closing_drawer_float ?? prior.counted_remaining_drawer_cash ?? 0) * 100
+            ) / 100;
+            prevShiftLabel = formatShiftLabel(prior.shift_number);
+          }
+        }
+
+        if (prevClosingFloat !== null && handoverVariance === null) {
+          handoverVariance = Math.round((openingF - prevClosingFloat) * 100) / 100;
+        }
+
         return {
           id: sh.id,
           shift_number: Number(sh.shift_number) || 1,
@@ -629,6 +678,10 @@ export const reconciliationApi = {
           extra_income_amount: extraIncome,
           denominations_json: (sh.denominations_json || {}) as Record<string, number>,
           handover_notes: sh.handover_notes || null,
+          previous_closing_float: prevClosingFloat,
+          previous_shift_label: prevShiftLabel,
+          handover_variance: handoverVariance,
+          opening_confirmed: openingConfirmed,
         };
       });
 

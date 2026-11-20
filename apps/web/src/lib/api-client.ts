@@ -3206,6 +3206,11 @@ export interface CashierShiftDto {
   shiftNumber: number; // 1, 2, ...
   hasLockedOpeningFloat?: boolean;
   previousShiftLabel?: string;
+  previousClosingFloat?: number | null;
+  handoverVariance?: number;
+  needsOpeningCount?: boolean;
+  openingConfirmed?: boolean;
+  notes?: string | null;
   startedAt: string;
   endedAt?: string | null;
   status: 'open' | 'closed';
@@ -3558,6 +3563,28 @@ export const shiftsApi = {
         }
       });
 
+      // Parse metadata from notes / handover_notes
+      const rawNotes = (openShift as any).notes || openShift.handover_notes || '';
+      let previousClosingFloat: number | null = null;
+      let prevShiftLabelFromNotes: string | undefined = undefined;
+      let handoverVariance = 0;
+      let openingConfirmed = false;
+
+      if (rawNotes) {
+        try {
+          const jsonStr = rawNotes.includes('[PENDING_OPENING_COUNT]')
+            ? rawNotes.replace('[PENDING_OPENING_COUNT]', '').trim()
+            : rawNotes;
+          if (jsonStr.startsWith('{')) {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.previous_closing_float !== undefined) previousClosingFloat = parsed.previous_closing_float;
+            if (parsed.previous_shift_label) prevShiftLabelFromNotes = parsed.previous_shift_label;
+            if (parsed.handover_variance !== undefined) handoverVariance = parsed.handover_variance;
+            if (parsed.opening_confirmed) openingConfirmed = true;
+          }
+        } catch {}
+      }
+
       // Check if any prior closed shift exists for this branch to mark locked status
       const { data: priorShift } = await supabase
         .from('cashier_shifts')
@@ -3569,7 +3596,17 @@ export const shiftsApi = {
         .maybeSingle();
 
       const hasLockedOpeningFloat = !!priorShift;
-      const previousShiftLabel = priorShift ? formatShiftLabel(priorShift.shift_number) : undefined;
+      const previousShiftLabel = prevShiftLabelFromNotes || (priorShift ? formatShiftLabel(priorShift.shift_number) : undefined);
+      if (previousClosingFloat === null && priorShift) {
+        previousClosingFloat = Math.round(
+          Number(priorShift.closing_float ?? priorShift.counted_remaining_drawer_cash ?? priorShift.closing_drawer_float ?? 0) * 100
+        ) / 100;
+      }
+
+      const needsOpeningCount =
+        openShift.opening_float == null ||
+        Boolean((openShift as any).notes?.includes('[PENDING_OPENING_COUNT]')) ||
+        Boolean(openShift.handover_notes?.includes('[PENDING_OPENING_COUNT]'));
 
       return {
         success: true,
@@ -3583,6 +3620,11 @@ export const shiftsApi = {
           shiftNumber: openShift.shift_number || 1,
           hasLockedOpeningFloat,
           previousShiftLabel,
+          previousClosingFloat,
+          handoverVariance,
+          needsOpeningCount,
+          openingConfirmed,
+          notes: (openShift as any).notes || openShift.handover_notes,
           startedAt: openShift.started_at,
           endedAt: openShift.ended_at,
           status: 'open',
@@ -3652,16 +3694,16 @@ export const shiftsApi = {
         .limit(1)
         .maybeSingle();
 
-      const carriedOpeningFloat = prevShift
+      const previousClosingFloat = prevShift
         ? Math.round(
             Number(
               prevShift?.closing_float ?? prevShift?.counted_remaining_drawer_cash ?? prevShift?.closing_drawer_float ?? 0
             ) * 100
           ) / 100
-        : 0;
+        : null;
 
-      const hasLockedOpeningFloat = !!prevShift;
       const previousShiftLabel = prevShift ? formatShiftLabel(prevShift.shift_number) : undefined;
+      const hasLockedOpeningFloat = !!prevShift;
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
@@ -3700,6 +3742,13 @@ export const shiftsApi = {
         if (isValidUuid(stored)) tenantId = stored!;
       }
 
+      const pendingMeta = JSON.stringify({
+        pending_opening_count: true,
+        previous_closing_float: previousClosingFloat,
+        previous_shift_label: previousShiftLabel,
+      });
+      const pendingNotes = `[PENDING_OPENING_COUNT] ${pendingMeta}`;
+
       const { data: newShift, error: createErr } = await supabase
         .from('cashier_shifts')
         .insert({
@@ -3710,7 +3759,9 @@ export const shiftsApi = {
           shift_number: shiftNumber,
           started_at: new Date().toISOString(),
           status: 'open',
-          opening_float: carriedOpeningFloat,
+          opening_float: 0,
+          notes: pendingNotes,
+          handover_notes: pendingNotes,
         })
         .select()
         .single();
@@ -3785,6 +3836,11 @@ export const shiftsApi = {
           shiftNumber: newShift.shift_number,
           hasLockedOpeningFloat,
           previousShiftLabel,
+          previousClosingFloat,
+          handoverVariance: 0,
+          needsOpeningCount: true,
+          openingConfirmed: false,
+          notes: pendingNotes,
           startedAt: newShift.started_at,
           status: 'open',
           posTotalBills: 0,
@@ -3796,12 +3852,12 @@ export const shiftsApi = {
           posGrossSales: 0,
           modakaTotalSoldQty: 0,
           modakaTotalAmount: 0,
-          openingFloat: carriedOpeningFloat,
+          openingFloat: 0,
           declaredShiftSale: 0,
-          totalCashAvailable: carriedOpeningFloat,
+          totalCashAvailable: 0,
           goodsPurchasedPaid: 0,
           otherExpenses: 0,
-          expectedCashBeforeBank: carriedOpeningFloat,
+          expectedCashBeforeBank: 0,
           countedDrawerCash: 0,
           denominationsJson: {},
           bankedAmount: 0,
@@ -3813,6 +3869,126 @@ export const shiftsApi = {
       };
     } catch (err: any) {
       console.error('[shiftsApi] getOrCreateActiveShift fatal:', err);
+      return {
+        success: false,
+        data: null as any,
+        error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
+  confirmShiftOpeningCount: async (
+    shiftId: string,
+    countedOpeningFloat: number,
+    denominationBreakdown?: Record<string, number>
+  ): Promise<ApiResponse<CashierShiftDto>> => {
+    try {
+      if (!isValidUuid(shiftId)) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INVALID_ID', message: 'Invalid shift ID', statusCode: 400 },
+        };
+      }
+
+      const { data: shiftRow, error: fetchErr } = await supabase
+        .from('cashier_shifts')
+        .select('*')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (fetchErr || !shiftRow) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'NOT_FOUND', message: 'Shift not found', statusCode: 404 },
+        };
+      }
+
+      let previousClosingFloat: number | null = null;
+      let previousShiftLabel: string | undefined = undefined;
+
+      const rawNotes = (shiftRow as any).notes || shiftRow.handover_notes || '';
+      if (rawNotes) {
+        try {
+          const jsonStr = rawNotes.includes('[PENDING_OPENING_COUNT]')
+            ? rawNotes.replace('[PENDING_OPENING_COUNT]', '').trim()
+            : rawNotes;
+          if (jsonStr.startsWith('{')) {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.previous_closing_float !== undefined) previousClosingFloat = parsed.previous_closing_float;
+            if (parsed.previous_shift_label) previousShiftLabel = parsed.previous_shift_label;
+          }
+        } catch {}
+      }
+
+      if (previousClosingFloat === null && shiftRow.branch_id) {
+        const { data: priorShift } = await supabase
+          .from('cashier_shifts')
+          .select('shift_number, closing_float, closing_drawer_float, counted_remaining_drawer_cash')
+          .eq('branch_id', shiftRow.branch_id)
+          .eq('status', 'closed')
+          .order('ended_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (priorShift) {
+          previousClosingFloat = Math.round(
+            Number(priorShift.closing_float ?? priorShift.counted_remaining_drawer_cash ?? priorShift.closing_drawer_float ?? 0) * 100
+          ) / 100;
+          previousShiftLabel = formatShiftLabel(priorShift.shift_number);
+        }
+      }
+
+      const countedFloat = Math.round(Number(countedOpeningFloat || 0) * 100) / 100;
+      const handoverVariance = previousClosingFloat !== null
+        ? Math.round((countedFloat - previousClosingFloat) * 100) / 100
+        : 0;
+
+      const notesPayload = JSON.stringify({
+        opening_confirmed: true,
+        opening_confirmed_at: new Date().toISOString(),
+        previous_closing_float: previousClosingFloat,
+        previous_shift_label: previousShiftLabel,
+        handover_variance: handoverVariance,
+        denomination_breakdown: denominationBreakdown || null,
+      });
+
+      const { data: updated, error: updErr } = await supabase
+        .from('cashier_shifts')
+        .update({
+          opening_float: countedFloat,
+          notes: notesPayload,
+          handover_notes: notesPayload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', shiftId)
+        .select()
+        .single();
+
+      if (updErr) {
+        console.error('[shiftsApi] confirmShiftOpeningCount update error:', updErr);
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'UPDATE_ERROR', message: updErr.message, statusCode: 500 },
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          ...updated,
+          openingFloat: countedFloat,
+          needsOpeningCount: false,
+          openingConfirmed: true,
+          previousClosingFloat,
+          previousShiftLabel,
+          handoverVariance,
+        },
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] confirmShiftOpeningCount fatal:', err);
       return {
         success: false,
         data: null as any,

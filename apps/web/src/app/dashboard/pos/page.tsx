@@ -50,6 +50,7 @@ import { posApi, shiftsApi, formatShiftLabel, type CashierShiftDto } from '../..
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
+import { ShiftStartModal } from '../../../components/pos/shift-start-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
 import { ModakaStockInModal } from '../../../components/pos/modaka-stock-in-modal';
 import { DiscountPickerModal } from '../../../components/pos/discount-picker-modal';
@@ -3032,6 +3033,31 @@ export default function ConfidencyPosPage() {
           refreshActiveShift();
           setScanFeedback('Special incoming stock (B) updated.');
           setTimeout(() => setScanFeedback(null), 3000);
+        }}
+      />
+
+      {/* 1. Start Shift Opening Drawer Count Modal (Mandatory Blind Count) */}
+      <ShiftStartModal
+        isOpen={Boolean(activeShift?.needsOpeningCount)}
+        activeShift={activeShift}
+        branchName={currentBranchName}
+        cashierName={cashierName}
+        onConfirmSuccess={(confirmedFloat) => {
+          setActiveShift((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  openingFloat: confirmedFloat,
+                  needsOpeningCount: false,
+                  openingConfirmed: true,
+                }
+              : null
+          );
+          setScanFeedback(`Opening float confirmed (LKR ${confirmedFloat.toLocaleString('en-US', { minimumFractionDigits: 2 })}). Terminal ready.`);
+          setTimeout(() => setScanFeedback(null), 3000);
+          setTimeout(() => {
+            searchInputRef.current?.focus();
+          }, 150);
         }}
       />
 
