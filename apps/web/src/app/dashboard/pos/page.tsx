@@ -1621,16 +1621,18 @@ export default function ConfidencyPosPage() {
               </button>
             )}
 
-            {/* Switch Shop (Logout) Button */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 bg-white px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
-              title="Switch Shop / Change Branch"
-            >
-              <Store className="w-4 h-4 text-slate-500" />
-              <span>Switch Shop</span>
-            </button>
+            {/* Switch Shop (Logout) Button - only shown for Owner */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 bg-white px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
+                title="Switch Shop / Change Branch"
+              >
+                <Store className="w-4 h-4 text-slate-500" />
+                <span>Switch Shop</span>
+              </button>
+            )}
 
             {/* Top-Right Logout Button */}
             <button

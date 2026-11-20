@@ -3386,13 +3386,16 @@ export const shiftsApi = {
 
   isOwnerUser: (user?: any | null): boolean => {
     if (!user) return false;
-    const role = String(user.role || '').toLowerCase();
-    if (['owner', 'admin', 'super_admin', 'superadmin'].includes(role)) {
+    const email = String(user.email || '').trim().toLowerCase();
+    if (email === 'owner@deegayu.pixelcraftlk.com' || email.startsWith('owner@')) {
       return true;
     }
-    const name = String(user.fullName || user.full_name || user.name || '').toLowerCase();
-    const email = String(user.email || '').toLowerCase();
-    if (name.includes('deegayu') || email.includes('deegayu') || email.includes('owner')) {
+    const role = String(user.role || '').trim().toLowerCase();
+    if (['owner', 'super_admin', 'superadmin'].includes(role)) {
+      return true;
+    }
+    const name = String(user.fullName || user.full_name || user.name || '').trim().toLowerCase();
+    if ((name === 'dr. deegayu' || name === 'dr deegayu' || name.startsWith('dr. deegayu') || name.startsWith('dr deegayu')) && !name.includes('cashier')) {
       return true;
     }
     return false;
