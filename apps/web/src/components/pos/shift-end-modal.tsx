@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   CheckCircle2,
@@ -125,6 +125,7 @@ export function ShiftEndModal({
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
+  const openingMetadataRef = useRef<Record<string, any> | null>(null);
 
   const enteredRemainingCash = useMemo(() => {
     const trimmed = countedRemainingCashInput.trim();
@@ -301,7 +302,45 @@ export function ShiftEndModal({
 
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
         setOtherExpenses(Number(shift.otherExpenses || 0));
-        setHandoverNotes(shift.handoverNotes || '');
+
+        // Cleanly separate system JSON opening metadata from cashier human remarks
+        const rawNotes = (shift as any)?.notes || shift?.handoverNotes || '';
+        let cleanHumanRemarks = '';
+        let parsedOpeningMeta: Record<string, any> | null = null;
+
+        if (rawNotes) {
+          let content = String(rawNotes).trim();
+          if (content.includes('[PENDING_OPENING_COUNT]')) {
+            content = content.replace('[PENDING_OPENING_COUNT]', '').trim();
+          }
+
+          const jsonStart = content.indexOf('{');
+          const jsonEnd = content.lastIndexOf('}');
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            try {
+              const jsonStr = content.slice(jsonStart, jsonEnd + 1);
+              parsedOpeningMeta = JSON.parse(jsonStr);
+              if (parsedOpeningMeta?.remarks) {
+                cleanHumanRemarks = String(parsedOpeningMeta.remarks).trim();
+              } else if (parsedOpeningMeta?.cashier_remarks) {
+                cleanHumanRemarks = String(parsedOpeningMeta.cashier_remarks).trim();
+              } else {
+                const before = content.slice(0, jsonStart).trim();
+                const after = content.slice(jsonEnd + 1).trim();
+                cleanHumanRemarks = [before, after].filter(Boolean).join(' ').trim();
+              }
+            } catch {
+              if (!content.startsWith('{')) {
+                cleanHumanRemarks = content;
+              }
+            }
+          } else if (!content.startsWith('{')) {
+            cleanHumanRemarks = content;
+          }
+        }
+
+        openingMetadataRef.current = parsedOpeningMeta;
+        setHandoverNotes(cleanHumanRemarks);
       }
 
       // Fetch company bank accounts
@@ -475,6 +514,16 @@ export function ShiftEndModal({
       }
     }
 
+    // Cleanly merge human remarks with preserved opening metadata
+    const userRemark = handoverNotes.trim();
+    let finalHandoverNotes = userRemark;
+    if (openingMetadataRef.current) {
+      finalHandoverNotes = JSON.stringify({
+        ...openingMetadataRef.current,
+        remarks: userRemark || undefined,
+      });
+    }
+
     const payload: EndShiftPayload = {
       shiftId: targetShift.id,
       branchId: targetShift.branchId,
@@ -490,7 +539,7 @@ export function ShiftEndModal({
       countedRemainingDrawerCash: countedCash,
       closingDrawerFloat: countedCash,
       denominationsJson: counts,
-      handoverNotes: handoverNotes.trim(),
+      handoverNotes: finalHandoverNotes,
       modakaEntries: modakaRows.map((r) => ({
         productId: r.productId,
         openingQty: r.openingQty,
@@ -1211,53 +1260,40 @@ export function ShiftEndModal({
                       </div>
 
                       {/* Remaining Cash Left in Drawer (Strict Blind Manual Input) */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <div>
-                          <span className="font-semibold text-[15px] text-slate-900 block">
-                            Remaining Cash Left in Drawer (LKR)
-                          </span>
-                          <span className="text-xs text-slate-500 block mt-0.5">
-                            Count physical cash remaining in drawer after bank deposit and enter exact total
-                          </span>
+                      <div className="p-3.5 rounded-xl border-2 border-emerald-500/70 bg-emerald-50/20 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div>
+                            <span className="font-bold text-[15px] text-slate-900 block">
+                              Remaining Cash Left in Drawer (LKR) <span className="text-rose-500">*</span>
+                            </span>
+                            <span className="text-xs text-slate-600 block mt-0.5 leading-relaxed">
+                              Count physical cash remaining in drawer — carries forward as next shift&apos;s Opening Float.
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <span className="text-xs font-bold text-emerald-800 font-mono">LKR</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              inputMode="decimal"
+                              placeholder="Enter counted cash..."
+                              value={countedRemainingCashInput}
+                              onChange={(e) => setCountedRemainingCashInput(e.target.value)}
+                              className="w-44 h-11 px-3 text-right font-mono text-base font-bold tabular-nums bg-white text-emerald-950 border border-emerald-400 rounded-lg focus:border-emerald-600 focus:ring-2 focus:ring-emerald-300/40 focus:outline-none placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans"
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-bold text-emerald-600">LKR</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={countedRemainingCashInput}
-                            onChange={(e) => setCountedRemainingCashInput(e.target.value)}
-                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-emerald-50/40 text-emerald-950 border border-emerald-300 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Glowing Emerald Carry-Forward Banner */}
-                      <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white flex items-center justify-between shadow-md">
-                        <div>
-                          <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-100 block">
-                            DECLARED CLOSING DRAWER FLOAT (CARRIED TO NEXT SHIFT)
-                          </span>
-                          <span className="text-xs text-emerald-100 font-medium block mt-0.5">
-                            Auto carries forward as next shift Opening Float
-                          </span>
-                        </div>
-                        <span className="text-2xl sm:text-3xl font-black font-mono text-white tabular-nums">
-                          LKR {enteredRemainingCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
                       </div>
 
                       {/* Handover Notes */}
-                      <div className="pt-2">
+                      <div className="pt-1">
                         <label className="text-xs sm:text-sm font-bold text-slate-700 block mb-1">
                           Handover Notes / Remarks
                         </label>
                         <textarea
                           rows={2}
-                          placeholder="Any notes for the next shift cashier or owner regarding cash or branch inventory..."
+                          placeholder="Optional remarks for Admin..."
                           value={handoverNotes}
                           onChange={(e) => setHandoverNotes(e.target.value)}
                           className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/15"

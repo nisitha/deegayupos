@@ -2259,12 +2259,23 @@ export default function CashReconciliationPage() {
                       </div>
 
                       {/* Handover Remarks */}
-                      {sh.handover_notes && (
-                        <div className="text-xs text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 italic">
-                          <span className="text-slate-500 not-italic font-bold mr-1.5">Handover Remarks:</span>
-                          &ldquo;{sh.handover_notes}&rdquo;
-                        </div>
-                      )}
+                      {sh.handover_notes && (() => {
+                        const raw = String(sh.handover_notes).trim();
+                        let displayNote = raw;
+                        if (raw.startsWith('{')) {
+                          try {
+                            const parsed = JSON.parse(raw);
+                            displayNote = parsed.remarks || parsed.cashier_remarks || '';
+                          } catch { }
+                        }
+                        if (!displayNote) return null;
+                        return (
+                          <div className="text-xs text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 italic">
+                            <span className="text-slate-500 not-italic font-bold mr-1.5">Handover Remarks:</span>
+                            &ldquo;{displayNote}&rdquo;
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
