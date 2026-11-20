@@ -36,6 +36,10 @@ import {
   PackagePlus,
   Store,
   Menu,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type {
   CheckoutPayload,
@@ -231,6 +235,51 @@ export default function ConfidencyPosPage() {
 
   // Department Filter & Search Station
   const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+
+  const checkCategoryScroll = useCallback(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 2);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    checkCategoryScroll();
+    el.addEventListener('scroll', checkCategoryScroll, { passive: true });
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkCategoryScroll();
+    });
+    resizeObserver.observe(el);
+
+    return () => {
+      el.removeEventListener('scroll', checkCategoryScroll);
+      resizeObserver.disconnect();
+    };
+  }, [checkCategoryScroll, isCategoriesExpanded]);
+
+  const handleCategoryScroll = (direction: 'left' | 'right') => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    const scrollAmount = direction === 'left' ? -260 : 260;
+    el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  };
+
+  const handleCategoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (isCategoriesExpanded) return;
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaY) > 0) {
+      el.scrollLeft += e.deltaY;
+    }
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1884,56 +1933,113 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 4. Category Tabs (English-Only) */}
-        <div className="px-5 py-2 border-b border-slate-200/90 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth shrink-0 bg-white backdrop-blur-xs">
-          {/* All Departments Tab */}
-          <button
-            type="button"
-            onClick={() => setSelectedDeptId('all')}
-            className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
-              }`}
+        {/* 4. Category Tabs (English-Only with Scroll Arrows & Expand Toggle) */}
+        <div className="px-3 sm:px-5 py-2 border-b border-slate-200/90 bg-white backdrop-blur-xs shrink-0 flex items-center gap-1.5 relative">
+          {/* Left Scroll Arrow Button */}
+          {!isCategoriesExpanded && canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => handleCategoryScroll('left')}
+              className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:scale-95 shadow-xs transition-all z-10 cursor-pointer"
+              title="Scroll Categories Left"
+              aria-label="Scroll Categories Left"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Categories Horizontal Scroll / Wrap Container */}
+          <div
+            ref={categoryScrollRef}
+            onWheel={handleCategoryWheel}
+            className={`flex-1 flex items-center gap-2 transition-all ${
+              isCategoriesExpanded
+                ? 'flex-wrap py-1 max-h-56 overflow-y-auto'
+                : 'flex-nowrap overflow-x-auto no-scrollbar scroll-smooth py-0.5'
+            }`}
           >
-            <span>All Products</span>
-            <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${selectedDeptId === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+            {/* All Departments Tab */}
+            <button
+              type="button"
+              onClick={() => setSelectedDeptId('all')}
+              className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${selectedDeptId === 'all'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
                 }`}
             >
-              {departmentCounts.all || 0}
-            </span>
-          </button>
-
-          {/* Standardized Departments (Clean English Only) */}
-          {AYURVEDIC_DEPARTMENT_LIST.map((dept) => {
-            const isActive = selectedDeptId === dept.id;
-            const count = departmentCounts[dept.id] || 0;
-
-            return (
-              <button
-                key={dept.id}
-                type="button"
-                onClick={() => setSelectedDeptId(dept.id)}
-                className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
-                  ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
+              <span>All Products</span>
+              <span
+                className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${selectedDeptId === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
                   }`}
               >
-                {/* 3D Mini Dot */}
-                <span
-                  className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : `bg-gradient-to-br ${dept.gradient}`
-                    } shadow-2xs shrink-0`}
-                />
-                <span className="whitespace-nowrap">{dept.en}</span>
-                <span
-                  className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${isActive ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+                {departmentCounts.all || 0}
+              </span>
+            </button>
+
+            {/* Standardized Departments (Clean English Only) */}
+            {AYURVEDIC_DEPARTMENT_LIST.map((dept) => {
+              const isActive = selectedDeptId === dept.id;
+              const count = departmentCounts[dept.id] || 0;
+
+              return (
+                <button
+                  key={dept.id}
+                  type="button"
+                  onClick={() => setSelectedDeptId(dept.id)}
+                  className={`h-10 px-3.5 py-1.5 rounded-xl text-[15px] font-semibold transition-all shrink-0 active:scale-95 flex items-center gap-2 border cursor-pointer ${isActive
+                    ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
                     }`}
                 >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                  {/* 3D Mini Dot */}
+                  <span
+                    className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : `bg-gradient-to-br ${dept.gradient}`
+                      } shadow-2xs shrink-0`}
+                  />
+                  <span className="whitespace-nowrap">{dept.en}</span>
+                  <span
+                    className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded-md ${isActive ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Scroll Arrow Button */}
+          {!isCategoriesExpanded && canScrollRight && (
+            <button
+              type="button"
+              onClick={() => handleCategoryScroll('right')}
+              className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:scale-95 shadow-xs transition-all z-10 cursor-pointer"
+              title="Scroll Categories Right"
+              aria-label="Scroll Categories Right"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Expand / Collapse All Categories Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsCategoriesExpanded((prev) => !prev)}
+            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold shrink-0 active:scale-95 flex items-center gap-1.5 border cursor-pointer transition-all ${
+              isCategoriesExpanded
+                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+            }`}
+            title={isCategoriesExpanded ? 'Collapse to single row' : 'Show all categories'}
+          >
+            <span className="hidden sm:inline">{isCategoriesExpanded ? 'Compact' : 'All Categories'}</span>
+            <span className="sm:hidden">{isCategoriesExpanded ? 'Less' : 'More'}</span>
+            {isCategoriesExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+            )}
+          </button>
         </div>
 
         {/* 5. Product Cards Grid with 3D Category Emblems */}
