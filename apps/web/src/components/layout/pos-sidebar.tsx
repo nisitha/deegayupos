@@ -114,6 +114,29 @@ export function PosSidebar() {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+  const isPosPage = pathname === '/dashboard/pos' || pathname?.startsWith('/dashboard/pos');
+
+  // Adaptive viewport collapse logic:
+  // On /dashboard/pos: collapse to icon-rail (w-[68px]) on < 1440px; expand on >= 1440px
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const adaptToViewport = () => {
+      const width = window.innerWidth;
+      if (isPosPage) {
+        if (width < 1440) {
+          setIsCollapsed(true);
+        } else {
+          setIsCollapsed(false);
+        }
+      }
+    };
+
+    adaptToViewport();
+    window.addEventListener('resize', adaptToViewport);
+    return () => window.removeEventListener('resize', adaptToViewport);
+  }, [isPosPage]);
+
   useEffect(() => {
     setMobileDrawerOpen(false);
   }, [pathname]);
@@ -249,9 +272,9 @@ export function PosSidebar() {
 
   return (
     <>
-      {/* Mobile Slide-Over Navigation Drawer (< lg screens) */}
+      {/* Mobile Slide-Over Navigation Drawer (< md screens) */}
       {mobileDrawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 md:hidden flex animate-in fade-in duration-200">
           {/* Backdrop Tap-to-Close */}
           <div
             onClick={() => setMobileDrawerOpen(false)}
@@ -414,9 +437,9 @@ export function PosSidebar() {
         </div>
       )}
 
-      {/* Desktop Sidebar (>= lg screens) */}
+      {/* Desktop / Tablet Sidebar (>= md screens) */}
       <aside
-        className={`hidden lg:flex ${
+        className={`hidden md:flex ${
           isCollapsed ? 'w-[68px]' : 'w-64'
         } bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30 transition-all duration-200`}
       >

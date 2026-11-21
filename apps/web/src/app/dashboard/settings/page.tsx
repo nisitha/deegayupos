@@ -924,7 +924,7 @@ export default function SettingsDocumentPage() {
                     setReceiptFooterNote(e.target.value);
                     setIsDirty(true);
                   }}
-                  placeholder="e.g. නිරෝගී සුවය පතමු! / Wishing you healthy living! Return within 7 days."
+                  placeholder="e.g. Wishing you healthy living! Return within 7 days."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7052FF] focus:bg-white transition-colors"
                 />
               </div>

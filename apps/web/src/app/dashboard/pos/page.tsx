@@ -333,6 +333,20 @@ export default function ConfidencyPosPage() {
   // Mobile Slide-up Bottom Sheet
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
+  // Synchronize cart state to window & sessionStorage for AutoUpdateWatcher
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__PIXELCRAFT_POS_CART_ACTIVE = cart.length > 0;
+      window.__PIXELCRAFT_POS_CART_COUNT = cart.length;
+      try {
+        sessionStorage.setItem('pixelcraft_pos_cart_active', cart.length > 0 ? 'true' : 'false');
+        sessionStorage.setItem('pixelcraft_pos_cart_count', String(cart.length));
+      } catch {
+        // ignore
+      }
+    }
+  }, [cart]);
+
   // Scanner & Notification feedback
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
 
@@ -1481,7 +1495,7 @@ export default function ConfidencyPosPage() {
   }, [isCheckoutModalOpen, executeCheckout, cart, handleHoldTicket, searchQuery, quantityModalTarget]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-[#080C16] text-slate-100 select-none">
+    <div className="h-full w-full max-w-full overflow-x-hidden flex bg-[#080C16] text-slate-100 select-none">
       {/* Toast Feedback */}
       {scanFeedback && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -1503,12 +1517,12 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           CENTER COLUMN: STATUS BAR, TACTILE ACTIONS, SEARCH STATION, DEPARTMENTS & CATALOG
       ===================================================================== */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/90 bg-slate-50/90 text-slate-900 min-w-0">
-        {/* 1. Top Terminal Status Bar (Unified Single Header for POS Terminal) */}
-        <div className="h-11 sm:h-12 px-2.5 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-2.5 bg-white border-b border-slate-200/90 shrink-0 shadow-xs overflow-x-auto no-scrollbar text-slate-700">
+      <div className="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200/90 bg-slate-50/90 text-slate-900 min-w-0 max-w-full">
+        {/* 1. Top Terminal Status Bar (Unified Single Header for POS Terminal, Fluid Flex-Wrap) */}
+        <div className="min-h-[44px] sm:min-h-[48px] px-2.5 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-white border-b border-slate-200/90 shrink-0 shadow-xs text-slate-700">
           {/* Left Group: Mobile Hamburger, Store/Terminal Badge, Cashier Profile */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
-            {/* Hamburger for mobile slide-over navigation (< lg) */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Hamburger for mobile slide-over navigation (< md) */}
             <button
               type="button"
               onClick={() => {
@@ -1516,7 +1530,7 @@ export default function ConfidencyPosPage() {
                   window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'));
                 }
               }}
-              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 -ml-1 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
+              className="md:hidden w-8 h-8 sm:w-9 sm:h-9 -ml-1 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer"
               aria-label="Open mobile navigation menu"
               title="Menu"
             >
@@ -1527,7 +1541,7 @@ export default function ConfidencyPosPage() {
               <Store className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>POS Terminal</span>
               <span className="text-indigo-400">•</span>
-              <span className="whitespace-nowrap truncate max-w-[90px] sm:max-w-none">{currentBranchName}</span>
+              <span className="whitespace-nowrap truncate max-w-[120px] sm:max-w-none">{currentBranchName}</span>
             </div>
 
             {isOwner ? (
@@ -1536,7 +1550,7 @@ export default function ConfidencyPosPage() {
                   <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
                   Owner • All Branches
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
+                <span className="hidden xl:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
                   {activeShift ? (
                     <>
                       <span className="font-semibold text-slate-900">Branch Shift:</span>{' '}
@@ -1565,9 +1579,21 @@ export default function ConfidencyPosPage() {
             )}
           </div>
 
-          {/* Right Group: Clock, Qty Toggle, End Shift, Switch Shop, Logout */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
-            {/* Live Sri Lanka Clock (Visible on wide screens) */}
+          {/* Right Group: Cart Button (< lg), Clock, Qty Toggle, End Shift, Switch Shop, Logout */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Prominent Cart Button for < lg screens / tablets / 150% scaled displays */}
+            <button
+              type="button"
+              onClick={() => setIsMobileCartOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
+              title="Open Order Summary / Cart"
+            >
+              <ShoppingBag className="w-4 h-4 text-white" />
+              <span>Cart ({totalItemCount})</span>
+              <span className="font-mono text-indigo-100 font-semibold">• LKR {totalAmount.toFixed(2)}</span>
+            </button>
+
+            {/* Live Sri Lanka Clock (Visible on extra-wide screens) */}
             {currentDateStr && (
               <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono font-medium text-slate-600">
                 <Clock className="w-4 h-4 text-indigo-600" />
@@ -1647,20 +1673,21 @@ export default function ConfidencyPosPage() {
           </div>
         </div>
 
-        {/* 2. Sleek Horizontal Action Pills (h-11, swipeable on mobile, 5-column grid on desktop) */}
-        <div className="px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-slate-100/70 border-b border-slate-200/80 shrink-0">
-          <div className="flex md:grid md:grid-cols-3 xl:grid-cols-5 overflow-x-auto md:overflow-visible gap-2 md:gap-2.5 pb-1 md:pb-0 no-scrollbar">
+        {/* 2. Sleek Horizontal Action Pills (Universal fluid grid: 2 cols on mobile, 3 on sm, 5 on lg) */}
+        <div className="px-2.5 sm:px-4 lg:px-5 py-2 bg-slate-100/70 border-b border-slate-200/80 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
             {/* Pill 1: Discount [F8] */}
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 ${discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
-                }`}
+              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 min-w-0 ${
+                discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
+              }`}
               title="Apply order discount [F8]"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <Percent className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">
                   {discountType === 'PERCENT'
                     ? `${discountPercent}% Off`
                     : discountType === 'FLAT'
@@ -1680,7 +1707,7 @@ export default function ConfidencyPosPage() {
                   <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
+                <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                   F8
                 </span>
               )}
@@ -1690,13 +1717,14 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 ${selectedCustomer ? 'ring-2 ring-blue-300' : ''
-                }`}
+              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 min-w-0 ${
+                selectedCustomer ? 'ring-2 ring-blue-300' : ''
+              }`}
               title="Select customer [F3]"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <UserPlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate max-w-[95px]">
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">
                   {selectedCustomer ? selectedCustomer.name : 'Customer'}
                 </span>
               </div>
@@ -1712,7 +1740,7 @@ export default function ConfidencyPosPage() {
                   <X className="w-3 h-3" />
                 </span>
               ) : (
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
+                <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                   F3
                 </span>
               )}
@@ -1723,19 +1751,19 @@ export default function ConfidencyPosPage() {
               type="button"
               onClick={handleHoldTicket}
               disabled={cart.length === 0}
-              className="h-11 min-h-[44px] min-w-[100px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none"
+              className="h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none min-w-0"
               title="Park current order ticket [F4]"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <PauseCircle className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Hold</span>
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">Hold</span>
                 {heldTickets.length > 0 && (
                   <span className="text-[10px] font-bold bg-white/25 px-1.5 py-0.2 rounded-full shrink-0">
                     {heldTickets.length}
                   </span>
                 )}
               </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
+              <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F4
               </span>
             </button>
@@ -1744,14 +1772,14 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomSaleModalOpen(true)}
-              className="h-11 min-h-[44px] min-w-[130px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-violet-600 hover:bg-violet-700"
+              className="h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-violet-600 hover:bg-violet-700 min-w-0"
               title="Add non-catalog or custom item [F9]"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <Tag className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Custom Item</span>
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">Custom Item</span>
               </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
+              <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F9
               </span>
             </button>
@@ -1760,14 +1788,14 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
-              className="h-11 min-h-[44px] min-w-[150px] md:min-w-0 shrink-0 px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-sm transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700"
+              className="col-span-2 sm:col-span-1 lg:col-span-1 h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700 min-w-0"
               title="Record incoming Special Stock [F7]"
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <PackagePlus className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                <span className="text-[13px] sm:text-sm font-bold whitespace-nowrap truncate">Special Stock In</span>
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">Special Stock In</span>
               </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/20 text-white shrink-0">
+              <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F7
               </span>
             </button>
@@ -2132,7 +2160,7 @@ export default function ConfidencyPosPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:gap-3">
               {visibleProducts.map((product) => {
                 return (
                   <div
@@ -2236,7 +2264,7 @@ export default function ConfidencyPosPage() {
       {/* =====================================================================
           RIGHT COLUMN: DEDICATED CART & CHECKOUT RAIL (>= lg screens)
       ===================================================================== */}
-      <aside className="hidden lg:flex w-full lg:w-[400px] xl:w-[440px] 2xl:w-[470px] bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] border-l border-indigo-200/80 shadow-2xl flex-col h-full shrink-0 select-none text-slate-800">
+      <aside className="hidden lg:flex w-[clamp(290px,28vw,440px)] bg-gradient-to-b from-[#F4F1FF] via-[#F9F7FF] to-[#EFEAFF] border-l border-indigo-200/80 shadow-2xl flex-col h-full shrink-0 select-none text-slate-800">
         {/* 1. Colorful Top Cart Header */}
         <div className="h-14 px-4 sm:px-5 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-2">
@@ -2306,7 +2334,7 @@ export default function ConfidencyPosPage() {
 
               const unitBadge = (() => {
                 const u = (activeUnit || '').toLowerCase();
-                if (u.includes('kalan') || u.includes('kal') || u.includes('කලං')) {
+                if (u.includes('kalan') || u.includes('kal')) {
                   return { label: activeUnit };
                 }
                 if (u.includes('g') || u.includes('ml') || u.includes('kg') || u.includes('l') || isWeightOrVolume) {
@@ -2745,7 +2773,7 @@ export default function ConfidencyPosPage() {
 
                 const unitBadge = (() => {
                   const u = (activeUnit || '').toLowerCase();
-                  if (u.includes('kalan') || u.includes('kal') || u.includes('කලං')) {
+                  if (u.includes('kalan') || u.includes('kal')) {
                     return { label: activeUnit };
                   }
                   if (u.includes('g') || u.includes('ml') || u.includes('kg') || u.includes('l') || isWeightOrVolume) {

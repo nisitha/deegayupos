@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { PosSidebar } from '../../components/layout/pos-sidebar';
 import { Header } from '../../components/layout/header';
 import { BottomNavBar } from '../../components/layout/bottom-nav-bar';
+import { AutoUpdateWatcher } from '../../components/layout/auto-update-watcher';
 import { TenantBranchProvider, useTenantBranch } from '../../context/tenant-branch-context';
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -105,6 +106,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       >
         {/* Left Column: Categorized Navigation Sidebar / Mobile Slide-Over Drawer */}
         <PosSidebar />
+
+        {/* Global Cart-Safe Auto-Update Watcher */}
+        <AutoUpdateWatcher />
 
         {/* Main Content Viewport */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">

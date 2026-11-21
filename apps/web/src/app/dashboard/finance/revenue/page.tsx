@@ -180,8 +180,8 @@ export default function RevenueDeskPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Revenue Desk</h1>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 font-sinhala">
-                ආදායම් සහ මූල්‍ය වාර්තා
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                Income & Financial Statements
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
