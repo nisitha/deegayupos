@@ -38,17 +38,19 @@ const BRANCH_TO_WAREHOUSE: Record<string, string> = {
   '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': '42f1fe9d-7e44-48eb-8eb0-10a6439b5619', // Alawwa
   'fa68e4a0-a515-44c8-a082-5b5590366658': '6e8904dd-b753-434e-a22d-2d8e428f0a02', // Dambadeniya
   '197693d6-4247-48df-b614-6fcde9e34f7d': '5f0f4a53-75d7-411e-be5c-337ff170da50', // Giriulla
-  '133eeaec-5726-4702-a819-8423750db203': '4898d051-2faf-4553-a198-19566f5598e1', // Main store
-  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c': '81a14e32-4396-4d6f-9aec-d970db095d23', // Main Branch
 };
 
 const BRANCH_NAMES: Record<string, string> = {
   '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': 'Alawwa',
   'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dambadeniya',
   '197693d6-4247-48df-b614-6fcde9e34f7d': 'Giriulla',
-  '133eeaec-5726-4702-a819-8423750db203': 'Main Store',
-  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c': 'Main Branch',
 };
+
+const ALL_BRANCH_WAREHOUSES = [
+  '42f1fe9d-7e44-48eb-8eb0-10a6439b5619', // Alawwa
+  '6e8904dd-b753-434e-a22d-2d8e428f0a02', // Dambadeniya
+  '5f0f4a53-75d7-411e-be5c-337ff170da50', // Giriulla
+];
 
 interface CatalogProductItem {
   id: string;
@@ -143,6 +145,68 @@ export default function PurchasesPage() {
   const [quickSupCode, setQuickSupCode] = useState<string>('');
   const [isSavingSupplier, setIsSavingSupplier] = useState<boolean>(false);
 
+  // Live Branch Stock Tracking
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [branchStockMap, setBranchStockMap] = useState<Record<string, number>>({});
+  const [, setLoadingStock] = useState<boolean>(false);
+
+  // Effective GRN Receiving Branch & Warehouse
+  const effectiveGrnBranchId = isOwner
+    ? (grnBranchId || selectedBranchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54')
+    : (selectedBranchId || grnBranchIds[0] || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54');
+  const effectiveGrnWarehouseId = BRANCH_TO_WAREHOUSE[effectiveGrnBranchId] || '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
+  const effectiveBranchName = BRANCH_NAMES[effectiveGrnBranchId] || 'Branch';
+
+  // Quick Add Catalog Item Sub-Modal State
+  const [isQuickProductOpen, setIsQuickProductOpen] = useState<boolean>(false);
+  const [quickProdName, setQuickProdName] = useState<string>('');
+  const [quickProdSku, setQuickProdSku] = useState<string>('');
+  const [quickProdCategoryId, setQuickProdCategoryId] = useState<string>('');
+  const [quickProdCost, setQuickProdCost] = useState<number>(0);
+  const [quickProdRetail, setQuickProdRetail] = useState<number>(0);
+  const [quickProdUnit, setQuickProdUnit] = useState<string>('pcs');
+  const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
+
+  const openQuickAddProduct = useCallback((presetName = '') => {
+    const defaultSku = `SKU-${Date.now().toString().slice(-6)}`;
+    setQuickProdName(presetName || productSearchTerm || '');
+    setQuickProdSku(defaultSku);
+    setQuickProdCategoryId(categories[0]?.id || '');
+    setQuickProdCost(0);
+    setQuickProdRetail(0);
+    setQuickProdUnit('pcs');
+    setIsQuickProductOpen(true);
+  }, [productSearchTerm, categories]);
+
+  const fetchBranchStock = useCallback(async (warehouseId: string) => {
+    if (!warehouseId) return;
+    setLoadingStock(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_levels')
+        .select('product_id, quantity_on_hand')
+        .eq('warehouse_id', warehouseId);
+
+      if (!error && data) {
+        const stockMap: Record<string, number> = {};
+        data.forEach((row: any) => {
+          stockMap[row.product_id] = Number(row.quantity_on_hand || 0);
+        });
+        setBranchStockMap(stockMap);
+      }
+    } catch (err) {
+      console.warn('Error fetching branch stock levels:', err);
+    } finally {
+      setLoadingStock(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGrnModalOpen && effectiveGrnWarehouseId) {
+      fetchBranchStock(effectiveGrnWarehouseId);
+    }
+  }, [isGrnModalOpen, effectiveGrnWarehouseId, fetchBranchStock]);
+
   // Sync initial Branch
   useEffect(() => {
     if (selectedBranchId && selectedBranchId !== 'ALL') {
@@ -163,7 +227,7 @@ export default function PurchasesPage() {
 
     try {
       // 1. Parallel queries to fetch flat tables (avoids fragile PostgREST relation embeds)
-      const [grnResult, poResult, supResult] = await Promise.all([
+      const [grnResult, poResult, supResult, catResult] = await Promise.all([
         supabase
           .from('goods_received_notes')
           .select('*')
@@ -177,7 +241,15 @@ export default function PurchasesPage() {
           .from('suppliers')
           .select('*')
           .order('name', { ascending: true }),
+        supabase
+          .from('categories')
+          .select('id, name')
+          .order('name', { ascending: true }),
       ]);
+
+      if (catResult.data && catResult.data.length > 0) {
+        setCategories(catResult.data.map((c: any) => ({ id: c.id, name: c.name })));
+      }
 
       // 2. Map suppliers
       let loadedSuppliers: SupplierDto[] = [];
@@ -455,6 +527,94 @@ export default function PurchasesPage() {
     }
   };
 
+  // Quick Add Catalog Item Action
+  const handleQuickAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickProdName.trim()) return;
+
+    try {
+      setIsSavingProduct(true);
+      const newProdId = crypto.randomUUID();
+      const trimmedName = quickProdName.trim();
+      const sku = quickProdSku.trim() || `SKU-${Date.now().toString().slice(-6)}`;
+      const slug =
+        trimmedName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || `prod-${Date.now().toString().slice(-6)}`;
+      const costPrice = Number(quickProdCost) || 0;
+      const retailPrice = Number(quickProdRetail) || 0;
+
+      // 1. Insert product into public.products
+      const { error: prodErr } = await supabase.from('products').insert({
+        id: newProdId,
+        tenant_id: '0fef1423-5d89-4147-8af8-17c7e641c88a',
+        name: trimmedName,
+        slug,
+        sku,
+        cost_price: costPrice,
+        retail_price: retailPrice,
+        category_id: quickProdCategoryId || null,
+        unit_of_measure: quickProdUnit.trim() || 'pcs',
+        is_active: true,
+        is_track_stock: true,
+        alert_quantity: 5,
+      });
+
+      if (prodErr) {
+        throw new Error(prodErr.message);
+      }
+
+      // 2. Initialize stock_levels with quantity_on_hand = 0 for all 3 branch warehouses
+      const initialStockRows = ALL_BRANCH_WAREHOUSES.map((wId) => ({
+        id: crypto.randomUUID(),
+        tenant_id: '0fef1423-5d89-4147-8af8-17c7e641c88a',
+        warehouse_id: wId,
+        product_id: newProdId,
+        quantity_on_hand: 0,
+        quantity_reserved: 0,
+        reorder_point: 5,
+      }));
+
+      const { error: stockErr } = await supabase.from('stock_levels').insert(initialStockRows);
+      if (stockErr) {
+        console.warn('Initial stock levels insertion warning:', stockErr.message);
+      }
+
+      // 3. Update local catalog and stock map
+      const newCatalogItem: CatalogProductItem = {
+        id: newProdId,
+        name: trimmedName,
+        sku,
+        costPrice,
+        retailPrice,
+      };
+
+      setCatalogProducts((prev) => [newCatalogItem, ...prev]);
+      setBranchStockMap((prev) => ({ ...prev, [newProdId]: 0 }));
+
+      // 4. Automatically select the newly created product in GRN item editor
+      setSelectedProduct(newCatalogItem);
+      setNewCost(costPrice);
+      setNewRetail(retailPrice);
+      setNewQty(10);
+      setProductSearchTerm('');
+
+      // 5. Close sub-modal and feedback
+      setIsQuickProductOpen(false);
+      setQuickProdName('');
+      setQuickProdSku('');
+      setFeedback({
+        type: 'success',
+        text: `Product "${trimmedName}" created and selected for receiving! Initialized with 0 stock across all branches.`,
+      });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to add product');
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
   // Submit End-to-End GRN & Physical Stock Receiving
   const handlePostGrn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -572,11 +732,19 @@ export default function PurchasesPage() {
         type: 'success',
         text: `GRN ${newGrnNumber} posted successfully! Stock levels updated in ${BRANCH_NAMES[effectiveBranch] || 'Branch'}.`,
       });
+      // Direct local stock update for instantaneous reactivity
+      setBranchStockMap((prev) => {
+        const next = { ...prev };
+        grnItems.forEach((i) => {
+          next[i.productId] = (next[i.productId] || 0) + Number(i.receivedQuantity || 0);
+        });
+        return next;
+      });
       setIsGrnModalOpen(false);
       setGrnItems([]);
       setGrnInvoiceNo('');
       setGrnNotes('');
-      await fetchData(true);
+      await Promise.all([fetchData(true), fetchBranchStock(effectiveWarehouse)]);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Error receiving GRN');
     } finally {
@@ -793,7 +961,6 @@ export default function PurchasesPage() {
               <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
               <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya</option>
               <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla</option>
-              <option value="133eeaec-5726-4702-a819-8423750db203">Main Store</option>
             </select>
           </div>
 
@@ -1202,13 +1369,24 @@ export default function PurchasesPage() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsGrnModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openQuickAddProduct()}
+                  className="px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200/80 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                  title="Quick create a new catalog product"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Item</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGrnModalOpen(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Content */}
@@ -1229,7 +1407,6 @@ export default function PurchasesPage() {
                       <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
                       <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya</option>
                       <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla</option>
-                      <option value="133eeaec-5726-4702-a819-8423750db203">Main Store</option>
                     </select>
                   ) : (
                     <div className="w-full px-3 py-2 text-xs rounded-xl bg-slate-100 border border-slate-200 text-slate-800 font-bold flex items-center gap-1.5">
@@ -1245,13 +1422,25 @@ export default function PurchasesPage() {
                     <label className="text-xs font-semibold text-slate-700">
                       Supplier ({suppliers.length} Vendors) *
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickSupplierOpen(true)}
-                      className="text-[11px] font-bold text-[#7052FF] hover:underline"
-                    >
-                      + Add Supplier
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openQuickAddProduct()}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+                        title="Add new catalog item"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Add Item</span>
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickSupplierOpen(true)}
+                        className="text-[11px] font-bold text-[#7052FF] hover:underline cursor-pointer"
+                      >
+                        + Add Supplier
+                      </button>
+                    </div>
                   </div>
                   <select
                     required
@@ -1325,49 +1514,110 @@ export default function PurchasesPage() {
                   />
 
                   {/* Autocomplete Dropdown */}
-                  {!selectedProduct && filteredCatalogProducts.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto divide-y divide-slate-100">
-                      {filteredCatalogProducts.map((p) => (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            setSelectedProduct(p);
-                            setNewCost(p.costPrice || 250);
-                            setNewRetail(p.retailPrice || 0);
-                            setProductSearchTerm('');
-                          }}
-                          className="p-2.5 hover:bg-purple-50/50 cursor-pointer text-xs flex justify-between items-center"
-                        >
-                          <div>
-                            <div className="font-semibold text-slate-900">{p.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              SKU: {p.sku}
+                  {!selectedProduct && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      {filteredCatalogProducts.length > 0 ? (
+                        filteredCatalogProducts.map((p) => {
+                          const stock = branchStockMap[p.id] ?? 0;
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                setSelectedProduct(p);
+                                setNewCost(p.costPrice || 250);
+                                setNewRetail(p.retailPrice || 0);
+                                setProductSearchTerm('');
+                              }}
+                              className="p-2.5 hover:bg-purple-50/50 cursor-pointer text-xs flex justify-between items-center transition-colors"
+                            >
+                              <div className="min-w-0 flex-1 pr-3">
+                                <div className="font-semibold text-slate-900 truncate">{p.name}</div>
+                                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                                  <span>SKU: {p.sku}</span>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${
+                                      stock > 5
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : stock > 0
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    }`}
+                                  >
+                                    {effectiveBranchName}: {stock} in stock
+                                  </span>
+                                </div>
+                              </div>
+                              {isOwner && (
+                                <div className="text-right shrink-0">
+                                  <span className="font-mono text-slate-700 font-bold block">
+                                    Cost: {formatLkr(p.costPrice)}
+                                  </span>
+                                  <span className="font-mono text-emerald-600 text-[10px] block">
+                                    Retail: {formatLkr(p.retailPrice)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
+                          );
+                        })
+                      ) : (
+                        productSearchTerm.trim() && (
+                          <div className="p-3 text-center space-y-2">
+                            <p className="text-xs text-slate-500">
+                              No products found matching &ldquo;{productSearchTerm}&rdquo;
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => openQuickAddProduct(productSearchTerm)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7052FF] hover:bg-[#5E3FE6] text-white text-xs font-bold shadow-xs cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Create &ldquo;{productSearchTerm}&rdquo; as New Item</span>
+                            </button>
                           </div>
-                          {isOwner && (
-                            <div className="text-right">
-                              <span className="font-mono text-slate-700 font-bold block">
-                                Cost: {formatLkr(p.costPrice)}
-                              </span>
-                              <span className="font-mono text-emerald-600 text-[10px] block">
-                                Retail: {formatLkr(p.retailPrice)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        )
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Line details when product selected */}
                 {selectedProduct && (
-                  <div className="p-3 bg-white rounded-xl border border-purple-200/80 space-y-2.5 animate-in fade-in duration-100">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-900">{selectedProduct.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        SKU: {selectedProduct.sku}
-                      </span>
+                  <div className="p-3.5 bg-white rounded-xl border border-purple-200/80 space-y-3 animate-in fade-in duration-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 text-sm block">{selectedProduct.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          SKU: {selectedProduct.sku}
+                        </span>
+                      </div>
+
+                      {/* Live Current Stock Badge & After GRN Preview */}
+                      {(() => {
+                        const currentStock = branchStockMap[selectedProduct.id] ?? 0;
+                        const afterGrn = currentStock + (Number(newQty) || 0);
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                currentStock > 5
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                  : currentStock > 0
+                                  ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                  : 'bg-rose-50 text-rose-700 border-rose-300'
+                              }`}
+                            >
+                              <Package className="w-3.5 h-3.5" />
+                              <span>Current Stock ({effectiveBranchName}): {currentStock} units</span>
+                            </span>
+                            {Number(newQty) > 0 && (
+                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                                → After GRN: <strong className="text-emerald-700 font-bold">{afterGrn} units</strong>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className={`grid grid-cols-2 ${isOwner ? 'sm:grid-cols-6' : 'sm:grid-cols-4'} gap-2`}>
@@ -1473,43 +1723,65 @@ export default function PurchasesPage() {
                   </div>
                 ) : (
                   <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-                    {grnItems.map((item, idx) => (
-                      <div key={idx} className="p-2.5 flex items-center justify-between gap-3 bg-white">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-slate-900 truncate">
-                            {item.productName}
+                    {grnItems.map((item, idx) => {
+                      const itemStock = branchStockMap[item.productId] ?? 0;
+                      const itemAfter = itemStock + Number(item.receivedQuantity || 0);
+                      return (
+                        <div key={idx} className="p-2.5 flex items-center justify-between gap-3 bg-white">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-slate-900 truncate">
+                              {item.productName}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              SKU: {item.productSku} • Batch: {item.batchNumber} • Exp: {item.expiryDate}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            SKU: {item.productSku} • Batch: {item.batchNumber} • Exp: {item.expiryDate}
+
+                          {/* Live Branch Stock Column */}
+                          <div className="text-right shrink-0 px-2">
+                            <div
+                              className={`text-[11px] font-bold ${
+                                itemStock > 5
+                                  ? 'text-emerald-700'
+                                  : itemStock > 0
+                                  ? 'text-amber-700'
+                                  : 'text-rose-600'
+                              }`}
+                            >
+                              Current: {itemStock}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              → {itemAfter} after GRN
+                            </div>
                           </div>
+
+                          {isOwner ? (
+                            <>
+                              <div className="font-mono text-slate-600 text-xs shrink-0">
+                                {item.receivedQuantity} × {formatLkr(item.unitCost)}
+                              </div>
+
+                              <div className="font-mono font-bold text-slate-900 text-xs shrink-0">
+                                {formatLkr(item.receivedQuantity * item.unitCost)}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="font-mono font-bold text-slate-700 text-xs shrink-0">
+                              {item.receivedQuantity} Units
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveGrnLine(idx)}
+                            className="text-rose-400 hover:text-rose-600 p-1 cursor-pointer"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-
-                        {isOwner ? (
-                          <>
-                            <div className="font-mono text-slate-600 text-xs shrink-0">
-                              {item.receivedQuantity} × {formatLkr(item.unitCost)}
-                            </div>
-
-                            <div className="font-mono font-bold text-slate-900 text-xs shrink-0">
-                              {formatLkr(item.receivedQuantity * item.unitCost)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="font-mono font-bold text-slate-700 text-xs shrink-0">
-                            {item.receivedQuantity} Units
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveGrnLine(idx)}
-                          className="text-rose-400 hover:text-rose-600 p-1"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1612,14 +1884,14 @@ export default function PurchasesPage() {
                 <button
                   type="button"
                   onClick={() => setIsQuickSupplierOpen(false)}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingSupplier || !quickSupName.trim()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   {isSavingSupplier ? (
                     <>
@@ -1628,6 +1900,152 @@ export default function PurchasesPage() {
                     </>
                   ) : (
                     <span>Add & Select</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          QUICK ADD CATALOG ITEM SUB-MODAL
+      ===================================================================== */}
+      {isQuickProductOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#7052FF]" />
+                <span>Add New Catalog Item</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsQuickProductOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickAddProduct} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Product Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ashwagandhadyaarishtaya 375ml"
+                  value={quickProdName}
+                  onChange={(e) => setQuickProdName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    SKU Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SKU-849201"
+                    value={quickProdSku}
+                    onChange={(e) => setQuickProdSku(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Category (Optional)
+                  </label>
+                  <select
+                    value={quickProdCategoryId}
+                    onChange={(e) => setQuickProdCategoryId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF] bg-white"
+                  >
+                    <option value="">Select Category...</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Unit Cost Price (LKR) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={quickProdCost}
+                    onChange={(e) => setQuickProdCost(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Retail Selling Price (LKR) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={quickProdRetail}
+                    onChange={(e) => setQuickProdRetail(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Unit of Measure
+                  </label>
+                  <input
+                    type="text"
+                    value={quickProdUnit}
+                    onChange={(e) => setQuickProdUnit(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                    placeholder="pcs"
+                  />
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-500">
+                <span className="font-semibold text-slate-700">Stock Initialization:</span> Automatically initializes 0 stock records across all 3 active branch warehouses (Alawwa, Dambadeniya, Giriulla).
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickProductOpen(false)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProduct || !quickProdName.trim() || !quickProdSku.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {isSavingProduct ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creating Item...</span>
+                    </>
+                  ) : (
+                    <span>Save & Select for GRN</span>
                   )}
                 </button>
               </div>
