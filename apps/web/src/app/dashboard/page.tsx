@@ -213,11 +213,12 @@ interface RawSale {
   total_amount: number;
   subtotal: number;
   discount_amount: number;
-  payment_method: string;
+  payment_method?: string;
   status: string;
   sold_at: string;
   created_at: string;
   shift_id?: string;
+  legacy_sale_id?: string;
 }
 
 interface RawSaleItem {
@@ -241,18 +242,26 @@ interface RawShift {
   status: string;
   opening_float?: number;
   closing_float?: number;
+  closing_drawer_float?: number;
   modaka_total_sold_qty?: number;
   modaka_total_amount?: number;
   started_at?: string;
   ended_at?: string;
+  notes?: string;
+  cash_variance?: number;
   users?: any;
 }
 
 interface RawModakaEntry {
   id: string;
   shift_id: string;
+  branch_id?: string;
   product_id: string;
+  opening_qty?: number;
+  in_qty?: number;
+  total_available_qty?: number;
   sold_qty: number;
+  closing_qty?: number;
   applied_rate: number;
   total_amount: number;
   created_at?: string;
@@ -454,7 +463,7 @@ export default function DashboardPage() {
   };
 
   // ============================================================================
-  // BULK EXECUTIVE DATA FETCHER (PAGINATED BEYOND 1,000 ROWS)
+  // BULK EXECUTIVE DATA FETCHER (FLAT GUARANTEED-VALID QUERIES)
   // ============================================================================
   const fetchExecutiveData = useCallback(async (isBackground = false) => {
     if (!isOwner) return;
@@ -464,21 +473,55 @@ export default function DashboardPage() {
     try {
       const bounds = getColomboBounds(datePreset, customStart, customEnd);
 
-      // 1. Fetch Products & Categories (Lookup table)
-      const productsPromise = supabase
-        .from('products')
-        .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity, categories(id, name)')
-        .limit(3500);
+      // 1. Fetch Products flat (Paginating beyond 1,000 rows so all ~3,170 products are retrieved)
+      let allProducts: RawProduct[] = [];
+      let prodOffset = 0;
+      const prodChunk = 1000;
+      while (true) {
+        const { data: pData, error: pErr } = await supabase
+          .from('products')
+          .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+          .range(prodOffset, prodOffset + prodChunk - 1);
+
+        if (pErr) {
+          console.error('[Dashboard] Products query error:', pErr);
+          break;
+        }
+        if (!pData || pData.length === 0) break;
+        allProducts.push(...(pData as any));
+        if (pData.length < prodChunk) break;
+        prodOffset += prodChunk;
+        if (prodOffset >= 10000) break;
+      }
+
+      // Fetch Categories flat
+      const { data: catData, error: catErr } = await supabase
+        .from('categories')
+        .select('id, name');
+      if (catErr) console.warn('[Dashboard] Categories query note:', catErr.message);
+
+      const categoryNameMap = new Map<string, string>();
+      if (catData) {
+        catData.forEach((c: any) => categoryNameMap.set(c.id, c.name));
+      }
+      allProducts.forEach((p) => {
+        if (p.category_id && categoryNameMap.has(p.category_id)) {
+          p.categories = { id: p.category_id, name: categoryNameMap.get(p.category_id)! };
+        }
+      });
+      const productsMap = new Map<string, RawProduct>();
+      allProducts.forEach((p) => productsMap.set(p.id, p));
 
       // 2. Fetch Current Stock Levels across the 3 branch warehouses
       const warehouseIds = ACTIVE_BRANCHES.map((b) => b.warehouseId);
-      const stockPromise = supabase
+      const { data: stockData, error: stockErr } = await supabase
         .from('stock_levels')
         .select('product_id, warehouse_id, quantity_on_hand')
         .in('warehouse_id', warehouseIds)
         .limit(10000);
+      if (stockErr) console.warn('[Dashboard] Stock query note:', stockErr.message);
 
-      // 3. Paginate POS Sales in chunks of 1,000
+      // 3. Paginate POS Sales in chunks of 1,000 using only confirmed valid columns
       let allSales: RawSale[] = [];
       let salesOffset = 0;
       const salesChunk = 1000;
@@ -486,7 +529,7 @@ export default function DashboardPage() {
       while (true) {
         let query = supabase
           .from('sales')
-          .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, payment_method, status, sold_at, created_at, shift_id')
+          .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
           .gte('sold_at', bounds.from)
           .lte('sold_at', bounds.to)
           .in('branch_id', ACTIVE_BRANCH_IDS)
@@ -494,27 +537,72 @@ export default function DashboardPage() {
           .range(salesOffset, salesOffset + salesChunk - 1);
 
         const { data: sData, error: sErr } = await query;
-        if (sErr || !sData || sData.length === 0) break;
-        allSales.push(...sData);
+        if (sErr) {
+          console.error('[Dashboard] Sales query error:', sErr);
+          break;
+        }
+        if (!sData || sData.length === 0) break;
+        allSales.push(...(sData as any));
         if (sData.length < salesChunk) break;
         salesOffset += salesChunk;
         if (salesOffset >= 10000) break;
       }
 
-      // 4. Fetch Sale Items for these sales in chunks of 500 sale IDs
+      // 4. Fetch Sale Items & Sale Payments for these sales in safe chunks of 500 sale IDs
       const saleIds = allSales.map((s) => s.id);
       let allSaleItems: RawSaleItem[] = [];
+      let allSalePayments: any[] = [];
+
       for (let i = 0; i < saleIds.length; i += 500) {
         const chunk = saleIds.slice(i, i + 500);
-        const { data: itemsData } = await supabase
-          .from('sale_items')
-          .select('id, sale_id, product_id, product_name, sku, quantity, unit_price, cost_price, subtotal')
-          .in('sale_id', chunk);
+        const [itemsRes, paymentsRes] = await Promise.all([
+          supabase
+            .from('sale_items')
+            .select('id, sale_id, product_id, product_name, sku, quantity, unit_price, cost_price, subtotal')
+            .in('sale_id', chunk),
+          supabase
+            .from('sale_payments')
+            .select('id, sale_id, payment_method, amount, status')
+            .in('sale_id', chunk),
+        ]);
 
-        if (itemsData) allSaleItems.push(...itemsData);
+        if (itemsRes.error) console.error('[Dashboard] Sale items query error:', itemsRes.error);
+        if (paymentsRes.error) console.error('[Dashboard] Sale payments query error:', paymentsRes.error);
+
+        if (itemsRes.data) allSaleItems.push(...(itemsRes.data as any));
+        if (paymentsRes.data) allSalePayments.push(...paymentsRes.data);
       }
 
-      // 5. Paginate Cashier Shifts in chunks of 1,000
+      // Attach payment methods to sales
+      const paymentMethodMap = new Map<string, string>();
+      allSalePayments.forEach((p) => {
+        if (!paymentMethodMap.has(p.sale_id) && p.payment_method) {
+          paymentMethodMap.set(p.sale_id, p.payment_method);
+        }
+      });
+      allSales.forEach((s) => {
+        s.payment_method = paymentMethodMap.get(s.id) || 'CASH';
+      });
+
+      // 5. Fetch Active Users flat for Cashier mapping & filter
+      const { data: usersData, error: usersErr } = await supabase
+        .from('users')
+        .select('id, full_name, role, assigned_branches')
+        .eq('is_active', true)
+        .order('full_name');
+      if (usersErr) console.warn('[Dashboard] Users query note:', usersErr.message);
+
+      const usersMap = new Map<string, any>();
+      const mappedCashiers: { id: string; fullName: string }[] = [];
+      if (usersData) {
+        usersData.forEach((u: any) => {
+          usersMap.set(u.id, u);
+          mappedCashiers.push({ id: u.id, fullName: u.full_name || 'Staff Member' });
+        });
+      }
+      setCashierOptions(mappedCashiers);
+
+      // 6. Paginate Cashier Shifts in chunks of 1,000 using flat confirmed columns
       let allShifts: RawShift[] = [];
       let shiftOffset = 0;
       const shiftChunk = 1000;
@@ -522,7 +610,7 @@ export default function DashboardPage() {
       while (true) {
         let query = supabase
           .from('cashier_shifts')
-          .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, users(id, full_name, role)')
+          .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, closing_drawer_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, notes, cash_variance')
           .gte('shift_date', bounds.startDateStr)
           .lte('shift_date', bounds.endDateStr)
           .in('branch_id', ACTIVE_BRANCH_IDS)
@@ -530,64 +618,79 @@ export default function DashboardPage() {
           .range(shiftOffset, shiftOffset + shiftChunk - 1);
 
         const { data: shiftData, error: shiftErr } = await query;
-        if (shiftErr || !shiftData || shiftData.length === 0) break;
+        if (shiftErr) {
+          console.error('[Dashboard] Cashier shifts query error:', shiftErr);
+          break;
+        }
+        if (!shiftData || shiftData.length === 0) break;
         allShifts.push(...(shiftData as any));
         if (shiftData.length < shiftChunk) break;
         shiftOffset += shiftChunk;
         if (shiftOffset >= 5000) break;
       }
 
-      // 6. Fetch Shift Modaka Entries for these shifts
+      // Populate cashier info on shifts in-memory
+      allShifts.forEach((s) => {
+        const u = usersMap.get(s.cashier_id);
+        s.users = u
+          ? { id: u.id, full_name: u.full_name, role: u.role }
+          : { id: s.cashier_id, full_name: 'Staff Cashier' };
+      });
+
+      // 7. Fetch Shift Modaka Entries for these shifts in safe chunks of 500
       const shiftIds = allShifts.map((s) => s.id);
       let allModaka: RawModakaEntry[] = [];
       for (let i = 0; i < shiftIds.length; i += 500) {
         const chunk = shiftIds.slice(i, i + 500);
-        const { data: mData } = await supabase
+        const { data: mData, error: mErr } = await supabase
           .from('shift_modaka_entries')
-          .select('id, shift_id, product_id, sold_qty, applied_rate, total_amount, created_at, products(id, name, sku, cost_price)')
+          .select('id, shift_id, branch_id, product_id, opening_qty, in_qty, total_available_qty, sold_qty, closing_qty, applied_rate, total_amount, created_at')
           .in('shift_id', chunk);
 
+        if (mErr) {
+          console.error('[Dashboard] Shift modaka entries query error:', mErr);
+        }
         if (mData) allModaka.push(...(mData as any));
       }
 
-      // 7. Fetch Daily Cash Reconciliations
-      const recPromise = supabase
+      // Populate product info on modaka entries in-memory
+      allModaka.forEach((m) => {
+        const prod = productsMap.get(m.product_id);
+        m.products = prod
+          ? { id: prod.id, name: prod.name, sku: prod.sku, cost_price: prod.cost_price }
+          : { id: m.product_id, name: 'Special Stock Item', sku: 'MODAKA', cost_price: 120 };
+      });
+
+      // 8. Fetch Daily Cash Reconciliations using exact confirmed columns
+      const { data: recData, error: recErr } = await supabase
         .from('daily_cash_reconciliations')
-        .select('id, branch_id, cashier_id, shift_date, status, declared_drawer_cash, system_expected_cash, drawer_difference, shortage_amount, excess_amount')
+        .select('id, branch_id, reconciliation_date, physical_cash_c, system_cash_sales, variance_amount, status, notes, submitted_by')
         .gte('reconciliation_date', bounds.startDateStr)
         .lte('reconciliation_date', bounds.endDateStr)
         .in('branch_id', ACTIVE_BRANCH_IDS);
 
-      // 8. Fetch Recent Activity feed
-      const actPromise = dashboardApi.getActivity(10, selectedBranch !== 'ALL' ? selectedBranch : undefined);
+      if (recErr) console.warn('[Dashboard] Reconciliations query note:', recErr.message);
 
-      // 9. Fetch Users for Cashier filter
-      const usersPromise = supabase
-        .from('users')
-        .select('id, full_name')
-        .eq('is_active', true)
-        .order('full_name');
+      const mappedRecs: RawReconciliation[] = (recData || []).map((r: any) => ({
+        id: r.id,
+        branch_id: r.branch_id,
+        cashier_id: r.submitted_by,
+        shift_date: r.reconciliation_date,
+        status: r.status,
+        declared_drawer_cash: Number(r.physical_cash_c || 0),
+        system_expected_cash: Number(r.system_cash_sales || 0),
+        drawer_difference: Number(r.variance_amount || 0),
+        shortage_amount: Number(r.variance_amount || 0) < 0 ? Math.abs(Number(r.variance_amount)) : 0,
+        excess_amount: Number(r.variance_amount || 0) > 0 ? Number(r.variance_amount) : 0,
+      }));
 
-      const [prodsRes, stockRes, recRes, actRes, usersRes] = await Promise.all([
-        productsPromise,
-        stockPromise,
-        recPromise,
-        actPromise,
-        usersPromise,
-      ]);
-
-      if (prodsRes.data) setProducts(prodsRes.data as any);
-      if (stockRes.data) setStockLevels(stockRes.data as any);
-      if (recRes.data) setReconciliations(recRes.data as any);
+      // 9. Fetch Recent Activity feed
+      const actRes = await dashboardApi.getActivity(10, selectedBranch !== 'ALL' ? selectedBranch : undefined);
       if (actRes.data) setActivity(actRes.data);
-      if (usersRes.data) {
-        const mappedUsers = usersRes.data.map((u: any) => ({
-          id: u.id,
-          fullName: u.full_name || 'Staff Member',
-        }));
-        setCashierOptions(mappedUsers);
-      }
 
+      setProducts(allProducts);
+      if (stockData) setStockLevels(stockData as any);
+      setReconciliations(mappedRecs);
       setSales(allSales);
       setSaleItems(allSaleItems);
       setShifts(allShifts);
@@ -669,7 +772,13 @@ export default function DashboardPage() {
       // Payment Method Filter
       if (selectedMethod !== 'ALL') {
         const pm = (s.payment_method || 'CASH').toUpperCase();
-        if (!pm.includes(selectedMethod)) return false;
+        if (selectedMethod === 'LANKA_QR') {
+          if (!pm.includes('QR')) return false;
+        } else if (selectedMethod === 'KHATA') {
+          if (!pm.includes('CREDIT') && !pm.includes('KHATA')) return false;
+        } else if (!pm.includes(selectedMethod)) {
+          return false;
+        }
       }
 
       return true;
@@ -685,18 +794,21 @@ export default function DashboardPage() {
       if (sold <= 0) return false;
 
       const shift = shiftLookupMap.get(e.shift_id);
-      if (!shift) return false;
+      const bId = e.branch_id || shift?.branch_id;
+      if (!bId) return false;
 
       // Branch Filter
-      if (selectedBranch !== 'ALL' && shift.branch_id !== selectedBranch) return false;
+      if (selectedBranch !== 'ALL' && bId !== selectedBranch) return false;
 
       // Shift Filter
-      if (selectedShift !== 'ALL' && String(shift.shift_number) !== selectedShift) return false;
+      if (selectedShift !== 'ALL') {
+        if (!shift || String(shift.shift_number) !== selectedShift) return false;
+      }
 
       // Cashier Filter
       if (selectedCashier !== 'ALL') {
         const cName = getShiftCashierName(shift);
-        if (shift.cashier_id !== selectedCashier && cName !== selectedCashier) return false;
+        if (shift && shift.cashier_id !== selectedCashier && cName !== selectedCashier) return false;
       }
 
       // Payment Method Filter (Special Stock modaka collections are cash drawer inflows)
@@ -939,7 +1051,7 @@ export default function DashboardPage() {
       const bSales = filteredSales.filter((s) => s.branch_id === b.id);
       const bModaka = filteredModakaEntries.filter((m) => {
         const shift = shiftLookupMap.get(m.shift_id);
-        return shift?.branch_id === b.id;
+        return m.branch_id === b.id || shift?.branch_id === b.id;
       });
 
       const posRev = bSales.reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
@@ -1435,11 +1547,10 @@ export default function DashboardPage() {
                 key={preset.id}
                 type="button"
                 onClick={() => setDatePreset(preset.id as DatePreset)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  datePreset === preset.id
-                    ? 'bg-[#005BD3] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${datePreset === preset.id
+                  ? 'bg-[#005BD3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
               >
                 {preset.label}
               </button>
@@ -1477,8 +1588,9 @@ export default function DashboardPage() {
             <select
               value={selectedBranch}
               onChange={(e) => {
-                setSelectedBranch(e.target.value);
-                setSelectedBranchId(e.target.value);
+                const val = e.target.value;
+                setSelectedBranch(val);
+                setSelectedBranchId(val === 'ALL' ? null : val);
               }}
               className="w-full px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
             >
@@ -1599,11 +1711,11 @@ export default function DashboardPage() {
                 <span className="text-xs text-slate-400">
                   {syncConfig?.lastRunAt
                     ? `(Last Sync: ${new Date(syncConfig.lastRunAt).toLocaleTimeString('en-US', {
-                        timeZone: 'Asia/Colombo',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })} Colombo)`
+                      timeZone: 'Asia/Colombo',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })} Colombo)`
                     : '(Initial setup pending)'}
                 </span>
               </div>
@@ -1647,11 +1759,10 @@ export default function DashboardPage() {
                 type="button"
                 onClick={handleToggleSync}
                 disabled={toggleLoading || !syncConfig}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer ${
-                  syncConfig?.isEnabled
-                    ? 'bg-rose-600/90 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-rose-600/20'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 hover:shadow-emerald-600/20'
-                } disabled:opacity-50`}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer ${syncConfig?.isEnabled
+                  ? 'bg-rose-600/90 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-rose-600/20'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 hover:shadow-emerald-600/20'
+                  } disabled:opacity-50`}
               >
                 {syncConfig?.isEnabled ? (
                   <>
@@ -2036,11 +2147,10 @@ export default function DashboardPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveBreakdownTab(tab.id as any)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  activeBreakdownTab === tab.id
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeBreakdownTab === tab.id
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -2159,13 +2269,12 @@ export default function DashboardPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span
-                        className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
-                          s.netVariance === 0
-                            ? 'text-emerald-700 bg-emerald-50'
-                            : s.netVariance < 0
+                        className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${s.netVariance === 0
+                          ? 'text-emerald-700 bg-emerald-50'
+                          : s.netVariance < 0
                             ? 'text-rose-700 bg-rose-50'
                             : 'text-blue-700 bg-blue-50'
-                        }`}
+                          }`}
                       >
                         {s.netVariance === 0 ? 'LKR 0.00' : formatCurrency(s.netVariance)}
                       </span>
@@ -2261,13 +2370,12 @@ export default function DashboardPage() {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <span
-                          className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
-                            c.variance === 0
-                              ? 'text-slate-600 bg-slate-100'
-                              : c.variance < 0
+                          className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${c.variance === 0
+                            ? 'text-slate-600 bg-slate-100'
+                            : c.variance < 0
                               ? 'text-rose-700 bg-rose-50'
                               : 'text-blue-700 bg-blue-50'
-                          }`}
+                            }`}
                         >
                           {c.variance === 0 ? 'LKR 0.00' : formatCurrency(c.variance)}
                         </span>
@@ -2763,9 +2871,9 @@ export default function DashboardPage() {
                           <span className="font-mono text-[10px] text-slate-400">
                             {isMounted
                               ? new Date(act.createdAt).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
                               : '--:--'}
                           </span>
                         </div>

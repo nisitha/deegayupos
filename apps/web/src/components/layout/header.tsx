@@ -95,7 +95,7 @@ export function Header() {
   };
 
   const currentBranch = branches.find((b) => b.id === selectedBranchId);
-  const currentBranchName = currentBranch?.name || (selectedBranchId === null ? 'All Branches' : 'Main Branch');
+  const currentBranchName = currentBranch?.name || 'All Branches';
   const displayName = user?.fullName || 'Dr. Deegayu (Owner)';
   const displayRole = user?.role || tenant?.role || 'OWNER';
   const rawBusinessName = business?.name || tenant?.name || 'Deegayu Weda Madhura';

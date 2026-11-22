@@ -102,22 +102,23 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
   const isOwnerRef = useRef(false);
 
   const setSelectedBranchId = useCallback((id: string | null) => {
+    const normalizedId = !id || id === 'ALL' ? null : id;
     // If not owner and already has a selected branch, lock branch switching during active session
-    if (!isOwnerRef.current && selectedBranchId && id && id !== selectedBranchId) {
+    if (!isOwnerRef.current && selectedBranchId && normalizedId && normalizedId !== selectedBranchId) {
       console.warn('Branch switching is locked for staff sessions. Please logout to switch shop.');
       return;
     }
-    setSelectedBranchIdState(id);
+    setSelectedBranchIdState(normalizedId);
     if (typeof window !== 'undefined') {
-      if (id) {
-        localStorage.setItem('pixelcraft_selected_branch', id);
-        localStorage.setItem('pixelcraft_active_branch_id', id);
+      if (normalizedId) {
+        localStorage.setItem('pixelcraft_selected_branch', normalizedId);
+        localStorage.setItem('pixelcraft_active_branch_id', normalizedId);
         try {
           const sess = localStorage.getItem('pixelcraft_pos_session');
           if (sess) {
             const parsed = JSON.parse(sess);
-            parsed.activeBranchId = id;
-            parsed.branchId = id;
+            parsed.activeBranchId = normalizedId;
+            parsed.branchId = normalizedId;
             localStorage.setItem('pixelcraft_pos_session', JSON.stringify(parsed));
           }
         } catch {}
@@ -153,15 +154,50 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
         console.warn('Could not query Supabase branches:', sbErr);
       }
 
+      const OPERATING_BRANCH_IDS = new Set([
+        '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54', // Alawwa
+        'fa68e4a0-a515-44c8-a082-5b5590366658', // Dambadeniya
+        '197693d6-4247-48df-b614-6fcde9e34f7d', // Giriulla
+      ]);
+
+      if (branchList.length > 0) {
+        // Strictly filter to the 3 operating branches (remove Main Branch / Main store)
+        branchList = branchList.filter((b) => {
+          if (OPERATING_BRANCH_IDS.has(b.id)) return true;
+          const nameLower = (b.name || '').toLowerCase();
+          const codeUpper = (b.code || '').toUpperCase();
+          if (nameLower.includes('main') || codeUpper.includes('MAIN')) return false;
+          return codeUpper.includes('ALW') || codeUpper.includes('DAB') || codeUpper.includes('GIR');
+        });
+      }
+
       if (branchList.length === 0) {
         branchList = [
           {
-            id: '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
-            name: 'Main Branch',
-            code: 'MAIN-01',
-            address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
-            phone: '0772634497',
+            id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+            name: 'Alawwa',
+            code: 'BR-ALW',
+            address: 'Deegayu Weda Madhura, Alawwa Road, Alawwa',
+            phone: '037-2241088',
             isPrimary: true,
+            isActive: true,
+          },
+          {
+            id: 'fa68e4a0-a515-44c8-a082-5b5590366658',
+            name: 'Dambadeniya',
+            code: 'BR-DAB',
+            address: 'Deegayu Weda Madhura, Kurunegala Road, Dambadeniya',
+            phone: '037-2287411',
+            isPrimary: false,
+            isActive: true,
+          },
+          {
+            id: '197693d6-4247-48df-b614-6fcde9e34f7d',
+            name: 'Giriulla',
+            code: 'BR-GIR',
+            address: 'Deegayu Weda Madhura, Negombo Road, Giriulla',
+            phone: '037-2288111',
+            isPrimary: false,
             isActive: true,
           },
         ];
@@ -169,20 +205,17 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
 
       setBranches(branchList);
       setSelectedBranchIdState((prev) => {
-        if (prev && branchList.some((b) => b.id === prev)) {
+        if (prev && prev !== 'ALL' && branchList.some((b) => b.id === prev)) {
           return prev;
         }
         if (typeof window !== 'undefined') {
           const stored = localStorage.getItem('pixelcraft_selected_branch');
-          if (stored && branchList.some((b) => b.id === stored)) {
+          if (stored && stored !== 'ALL' && branchList.some((b) => b.id === stored)) {
             return stored;
           }
         }
-        const primary = branchList.find((b) => b.isPrimary) || branchList[0];
-        if (primary && typeof window !== 'undefined') {
-          localStorage.setItem('pixelcraft_selected_branch', primary.id);
-        }
-        return primary ? primary.id : null;
+        // Default to null ("All Branches") for Owner/General view
+        return null;
       });
     } catch (err) {
       console.warn('Could not fetch branches:', err);
