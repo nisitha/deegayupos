@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useTransition } from 'react';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -27,6 +27,7 @@ import {
   BarChart3,
   Flame,
   ShieldAlert,
+  Search,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -364,6 +365,313 @@ function CustomTimelineTooltip({ active, payload, label, currency }: CustomTimel
 }
 
 // ============================================================================
+// MASTER DATA CACHE & PARALLELIZED TELEMETRY ENGINE
+// ============================================================================
+interface MasterDataCache {
+  products: RawProduct[];
+  productsMap: Map<string, RawProduct>;
+  stockLevels: RawStockLevel[];
+  cashierOptions: { id: string; fullName: string }[];
+  usersMap: Map<string, any>;
+  timestamp: number;
+}
+
+let masterDataMemoryCache: MasterDataCache | null = null;
+const MASTER_DATA_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchMasterData(forceRefresh = false): Promise<MasterDataCache> {
+  const now = Date.now();
+  if (!forceRefresh && masterDataMemoryCache && now - masterDataMemoryCache.timestamp < MASTER_DATA_TTL) {
+    return masterDataMemoryCache;
+  }
+
+  const warehouseIds = ACTIVE_BRANCHES.map((b) => b.warehouseId);
+
+  // Parallel retrieval of product ranges (0..4999), categories, stock levels, and active users
+  const [p0, p1, p2, p3, p4, catRes, stockRes, usersRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+      .range(0, 999),
+    supabase
+      .from('products')
+      .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+      .range(1000, 1999),
+    supabase
+      .from('products')
+      .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+      .range(2000, 2999),
+    supabase
+      .from('products')
+      .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+      .range(3000, 3999),
+    supabase
+      .from('products')
+      .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
+      .range(4000, 4999),
+    supabase
+      .from('categories')
+      .select('id, name'),
+    supabase
+      .from('stock_levels')
+      .select('product_id, warehouse_id, quantity_on_hand')
+      .in('warehouse_id', warehouseIds)
+      .limit(10000),
+    supabase
+      .from('users')
+      .select('id, full_name, role, assigned_branches')
+      .eq('is_active', true)
+      .order('full_name'),
+  ]);
+
+  const prodMap = new Map<string, RawProduct>();
+  [p0.data, p1.data, p2.data, p3.data, p4.data].forEach((chunk) => {
+    if (chunk) {
+      chunk.forEach((item: any) => prodMap.set(item.id, item));
+    }
+  });
+  const allProducts = Array.from(prodMap.values());
+
+  const categoryNameMap = new Map<string, string>();
+  if (catRes.data) {
+    catRes.data.forEach((c: any) => categoryNameMap.set(c.id, c.name));
+  }
+  allProducts.forEach((p) => {
+    if (p.category_id && categoryNameMap.has(p.category_id)) {
+      p.categories = { id: p.category_id, name: categoryNameMap.get(p.category_id)! };
+    }
+  });
+
+  const productsMap = new Map<string, RawProduct>();
+  allProducts.forEach((p) => productsMap.set(p.id, p));
+
+  const usersMap = new Map<string, any>();
+  const cashierOptions: { id: string; fullName: string }[] = [];
+  if (usersRes.data) {
+    usersRes.data.forEach((u: any) => {
+      usersMap.set(u.id, u);
+      cashierOptions.push({ id: u.id, fullName: u.full_name || 'Staff Member' });
+    });
+  }
+
+  const stockLevels: RawStockLevel[] = (stockRes.data as any) || [];
+
+  masterDataMemoryCache = {
+    products: allProducts,
+    productsMap,
+    stockLevels,
+    cashierOptions,
+    usersMap,
+    timestamp: now,
+  };
+
+  return masterDataMemoryCache;
+}
+
+interface DateRangeDataset {
+  sales: RawSale[];
+  saleItems: RawSaleItem[];
+  shifts: RawShift[];
+  modakaEntries: RawModakaEntry[];
+  reconciliations: RawReconciliation[];
+  activity: DashboardActivityItem[];
+  timestamp: number;
+}
+
+const dateRangeDatasetCache = new Map<string, DateRangeDataset>();
+
+function getCacheKey(preset: DatePreset, start?: string, end?: string): string {
+  if (preset === 'custom') {
+    return `custom_${start || ''}_${end || ''}`;
+  }
+  return preset;
+}
+
+async function fetchDateRangeDataset(
+  preset: DatePreset,
+  customStart?: string,
+  customEnd?: string,
+  masterData?: MasterDataCache
+): Promise<DateRangeDataset> {
+  const mData = masterData || (await fetchMasterData());
+  const bounds = getColomboBounds(preset, customStart, customEnd);
+
+  // Parallel transaction queries: Sales (ranges 0..999, 1000..1999, 2000..2999), Shifts (0..999, 1000..1999), Reconciliations, and Activity
+  const [s0, s1, s2, sh0, sh1, recRes, actRes] = await Promise.all([
+    supabase
+      .from('sales')
+      .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
+      .gte('sold_at', bounds.from)
+      .lte('sold_at', bounds.to)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('sold_at', { ascending: false })
+      .range(0, 999),
+    supabase
+      .from('sales')
+      .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
+      .gte('sold_at', bounds.from)
+      .lte('sold_at', bounds.to)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('sold_at', { ascending: false })
+      .range(1000, 1999),
+    supabase
+      .from('sales')
+      .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
+      .gte('sold_at', bounds.from)
+      .lte('sold_at', bounds.to)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('sold_at', { ascending: false })
+      .range(2000, 2999),
+    supabase
+      .from('cashier_shifts')
+      .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, closing_drawer_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, notes, cash_variance')
+      .gte('shift_date', bounds.startDateStr)
+      .lte('shift_date', bounds.endDateStr)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('shift_date', { ascending: false })
+      .range(0, 999),
+    supabase
+      .from('cashier_shifts')
+      .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, closing_drawer_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, notes, cash_variance')
+      .gte('shift_date', bounds.startDateStr)
+      .lte('shift_date', bounds.endDateStr)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('shift_date', { ascending: false })
+      .range(1000, 1999),
+    supabase
+      .from('daily_cash_reconciliations')
+      .select('id, branch_id, reconciliation_date, physical_cash_c, system_cash_sales, variance_amount, status, notes, submitted_by')
+      .gte('reconciliation_date', bounds.startDateStr)
+      .lte('reconciliation_date', bounds.endDateStr)
+      .in('branch_id', ACTIVE_BRANCH_IDS),
+    dashboardApi.getActivity(10).catch(() => ({ data: [] })),
+  ]);
+
+  const salesMap = new Map<string, RawSale>();
+  [s0.data, s1.data, s2.data].forEach((chunk) => {
+    if (chunk) {
+      chunk.forEach((item: any) => salesMap.set(item.id, item));
+    }
+  });
+  const allSales = Array.from(salesMap.values());
+
+  const shiftsMap = new Map<string, RawShift>();
+  [sh0.data, sh1.data].forEach((chunk) => {
+    if (chunk) {
+      chunk.forEach((item: any) => shiftsMap.set(item.id, item));
+    }
+  });
+  const allShifts = Array.from(shiftsMap.values());
+
+  allShifts.forEach((s) => {
+    const u = mData.usersMap.get(s.cashier_id);
+    s.users = u
+      ? { id: u.id, full_name: u.full_name, role: u.role }
+      : { id: s.cashier_id, full_name: 'Staff Cashier' };
+  });
+
+  const mappedRecs: RawReconciliation[] = ((recRes.data as any[]) || []).map((r: any) => ({
+    id: r.id,
+    branch_id: r.branch_id,
+    cashier_id: r.submitted_by,
+    shift_date: r.reconciliation_date,
+    status: r.status,
+    declared_drawer_cash: Number(r.physical_cash_c || 0),
+    system_expected_cash: Number(r.system_cash_sales || 0),
+    drawer_difference: Number(r.variance_amount || 0),
+    shortage_amount: Number(r.variance_amount || 0) < 0 ? Math.abs(Number(r.variance_amount)) : 0,
+    excess_amount: Number(r.variance_amount || 0) > 0 ? Number(r.variance_amount) : 0,
+  }));
+
+  // Concurrently fetch all child chunks in parallel!
+  const saleIds = allSales.map((s) => s.id);
+  const shiftIds = allShifts.map((s) => s.id);
+
+  const saleItemPromises: Promise<any>[] = [];
+  const salePaymentPromises: Promise<any>[] = [];
+  for (let i = 0; i < saleIds.length; i += 500) {
+    const chunk = saleIds.slice(i, i + 500);
+    saleItemPromises.push(
+      Promise.resolve(
+        supabase
+          .from('sale_items')
+          .select('id, sale_id, product_id, product_name, sku, quantity, unit_price, cost_price, subtotal')
+          .in('sale_id', chunk)
+      )
+    );
+    salePaymentPromises.push(
+      Promise.resolve(
+        supabase
+          .from('sale_payments')
+          .select('id, sale_id, payment_method, amount, status')
+          .in('sale_id', chunk)
+      )
+    );
+  }
+
+  const modakaPromises: Promise<any>[] = [];
+  for (let i = 0; i < shiftIds.length; i += 500) {
+    const chunk = shiftIds.slice(i, i + 500);
+    modakaPromises.push(
+      Promise.resolve(
+        supabase
+          .from('shift_modaka_entries')
+          .select('id, shift_id, branch_id, product_id, opening_qty, in_qty, total_available_qty, sold_qty, closing_qty, applied_rate, total_amount, created_at')
+          .in('shift_id', chunk)
+      )
+    );
+  }
+
+  const [itemResults, paymentResults, modakaResults] = await Promise.all([
+    Promise.all(saleItemPromises),
+    Promise.all(salePaymentPromises),
+    Promise.all(modakaPromises),
+  ]);
+
+  const allSaleItems: RawSaleItem[] = [];
+  itemResults.forEach((res) => {
+    if (res.data) allSaleItems.push(...(res.data as any));
+  });
+
+  const paymentMethodMap = new Map<string, string>();
+  paymentResults.forEach((res) => {
+    if (res.data) {
+      res.data.forEach((p: any) => {
+        if (!paymentMethodMap.has(p.sale_id) && p.payment_method) {
+          paymentMethodMap.set(p.sale_id, p.payment_method);
+        }
+      });
+    }
+  });
+
+  allSales.forEach((s) => {
+    s.payment_method = paymentMethodMap.get(s.id) || 'CASH';
+  });
+
+  const allModaka: RawModakaEntry[] = [];
+  modakaResults.forEach((res) => {
+    if (res.data) allModaka.push(...(res.data as any));
+  });
+
+  allModaka.forEach((m) => {
+    const prod = mData.productsMap.get(m.product_id);
+    m.products = prod
+      ? { id: prod.id, name: prod.name, sku: prod.sku, cost_price: prod.cost_price }
+      : { id: m.product_id, name: 'Special Stock Item', sku: 'MODAKA', cost_price: 120 };
+  });
+
+  return {
+    sales: allSales,
+    saleItems: allSaleItems,
+    shifts: allShifts,
+    modakaEntries: allModaka,
+    reconciliations: mappedRecs,
+    activity: (actRes?.data as any) || [],
+    timestamp: Date.now(),
+  };
+}
+
+// ============================================================================
 // MAIN EXECUTIVE COMMAND CENTER COMPONENT
 // ============================================================================
 export default function DashboardPage() {
@@ -374,7 +682,7 @@ export default function DashboardPage() {
   const [customStart, setCustomStart] = useState(() => getColomboDateString(new Date()));
   const [customEnd, setCustomEnd] = useState(() => getColomboDateString(new Date()));
 
-  // 2. In-Page Multi-Dimensional Filters
+  // 2. In-Page Multi-Dimensional Filters (100% In-Memory via useMemo)
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
     if (selectedBranchId && ACTIVE_BRANCH_IDS.includes(selectedBranchId)) {
       return selectedBranchId;
@@ -397,8 +705,12 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<DashboardActivityItem[]>([]);
   const [cashierOptions, setCashierOptions] = useState<{ id: string; fullName: string }[]>([]);
 
-  // 4. UI Auxiliary State
+  // 4. UI Auxiliary State & Performance Optimizations
   const [loading, setLoading] = useState(true);
+  const [isNavigatingRange, setIsNavigatingRange] = useState(false);
+  const [isRevalidating, setIsRevalidating] = useState(false);
+  const [isTabPending, startTabTransition] = useTransition();
+
   const [isMounted, setIsMounted] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [activeBreakdownTab, setActiveBreakdownTab] = useState<'BRANCH' | 'SHIFT' | 'CASHIER' | 'PEAK'>('BRANCH');
@@ -406,6 +718,14 @@ export default function DashboardPage() {
   const [inventoryChannel, setInventoryChannel] = useState<'ALL' | 'POS' | 'SPECIAL'>('ALL');
   const [cashierSortField, setCashierSortField] = useState<'revenue' | 'profit' | 'bills' | 'variance'>('revenue');
   const [cashierSortDir, setCashierSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // Windowing & Search for Large Inventory Tables
+  const [fastMovingLimit, setFastMovingLimit] = useState(25);
+  const [fastMovingSearch, setFastMovingSearch] = useState('');
+  const [slowMovingLimit, setSlowMovingLimit] = useState(25);
+  const [slowMovingSearch, setSlowMovingSearch] = useState('');
+  const [splitModalLimit, setSplitModalLimit] = useState(25);
+  const [splitModalSearch, setSplitModalSearch] = useState('');
 
   // Legacy sync config
   const [syncConfig, setSyncConfig] = useState<LegacySyncConfigDto | null>(null);
@@ -463,244 +783,63 @@ export default function DashboardPage() {
   };
 
   // ============================================================================
-  // BULK EXECUTIVE DATA FETCHER (FLAT GUARANTEED-VALID QUERIES)
+  // BULK EXECUTIVE DATA FETCHER (DECOUPLED FROM DIMENSIONAL FILTERS)
   // ============================================================================
-  const fetchExecutiveData = useCallback(async (isBackground = false) => {
+  const fetchExecutiveData = useCallback(async (forceRefresh = false) => {
     if (!isOwner) return;
 
-    if (!isBackground) setLoading(true);
+    const cacheKey = getCacheKey(datePreset, customStart, customEnd);
+    const cached = dateRangeDatasetCache.get(cacheKey);
+
+    if (!forceRefresh && cached) {
+      // 0ms instant render from memory cache
+      setSales(cached.sales);
+      setSaleItems(cached.saleItems);
+      setShifts(cached.shifts);
+      setModakaEntries(cached.modakaEntries);
+      setReconciliations(cached.reconciliations);
+      if (cached.activity) setActivity(cached.activity);
+      setLoading(false);
+
+      // Background revalidation if older than 60s
+      if (Date.now() - cached.timestamp > 60 * 1000) {
+        setIsRevalidating(true);
+      } else {
+        return;
+      }
+    } else {
+      // Uncached or forced refresh
+      setIsNavigatingRange(true);
+      // keepPreviousData: only show full loading skeleton if we have no prior data at all
+      setSales((prev) => {
+        if (!prev || prev.length === 0) setLoading(true);
+        return prev;
+      });
+    }
 
     try {
-      const bounds = getColomboBounds(datePreset, customStart, customEnd);
+      const masterData = await fetchMasterData(forceRefresh);
+      setProducts(masterData.products);
+      setStockLevels(masterData.stockLevels);
+      setCashierOptions(masterData.cashierOptions);
 
-      // 1. Fetch Products flat (Paginating beyond 1,000 rows so all ~3,170 products are retrieved)
-      let allProducts: RawProduct[] = [];
-      let prodOffset = 0;
-      const prodChunk = 1000;
-      while (true) {
-        const { data: pData, error: pErr } = await supabase
-          .from('products')
-          .select('id, name, sku, cost_price, retail_price, category_id, is_active, alert_quantity')
-          .range(prodOffset, prodOffset + prodChunk - 1);
+      const dataset = await fetchDateRangeDataset(datePreset, customStart, customEnd, masterData);
+      dateRangeDatasetCache.set(cacheKey, dataset);
 
-        if (pErr) {
-          console.error('[Dashboard] Products query error:', pErr);
-          break;
-        }
-        if (!pData || pData.length === 0) break;
-        allProducts.push(...(pData as any));
-        if (pData.length < prodChunk) break;
-        prodOffset += prodChunk;
-        if (prodOffset >= 10000) break;
-      }
-
-      // Fetch Categories flat
-      const { data: catData, error: catErr } = await supabase
-        .from('categories')
-        .select('id, name');
-      if (catErr) console.warn('[Dashboard] Categories query note:', catErr.message);
-
-      const categoryNameMap = new Map<string, string>();
-      if (catData) {
-        catData.forEach((c: any) => categoryNameMap.set(c.id, c.name));
-      }
-      allProducts.forEach((p) => {
-        if (p.category_id && categoryNameMap.has(p.category_id)) {
-          p.categories = { id: p.category_id, name: categoryNameMap.get(p.category_id)! };
-        }
-      });
-      const productsMap = new Map<string, RawProduct>();
-      allProducts.forEach((p) => productsMap.set(p.id, p));
-
-      // 2. Fetch Current Stock Levels across the 3 branch warehouses
-      const warehouseIds = ACTIVE_BRANCHES.map((b) => b.warehouseId);
-      const { data: stockData, error: stockErr } = await supabase
-        .from('stock_levels')
-        .select('product_id, warehouse_id, quantity_on_hand')
-        .in('warehouse_id', warehouseIds)
-        .limit(10000);
-      if (stockErr) console.warn('[Dashboard] Stock query note:', stockErr.message);
-
-      // 3. Paginate POS Sales in chunks of 1,000 using only confirmed valid columns
-      let allSales: RawSale[] = [];
-      let salesOffset = 0;
-      const salesChunk = 1000;
-
-      while (true) {
-        let query = supabase
-          .from('sales')
-          .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
-          .gte('sold_at', bounds.from)
-          .lte('sold_at', bounds.to)
-          .in('branch_id', ACTIVE_BRANCH_IDS)
-          .order('sold_at', { ascending: false })
-          .range(salesOffset, salesOffset + salesChunk - 1);
-
-        const { data: sData, error: sErr } = await query;
-        if (sErr) {
-          console.error('[Dashboard] Sales query error:', sErr);
-          break;
-        }
-        if (!sData || sData.length === 0) break;
-        allSales.push(...(sData as any));
-        if (sData.length < salesChunk) break;
-        salesOffset += salesChunk;
-        if (salesOffset >= 10000) break;
-      }
-
-      // 4. Fetch Sale Items & Sale Payments for these sales in safe chunks of 500 sale IDs
-      const saleIds = allSales.map((s) => s.id);
-      let allSaleItems: RawSaleItem[] = [];
-      let allSalePayments: any[] = [];
-
-      for (let i = 0; i < saleIds.length; i += 500) {
-        const chunk = saleIds.slice(i, i + 500);
-        const [itemsRes, paymentsRes] = await Promise.all([
-          supabase
-            .from('sale_items')
-            .select('id, sale_id, product_id, product_name, sku, quantity, unit_price, cost_price, subtotal')
-            .in('sale_id', chunk),
-          supabase
-            .from('sale_payments')
-            .select('id, sale_id, payment_method, amount, status')
-            .in('sale_id', chunk),
-        ]);
-
-        if (itemsRes.error) console.error('[Dashboard] Sale items query error:', itemsRes.error);
-        if (paymentsRes.error) console.error('[Dashboard] Sale payments query error:', paymentsRes.error);
-
-        if (itemsRes.data) allSaleItems.push(...(itemsRes.data as any));
-        if (paymentsRes.data) allSalePayments.push(...paymentsRes.data);
-      }
-
-      // Attach payment methods to sales
-      const paymentMethodMap = new Map<string, string>();
-      allSalePayments.forEach((p) => {
-        if (!paymentMethodMap.has(p.sale_id) && p.payment_method) {
-          paymentMethodMap.set(p.sale_id, p.payment_method);
-        }
-      });
-      allSales.forEach((s) => {
-        s.payment_method = paymentMethodMap.get(s.id) || 'CASH';
-      });
-
-      // 5. Fetch Active Users flat for Cashier mapping & filter
-      const { data: usersData, error: usersErr } = await supabase
-        .from('users')
-        .select('id, full_name, role, assigned_branches')
-        .eq('is_active', true)
-        .order('full_name');
-      if (usersErr) console.warn('[Dashboard] Users query note:', usersErr.message);
-
-      const usersMap = new Map<string, any>();
-      const mappedCashiers: { id: string; fullName: string }[] = [];
-      if (usersData) {
-        usersData.forEach((u: any) => {
-          usersMap.set(u.id, u);
-          mappedCashiers.push({ id: u.id, fullName: u.full_name || 'Staff Member' });
-        });
-      }
-      setCashierOptions(mappedCashiers);
-
-      // 6. Paginate Cashier Shifts in chunks of 1,000 using flat confirmed columns
-      let allShifts: RawShift[] = [];
-      let shiftOffset = 0;
-      const shiftChunk = 1000;
-
-      while (true) {
-        let query = supabase
-          .from('cashier_shifts')
-          .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, closing_drawer_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, notes, cash_variance')
-          .gte('shift_date', bounds.startDateStr)
-          .lte('shift_date', bounds.endDateStr)
-          .in('branch_id', ACTIVE_BRANCH_IDS)
-          .order('shift_date', { ascending: false })
-          .range(shiftOffset, shiftOffset + shiftChunk - 1);
-
-        const { data: shiftData, error: shiftErr } = await query;
-        if (shiftErr) {
-          console.error('[Dashboard] Cashier shifts query error:', shiftErr);
-          break;
-        }
-        if (!shiftData || shiftData.length === 0) break;
-        allShifts.push(...(shiftData as any));
-        if (shiftData.length < shiftChunk) break;
-        shiftOffset += shiftChunk;
-        if (shiftOffset >= 5000) break;
-      }
-
-      // Populate cashier info on shifts in-memory
-      allShifts.forEach((s) => {
-        const u = usersMap.get(s.cashier_id);
-        s.users = u
-          ? { id: u.id, full_name: u.full_name, role: u.role }
-          : { id: s.cashier_id, full_name: 'Staff Cashier' };
-      });
-
-      // 7. Fetch Shift Modaka Entries for these shifts in safe chunks of 500
-      const shiftIds = allShifts.map((s) => s.id);
-      let allModaka: RawModakaEntry[] = [];
-      for (let i = 0; i < shiftIds.length; i += 500) {
-        const chunk = shiftIds.slice(i, i + 500);
-        const { data: mData, error: mErr } = await supabase
-          .from('shift_modaka_entries')
-          .select('id, shift_id, branch_id, product_id, opening_qty, in_qty, total_available_qty, sold_qty, closing_qty, applied_rate, total_amount, created_at')
-          .in('shift_id', chunk);
-
-        if (mErr) {
-          console.error('[Dashboard] Shift modaka entries query error:', mErr);
-        }
-        if (mData) allModaka.push(...(mData as any));
-      }
-
-      // Populate product info on modaka entries in-memory
-      allModaka.forEach((m) => {
-        const prod = productsMap.get(m.product_id);
-        m.products = prod
-          ? { id: prod.id, name: prod.name, sku: prod.sku, cost_price: prod.cost_price }
-          : { id: m.product_id, name: 'Special Stock Item', sku: 'MODAKA', cost_price: 120 };
-      });
-
-      // 8. Fetch Daily Cash Reconciliations using exact confirmed columns
-      const { data: recData, error: recErr } = await supabase
-        .from('daily_cash_reconciliations')
-        .select('id, branch_id, reconciliation_date, physical_cash_c, system_cash_sales, variance_amount, status, notes, submitted_by')
-        .gte('reconciliation_date', bounds.startDateStr)
-        .lte('reconciliation_date', bounds.endDateStr)
-        .in('branch_id', ACTIVE_BRANCH_IDS);
-
-      if (recErr) console.warn('[Dashboard] Reconciliations query note:', recErr.message);
-
-      const mappedRecs: RawReconciliation[] = (recData || []).map((r: any) => ({
-        id: r.id,
-        branch_id: r.branch_id,
-        cashier_id: r.submitted_by,
-        shift_date: r.reconciliation_date,
-        status: r.status,
-        declared_drawer_cash: Number(r.physical_cash_c || 0),
-        system_expected_cash: Number(r.system_cash_sales || 0),
-        drawer_difference: Number(r.variance_amount || 0),
-        shortage_amount: Number(r.variance_amount || 0) < 0 ? Math.abs(Number(r.variance_amount)) : 0,
-        excess_amount: Number(r.variance_amount || 0) > 0 ? Number(r.variance_amount) : 0,
-      }));
-
-      // 9. Fetch Recent Activity feed
-      const actRes = await dashboardApi.getActivity(10, selectedBranch !== 'ALL' ? selectedBranch : undefined);
-      if (actRes.data) setActivity(actRes.data);
-
-      setProducts(allProducts);
-      if (stockData) setStockLevels(stockData as any);
-      setReconciliations(mappedRecs);
-      setSales(allSales);
-      setSaleItems(allSaleItems);
-      setShifts(allShifts);
-      setModakaEntries(allModaka);
+      setSales(dataset.sales);
+      setSaleItems(dataset.saleItems);
+      setShifts(dataset.shifts);
+      setModakaEntries(dataset.modakaEntries);
+      setReconciliations(dataset.reconciliations);
+      setActivity(dataset.activity);
     } catch (err) {
       console.error('[Dashboard] Telemetry query error:', err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
+      setIsNavigatingRange(false);
+      setIsRevalidating(false);
     }
-  }, [isOwner, datePreset, customStart, customEnd, selectedBranch]);
+  }, [isOwner, datePreset, customStart, customEnd]);
 
   useEffect(() => {
     if (isOwner) {
@@ -708,8 +847,31 @@ export default function DashboardPage() {
     }
   }, [isOwner, fetchExecutiveData]);
 
+  // Background prefetch for common presets ('yesterday', '7days') after initial mount settles
+  useEffect(() => {
+    if (!isOwner || loading) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const mData = await fetchMasterData(false);
+        const presetsToPrefetch: DatePreset[] = ['yesterday', '7days'];
+        for (const p of presetsToPrefetch) {
+          const key = getCacheKey(p);
+          if (!dateRangeDatasetCache.has(key)) {
+            const ds = await fetchDateRangeDataset(p, undefined, undefined, mData);
+            dateRangeDatasetCache.set(key, ds);
+          }
+        }
+      } catch {
+        // Silent background prefetch
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [isOwner, loading]);
+
   // Real-time listener: triggers background refresh when sales or shifts change
-  useRealtimePosSync((isBg) => fetchExecutiveData(isBg ?? true));
+  useRealtimePosSync(() => fetchExecutiveData(true));
 
   // ============================================================================
   // DERIVED FILTERING & EXACT PROFIT CALCULATION ENGINE
@@ -1404,7 +1566,6 @@ export default function DashboardPage() {
     const fastMoving = Array.from(prodVelocityMap.values())
       .filter((p) => p.unitsSold > 0)
       .sort((a, b) => b.unitsSold - a.unitsSold)
-      .slice(0, 10)
       .map((p, idx) => {
         const onHand = currentStockMap.get(p.id) || 0;
         const dailyVelocity = p.unitsSold / days;
@@ -1440,8 +1601,7 @@ export default function DashboardPage() {
         };
       })
       .filter((p) => p.onHand > 0 && p.unitsSold <= 2)
-      .sort((a, b) => b.tiedCapital - a.tiedCapital)
-      .slice(0, 10);
+      .sort((a, b) => b.tiedCapital - a.tiedCapital);
 
     return { fastMoving, slowMoving };
   }, [
@@ -1458,6 +1618,44 @@ export default function DashboardPage() {
     shiftLookupMap,
     products,
   ]);
+
+  // Windowed & Filtered Inventory Lists
+  const displayedFastMoving = useMemo(() => {
+    let list = inventoryIntelligence.fastMoving;
+    if (fastMovingSearch.trim()) {
+      const q = fastMovingSearch.toLowerCase().trim();
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    }
+    return list;
+  }, [inventoryIntelligence.fastMoving, fastMovingSearch]);
+
+  const displayedSlowMoving = useMemo(() => {
+    let list = inventoryIntelligence.slowMoving;
+    if (slowMovingSearch.trim()) {
+      const q = slowMovingSearch.toLowerCase().trim();
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+    }
+    return list;
+  }, [inventoryIntelligence.slowMoving, slowMovingSearch]);
+
+  // Windowed & Filtered Split Modal Lists
+  const displayedModalPosItems = useMemo(() => {
+    let list = posAnalytics.topItems;
+    if (splitModalSearch.trim()) {
+      const q = splitModalSearch.toLowerCase().trim();
+      list = list.filter((item) => item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q));
+    }
+    return list;
+  }, [posAnalytics.topItems, splitModalSearch]);
+
+  const displayedModalSpecialItems = useMemo(() => {
+    let list = specialAnalytics.topItems;
+    if (splitModalSearch.trim()) {
+      const q = splitModalSearch.toLowerCase().trim();
+      list = list.filter((item) => item.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [specialAnalytics.topItems, splitModalSearch]);
 
   // Loading state during initial context hydration
   if (!isMounted || isTenantLoading) {
@@ -1489,6 +1687,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Sleek Top Progress Bar during cache revalidation or date navigation */}
+      {(isNavigatingRange || isRevalidating) && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-pulse z-50 pointer-events-none" />
+      )}
+
       {/* =====================================================================
           PAGE TITLE & EXECUTIVE FILTERS BAR (PART 1)
       ===================================================================== */}
@@ -1509,11 +1712,11 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => fetchExecutiveData(false)}
-              disabled={loading}
+              onClick={() => fetchExecutiveData(true)}
+              disabled={loading || isNavigatingRange}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${(loading || isNavigatingRange || isRevalidating) ? 'animate-spin text-blue-600' : ''}`} />
               <span>Refresh</span>
             </button>
 
@@ -2146,11 +2349,15 @@ export default function DashboardPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveBreakdownTab(tab.id as any)}
+                onClick={() => {
+                  startTabTransition(() => {
+                    setActiveBreakdownTab(tab.id as any);
+                  });
+                }}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeBreakdownTab === tab.id
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  } ${isTabPending ? 'opacity-70' : ''}`}
               >
                 {tab.label}
               </button>
@@ -2499,17 +2706,32 @@ export default function DashboardPage() {
         <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Side A: Top Fast-Moving Products (High Velocity) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                <Flame className="w-4 h-4 text-amber-500" />
-                <span>Top Fast-Moving Products (High Velocity)</span>
-              </h3>
-              <span className="text-[11px] text-slate-400 font-mono">Ranked by volume</span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <span>Top Fast-Moving Products ({displayedFastMoving.length})</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-mono">Ranked by volume</span>
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter fast-moving..."
+                  value={fastMovingSearch}
+                  onChange={(e) => {
+                    setFastMovingSearch(e.target.value);
+                    setFastMovingLimit(25);
+                  }}
+                  className="pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white placeholder-slate-400 text-slate-800 focus:outline-none focus:border-blue-500 w-44"
+                />
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-              {inventoryIntelligence.fastMoving.length > 0 ? (
-                inventoryIntelligence.fastMoving.map((p) => (
+              {displayedFastMoving.length > 0 ? (
+                displayedFastMoving.slice(0, fastMovingLimit).map((p) => (
                   <div key={p.id} className="p-3 bg-white hover:bg-slate-50 transition-colors flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -2549,21 +2771,55 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {displayedFastMoving.length > fastMovingLimit && (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setFastMovingLimit((prev) => prev + 25)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs cursor-pointer"
+                >
+                  Show More (+25)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFastMovingLimit(displayedFastMoving.length)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 shadow-2xs cursor-pointer"
+                >
+                  Show All ({displayedFastMoving.length})
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Side B: Slow-Moving & Dead Stock (Low/Zero Velocity) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                <ShieldAlert className="w-4 h-4 text-purple-600" />
-                <span>Slow-Moving & Dead Stock (Tied-Up Capital)</span>
-              </h3>
-              <span className="text-[11px] text-slate-400 font-mono">Stock on-hand with 0–2 sales</span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                  <ShieldAlert className="w-4 h-4 text-purple-600" />
+                  <span>Slow-Moving & Dead Stock ({displayedSlowMoving.length})</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-mono">Stock on-hand with 0–2 sales</span>
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter slow-moving..."
+                  value={slowMovingSearch}
+                  onChange={(e) => {
+                    setSlowMovingSearch(e.target.value);
+                    setSlowMovingLimit(25);
+                  }}
+                  className="pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white placeholder-slate-400 text-slate-800 focus:outline-none focus:border-purple-500 w-44"
+                />
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-              {inventoryIntelligence.slowMoving.length > 0 ? (
-                inventoryIntelligence.slowMoving.map((p, idx) => (
+              {displayedSlowMoving.length > 0 ? (
+                displayedSlowMoving.slice(0, slowMovingLimit).map((p, idx) => (
                   <div key={p.id || idx} className="p-3 bg-white hover:bg-slate-50 transition-colors flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-slate-900 truncate">{p.name}</div>
@@ -2584,6 +2840,25 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {displayedSlowMoving.length > slowMovingLimit && (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSlowMovingLimit((prev) => prev + 25)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs cursor-pointer"
+                >
+                  Show More (+25)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSlowMovingLimit(displayedSlowMoving.length)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 shadow-2xs cursor-pointer"
+                >
+                  Show All ({displayedSlowMoving.length})
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2595,9 +2870,9 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+            <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7052FF] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7052FF] flex items-center justify-center shrink-0">
                   <Layers className="w-4 h-4" />
                 </div>
                 <div>
@@ -2609,13 +2884,28 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsSplitModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search split items..."
+                    value={splitModalSearch}
+                    onChange={(e) => {
+                      setSplitModalSearch(e.target.value);
+                      setSplitModalLimit(25);
+                    }}
+                    className="pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white placeholder-slate-400 text-slate-800 focus:outline-none focus:border-purple-500 w-44"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSplitModalOpen(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Content: 2-Column Side-by-Side Comparison */}
@@ -2671,12 +2961,17 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Side A Items: POS Catalog */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Top POS Products (Units & Margin)
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Top POS Products (Units & Margin)
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Showing {Math.min(displayedModalPosItems.length, splitModalLimit)} of {displayedModalPosItems.length}
+                    </span>
+                  </div>
                   <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs max-h-80 overflow-y-auto">
-                    {posAnalytics.topItems.slice(0, 15).map((item, idx) => (
-                      <div key={idx} className="p-2.5 flex items-center justify-between gap-2 bg-white">
+                    {displayedModalPosItems.slice(0, splitModalLimit).map((item, idx) => (
+                      <div key={idx} className="p-2.5 flex items-center justify-between gap-2 bg-white hover:bg-slate-50 transition-colors">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-slate-900 truncate">{item.name}</div>
                           <div className="text-[10px] text-slate-400 font-mono">
@@ -2691,17 +2986,43 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ))}
+                    {displayedModalPosItems.length === 0 && (
+                      <div className="p-4 text-center text-slate-400 text-xs">No matching POS items</div>
+                    )}
                   </div>
+                  {displayedModalPosItems.length > splitModalLimit && (
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSplitModalLimit((prev) => prev + 25)}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                      >
+                        Show More (+25)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSplitModalLimit(displayedModalPosItems.length)}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer"
+                      >
+                        Show All ({displayedModalPosItems.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Side B Items: Special Stock */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Special Stock Remedies Sold
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Special Stock Remedies Sold
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Showing {Math.min(displayedModalSpecialItems.length, splitModalLimit)} of {displayedModalSpecialItems.length}
+                    </span>
+                  </div>
                   <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs max-h-80 overflow-y-auto">
-                    {specialAnalytics.topItems.map((item, idx) => (
-                      <div key={idx} className="p-2.5 flex items-center justify-between gap-2 bg-white">
+                    {displayedModalSpecialItems.slice(0, splitModalLimit).map((item, idx) => (
+                      <div key={idx} className="p-2.5 flex items-center justify-between gap-2 bg-white hover:bg-slate-50 transition-colors">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-slate-900 truncate">{item.name}</div>
                           <div className="text-[10px] text-slate-400 font-mono">
@@ -2716,7 +3037,28 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ))}
+                    {displayedModalSpecialItems.length === 0 && (
+                      <div className="p-4 text-center text-slate-400 text-xs">No matching Special items</div>
+                    )}
                   </div>
+                  {displayedModalSpecialItems.length > splitModalLimit && (
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSplitModalLimit((prev) => prev + 25)}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                      >
+                        Show More (+25)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSplitModalLimit(displayedModalSpecialItems.length)}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 cursor-pointer"
+                      >
+                        Show All ({displayedModalSpecialItems.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
