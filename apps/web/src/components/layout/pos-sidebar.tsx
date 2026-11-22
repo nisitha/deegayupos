@@ -65,7 +65,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Sales & Bills', href: '/dashboard/orders', icon: Receipt },
       { name: 'Catalog', href: '/dashboard/products', icon: Package },
       { name: 'Branch Inventory', href: '/dashboard/inventory', icon: Boxes },
-      { name: 'Stock Transfers', href: '/dashboard/inventory/transfers', icon: ArrowLeftRight },
+      { name: 'Stock Transfers', href: '/dashboard/transfers', icon: ArrowLeftRight },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
       { name: 'Special Stock & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
@@ -203,6 +203,7 @@ export function PosSidebar() {
         title: 'OPERATIONS',
         items: [
           { name: 'POS Terminal', href: '/dashboard/pos', icon: Layers, badge: 'POS' },
+          { name: 'Stock Transfers', href: '/dashboard/transfers', icon: ArrowLeftRight, badge: 'Transfer' },
           ...(hasGrnAccess
             ? [
                 {
@@ -242,6 +243,13 @@ export function PosSidebar() {
       // If href is a query action shortcut like shift-handover, don't override base POS tab
       if (href.includes('?')) {
         return false;
+      }
+      // Transfers route alias matching
+      if (
+        (cleanHref === '/dashboard/transfers' || cleanHref === '/dashboard/inventory/transfers') &&
+        (pathname === '/dashboard/transfers' || pathname === '/dashboard/inventory/transfers' || pathname.startsWith('/dashboard/transfers/') || pathname.startsWith('/dashboard/inventory/transfers/'))
+      ) {
+        return true;
       }
       // Exact match
       if (pathname === cleanHref) {

@@ -69,6 +69,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       return !canAccessActiveBranchGrn;
     }
 
+    // 3. Stock Transfers is allowed for staff so branch staff can submit outgoing transfer requests
+    if (
+      pathname === '/dashboard/transfers' ||
+      pathname.startsWith('/dashboard/transfers/') ||
+      pathname === '/dashboard/inventory/transfers' ||
+      pathname.startsWith('/dashboard/inventory/transfers/')
+    ) {
+      return false;
+    }
+
     // All other administrative, overview & financial routes are strictly restricted for STAFF
     return true;
   }, [authChecked, isTenantLoading, isOwner, grnBranchIds, selectedBranchId, pathname]);
