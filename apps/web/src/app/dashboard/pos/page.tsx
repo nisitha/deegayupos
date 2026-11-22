@@ -46,7 +46,7 @@ import type {
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi, shiftsApi, formatShiftLabel, isOwnerUser, type CashierShiftDto } from '../../../lib/api-client';
+import { posApi, shiftsApi, formatShiftLabel, isOwnerUser, resolveWarehouseId, type CashierShiftDto } from '../../../lib/api-client';
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
@@ -430,9 +430,12 @@ export default function ConfidencyPosPage() {
     setIsLoadingProducts(true);
     setCatalogError(null);
 
+    const activeWarehouseId = resolveWarehouseId(selectedBranchId);
+    const branchCacheKey = `deegayu_catalog_${activeWarehouseId}`;
+
     // 1. Immediately read from IndexedDB with ZERO blocking spinner
     try {
-      const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
+      const cached = await getCachedCatalogData<RetailProductItem>(branchCacheKey);
       if (cached && cached.products && cached.products.length > 0) {
         setProducts(cached.products);
         setIsLoadingProducts(false);
@@ -458,7 +461,7 @@ export default function ConfidencyPosPage() {
         console.warn('[POS Catalog] Categories fetch error:', cErr);
       }
 
-      // Step B: Fetch stock levels in 1,000-row chunks
+      // Step B: Fetch stock levels for active branch warehouse in 1,000-row chunks
       const stockMap = new Map<string, number>();
       try {
         let stockPage = 0;
@@ -471,6 +474,7 @@ export default function ConfidencyPosPage() {
           const { data: stockChunk, error: sErr } = await supabase
             .from('stock_levels')
             .select('product_id, quantity_on_hand')
+            .eq('warehouse_id', activeWarehouseId)
             .range(sFrom, sTo);
 
           if (sErr || !stockChunk || stockChunk.length === 0) {
@@ -480,8 +484,7 @@ export default function ConfidencyPosPage() {
 
           stockChunk.forEach((sl: any) => {
             if (sl.product_id) {
-              const cur = stockMap.get(sl.product_id) || 0;
-              stockMap.set(sl.product_id, cur + Number(sl.quantity_on_hand ?? 0));
+              stockMap.set(sl.product_id, Number(sl.quantity_on_hand ?? 0));
             }
           });
 
@@ -536,7 +539,7 @@ export default function ConfidencyPosPage() {
       if (allProducts.length > 0) {
         const freshProducts: RetailProductItem[] = allProducts.map((p: any) => {
           const cat = p.category_id ? categoryMap.get(p.category_id) : null;
-          const stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 100;
+          const stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 0;
 
           return {
             id: p.id,
@@ -562,13 +565,13 @@ export default function ConfidencyPosPage() {
         setCatalogError(null);
 
         // Update IndexedDB asynchronously for instant 0ms subsequent loads
-        await setCachedCatalogData('deegayu', {
+        await setCachedCatalogData(branchCacheKey, {
           products: freshProducts,
           categories: Array.from(categoryMap.values()),
           total: freshProducts.length,
         });
       } else {
-        const cached = await getCachedCatalogData<RetailProductItem>('deegayu');
+        const cached = await getCachedCatalogData<RetailProductItem>(branchCacheKey);
         if (cached && cached.products && cached.products.length > 0) {
           setProducts(cached.products);
         } else {
@@ -587,7 +590,7 @@ export default function ConfidencyPosPage() {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, []);
+  }, [selectedBranchId]);
 
   useEffect(() => {
     initCatalog();
@@ -1385,6 +1388,24 @@ export default function ConfidencyPosPage() {
           );
         }
 
+        // Instant In-Memory Stock Decrement for immediate zero-latency UI feedback
+        const soldQtyMap = new Map<string, number>();
+        cart.forEach((cItem) => {
+          const current = soldQtyMap.get(cItem.productId) || 0;
+          soldQtyMap.set(cItem.productId, current + cItem.quantity);
+        });
+
+        setProducts((prevProducts) =>
+          prevProducts.map((p) => {
+            const soldQty = soldQtyMap.get(p.id);
+            if (!soldQty) return p;
+            return {
+              ...p,
+              stockOnHand: Math.max(0, p.stockOnHand - soldQty),
+            };
+          })
+        );
+
         clearCart();
         resetDiscount();
         setSearchQuery('');
@@ -1954,12 +1975,14 @@ export default function ConfidencyPosPage() {
                               <span>•</span>
                               <span
                                 className={
-                                  item.stockOnHand <= 5
-                                    ? 'text-amber-600 font-semibold'
-                                    : 'text-emerald-600 font-semibold'
+                                  item.stockOnHand <= 0
+                                    ? 'text-rose-600 font-semibold'
+                                    : item.stockOnHand <= 5
+                                      ? 'text-amber-600 font-semibold'
+                                      : 'text-emerald-600 font-semibold'
                                 }
                               >
-                                In Stock: {item.stockOnHand}
+                                {item.stockOnHand <= 0 ? 'Out of Stock (0)' : `In Stock: ${item.stockOnHand}`}
                               </span>
                             </div>
                           </div>
@@ -2168,7 +2191,7 @@ export default function ConfidencyPosPage() {
                     onClick={() => handleProductClick(product)}
                     className="rounded-2xl border border-slate-200/90 bg-white p-2.5 hover:border-indigo-300 hover:bg-slate-50/70 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group active:scale-[0.98] select-none relative shadow-xs"
                   >
-                    {/* Image Frame (h-28 sm:h-32, clean crisp frame, top-right stock badge) */}
+                    {/* Image Frame (h-28 sm:h-32, clean crisp frame) */}
                     <div className="relative h-28 sm:h-32 w-full rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-2.5 flex items-center justify-center p-2 group-hover:scale-[1.02] transition-transform">
                       <img
                         src={getProductPhoto(product)}
@@ -2179,31 +2202,35 @@ export default function ConfidencyPosPage() {
                           e.currentTarget.src = DEFAULT_STUDIO_PHOTO;
                         }}
                       />
-                      <div className="absolute top-1.5 right-1.5 z-10">
-                        {product.stockOnHand <= 0 ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 font-mono shadow-2xs">
-                            0 left
-                          </span>
-                        ) : product.stockOnHand <= 5 ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-mono shadow-2xs">
-                            {product.stockOnHand} left
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono shadow-2xs">
-                            {product.stockOnHand.toLocaleString()} left
-                          </span>
-                        )}
-                      </div>
                     </div>
 
-                    {/* Product Title (Clean 2-line English) */}
+                    {/* Product Title & Stock Badge */}
                     <div className="flex-1 flex flex-col justify-between">
-                      <h4
-                        className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-indigo-600 transition-colors"
-                        title={product.name}
-                      >
-                        {product.name}
-                      </h4>
+                      <div>
+                        <h4
+                          className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-indigo-600 transition-colors"
+                          title={product.name}
+                        >
+                          {product.name}
+                        </h4>
+
+                        {/* High-Contrast Branch Stock Badge */}
+                        <div className="mt-1.5 flex items-center">
+                          {product.stockOnHand <= 0 ? (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-mono shadow-2xs">
+                              Out of Stock (0)
+                            </span>
+                          ) : product.stockOnHand <= 5 ? (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-mono shadow-2xs">
+                              Low Stock: {product.stockOnHand}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shadow-2xs">
+                              Stock: {product.stockOnHand.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Bottom Price & Quick-Add Row */}
                       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">

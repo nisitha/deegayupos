@@ -910,9 +910,49 @@ export const productsApi = {
 };
 
 const DEEGAYU_TENANT_ID = '0fef1423-5d89-4147-8af8-17c7e641c88a';
-const DEEGAYU_BRANCH_ID = '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
+const DEEGAYU_BRANCH_ID = '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54'; // Alawwa default operating branch
 const DEEGAYU_CASHIER_ID = '96b2747b-9d22-4266-94ce-b035fadef498';
 const DEEGAYU_CASHIER_NAME = 'Dr. Deegayu (Owner)';
+
+// 3 Operating Branches & Exact Warehouses Mapping
+export const ALAWWA_BRANCH_ID = '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
+export const DAMBADENIYA_BRANCH_ID = 'fa68e4a0-a515-44c8-a082-5b5590366658';
+export const GIRIULLA_BRANCH_ID = '197693d6-4247-48df-b614-6fcde9e34f7d';
+export const GIRIULLA_ALT_BRANCH_ID = '197693d6-1431-4250-aa63-1b2135a6875c';
+
+export const ALAWWA_WAREHOUSE_ID = '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
+export const DAMBADENIYA_WAREHOUSE_ID = '6e8904dd-b753-434e-a22d-2d8e428f0a02';
+export const GIRIULLA_WAREHOUSE_ID = '5f0f4a53-75d7-411e-be5c-337ff170da50';
+
+export const BRANCH_TO_WAREHOUSE_MAP: Record<string, string> = {
+  // Alawwa
+  [ALAWWA_BRANCH_ID]: ALAWWA_WAREHOUSE_ID,
+  'alawwa': ALAWWA_WAREHOUSE_ID,
+  'alw': ALAWWA_WAREHOUSE_ID,
+  // Dambadeniya
+  [DAMBADENIYA_BRANCH_ID]: DAMBADENIYA_WAREHOUSE_ID,
+  'dambadeniya': DAMBADENIYA_WAREHOUSE_ID,
+  'dabadeniya': DAMBADENIYA_WAREHOUSE_ID,
+  'dam': DAMBADENIYA_WAREHOUSE_ID,
+  'dab': DAMBADENIYA_WAREHOUSE_ID,
+  // Giriulla
+  [GIRIULLA_BRANCH_ID]: GIRIULLA_WAREHOUSE_ID,
+  [GIRIULLA_ALT_BRANCH_ID]: GIRIULLA_WAREHOUSE_ID,
+  'giriulla': GIRIULLA_WAREHOUSE_ID,
+  'gir': GIRIULLA_WAREHOUSE_ID,
+};
+
+export function resolveWarehouseId(branchIdOrName?: string | null): string {
+  if (!branchIdOrName) return ALAWWA_WAREHOUSE_ID;
+  const str = String(branchIdOrName).trim();
+  if (BRANCH_TO_WAREHOUSE_MAP[str]) return BRANCH_TO_WAREHOUSE_MAP[str];
+  const lower = str.toLowerCase();
+  if (BRANCH_TO_WAREHOUSE_MAP[lower]) return BRANCH_TO_WAREHOUSE_MAP[lower];
+  if (lower.includes('alawwa') || lower.includes('alw')) return ALAWWA_WAREHOUSE_ID;
+  if (lower.includes('dam') || lower.includes('dab')) return DAMBADENIYA_WAREHOUSE_ID;
+  if (lower.includes('gir')) return GIRIULLA_WAREHOUSE_ID;
+  return ALAWWA_WAREHOUSE_ID;
+}
 
 function isValidUuid(val?: string | null): boolean {
   if (!val || typeof val !== 'string') return false;
@@ -1214,7 +1254,9 @@ export const posApi = {
       console.warn('[posApi.checkout] Supabase sale_payments insert warning:', payErr.message);
     }
 
-    // 9. Decrement stock levels in Supabase for each sold item
+    // 9. Decrement stock levels in Supabase for each sold item strictly scoped to selling branch warehouse
+    const targetWarehouseId = resolveWarehouseId((data as any).warehouseId || branchId);
+
     for (const item of data.items) {
       if (item.productId && isValidUuid(item.productId)) {
         try {
@@ -1222,7 +1264,7 @@ export const posApi = {
             .from('stock_levels')
             .select('id, quantity_on_hand')
             .eq('product_id', item.productId)
-            .limit(1)
+            .eq('warehouse_id', targetWarehouseId)
             .maybeSingle();
 
           if (!sErr && stockRow) {
@@ -1235,9 +1277,21 @@ export const posApi = {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', stockRow.id);
+          } else if (!stockRow) {
+            // If row does not yet exist for targetWarehouseId, insert a record for this warehouse
+            await supabase
+              .from('stock_levels')
+              .insert({
+                tenant_id: tenantId,
+                warehouse_id: targetWarehouseId,
+                product_id: item.productId,
+                quantity_on_hand: 0,
+                quantity_reserved: 0,
+                updated_at: new Date().toISOString(),
+              });
           }
         } catch (stockErr) {
-          console.warn(`[posApi.checkout] Stock decrement warning for product ${item.productId}:`, stockErr);
+          console.warn(`[posApi.checkout] Stock decrement warning for product ${item.productId} at warehouse ${targetWarehouseId}:`, stockErr);
         }
       }
     }
@@ -1364,12 +1418,68 @@ export const posApi = {
   },
   voidSale: async (id: string, reason: string): Promise<ApiResponse<SaleDto>> => {
     try {
-      await supabase
+      const { data: saleData } = await supabase
         .from('sales')
-        .update({ status: 'VOIDED', notes: reason })
-        .eq('id', id);
-    } catch {
-      // Safe
+        .select('id, branch_id, status')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (saleData && saleData.status !== 'VOIDED') {
+        const { error: updErr } = await supabase
+          .from('sales')
+          .update({ status: 'VOIDED', notes: reason, updated_at: new Date().toISOString() })
+          .eq('id', id);
+
+        if (!updErr) {
+          // Restore stock strictly to this sale's branch warehouse
+          const targetWarehouseId = resolveWarehouseId(saleData.branch_id);
+          const { data: items } = await supabase
+            .from('sale_items')
+            .select('product_id, quantity')
+            .eq('sale_id', id);
+
+          if (items && items.length > 0) {
+            for (const item of items) {
+              if (item.product_id && isValidUuid(item.product_id)) {
+                try {
+                  const { data: stockRow } = await supabase
+                    .from('stock_levels')
+                    .select('id, quantity_on_hand')
+                    .eq('product_id', item.product_id)
+                    .eq('warehouse_id', targetWarehouseId)
+                    .maybeSingle();
+
+                  if (stockRow) {
+                    const currentQty = Number(stockRow.quantity_on_hand) || 0;
+                    await supabase
+                      .from('stock_levels')
+                      .update({
+                        quantity_on_hand: currentQty + Number(item.quantity || 1),
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq('id', stockRow.id);
+                  } else {
+                    await supabase
+                      .from('stock_levels')
+                      .insert({
+                        tenant_id: DEEGAYU_TENANT_ID,
+                        warehouse_id: targetWarehouseId,
+                        product_id: item.product_id,
+                        quantity_on_hand: Number(item.quantity || 1),
+                        quantity_reserved: 0,
+                        updated_at: new Date().toISOString(),
+                      });
+                  }
+                } catch (stockErr) {
+                  console.warn(`[voidSale] Stock restore warning for product ${item.product_id}:`, stockErr);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[voidSale] fatal error:', err);
     }
 
     if (typeof window !== 'undefined') {
