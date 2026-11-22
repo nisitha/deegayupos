@@ -54,9 +54,18 @@ export function calculateSaleProfit(sale: SaleDto | any): number {
   return Math.round(Number(sale.totalAmount ?? sale.total_amount ?? 0) * 0.35 * 100) / 100;
 }
 
+export interface SpecialStockTimelineItem {
+  date?: string; // YYYY-MM-DD
+  amount: number;
+  profit: number;
+  qty?: number;
+  createdAt?: string;
+}
+
 export function buildColomboTimeline(
   sales: (SaleDto | any)[],
-  period: 'today' | 'week' | 'month' | string
+  period: 'today' | 'week' | 'month' | string,
+  specialItems?: SpecialStockTimelineItem[]
 ): TimelineDataPoint[] {
   const now = new Date();
   const todayColomboStr = getColomboDateString(now);
@@ -117,6 +126,25 @@ export function buildColomboTimeline(
       }
     }
 
+    // Include Special Stock items in hourly slots
+    if (Array.isArray(specialItems)) {
+      for (const item of specialItems) {
+        const itemDateStr = item.date || (item.createdAt ? getColomboDateString(item.createdAt) : todayColomboStr);
+        if (itemDateStr !== todayColomboStr) continue;
+
+        let h = item.createdAt ? getColomboHour(item.createdAt) : 12;
+        if (h < 7) h = 7;
+        if (h > 22) h = 22;
+
+        const target = slotMap.get(h);
+        if (target) {
+          target.sales += Number(item.amount || 0);
+          target.profit += Number(item.profit || 0);
+          target.count += Number(item.qty || 1);
+        }
+      }
+    }
+
     slots.forEach((s) => {
       s.sales = Math.round(s.sales * 100) / 100;
       s.profit = Math.round(s.profit * 100) / 100;
@@ -126,7 +154,7 @@ export function buildColomboTimeline(
   }
 
   // 7 Days or 30 Days (Daily Buckets)
-  const daysCount = period === 'month' || period === '30d' || period === '30days' ? 30 : 7;
+  const daysCount = period === 'month' || period === '30d' || period === '30days' || period === 'this_month' || period === 'last_month' ? 30 : 7;
   const slots: TimelineDataPoint[] = [];
   const slotMap = new Map<string, TimelineDataPoint>();
 
@@ -170,6 +198,20 @@ export function buildColomboTimeline(
       target.sales += Number(sale.totalAmount ?? sale.total_amount ?? 0);
       target.profit += calculateSaleProfit(sale);
       target.count += 1;
+    }
+  }
+
+  // Include Special Stock items in daily buckets
+  if (Array.isArray(specialItems)) {
+    for (const item of specialItems) {
+      const itemDateStr = item.date || (item.createdAt ? getColomboDateString(item.createdAt) : '');
+      if (!itemDateStr) continue;
+      const target = slotMap.get(itemDateStr);
+      if (target) {
+        target.sales += Number(item.amount || 0);
+        target.profit += Number(item.profit || 0);
+        target.count += Number(item.qty || 1);
+      }
     }
   }
 
