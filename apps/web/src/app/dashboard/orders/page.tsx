@@ -12,14 +12,12 @@ import {
   DollarSign,
   ShoppingCart,
   RotateCcw,
-  TrendingUp,
   CreditCard,
   QrCode,
   Banknote,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  UserCheck,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -34,30 +32,66 @@ import {
   FileSpreadsheet,
   Building2,
   User,
-  Award,
+  PackagePlus,
+  Layers,
 } from 'lucide-react';
 import type { SaleDto, SalePaymentMethod, SaleStatus } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
-import { posApi, type SalesSummaryKPI } from '../../../lib/api-client';
+import { posApi, type SalesSummaryKPI, getColomboDateBounds, formatShiftLabel } from '../../../lib/api-client';
+import { supabase } from '../../../lib/supabase';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
 type PeriodFilter = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom';
 type SortField = 'created_at' | 'total_amount' | 'invoice_number' | 'cashier_name';
+type TransactionTab = 'ALL' | 'POS' | 'SPECIAL';
 
 interface CashierOption {
   id: string;
   fullName: string;
   role: string;
+  assignedBranches?: string[];
 }
 
-const BRANCH_MAP: Record<string, string> = {
+// Exactly the 3 active operating branches for Deegayu Weda Madhura (NO Main Store)
+export const ACTIVE_BRANCHES = [
+  { id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54', name: 'Alawwa', code: 'ALW' },
+  { id: 'fa68e4a0-a515-44c8-a082-5b5590366658', name: 'Dambadeniya', code: 'DAM' },
+  { id: '197693d6-4247-48df-b614-6fcde9e34f7d', name: 'Giriulla', code: 'GIR' },
+];
+
+export const ACTIVE_BRANCH_IDS = ACTIVE_BRANCHES.map((b) => b.id);
+
+export const BRANCH_MAP: Record<string, string> = {
   '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': 'Alawwa',
   'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dambadeniya',
   '197693d6-4247-48df-b614-6fcde9e34f7d': 'Giriulla',
-  '133eeaec-5726-4702-a819-8423750db203': 'Main Store',
-  '85d48a94-b6a3-4b9f-a746-0ac2ff61355c': 'Main Branch',
 };
+
+export interface SpecialStockSalesEntry {
+  id: string;
+  shiftId: string;
+  shiftDate: string;
+  shiftNumber: number;
+  branchId: string;
+  branchName: string;
+  cashierId: string;
+  cashierName: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  soldQty: number;
+  appliedRate: number;
+  totalAmount: number;
+  createdAt: string;
+  shiftStatus: 'open' | 'closed';
+}
+
+export interface SpecialStockSummaryKPI {
+  totalGross: number;
+  totalUnits: number;
+  entryCount: number;
+}
 
 // Asia/Colombo (+05:30) today's date in YYYY-MM-DD
 function getColomboTodayDateString(): string {
@@ -70,21 +104,38 @@ function getColomboTodayDateString(): string {
 }
 
 export default function SalesOrdersPage() {
-  const { currency, selectedBranchId, branches, isOwnerOrAdmin } = useTenantBranch();
+  const { currency, selectedBranchId, setSelectedBranchId, branches, isOwnerOrAdmin } = useTenantBranch();
 
-  // Primary Data State
+  // Primary Data State (POS Catalog Bills)
   const [sales, setSales] = useState<SaleDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const fetchIdRef = useRef(0);
 
+  // Active Transaction Tab (All Transactions | POS Catalog Bills | Special Stock Sales)
+  const [activeTransactionTab, setActiveTransactionTab] = useState<TransactionTab>('ALL');
+
+  // Special Stock Sales State
+  const [specialStockEntries, setSpecialStockEntries] = useState<SpecialStockSalesEntry[]>([]);
+  const [specialStockSummary, setSpecialStockSummary] = useState<SpecialStockSummaryKPI>({
+    totalGross: 0,
+    totalUnits: 0,
+    entryCount: 0,
+  });
+  const [selectedSpecialDetail, setSelectedSpecialDetail] = useState<SpecialStockSalesEntry | null>(null);
+
   // Filters State
   const [period, setPeriod] = useState<PeriodFilter>('today');
   const [customStartDate, setCustomStartDate] = useState(getColomboTodayDateString());
   const [customEndDate, setCustomEndDate] = useState(getColomboTodayDateString());
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string>(() => {
+    if (selectedBranchId && ACTIVE_BRANCH_IDS.includes(selectedBranchId)) {
+      return selectedBranchId;
+    }
+    return 'ALL';
+  });
   const [selectedCashier, setSelectedCashier] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedMethod, setSelectedMethod] = useState<string>('ALL');
@@ -101,7 +152,7 @@ export default function SalesOrdersPage() {
   // Cashiers List from API
   const [cashiers, setCashiers] = useState<CashierOption[]>([]);
 
-  // Accurate Backend Aggregated KPI Summary across ALL matching rows
+  // Backend Aggregated KPI Summary for POS bills
   const [kpiSummary, setKpiSummary] = useState<SalesSummaryKPI>({
     totalGross: 0,
     completedCount: 0,
@@ -134,21 +185,267 @@ export default function SalesOrdersPage() {
     setIsMounted(true);
   }, []);
 
-  // Sync initial branch from context: only lock for staff, keep Owner on ALL
+  // Bi-directionally sync from global header branch selector
   useEffect(() => {
-    if (!isOwnerOrAdmin && selectedBranchId && selectedBranchId !== 'ALL') {
-      setSelectedBranch(selectedBranchId);
-    }
-  }, [isOwnerOrAdmin, selectedBranchId]);
+    if (!isMounted) return;
+    const target = selectedBranchId && ACTIVE_BRANCH_IDS.includes(selectedBranchId) ? selectedBranchId : 'ALL';
+    setSelectedBranch((prev) => (prev !== target ? target : prev));
+  }, [selectedBranchId, isMounted]);
 
-  // Load Cashiers List
+  // Load Cashiers List with assigned branch mappings
   useEffect(() => {
-    posApi.getCashiers().then((list) => {
-      if (list && list.length > 0) {
-        setCashiers(list);
+    async function loadCashiers() {
+      try {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, full_name, role, assigned_branches')
+          .eq('is_active', true)
+          .neq('role', 'ARCHIVED')
+          .order('full_name');
+
+        if (usersData && usersData.length > 0) {
+          const mapped: CashierOption[] = usersData.map((u: any) => ({
+            id: u.id,
+            fullName: u.full_name || 'Staff',
+            role: u.role || 'STAFF',
+            assignedBranches: u.assigned_branches || [],
+          }));
+          setCashiers(mapped);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Orders] users query fallback:', e);
       }
-    });
+
+      posApi.getCashiers().then((list) => {
+        if (list && list.length > 0) {
+          setCashiers(list);
+        }
+      });
+    }
+
+    loadCashiers();
   }, []);
+
+  // Filter Active Staff dynamically to current branch selection (Owner is always available)
+  const activeStaff = useMemo(() => {
+    return cashiers.filter((c) => {
+      const name = (c.fullName || '').toLowerCase();
+      if (
+        name.startsWith('sale ') ||
+        name.startsWith('cashier ') ||
+        name.startsWith('user ') ||
+        name.startsWith('system ')
+      ) {
+        return false;
+      }
+      const isOwnerRole = c.role === 'OWNER' || name.includes('owner') || name.includes('dr. deegayu');
+      if (isOwnerRole) return true;
+      if (selectedBranch === 'ALL') return true;
+      if (c.assignedBranches && c.assignedBranches.length > 0) {
+        return c.assignedBranches.includes(selectedBranch);
+      }
+      return true;
+    });
+  }, [cashiers, selectedBranch]);
+
+  // If branch switches and the selected cashier is no longer in that branch's staff, reset to ALL
+  useEffect(() => {
+    if (selectedCashier !== 'ALL') {
+      const exists = activeStaff.some((c) => c.fullName === selectedCashier);
+      if (!exists) {
+        setSelectedCashier('ALL');
+      }
+    }
+  }, [selectedBranch, activeStaff, selectedCashier]);
+
+  // Active Branch Label Helper
+  const getBranchLabel = useCallback((id?: string) => {
+    if (!id || id === 'ALL') return 'All Branches';
+    return BRANCH_MAP[id] || branches.find((b) => b.id === id)?.name || 'Branch';
+  }, [branches]);
+
+  // Special Stock / Modaka Sales Fetcher across All 3 Branches (Alawwa, Dambadeniya, Giriulla)
+  const fetchSpecialStockSales = useCallback(
+    async (
+      currentPeriod: PeriodFilter,
+      startDate?: string,
+      endDate?: string,
+      branchId?: string,
+      cashierNameFilter?: string
+    ) => {
+      try {
+        const bounds = getColomboDateBounds(currentPeriod, startDate, endDate);
+        const startDateStr = bounds.from ? bounds.from.slice(0, 10) : undefined;
+        const endDateStr = bounds.to ? bounds.to.slice(0, 10) : undefined;
+
+        // 1. Fetch cashier shifts using pagination beyond 1,000-row limit
+        let allShifts: any[] = [];
+        let shiftOffset = 0;
+        const shiftChunkSize = 1000;
+
+        while (true) {
+          let shiftsQuery = supabase
+            .from('cashier_shifts')
+            .select(`
+              id,
+              tenant_id,
+              branch_id,
+              cashier_id,
+              shift_date,
+              shift_number,
+              status,
+              started_at,
+              ended_at,
+              modaka_total_sold_qty,
+              modaka_total_amount,
+              users (id, full_name)
+            `)
+            .order('shift_date', { ascending: false })
+            .order('shift_number', { ascending: true })
+            .range(shiftOffset, shiftOffset + shiftChunkSize - 1);
+
+          if (startDateStr && endDateStr) {
+            if (startDateStr === endDateStr) {
+              shiftsQuery = shiftsQuery.eq('shift_date', startDateStr);
+            } else {
+              shiftsQuery = shiftsQuery.gte('shift_date', startDateStr).lte('shift_date', endDateStr);
+            }
+          } else if (startDateStr) {
+            shiftsQuery = shiftsQuery.gte('shift_date', startDateStr);
+          } else if (endDateStr) {
+            shiftsQuery = shiftsQuery.lte('shift_date', endDateStr);
+          }
+
+          if (branchId && branchId !== 'ALL') {
+            shiftsQuery = shiftsQuery.eq('branch_id', branchId);
+          } else {
+            shiftsQuery = shiftsQuery.in('branch_id', ACTIVE_BRANCH_IDS);
+          }
+
+          const { data: sData, error: sErr } = await shiftsQuery;
+          if (sErr || !sData || sData.length === 0) break;
+          allShifts.push(...sData);
+          if (sData.length < shiftChunkSize) break;
+          shiftOffset += shiftChunkSize;
+          if (shiftOffset >= 5000) break;
+        }
+
+        // Apply Cashier filter if specified
+        if (cashierNameFilter && cashierNameFilter !== 'ALL') {
+          allShifts = allShifts.filter((s: any) => {
+            const cName = s.users?.full_name || '';
+            return cName === cashierNameFilter;
+          });
+        }
+
+        if (allShifts.length === 0) {
+          setSpecialStockEntries([]);
+          setSpecialStockSummary({ totalGross: 0, totalUnits: 0, entryCount: 0 });
+          return;
+        }
+
+        const shiftMap = new Map<string, any>();
+        allShifts.forEach((s) => shiftMap.set(s.id, s));
+        const shiftIds = allShifts.map((s) => s.id);
+
+        // 2. Fetch shift_modaka_entries in safe chunks of 500 shift IDs
+        const rawEntries: any[] = [];
+        for (let i = 0; i < shiftIds.length; i += 500) {
+          const chunk = shiftIds.slice(i, i + 500);
+          const { data: smeData } = await supabase
+            .from('shift_modaka_entries')
+            .select('*, products(id, name, sku)')
+            .in('shift_id', chunk);
+
+          if (smeData) {
+            rawEntries.push(...smeData);
+          }
+        }
+
+        // Build structured SpecialStockSalesEntry records
+        const formattedEntries: SpecialStockSalesEntry[] = [];
+        const accountedShiftIds = new Set<string>();
+
+        rawEntries.forEach((e) => {
+          const sold = Number(e.sold_qty || 0);
+          if (sold <= 0) return;
+          const shift = shiftMap.get(e.shift_id);
+          if (!shift) return;
+
+          accountedShiftIds.add(shift.id);
+          const rate = Number(e.applied_rate || 250);
+          const amt = Number(e.total_amount || sold * rate);
+          const cName = shift.users?.full_name || 'Staff Cashier';
+          const bName = BRANCH_MAP[shift.branch_id] || 'Branch';
+
+          formattedEntries.push({
+            id: e.id,
+            shiftId: shift.id,
+            shiftDate: shift.shift_date,
+            shiftNumber: shift.shift_number || 1,
+            branchId: shift.branch_id,
+            branchName: bName,
+            cashierId: shift.cashier_id,
+            cashierName: cName,
+            productId: e.product_id,
+            productName: e.products?.name || 'Special Stock Item',
+            productSku: e.products?.sku || '',
+            soldQty: sold,
+            appliedRate: rate,
+            totalAmount: amt,
+            createdAt: e.created_at || `${shift.shift_date}T12:00:00.000+05:30`,
+            shiftStatus: shift.status || 'open',
+          });
+        });
+
+        // Catch shifts that recorded shift-level modaka sales without itemized child rows
+        allShifts.forEach((shift) => {
+          const shiftSpecialAmt = Number(shift.modaka_total_amount || 0);
+          const shiftSpecialQty = Number(shift.modaka_total_sold_qty || 0);
+          if (shiftSpecialAmt > 0 && !accountedShiftIds.has(shift.id)) {
+            const cName = shift.users?.full_name || 'Staff Cashier';
+            const bName = BRANCH_MAP[shift.branch_id] || 'Branch';
+
+            formattedEntries.push({
+              id: `shift-modaka-${shift.id}`,
+              shiftId: shift.id,
+              shiftDate: shift.shift_date,
+              shiftNumber: shift.shift_number || 1,
+              branchId: shift.branch_id,
+              branchName: bName,
+              cashierId: shift.cashier_id,
+              cashierName: cName,
+              productId: 'special-stock-aggregate',
+              productName: 'Special Stock (Shift Inflow)',
+              productSku: 'SPEC-SHIFT',
+              soldQty: shiftSpecialQty || 1,
+              appliedRate: shiftSpecialQty > 0 ? Math.round((shiftSpecialAmt / shiftSpecialQty) * 100) / 100 : shiftSpecialAmt,
+              totalAmount: shiftSpecialAmt,
+              createdAt: shift.started_at || `${shift.shift_date}T12:00:00.000+05:30`,
+              shiftStatus: shift.status || 'open',
+            });
+          }
+        });
+
+        // Sort entries by createdAt descending
+        formattedEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        const totalGross = formattedEntries.reduce((sum, e) => sum + e.totalAmount, 0);
+        const totalUnits = formattedEntries.reduce((sum, e) => sum + e.soldQty, 0);
+
+        setSpecialStockEntries(formattedEntries);
+        setSpecialStockSummary({
+          totalGross,
+          totalUnits,
+          entryCount: formattedEntries.length,
+        });
+      } catch (err) {
+        console.error('[Orders] Failed to load Special Stock sales:', err);
+      }
+    },
+    []
+  );
 
   // Fetch Sales Data reactively based on active filters with Request Sequence Guard
   const fetchSales = useCallback(
@@ -163,20 +460,30 @@ export default function SalesOrdersPage() {
           setLoading(true);
         }
 
-        const res = await posApi.getSales({
-          page: currentPage,
-          limit: 50,
-          period,
-          startDate: period === 'custom' ? customStartDate : undefined,
-          endDate: period === 'custom' ? customEndDate : undefined,
-          search: searchQuery.trim() || undefined,
-          status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
-          paymentMethod: selectedMethod !== 'ALL' ? selectedMethod : undefined,
-          branchId: selectedBranch !== 'ALL' ? selectedBranch : undefined,
-          cashierName: selectedCashier !== 'ALL' ? selectedCashier : undefined,
-          sortBy,
-          sortOrder,
-        });
+        // In parallel, fetch POS sales and Special Stock sales
+        const [res] = await Promise.all([
+          posApi.getSales({
+            page: currentPage,
+            limit: 50,
+            period,
+            startDate: period === 'custom' ? customStartDate : undefined,
+            endDate: period === 'custom' ? customEndDate : undefined,
+            search: searchQuery.trim() || undefined,
+            status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+            paymentMethod: selectedMethod !== 'ALL' ? selectedMethod : undefined,
+            branchId: selectedBranch !== 'ALL' ? selectedBranch : undefined,
+            cashierName: selectedCashier !== 'ALL' ? selectedCashier : undefined,
+            sortBy,
+            sortOrder,
+          }),
+          fetchSpecialStockSales(
+            period,
+            customStartDate,
+            customEndDate,
+            selectedBranch,
+            selectedCashier
+          ),
+        ]);
 
         // Guard against stale response overwrites
         if (fetchId !== fetchIdRef.current) return;
@@ -229,6 +536,7 @@ export default function SalesOrdersPage() {
       selectedCashier,
       sortBy,
       sortOrder,
+      fetchSpecialStockSales,
     ],
   );
 
@@ -251,6 +559,10 @@ export default function SalesOrdersPage() {
     setLoading(true);
     setSelectedBranch(newBranch);
     setCurrentPage(1);
+    // Bi-directionally sync with global header
+    if (isOwnerOrAdmin) {
+      setSelectedBranchId(newBranch === 'ALL' ? null : newBranch);
+    }
   };
 
   const handleCashierChange = (newCashier: string) => {
@@ -323,7 +635,7 @@ export default function SalesOrdersPage() {
     setCurrentPage(1);
   };
 
-  // Full CSV Export across ALL matching rows
+  // Full CSV Export across ALL matching rows (Including Special Stock Sales)
   const handleExportCsv = async () => {
     try {
       setIsExportingCsv(true);
@@ -340,17 +652,19 @@ export default function SalesOrdersPage() {
         sortOrder,
       });
 
-      if (!allMatching || allMatching.length === 0) {
+      if ((!allMatching || allMatching.length === 0) && specialStockEntries.length === 0) {
         alert('No sales records found for the active filter selection.');
         return;
       }
 
       const headers = [
-        'Invoice #',
+        'Transaction Type',
+        'Invoice / Ref #',
         'Date Time (Asia/Colombo)',
         'Branch',
         'Cashier',
-        'Customer',
+        'Customer / Product Details',
+        'Quantity',
         'Payment Method',
         'Status',
         'Subtotal (LKR)',
@@ -359,27 +673,56 @@ export default function SalesOrdersPage() {
         'Grand Total (LKR)',
       ];
 
-      const rows = allMatching.map((s) => {
-        const bName = BRANCH_MAP[s.branchId] || branches.find((b) => b.id === s.branchId)?.name || 'Main Store';
-        const cName = s.cashier?.fullName || s.cashierName || 'Staff';
-        const custName = s.customerName || 'Walk-in Customer';
-        const dt = new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
-        const pm = s.payments?.[0]?.paymentMethod || 'CASH';
+      const rows: string[] = [];
 
-        return [
-          `"${s.invoiceNumber}"`,
-          `"${dt}"`,
-          `"${bName.replace(/"/g, '""')}"`,
-          `"${cName.replace(/"/g, '""')}"`,
-          `"${custName.replace(/"/g, '""')}"`,
-          `"${pm}"`,
-          `"${s.status}"`,
-          Number(s.subtotal || 0).toFixed(2),
-          Number(s.discountAmount || 0).toFixed(2),
-          Number(s.taxAmount || 0).toFixed(2),
-          Number(s.totalAmount || 0).toFixed(2),
-        ].join(',');
-      });
+      // Append POS Bills
+      if (activeTransactionTab !== 'SPECIAL') {
+        allMatching.forEach((s) => {
+          const bName = getBranchLabel(s.branchId);
+          const cName = s.cashier?.fullName || s.cashierName || 'Staff';
+          const custName = s.customerName || 'Walk-in Customer';
+          const dt = new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
+          const pm = s.payments?.[0]?.paymentMethod || 'CASH';
+
+          rows.push([
+            '"POS Bill"',
+            `"${s.invoiceNumber}"`,
+            `"${dt}"`,
+            `"${bName.replace(/"/g, '""')}"`,
+            `"${cName.replace(/"/g, '""')}"`,
+            `"${custName.replace(/"/g, '""')}"`,
+            `"${s.items?.length || 1}"`,
+            `"${pm}"`,
+            `"${s.status}"`,
+            Number(s.subtotal || 0).toFixed(2),
+            Number(s.discountAmount || 0).toFixed(2),
+            Number(s.taxAmount || 0).toFixed(2),
+            Number(s.totalAmount || 0).toFixed(2),
+          ].join(','));
+        });
+      }
+
+      // Append Special Stock Sales
+      if (activeTransactionTab !== 'POS' && specialStockEntries.length > 0) {
+        specialStockEntries.forEach((e) => {
+          const dt = new Date(e.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
+          rows.push([
+            '"Special Stock Sales"',
+            `"SPEC-${e.shiftDate.replace(/-/g, '')}-S${e.shiftNumber}-${e.productSku || 'ITEM'}"`,
+            `"${dt}"`,
+            `"${e.branchName.replace(/"/g, '""')}"`,
+            `"${e.cashierName.replace(/"/g, '""')}"`,
+            `"${e.productName.replace(/"/g, '""')} (${e.soldQty} units @ LKR ${e.appliedRate.toFixed(2)})"`,
+            `"${e.soldQty}"`,
+            '"CASH (Drawer)"',
+            '"COMPLETED"',
+            Number(e.totalAmount || 0).toFixed(2),
+            '0.00',
+            '0.00',
+            Number(e.totalAmount || 0).toFixed(2),
+          ].join(','));
+        });
+      }
 
       // UTF-8 BOM for Microsoft Excel compatibility
       const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
@@ -388,7 +731,8 @@ export default function SalesOrdersPage() {
       const link = document.createElement('a');
       link.href = url;
       const cashierSlug = selectedCashier !== 'ALL' ? `_${selectedCashier.replace(/\s+/g, '_')}` : '';
-      link.download = `deegayu-sales-report-${period}${cashierSlug}-${getColomboTodayDateString()}.csv`;
+      const branchSlug = selectedBranch !== 'ALL' ? `_${getBranchLabel(selectedBranch).replace(/\s+/g, '_')}` : '';
+      link.download = `deegayu-combined-sales${branchSlug}-${period}${cashierSlug}-${getColomboTodayDateString()}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -459,12 +803,12 @@ export default function SalesOrdersPage() {
       case 'STORE_CREDIT':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <UserCheck className="w-3 h-3" /> Khata Credit
+            Khata Credit
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">
             {method || 'CASH'}
           </span>
         );
@@ -472,14 +816,14 @@ export default function SalesOrdersPage() {
   };
 
   const getStatusBadge = (status: SaleStatus | string) => {
-    if (status === 'COMPLETED') {
+    if (status === 'COMPLETED' || status === 'PAID') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
           <CheckCircle2 className="w-3 h-3" /> Completed
         </span>
       );
     }
-    if (status === 'VOIDED') {
+    if (status === 'VOIDED' || status === 'CANCELLED') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
           <XCircle className="w-3 h-3" /> Voided
@@ -492,20 +836,6 @@ export default function SalesOrdersPage() {
       </span>
     );
   };
-
-  // Active Staff Cashiers (Strictly Current Active Team Members)
-  const activeStaff = useMemo(
-    () =>
-      cashiers.filter(
-        (c) =>
-          (c.role === 'OWNER' || c.role === 'STAFF') &&
-          !c.fullName.toLowerCase().startsWith('sale') &&
-          !c.fullName.toLowerCase().startsWith('cashier') &&
-          !c.fullName.toLowerCase().startsWith('user') &&
-          !c.fullName.toLowerCase().startsWith('system')
-      ),
-    [cashiers],
-  );
 
   // Computed Report Aggregates for Audit Modal
   const reportCompleted = useMemo(
@@ -563,12 +893,11 @@ export default function SalesOrdersPage() {
         voidCount: number;
       }
     >();
+
     for (const s of reportSales) {
       const cName = s.cashier?.fullName || s.cashierName || 'Staff';
       const bId = s.branchId || '';
-      const bName =
-        s.branchName ||
-        (bId ? BRANCH_MAP[bId] || branches.find((b) => b.id === bId)?.name || 'Main Store' : 'Main Store');
+      const bName = getBranchLabel(bId);
       const key = `${cName}__${bId}`;
       const entry = map.get(key) || {
         cashierName: cName,
@@ -596,14 +925,109 @@ export default function SalesOrdersPage() {
       }
       map.set(key, entry);
     }
-    return Array.from(map.values());
-  }, [reportSales, branches]);
 
-  // Active Branch Label Helper
-  const getBranchLabel = (id?: string) => {
-    if (!id) return 'Main Store';
-    return BRANCH_MAP[id] || branches.find((b) => b.id === id)?.name || id.slice(0, 8);
-  };
+    // Incorporate Special Stock Sales into Cashier Performance Breakdown
+    specialStockEntries.forEach((e) => {
+      const key = `${e.cashierName}__${e.branchId}`;
+      const entry = map.get(key) || {
+        cashierName: e.cashierName,
+        branchName: e.branchName,
+        branchId: e.branchId,
+        count: 0,
+        gross: 0,
+        cash: 0,
+        card: 0,
+        voidCount: 0,
+      };
+      entry.count++;
+      entry.gross += e.totalAmount;
+      entry.cash += e.totalAmount;
+      map.set(key, entry);
+    });
+
+    return Array.from(map.values());
+  }, [reportSales, specialStockEntries, getBranchLabel]);
+
+  // Unified Table Rows (combining POS Bills and Special Stock Sales)
+  const displayRows = useMemo(() => {
+    if (activeTransactionTab === 'POS') {
+      return sales.map((s) => ({
+        type: 'POS' as const,
+        id: s.id,
+        invoiceNumber: s.invoiceNumber,
+        createdAt: s.createdAt,
+        branchId: s.branchId,
+        branchName: getBranchLabel(s.branchId),
+        customerName: s.customerName || 'Walk-in Customer',
+        cashierName: s.cashier?.fullName || s.cashierName || 'Staff',
+        itemsCount: s.items && s.items.length > 0 ? s.items.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0) : 1,
+        itemsSummary: s.items && s.items.length > 0 ? `${s.items.length} product(s)` : 'General Items',
+        paymentMethod: s.payments?.[0]?.paymentMethod || 'CASH',
+        status: s.status,
+        totalAmount: Number(s.totalAmount || 0),
+        rawSale: s,
+      }));
+    }
+
+    if (activeTransactionTab === 'SPECIAL') {
+      return specialStockEntries.map((e) => ({
+        type: 'SPECIAL' as const,
+        id: e.id,
+        invoiceNumber: `SPEC-${e.shiftDate.replace(/-/g, '')}-S${e.shiftNumber}-${e.productSku || e.id.slice(0, 4).toUpperCase()}`,
+        createdAt: e.createdAt,
+        branchId: e.branchId,
+        branchName: e.branchName,
+        customerName: `${e.productName} (${e.soldQty} units)`,
+        cashierName: e.cashierName,
+        itemsCount: e.soldQty,
+        itemsSummary: `${e.productName} @ LKR ${e.appliedRate.toFixed(2)}`,
+        paymentMethod: 'CASH',
+        status: 'COMPLETED',
+        totalAmount: e.totalAmount,
+        specialStockEntry: e,
+      }));
+    }
+
+    // ALL: Combine active page POS sales and Special Stock entries sorted by createdAt desc
+    const posRows = sales.map((s) => ({
+      type: 'POS' as const,
+      id: s.id,
+      invoiceNumber: s.invoiceNumber,
+      createdAt: s.createdAt,
+      branchId: s.branchId,
+      branchName: getBranchLabel(s.branchId),
+      customerName: s.customerName || 'Walk-in Customer',
+      cashierName: s.cashier?.fullName || s.cashierName || 'Staff',
+      itemsCount: s.items && s.items.length > 0 ? s.items.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0) : 1,
+      itemsSummary: s.items && s.items.length > 0 ? `${s.items.length} product(s)` : 'General Items',
+      paymentMethod: s.payments?.[0]?.paymentMethod || 'CASH',
+      status: s.status,
+      totalAmount: Number(s.totalAmount || 0),
+      rawSale: s,
+    }));
+
+    const specialRows = specialStockEntries.map((e) => ({
+      type: 'SPECIAL' as const,
+      id: e.id,
+      invoiceNumber: `SPEC-${e.shiftDate.replace(/-/g, '')}-S${e.shiftNumber}-${e.productSku || e.id.slice(0, 4).toUpperCase()}`,
+      createdAt: e.createdAt,
+      branchId: e.branchId,
+      branchName: e.branchName,
+      customerName: `${e.productName} (${e.soldQty} units)`,
+      cashierName: e.cashierName,
+      itemsCount: e.soldQty,
+      itemsSummary: `${e.productName} @ LKR ${e.appliedRate.toFixed(2)}`,
+      paymentMethod: 'CASH',
+      status: 'COMPLETED',
+      totalAmount: e.totalAmount,
+      specialStockEntry: e,
+    }));
+
+    return [...posRows, ...specialRows].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [activeTransactionTab, sales, specialStockEntries, getBranchLabel]);
+
+  // Combined Gross Calculation across active branch & date filters
+  const combinedGrossSales = kpiSummary.totalGross + specialStockSummary.totalGross;
 
   return (
     <div className="space-y-6">
@@ -672,7 +1096,7 @@ export default function SalesOrdersPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time multi-branch transaction register, cashier audit reports, 80mm/58mm reprints, and stock-restoring void management.
+            Real-time multi-branch transaction register, Special Stock sales tracking, cashier audit reports, reprints, and stock restoration.
           </p>
         </div>
 
@@ -690,7 +1114,7 @@ export default function SalesOrdersPage() {
           {/* Export CSV Button */}
           <button
             onClick={handleExportCsv}
-            disabled={isExportingCsv || sales.length === 0}
+            disabled={isExportingCsv || (sales.length === 0 && specialStockEntries.length === 0)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50"
             title="Export all matching records across database to Excel CSV"
           >
@@ -800,7 +1224,7 @@ export default function SalesOrdersPage() {
 
         <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
           <Clock className="w-3.5 h-3.5 text-blue-600" />
-          <span>Colombo Timezone (UTC+05:30)</span>
+          <span>Colombo Timezone (UTC+05:30) • Operating Branches: Alawwa, Dambadeniya, Giriulla</span>
         </div>
       </div>
 
@@ -851,12 +1275,12 @@ export default function SalesOrdersPage() {
         </div>
       )}
 
-      {/* KPI Cards Row — Accurate Aggregates across ALL matching database records */}
+      {/* KPI Cards Row — Accurate Combined Aggregates across POS Catalog & Special Stock Sales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Gross Sales */}
+        {/* Card 1: Combined Total Gross Sales */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Sales</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Sales</span>
             <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3]">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -865,20 +1289,23 @@ export default function SalesOrdersPage() {
             {loading ? (
               <div className="h-8 w-36 bg-slate-200 animate-pulse rounded-lg my-0.5" />
             ) : (
-              <div className="text-2xl font-bold text-slate-900 tracking-tight">
-                {formatCurrency(kpiSummary.totalGross)}
+              <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                {formatCurrency(combinedGrossSales)}
               </div>
             )}
-            <div className="mt-1 text-xs text-slate-500">
-              Settled payments across {kpiSummary.completedCount.toLocaleString()} bill(s)
+            <div
+              className="mt-1 text-xs font-medium text-slate-600 truncate"
+              title={`POS Bills: ${formatCurrency(kpiSummary.totalGross)} + Special Stock: ${formatCurrency(specialStockSummary.totalGross)}`}
+            >
+              <span className="text-blue-700 font-bold">POS Bills:</span> {formatCurrency(kpiSummary.totalGross)} + <span className="text-rose-700 font-bold">Special Stock:</span> {formatCurrency(specialStockSummary.totalGross)}
             </div>
           </div>
         </div>
 
-        {/* Completed Orders */}
+        {/* Card 2: POS Catalog Bills */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed Bills</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">POS Catalog Bills</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
               <ShoppingCart className="w-4 h-4" />
             </div>
@@ -888,38 +1315,42 @@ export default function SalesOrdersPage() {
               <div className="h-8 w-20 bg-slate-200 animate-pulse rounded-lg my-0.5" />
             ) : (
               <div className="text-2xl font-bold text-slate-900 tracking-tight">
-                {kpiSummary.completedCount.toLocaleString()}
+                {kpiSummary.completedCount.toLocaleString()} <span className="text-xs font-normal text-slate-500">Bills</span>
               </div>
             )}
-            <div className="mt-1 text-xs text-slate-500">Fulfilled retail transactions</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Subtotal: <span className="font-semibold text-slate-700">{formatCurrency(kpiSummary.totalGross)}</span> • Fulfilled retail checkouts
+            </div>
           </div>
         </div>
 
-        {/* Average Ticket */}
+        {/* Card 3: Special Stock Sales */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Ticket</span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <TrendingUp className="w-4 h-4" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Special Stock Sales</span>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+              <PackagePlus className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             {loading ? (
               <div className="h-8 w-28 bg-slate-200 animate-pulse rounded-lg my-0.5" />
             ) : (
-              <div className="text-2xl font-bold text-slate-900 tracking-tight">
-                {formatCurrency(kpiSummary.avgTicket)}
+              <div className="text-2xl font-bold text-rose-600 tracking-tight">
+                {formatCurrency(specialStockSummary.totalGross)}
               </div>
             )}
-            <div className="mt-1 text-xs text-slate-500">Per customer checkout</div>
+            <div className="mt-1 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{specialStockSummary.totalUnits.toLocaleString()}</span> units across <span className="font-semibold text-slate-700">{specialStockSummary.entryCount}</span> shift item(s)
+            </div>
           </div>
         </div>
 
-        {/* Voided Orders */}
+        {/* Card 4: Voided Bills / Average Ticket */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Voided Bills</span>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Voided Bills / Avg Ticket</span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
               <RotateCcw className="w-4 h-4" />
             </div>
           </div>
@@ -927,12 +1358,16 @@ export default function SalesOrdersPage() {
             {loading ? (
               <div className="h-8 w-16 bg-slate-200 animate-pulse rounded-lg my-0.5" />
             ) : (
-              <div className="text-2xl font-bold text-slate-900 tracking-tight">
-                {kpiSummary.voidedCount.toLocaleString()}
+              <div className="text-2xl font-bold text-slate-900 tracking-tight flex items-baseline gap-2">
+                <span>{kpiSummary.voidedCount.toLocaleString()}</span>
+                <span className="text-xs font-normal text-slate-400">Voided</span>
+                <span className="text-sm font-semibold text-slate-300">|</span>
+                <span className="text-base font-semibold text-slate-700">{formatCurrency(kpiSummary.avgTicket)}</span>
+                <span className="text-xs font-normal text-slate-400">Avg</span>
               </div>
             )}
             <div className="mt-1 text-xs text-slate-500">
-              {formatCurrency(kpiSummary.totalVoidedAmount)} reversed
+              {formatCurrency(kpiSummary.totalVoidedAmount)} reversed • Per POS ticket
             </div>
           </div>
         </div>
@@ -943,10 +1378,73 @@ export default function SalesOrdersPage() {
         {/* Shimmer loading progress bar */}
         <div className="h-1 w-full bg-slate-100 overflow-hidden">
           <div
-            className={`h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 transition-all duration-300 ${
+            className={`h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-rose-500 transition-all duration-300 ${
               loading ? 'w-full animate-pulse' : 'w-0'
             }`}
           />
+        </div>
+
+        {/* Filter Tab Switcher (All Transactions | POS Catalog Bills | Special Stock Sales) */}
+        <div className="flex items-center gap-2 px-4 pt-3.5 border-b border-slate-200/80 bg-white">
+          <button
+            type="button"
+            onClick={() => setActiveTransactionTab('ALL')}
+            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+              activeTransactionTab === 'ALL'
+                ? 'border-[#005BD3] text-[#005BD3]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>All Transactions</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeTransactionTab === 'ALL' ? 'bg-blue-100 text-[#005BD3]' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {totalCount + specialStockEntries.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTransactionTab('POS')}
+            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+              activeTransactionTab === 'POS'
+                ? 'border-[#005BD3] text-[#005BD3]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>POS Catalog Bills</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeTransactionTab === 'POS' ? 'bg-blue-100 text-[#005BD3]' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {totalCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTransactionTab('SPECIAL')}
+            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+              activeTransactionTab === 'SPECIAL'
+                ? 'border-rose-600 text-rose-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <PackagePlus className="w-3.5 h-3.5 text-rose-600" />
+            <span>Special Stock Sales</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeTransactionTab === 'SPECIAL' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {specialStockEntries.length}
+            </span>
+          </button>
         </div>
 
         {/* Table Filters & Search Bar */}
@@ -981,7 +1479,7 @@ export default function SalesOrdersPage() {
 
           {/* Filter Dropdowns Grid */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Branch Filter */}
+            {/* Branch Filter — Strictly the 3 Active Branches (Alawwa, Dambadeniya, Giriulla), Zero Main Store */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
               <span>Branch:</span>
@@ -993,11 +1491,10 @@ export default function SalesOrdersPage() {
                   !isOwnerOrAdmin ? 'opacity-70 bg-slate-100 cursor-not-allowed' : 'border-slate-200'
                 }`}
               >
-                {isOwnerOrAdmin && <option value="ALL">All Branches</option>}
+                {isOwnerOrAdmin && <option value="ALL">All Branches (Consolidated)</option>}
                 <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
                 <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya</option>
                 <option value="197693d6-4247-48df-b614-6fcde9e34f7d">Giriulla</option>
-                <option value="133eeaec-5726-4702-a819-8423750db203">Main Store</option>
               </select>
               {!isOwnerOrAdmin && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
@@ -1006,7 +1503,7 @@ export default function SalesOrdersPage() {
               )}
             </div>
 
-            {/* Cashier Filter */}
+            {/* Cashier Filter — Dynamically Filtered to Selected Branch Staff */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <User className="w-3.5 h-3.5 text-slate-400" />
               <span>Cashier:</span>
@@ -1109,13 +1606,13 @@ export default function SalesOrdersPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
               <tr>
-                {/* Invoice / Time Header with Sort */}
+                {/* Invoice / Ref / Time Header with Sort */}
                 <th
                   onClick={() => handleHeaderSort('created_at')}
                   className="py-3 px-4 cursor-pointer hover:bg-slate-100/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Invoice / Time</span>
+                    <span>Invoice / Ref / Time</span>
                     {sortBy === 'created_at' ? (
                       sortOrder === 'asc' ? (
                         <ArrowUp className="w-3 h-3 text-[#005BD3]" />
@@ -1129,7 +1626,7 @@ export default function SalesOrdersPage() {
                 </th>
 
                 <th className="py-3 px-4">Branch</th>
-                <th className="py-3 px-4">Customer</th>
+                <th className="py-3 px-4">Customer / Product Details</th>
 
                 {/* Cashier Header with Sort */}
                 <th
@@ -1150,7 +1647,7 @@ export default function SalesOrdersPage() {
                   </div>
                 </th>
 
-                <th className="py-3 px-4">Items</th>
+                <th className="py-3 px-4">Quantity / Items</th>
                 <th className="py-3 px-4">Payment</th>
                 <th className="py-3 px-4">Status</th>
 
@@ -1211,154 +1708,276 @@ export default function SalesOrdersPage() {
                     </td>
                   </tr>
                 ))
-              ) : sales.length > 0 ? (
-                sales.map((sale) => (
-                  <tr
-                    key={sale.id}
-                    className={`hover:bg-slate-50/70 transition-colors group ${
-                      sale.status === 'VOIDED' ? 'bg-rose-50/20' : ''
-                    }`}
-                  >
-                    {/* Invoice & Time */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
-                          {sale.invoiceNumber}
-                        </span>
-                        <button
-                          onClick={() => copyToClipboard(sale.invoiceNumber)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 transition-opacity p-0.5"
-                          title="Copy Invoice #"
-                        >
-                          {copiedInvoice === sale.invoiceNumber ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono mt-0.5">
-                        <Clock className="w-2.5 h-2.5" />
-                        {isMounted
-                          ? new Date(sale.createdAt).toLocaleDateString([], {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            }) +
-                            ' ' +
-                            new Date(sale.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '--:--'}
-                      </div>
-                    </td>
+              ) : displayRows.length > 0 ? (
+                displayRows.map((row) => {
+                  if (row.type === 'SPECIAL') {
+                    const entry = row.specialStockEntry!;
+                    return (
+                      <tr
+                        key={`special-${row.id}`}
+                        className="hover:bg-rose-50/40 bg-rose-50/15 transition-colors group select-none"
+                      >
+                        {/* Reference & Shift / Date */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-rose-900 group-hover:text-rose-700 transition-colors">
+                              {row.invoiceNumber}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              Special Stock
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(row.invoiceNumber)}
+                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 transition-opacity p-0.5"
+                              title="Copy Reference #"
+                            >
+                              {copiedInvoice === row.invoiceNumber ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono mt-0.5">
+                            <Clock className="w-2.5 h-2.5 text-rose-500" />
+                            <span>
+                              {entry.shiftDate} • {formatShiftLabel(entry.shiftNumber)}
+                            </span>
+                          </div>
+                        </td>
 
-                    {/* Branch */}
-                    <td className="py-3.5 px-4 font-medium text-slate-700">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
-                        {getBranchLabel(sale.branchId)}
-                      </span>
-                    </td>
+                        {/* Branch */}
+                        <td className="py-3.5 px-4 font-medium text-slate-700">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100/70 text-rose-800 border border-rose-200/60">
+                            {entry.branchName}
+                          </span>
+                        </td>
 
-                    {/* Customer */}
-                    <td className="py-3.5 px-4 font-medium text-slate-700">
-                      <div>{sale.customerName || 'Walk-in Customer'}</div>
-                    </td>
+                        {/* Customer / Product Details */}
+                        <td className="py-3.5 px-4 font-medium text-slate-700">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>{entry.productName}</span>
+                            {entry.productSku && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                {entry.productSku}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                            Unit Price: {formatCurrency(entry.appliedRate)}
+                          </div>
+                        </td>
 
-                    {/* Cashier with 1-Click Quick Filter & Branch Badge */}
-                    <td className="py-3.5 px-4 text-slate-600">
-                      <div className="flex flex-col gap-1 items-start">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
-                            handleCashierChange(cName);
-                          }}
-                          title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
-                        >
-                          <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
-                          <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
-                        </button>
-                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded">
+                        {/* Cashier with 1-Click Quick Filter */}
+                        <td className="py-3.5 px-4 text-slate-600">
+                          <div className="flex flex-col gap-1 items-start">
+                            <button
+                              type="button"
+                              onClick={() => handleCashierChange(entry.cashierName)}
+                              title={`Click to filter only records by ${entry.cashierName}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-[11px] font-semibold transition-all group/cashier"
+                            >
+                              <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-rose-600" />
+                              <span>{entry.cashierName}</span>
+                            </button>
+                            <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded">
+                              {entry.branchName}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Units Sold */}
+                        <td className="py-3.5 px-4 text-slate-600 font-mono">
+                          <span className="font-bold text-rose-700 text-sm">
+                            {entry.soldQty}
+                          </span>{' '}
+                          unit(s)
+                        </td>
+
+                        {/* Payment Method */}
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Banknote className="w-3 h-3" /> Cash (Drawer)
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3" /> Completed
+                          </span>
+                        </td>
+
+                        {/* Grand Total */}
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-700 text-sm">
+                          {formatCurrency(entry.totalAmount)}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSpecialDetail(entry)}
+                            title="View Special Stock Sales Audit Voucher"
+                            className="p-1.5 rounded-lg border border-rose-200 text-rose-700 hover:text-white hover:bg-rose-600 transition-all shadow-2xs cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // Regular POS Bill Row
+                  const sale = row.rawSale!;
+                  return (
+                    <tr
+                      key={`pos-${sale.id}`}
+                      className={`hover:bg-slate-50/70 transition-colors group ${
+                        sale.status === 'VOIDED' ? 'bg-rose-50/20' : ''
+                      }`}
+                    >
+                      {/* Invoice & Time */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-900 group-hover:text-[#005BD3] transition-colors">
+                            {sale.invoiceNumber}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(sale.invoiceNumber)}
+                            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 transition-opacity p-0.5"
+                            title="Copy Invoice #"
+                          >
+                            {copiedInvoice === sale.invoiceNumber ? (
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono mt-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          {isMounted
+                            ? new Date(sale.createdAt).toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              }) +
+                              ' ' +
+                              new Date(sale.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '--:--'}
+                        </div>
+                      </td>
+
+                      {/* Branch */}
+                      <td className="py-3.5 px-4 font-medium text-slate-700">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
                           {getBranchLabel(sale.branchId)}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Items */}
-                    <td className="py-3.5 px-4 text-slate-600">
-                      <span className="font-bold text-slate-900">
-                        {sale.items && sale.items.length > 0
-                          ? sale.items.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0)
-                          : '—'}
-                      </span>{' '}
-                      item(s)
-                    </td>
+                      {/* Customer */}
+                      <td className="py-3.5 px-4 font-medium text-slate-700">
+                        <div>{sale.customerName || 'Walk-in Customer'}</div>
+                      </td>
 
-                    {/* Payment Method */}
-                    <td className="py-3.5 px-4">
-                      {getMethodBadge(sale.payments?.[0]?.paymentMethod)}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3.5 px-4">
-                      {getStatusBadge(sale.status)}
-                    </td>
-
-                    {/* Grand Total */}
-                    <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900 text-sm">
-                      <span className={sale.status === 'VOIDED' ? 'line-through text-slate-400' : ''}>
-                        {formatCurrency(Number(sale.totalAmount))}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {/* View & Print Hardware Receipt */}
-                        <button
-                          onClick={() => setActiveReceiptSaleId(sale.id)}
-                          title="View & Reprint 80mm/58mm Slip"
-                          className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-[#005BD3] hover:border-[#005BD3]/50 hover:bg-blue-50/60 transition-all shadow-2xs"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Void Bill Action */}
-                        {sale.status === 'COMPLETED' ? (
+                      {/* Cashier with 1-Click Quick Filter & Branch Badge */}
+                      <td className="py-3.5 px-4 text-slate-600">
+                        <div className="flex flex-col gap-1 items-start">
                           <button
+                            type="button"
                             onClick={() => {
-                              setVoidModalSale(sale);
-                              setVoidReason('');
-                              setVoidError(null);
+                              const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
+                              handleCashierChange(cName);
                             }}
-                            title="Void Bill & Restore Inventory"
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/60 transition-all shadow-2xs"
+                            title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
                           >
-                            <RotateCcw className="w-3.5 h-3.5" />
+                            <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
+                            <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
                           </button>
-                        ) : (
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded">
+                            {getBranchLabel(sale.branchId)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Items */}
+                      <td className="py-3.5 px-4 text-slate-600">
+                        <span className="font-bold text-slate-900">
+                          {sale.items && sale.items.length > 0
+                            ? sale.items.reduce((cnt, it) => cnt + Number(it.quantity || 1), 0)
+                            : '—'}
+                        </span>{' '}
+                        item(s)
+                      </td>
+
+                      {/* Payment Method */}
+                      <td className="py-3.5 px-4">
+                        {getMethodBadge(sale.payments?.[0]?.paymentMethod)}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        {getStatusBadge(sale.status)}
+                      </td>
+
+                      {/* Grand Total */}
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900 text-sm">
+                        <span className={sale.status === 'VOIDED' ? 'line-through text-slate-400' : ''}>
+                          {formatCurrency(Number(sale.totalAmount))}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* View & Print Hardware Receipt */}
                           <button
-                            disabled
-                            title="Bill has already been voided"
-                            className="p-1.5 rounded-lg border border-slate-100 text-slate-300 cursor-not-allowed"
+                            onClick={() => setActiveReceiptSaleId(sale.id)}
+                            title="View & Reprint 80mm/58mm Slip"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-[#005BD3] hover:border-[#005BD3]/50 hover:bg-blue-50/60 transition-all shadow-2xs"
                           >
-                            <XCircle className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+
+                          {/* Void Bill Action */}
+                          {sale.status === 'COMPLETED' ? (
+                            <button
+                              onClick={() => {
+                                setVoidModalSale(sale);
+                                setVoidReason('');
+                                setVoidError(null);
+                              }}
+                              title="Void Bill & Restore Inventory"
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/60 transition-all shadow-2xs"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              title="Bill has already been voided"
+                              className="p-1.5 rounded-lg border border-slate-100 text-slate-300 cursor-not-allowed"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={9} className="py-14 text-center text-slate-400">
                     <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="font-medium text-slate-600 text-sm">No sales records found</p>
+                    <p className="font-medium text-slate-600 text-sm">No transaction records found</p>
                     <p className="text-xs text-slate-400 mt-1">
-                      No transactions matched the active filters for {period === 'today' ? "today's register" : 'selected period'}.
+                      No records matched the active filters for {period === 'today' ? "today's register" : 'the selected period'}.
                     </p>
                   </td>
                 </tr>
@@ -1367,14 +1986,17 @@ export default function SalesOrdersPage() {
           </table>
         </div>
 
-        {/* Table Footer with Accurate Multi-Page Pagination */}
+        {/* Table Footer with Multi-Page Pagination */}
         <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 bg-slate-50/30">
           <div>
-            Showing <span className="font-semibold text-slate-700">{sales.length}</span> bills on this page •{' '}
-            <span className="font-semibold text-slate-700">{totalCount.toLocaleString()}</span> total matching transactions across database
+            Showing <span className="font-semibold text-slate-700">{displayRows.length}</span> transaction(s)
+            {activeTransactionTab === 'ALL' && (
+              <span> ({sales.length} POS Bills + {specialStockEntries.length} Special Stock)</span>
+            )}{' '}
+            • <span className="font-semibold text-slate-700">{(totalCount + (activeTransactionTab !== 'POS' ? specialStockEntries.length : 0)).toLocaleString()}</span> total matching across database
           </div>
 
-          {totalPages > 1 && (
+          {activeTransactionTab !== 'SPECIAL' && totalPages > 1 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
@@ -1397,10 +2019,99 @@ export default function SalesOrdersPage() {
           )}
 
           <div className="font-mono text-[11px] text-slate-400">
-            Encrypted Audit Logs • Colombo +05:30
+            Encrypted Multi-Branch Audit Trail • Asia/Colombo +05:30
           </div>
         </div>
       </div>
+
+      {/* Special Stock Sales Audit Detail Modal */}
+      {selectedSpecialDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 font-bold">
+                  <PackagePlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Special Stock Sales Audit Voucher</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Shift {selectedSpecialDetail.shiftNumber === 1 ? 'A (Morning)' : selectedSpecialDetail.shiftNumber === 2 ? 'B (Evening)' : selectedSpecialDetail.shiftNumber} • {selectedSpecialDetail.shiftDate}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedSpecialDetail(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Operating Branch</span>
+                  <span className="font-bold text-slate-800 text-xs mt-0.5 block">{selectedSpecialDetail.branchName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Shift Cashier</span>
+                  <span className="font-bold text-slate-800 text-xs mt-0.5 block">{selectedSpecialDetail.cashierName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Shift Lifecycle</span>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold mt-0.5 ${
+                      selectedSpecialDetail.shiftStatus === 'closed'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {selectedSpecialDetail.shiftStatus === 'closed' ? 'Closed & Handed Over' : 'Active / Open Shift'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Payment Flow</span>
+                  <span className="font-bold text-emerald-700 text-xs mt-0.5 block">Cash Inflow to Drawer Float</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Special Stock Item Details</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-900">{selectedSpecialDetail.productName}</span>
+                  <span className="font-mono text-slate-500 text-[11px]">{selectedSpecialDetail.productSku || 'SPEC-SKU'}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-[10px] text-slate-400 block font-medium">Quantity Sold</span>
+                    <span className="font-mono font-bold text-slate-800 text-xs">{selectedSpecialDetail.soldQty} units</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-[10px] text-slate-400 block font-medium">Applied Rate</span>
+                    <span className="font-mono font-bold text-slate-800 text-xs">{formatCurrency(selectedSpecialDetail.appliedRate)}</span>
+                  </div>
+                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <span className="text-[10px] text-emerald-700 block font-bold">Total Inflow</span>
+                    <span className="font-mono font-extrabold text-emerald-800 text-xs">{formatCurrency(selectedSpecialDetail.totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedSpecialDetail(null)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Close Audit Voucher
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hardware-Ready Thermal Receipt Modal */}
       {activeReceiptSaleId && (
@@ -1418,46 +2129,25 @@ export default function SalesOrdersPage() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 text-rose-600 font-bold text-base">
-                <AlertTriangle className="w-5 h-5 shrink-0" />
-                <span>Void Sale Transaction</span>
+                <AlertTriangle className="w-5 h-5" />
+                <span>Void Transaction & Restore Inventory</span>
               </div>
               <button
+                type="button"
                 onClick={() => setVoidModalSale(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1"
+                className="text-slate-400 hover:text-slate-600 p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-              <div className="font-bold">Inventory & Ledger Reversal Warning:</div>
-              <div>
-                Voiding invoice <span className="font-mono font-bold">{voidModalSale.invoiceNumber}</span> will
-                immediately restore all sold items back to branch stock levels and record an audit log entry.
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Invoice:</span>
-                <span className="font-mono font-bold text-slate-900">{voidModalSale.invoiceNumber}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Branch:</span>
-                <span className="font-medium text-slate-800">{getBranchLabel(voidModalSale.branchId)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Cashier:</span>
-                <span className="font-medium text-slate-800">{voidModalSale.cashier?.fullName || voidModalSale.cashierName || 'Staff'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Customer:</span>
-                <span className="font-medium text-slate-800">{voidModalSale.customerName || 'Walk-in Customer'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Total Refund:</span>
-                <span className="font-mono font-bold text-rose-600">{formatCurrency(Number(voidModalSale.totalAmount))}</span>
-              </div>
+            <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-800 space-y-1">
+              <p className="font-bold">
+                Are you sure you want to void bill #{voidModalSale.invoiceNumber}?
+              </p>
+              <p className="text-[11px] text-rose-600">
+                Total bill value of {formatCurrency(Number(voidModalSale.totalAmount))} will be reversed, and all items will be automatically returned to live stock inventory.
+              </p>
             </div>
 
             <div>
@@ -1465,19 +2155,16 @@ export default function SalesOrdersPage() {
                 Reason for Voiding <span className="text-rose-500">*</span>
               </label>
               <textarea
+                rows={3}
                 value={voidReason}
                 onChange={(e) => setVoidReason(e.target.value)}
-                placeholder="e.g. Customer returned items, cashier punched wrong SKU, duplicate transaction..."
-                rows={3}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                placeholder="Specify the reason (e.g., Cashier billing error, customer return, exchange)..."
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
               />
+              {voidError && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{voidError}</p>
+              )}
             </div>
-
-            {voidError && (
-              <div className="text-xs text-rose-600 font-medium bg-rose-50 p-2.5 rounded-lg border border-rose-200">
-                {voidError}
-              </div>
-            )}
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
@@ -1492,110 +2179,88 @@ export default function SalesOrdersPage() {
                 type="button"
                 onClick={handleConfirmVoid}
                 disabled={voiding || !voidReason.trim()}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
               >
-                {voiding ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Voiding...</span>
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Confirm Void & Restore Stock</span>
-                  </>
-                )}
+                {voiding && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>Confirm & Restore Stock</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Executive Printable Cashier & Sales Audit Report Modal */}
+      {/* Printable Cashier Audit & Multi-Branch Reconciliation Report Modal */}
       {isReportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            {/* Modal Non-Print Action Header */}
-            <div className="no-print p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
+            {/* Header controls (No print) */}
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between no-print">
               <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-[#005BD3]" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  Cashier & Sales Performance Audit Report
-                </h2>
-                <span className="text-[11px] font-medium text-slate-500">
-                  ({reportSales.length} records matching current filter)
+                <Printer className="w-4 h-4 text-blue-400" />
+                <span className="font-bold text-xs uppercase tracking-wider">
+                  Executive Cashier & Multi-Branch Sales Audit Report
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  type="button"
                   onClick={() => window.print()}
-                  disabled={reportLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#005BD3] hover:bg-[#004bb5] text-white text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                  className="px-3 py-1.5 bg-[#005BD3] hover:bg-[#004bb5] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print / Save PDF</span>
+                  <span>Print A4 / Save PDF</span>
                 </button>
                 <button
-                  type="button"
                   onClick={() => setIsReportModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Printable Report Canvas */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6" id="cashier-audit-report-printable">
+            {/* Printable Document Body */}
+            <div id="cashier-audit-report-printable" className="p-8 space-y-6 bg-white text-slate-900">
+              {/* Document Header */}
+              <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
+                <div>
+                  <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase">
+                    Deegayu Weda Madhura
+                  </h1>
+                  <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                    Ayurvedic Pharmacy & Healthcare Store • Financial Audit Department
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    Branch Scope: {getBranchLabel(selectedBranch)} • Colombo (UTC+05:30)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="inline-block px-2.5 py-1 rounded bg-slate-100 font-mono text-xs font-bold text-slate-900 border border-slate-300">
+                    AUDIT REPORT
+                  </span>
+                  <div className="text-[11px] text-slate-500 font-mono mt-1">
+                    Generated: {new Date().toLocaleString('en-GB', { timeZone: 'Asia/Colombo' })}
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Filter Scope: {period.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+
               {reportLoading ? (
-                <div className="py-20 text-center text-slate-400">
-                  <RefreshCw className="w-8 h-8 mx-auto mb-3 text-blue-600 animate-spin" />
-                  <p className="font-semibold text-slate-700 text-sm">Generating comprehensive audit report...</p>
-                  <p className="text-xs text-slate-400 mt-1">Aggregating tender records across branch database</p>
+                <div className="py-20 text-center space-y-3">
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#005BD3] mx-auto" />
+                  <p className="text-xs text-slate-500">Compiling executive audit statements across database...</p>
                 </div>
               ) : (
                 <>
-                  {/* Executive Letterhead Header */}
-                  <div className="border-b-2 border-slate-900 pb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Award className="w-6 h-6 text-[#005BD3]" />
-                        <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">
-                          Deegayu Weda Madhura
-                        </h1>
-                      </div>
-                      <p className="text-xs text-slate-700 font-bold mt-0.5">
-                        Ayurvedic Healthcare & Pharmaceutical Services
-                      </p>
-                      <p className="text-xs text-slate-600 mt-1 font-medium">
-                        Executive Sales & Cashier Settlement Ledger • Official Financial Audit
-                      </p>
-                    </div>
-
-                    <div className="text-left sm:text-right text-xs space-y-1">
-                      <div className="inline-block px-2.5 py-1 rounded-md bg-slate-100 font-mono font-bold text-slate-800 text-[11px]">
-                        AUDIT-REP-{new Date().toISOString().slice(0, 10).replace(/-/g, '')}
-                      </div>
-                      <div className="text-slate-500 text-[11px]">
-                        Generated: {new Date().toLocaleString('en-GB', { timeZone: 'Asia/Colombo' })} (SLST)
-                      </div>
-                      <div className="text-slate-500 text-[11px]">
-                        Branch: <span className="font-bold text-slate-800">{selectedBranch !== 'ALL' ? getBranchLabel(selectedBranch) : 'All Branches (Consolidated)'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Filter Metadata Context Bar */}
+                  {/* Parameter Snapshot Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Report Period</span>
-                      <span className="font-bold text-slate-900 capitalize">
-                        {period === 'custom' ? `${customStartDate} to ${customEndDate}` : period.replace('_', ' ')}
-                      </span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Selected Branch</span>
+                      <span className="font-bold text-slate-900">{getBranchLabel(selectedBranch)}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Cashier Scope</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Audited Staff</span>
                       <span className="font-bold text-slate-900">
                         {selectedCashier !== 'ALL' ? selectedCashier : 'All Cashiers'}
                       </span>
@@ -1610,28 +2275,30 @@ export default function SalesOrdersPage() {
                     </div>
                   </div>
 
-                  {/* Executive Tender Summary Cards */}
+                  {/* Executive Settlement Summary Cards */}
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
-                      Executive Settlement Summary
+                      Executive Settlement Summary (POS Catalog + Special Stock Sales)
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                       <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                        <span className="text-[10px] font-bold uppercase text-emerald-800 block">Total Gross</span>
+                        <span className="text-[10px] font-bold uppercase text-emerald-800 block">Total Combined Gross</span>
                         <span className="text-base font-extrabold text-emerald-950 block mt-0.5">
-                          {formatCurrency(reportGross)}
+                          {formatCurrency(reportGross + specialStockSummary.totalGross)}
                         </span>
                         <span className="text-[10px] text-emerald-700 mt-0.5 block">
-                          {reportCompleted.length} Completed
+                          {reportCompleted.length} POS + {specialStockSummary.entryCount} Special
                         </span>
                       </div>
 
                       <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
-                        <span className="text-[10px] font-bold uppercase text-blue-800 block">Physical Cash</span>
+                        <span className="text-[10px] font-bold uppercase text-blue-800 block">Drawer Cash Total</span>
                         <span className="text-base font-extrabold text-blue-950 block mt-0.5">
-                          {formatCurrency(reportCashTotal)}
+                          {formatCurrency(reportCashTotal + specialStockSummary.totalGross)}
                         </span>
-                        <span className="text-[10px] text-blue-700 mt-0.5 block">Drawer Cash</span>
+                        <span className="text-[10px] text-blue-700 mt-0.5 block">
+                          Physical Drawer Settlement
+                        </span>
                       </div>
 
                       <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
@@ -1662,18 +2329,18 @@ export default function SalesOrdersPage() {
                     </div>
                   </div>
 
-                  {/* Cashier Performance Breakdown (if multiple cashiers or all) */}
+                  {/* Cashier Performance Breakdown */}
                   {cashierAuditBreakdown.length > 0 && (
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                        Cashier Performance Breakdown
+                        Cashier Performance Breakdown (POS + Special Stock Combined)
                       </h3>
                       <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
                         <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                           <tr>
                             <th className="py-2 px-3">Cashier</th>
                             <th className="py-2 px-3">Branch</th>
-                            <th className="py-2 px-3 text-center">Bills Count</th>
+                            <th className="py-2 px-3 text-center">Transactions</th>
                             <th className="py-2 px-3 text-right">Cash Total</th>
                             <th className="py-2 px-3 text-right">Card Total</th>
                             <th className="py-2 px-3 text-right">Gross Total (LKR)</th>
@@ -1704,7 +2371,7 @@ export default function SalesOrdersPage() {
                   {/* Itemized Transactions Table */}
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                      Itemized Audit Records ({reportSales.length} Bills)
+                      Itemized Audit Records ({reportSales.length} POS Bills)
                     </h3>
                     <div className="border border-slate-200 rounded-lg overflow-hidden">
                       <table className="w-full text-left text-xs">
@@ -1753,7 +2420,7 @@ export default function SalesOrdersPage() {
                         <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                           <tr>
                             <td colSpan={7} className="py-2 px-3 text-right uppercase text-[11px] text-slate-600">
-                              Grand Settled Total:
+                              Grand Settled POS Total:
                             </td>
                             <td className="py-2 px-3 text-right font-mono text-xs text-slate-950">
                               {formatCurrency(reportGross)}
