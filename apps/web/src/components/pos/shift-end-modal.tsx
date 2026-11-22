@@ -71,6 +71,7 @@ export function ShiftEndModal({
   onConfirmEndShift,
   branchId,
   cashierId,
+  isOwner = false,
 }: ShiftEndModalProps) {
   const [activeTab, setActiveTab] = useState<'MODAKA' | 'DENOMINATIONS' | 'SUMMARY'>('MODAKA');
   const [localShift, setLocalShift] = useState<CashierShiftDto | null>(activeShift);
@@ -958,190 +959,194 @@ export function ShiftEndModal({
               {/* TAB 3: SHIFT CASH & EXPENSE SUMMARY */}
               {activeTab === 'SUMMARY' && (
                 <div className="space-y-4">
-                  <div>
+                  <div className={!isOwner ? 'max-w-2xl mx-auto' : ''}>
                     <h4 className="text-lg font-bold text-slate-900">
                       Shift Cash &amp; Expense Summary
                     </h4>
                     <p className="text-sm text-slate-500 mt-0.5">
-                      Side-by-side reconciliation of shift inflows, expenses, bank deposits, and next shift drawer float.
+                      {isOwner
+                        ? 'Side-by-side reconciliation of shift inflows, expenses, bank deposits, and next shift drawer float.'
+                        : 'Reconciliation of shift expenses, bank deposits, and physical drawer cash for next shift.'}
                     </p>
                   </div>
 
-                  {/* 2-Column Responsive Layout */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    {/* LEFT COLUMN: CASH INFLOWS */}
-                    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 space-y-4 shadow-xs">
-                      <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                          1. Cash Inflows (Shift Sales &amp; Float)
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          All amounts in LKR
-                        </span>
-                      </div>
-
-                      {/* 1. Opening Drawer Float */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[15px] text-slate-900 block">
-                              Opening Float
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-300 flex items-center gap-1">
-                              <span>🔒</span> Confirmed at Shift Start
-                            </span>
-                          </div>
-                          <span className="text-xs text-slate-500 block mt-0.5">
-                            Physical drawer cash verified and confirmed at shift commencement
+                  {/* 2-Column Responsive Layout for Owner vs Clean Centered Layout for Staff */}
+                  <div className={isOwner ? 'grid grid-cols-1 lg:grid-cols-2 gap-5' : 'max-w-2xl mx-auto space-y-5'}>
+                    {/* LEFT COLUMN: CASH INFLOWS (OWNER ONLY) */}
+                    {isOwner && (
+                      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 space-y-4 shadow-xs">
+                        <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            1. Cash Inflows (Shift Sales &amp; Float)
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            All amounts in LKR
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-bold text-slate-400">LKR</span>
-                          <input
-                            type="number"
-                            readOnly
-                            disabled
-                            value={openingFloat || 0}
-                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg bg-slate-100 text-slate-700 border border-slate-300 cursor-not-allowed select-none"
-                          />
-                        </div>
-                      </div>
 
-                      {/* 2. POS Cash Sales */}
-                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-2.5">
-                        <div className="flex items-center justify-between gap-3">
+                        {/* 1. Opening Drawer Float */}
+                        <div className="flex items-center justify-between gap-3 pt-1">
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-[15px] text-slate-900 block">
-                                POS Cash Sales
+                                Opening Float
                               </span>
-                              {livePosBillCount > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setIsCashBillsExpanded((prev) => !prev)}
-                                  className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-100/80 hover:bg-indigo-200/80 px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
-                                  title="Toggle cash bills breakdown"
-                                >
-                                  {isCashBillsExpanded ? (
-                                    <>
-                                      <span>Hide bills</span>
-                                      <ChevronUp className="w-3 h-3" />
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span>View {livePosBillCount} bill{livePosBillCount > 1 ? 's' : ''}</span>
-                                      <ChevronDown className="w-3 h-3" />
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={refreshLiveSales}
-                                disabled={isRefreshingSales}
-                                className="text-slate-400 hover:text-indigo-600 transition-colors p-0.5 rounded cursor-pointer disabled:opacity-50"
-                                title="Refresh shift sales"
-                              >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingSales ? 'animate-spin text-indigo-600' : ''}`} />
-                              </button>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-300 flex items-center gap-1">
+                                <span>🔒</span> Confirmed at Shift Start
+                              </span>
                             </div>
                             <span className="text-xs text-slate-500 block mt-0.5">
-                              {livePosBillCount > 0
-                                ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`
-                                : `Auto-pulled from completed cash bills in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`}
+                              Physical drawer cash verified and confirmed at shift commencement
                             </span>
-                            {Number(currentShift?.shiftNumber || localShift?.shiftNumber || 1) > 1 && (
-                              <span className="text-[11px] text-amber-700/90 block mt-0.5 font-medium">
-                                Earlier bills from today belong to {formatShiftLabel(Number(currentShift?.shiftNumber || localShift?.shiftNumber || 2) - 1)} and are accounted for in that shift&apos;s handover.
-                              </span>
-                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs font-bold text-slate-400">LKR</span>
-                            <span className="w-36 h-11 px-3 flex items-center justify-end font-mono text-lg font-bold tabular-nums rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200">
-                              {declaredShiftSale.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <input
+                              type="number"
+                              readOnly
+                              disabled
+                              value={openingFloat || 0}
+                              className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg bg-slate-100 text-slate-700 border border-slate-300 cursor-not-allowed select-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 2. POS Cash Sales */}
+                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[15px] text-slate-900 block">
+                                  POS Cash Sales
+                                </span>
+                                {livePosBillCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsCashBillsExpanded((prev) => !prev)}
+                                    className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-100/80 hover:bg-indigo-200/80 px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                    title="Toggle cash bills breakdown"
+                                  >
+                                    {isCashBillsExpanded ? (
+                                      <>
+                                        <span>Hide bills</span>
+                                        <ChevronUp className="w-3 h-3" />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span>View {livePosBillCount} bill{livePosBillCount > 1 ? 's' : ''}</span>
+                                        <ChevronDown className="w-3 h-3" />
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={refreshLiveSales}
+                                  disabled={isRefreshingSales}
+                                  className="text-slate-400 hover:text-indigo-600 transition-colors p-0.5 rounded cursor-pointer disabled:opacity-50"
+                                  title="Refresh shift sales"
+                                >
+                                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingSales ? 'animate-spin text-indigo-600' : ''}`} />
+                                </button>
+                              </div>
+                              <span className="text-xs text-slate-500 block mt-0.5">
+                                {livePosBillCount > 0
+                                  ? `Auto-pulled from ${livePosBillCount} cash bill${livePosBillCount > 1 ? 's' : ''} in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`
+                                  : `Auto-pulled from completed cash bills in this shift${formattedShiftStartTime ? ` (since ${formattedShiftStartTime})` : ''}`}
+                              </span>
+                              {Number(currentShift?.shiftNumber || localShift?.shiftNumber || 1) > 1 && (
+                                <span className="text-[11px] text-amber-700/90 block mt-0.5 font-medium">
+                                  Earlier bills from today belong to {formatShiftLabel(Number(currentShift?.shiftNumber || localShift?.shiftNumber || 2) - 1)} and are accounted for in that shift&apos;s handover.
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs font-bold text-slate-400">LKR</span>
+                              <span className="w-36 h-11 px-3 flex items-center justify-end font-mono text-lg font-bold tabular-nums rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200">
+                                {declaredShiftSale.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Expandable Breakdown of Included Cash Invoices */}
+                          {isCashBillsExpanded && liveCashBills.length > 0 && (
+                            <div className="mt-2.5 pt-2.5 border-t border-indigo-100/80 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {liveCashBills.map((b) => {
+                                const timeStr = (() => {
+                                  try {
+                                    return new Intl.DateTimeFormat('en-US', {
+                                      timeZone: 'Asia/Colombo',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true,
+                                    }).format(new Date(b.soldAt));
+                                  } catch {
+                                    return '';
+                                  }
+                                })();
+
+                                return (
+                                  <div
+                                    key={b.id}
+                                    className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/90 border border-indigo-100 shadow-2xs font-mono"
+                                  >
+                                    <div className="flex items-center gap-2 text-slate-700">
+                                      <span className="font-semibold text-slate-900">{b.invoiceNumber}</span>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-slate-500 text-[11px]">{timeStr}</span>
+                                      {b.isSplit && (
+                                        <span className="bg-amber-100 text-amber-800 text-[10px] font-sans px-1.5 py-0.5 rounded font-medium">
+                                          Split Cash
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-slate-900">
+                                      LKR {b.cashAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Special Stock Sales */}
+                        <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 flex items-center justify-between gap-3">
+                          <div>
+                            <span className="font-bold text-[15px] text-purple-950 block">
+                              Special Stock Sales
+                            </span>
+                            <span className="text-xs text-purple-700 block mt-0.5">
+                              Auto-calculated from Step 1 Special Stock ({modakaUnitsTotal} units)
                             </span>
                           </div>
+                          <span className="font-mono text-lg font-bold text-purple-900 shrink-0">
+                            + LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
 
-                        {/* Expandable Breakdown of Included Cash Invoices */}
-                        {isCashBillsExpanded && liveCashBills.length > 0 && (
-                          <div className="mt-2.5 pt-2.5 border-t border-indigo-100/80 space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                            {liveCashBills.map((b) => {
-                              const timeStr = (() => {
-                                try {
-                                  return new Intl.DateTimeFormat('en-US', {
-                                    timeZone: 'Asia/Colombo',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true,
-                                  }).format(new Date(b.soldAt));
-                                } catch {
-                                  return '';
-                                }
-                              })();
-
-                              return (
-                                <div
-                                  key={b.id}
-                                  className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/90 border border-indigo-100 shadow-2xs font-mono"
-                                >
-                                  <div className="flex items-center gap-2 text-slate-700">
-                                    <span className="font-semibold text-slate-900">{b.invoiceNumber}</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span className="text-slate-500 text-[11px]">{timeStr}</span>
-                                    {b.isSplit && (
-                                      <span className="bg-amber-100 text-amber-800 text-[10px] font-sans px-1.5 py-0.5 rounded font-medium">
-                                        Split Cash
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="font-bold text-slate-900">
-                                    LKR {b.cashAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                        {/* Subtotal: Total Shift Cash Hero Box */}
+                        <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-sm">
+                          <div>
+                            <span className="text-sm font-bold text-white block">
+                              Total Shift Cash Inflow
+                            </span>
+                            <span className="text-xs text-slate-400 block mt-0.5">
+                              Opening Float + POS Cash + Special Sales
+                            </span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* 3. Special Stock Sales */}
-                      <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 flex items-center justify-between gap-3">
-                        <div>
-                          <span className="font-bold text-[15px] text-purple-950 block">
-                            Special Stock Sales
-                          </span>
-                          <span className="text-xs text-purple-700 block mt-0.5">
-                            Auto-calculated from Step 1 Special Stock ({modakaUnitsTotal} units)
+                          <span className="font-mono text-2xl font-extrabold text-emerald-400 tabular-nums">
+                            LKR {totalCashInflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
-                        <span className="font-mono text-lg font-bold text-purple-900 shrink-0">
-                          + LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
                       </div>
-
-                      {/* Subtotal: Total Shift Cash Hero Box */}
-                      <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-sm">
-                        <div>
-                          <span className="text-sm font-bold text-white block">
-                            Total Shift Cash Inflow
-                          </span>
-                          <span className="text-xs text-slate-400 block mt-0.5">
-                            Opening Float + POS Cash + Special Sales
-                          </span>
-                        </div>
-                        <span className="font-mono text-2xl font-extrabold text-emerald-400 tabular-nums">
-                          LKR {totalCashInflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
+                    )}
 
                     {/* RIGHT COLUMN: DEDUCTIONS, BANK DEPOSIT & CLOSING FLOAT */}
                     <div className="bg-white rounded-2xl border border-slate-200/90 p-5 space-y-4 shadow-xs">
                       <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-                          2. Deductions &amp; Drawer Float
+                          {isOwner ? '2. Deductions & Drawer Float' : 'Deductions & Drawer Float'}
                         </span>
                         <span className="text-[11px] font-mono text-slate-400">
                           Carried to Next Shift
@@ -1303,7 +1308,7 @@ export function ShiftEndModal({
                   </div>
 
                   {/* Back Action */}
-                  <div className="flex items-center justify-start pt-2">
+                  <div className={`flex items-center justify-start pt-2 ${!isOwner ? 'max-w-2xl mx-auto' : ''}`}>
                     <button
                       type="button"
                       onClick={() => setActiveTab('DENOMINATIONS')}

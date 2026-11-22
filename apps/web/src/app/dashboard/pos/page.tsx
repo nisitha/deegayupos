@@ -3161,13 +3161,14 @@ export default function ConfidencyPosPage() {
 
       {/* 2. End Shift Modal */}
       <ShiftEndModal
-        isOpen={Boolean(!isOwner && isEndShiftModalOpen && activeShift && activeShift.branchId === selectedBranchId)}
+        isOpen={Boolean(isEndShiftModalOpen && activeShift && activeShift.branchId === selectedBranchId)}
         onClose={() => setIsEndShiftModalOpen(false)}
         activeShift={activeShift}
         branchId={selectedBranchId}
         cashierId={cashierId}
         branchName={currentBranchName}
         cashierName={cashierName}
+        isOwner={isOwner}
         onConfirmEndShift={() => {
           refreshActiveShift();
           setScanFeedback('Shift Ended & Handover Completed.');
