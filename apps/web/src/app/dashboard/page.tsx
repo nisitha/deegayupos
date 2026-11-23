@@ -56,6 +56,11 @@ import {
   type TimelineDataPoint,
   type SpecialStockTimelineItem,
 } from '../../lib/sales-timeline';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../components/ui/motion-primitives';
 
 // ============================================================================
 // CONSTANTS & 3 OPERATING BRANCHES (NO MAIN STORE)
@@ -1979,7 +1984,7 @@ export default function DashboardPage() {
       : BRANCH_MAP[selectedBranch] || 'Branch';
 
   return (
-    <div className="space-y-6">
+    <MotionPageShell className="space-y-6">
       {/* Sleek Top Progress Bar during cache revalidation or date navigation */}
       {(isNavigatingRange || isRevalidating) && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-pulse z-50 pointer-events-none" />
@@ -2280,151 +2285,159 @@ export default function DashboardPage() {
       {/* =====================================================================
           PART 2: TOP KPI TELEMETRY ROW (4 VIBRANT FULL-COLOR GRADIENT HERO CARDS)
       ===================================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <MotionStaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: TOTAL GROSS SALES (Royal Blue Gradient) */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] text-white shadow-lg shadow-blue-600/15 relative overflow-hidden flex flex-col justify-between group transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
-                Total Gross Sales
+        <MotionStaggerItem>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#1E40AF] text-white shadow-lg shadow-blue-600/15 relative overflow-hidden flex flex-col justify-between group transition-all h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
+                  Total Gross Sales
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {formatCurrency(combinedGross)}
+                </div>
+                <div className="mt-2 text-xs flex items-center gap-1.5 flex-wrap">
+                  <span className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white">
+                    POS: {formatCurrency(posAnalytics.revenue)}
+                  </span>
+                  <span className="bg-purple-900/40 border border-purple-400/40 px-2 py-0.5 rounded-full text-[11px] font-semibold text-purple-100">
+                    Special: {formatCurrency(specialAnalytics.revenue)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsSplitModalOpen(true)}
+                className="text-xs font-bold text-white hover:text-blue-100 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>View Split Breakdown &rarr;</span>
+              </button>
+              <span className="text-[10px] text-blue-100 font-mono">
+                {combinedBills} Bills • {specialAnalytics.units} Modaka
               </span>
-              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
-                <DollarSign className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {formatCurrency(combinedGross)}
-              </div>
-              <div className="mt-2 text-xs flex items-center gap-1.5 flex-wrap">
-                <span className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white">
-                  POS: {formatCurrency(posAnalytics.revenue)}
-                </span>
-                <span className="bg-purple-900/40 border border-purple-400/40 px-2 py-0.5 rounded-full text-[11px] font-semibold text-purple-100">
-                  Special: {formatCurrency(specialAnalytics.revenue)}
-                </span>
-              </div>
             </div>
           </div>
-
-          <div className="mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setIsSplitModalOpen(true)}
-              className="text-xs font-bold text-white hover:text-blue-100 flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>View Split Breakdown &rarr;</span>
-            </button>
-            <span className="text-[10px] text-blue-100 font-mono">
-              {combinedBills} Bills • {specialAnalytics.units} Modaka
-            </span>
-          </div>
-        </div>
+        </MotionStaggerItem>
 
         {/* KPI 2: TRUE NET PROFIT (Emerald Green Gradient) */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] via-[#059669] to-[#047857] text-white shadow-lg shadow-emerald-600/15 relative overflow-hidden flex flex-col justify-between group transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
-                True Net Profit
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {formatCurrency(combinedNetProfit)}
-              </div>
-              <div className="mt-2 flex items-center gap-1.5 text-xs">
-                <span className="bg-white/25 border border-white/40 px-2 py-0.5 rounded-full font-bold text-white font-mono text-[11px]">
-                  {combinedMargin.toFixed(1)}% Margin
+        <MotionStaggerItem>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] via-[#059669] to-[#047857] text-white shadow-lg shadow-emerald-600/15 relative overflow-hidden flex flex-col justify-between group transition-all h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+                  True Net Profit
                 </span>
-                <span className="text-emerald-100 text-[11px]">after actual COGS</span>
+                <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {formatCurrency(combinedNetProfit)}
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-xs">
+                  <span className="bg-white/25 border border-white/40 px-2 py-0.5 rounded-full font-bold text-white font-mono text-[11px]">
+                    {combinedMargin.toFixed(1)}% Margin
+                  </span>
+                  <span className="text-emerald-100 text-[11px]">after actual COGS</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 pt-3 border-t border-white/20 text-[11px] text-emerald-100 font-mono flex items-center justify-between">
-            <span>Buying Cost (COGS):</span>
-            <span className="font-bold text-white">{formatCurrency(combinedCOGS)}</span>
+            <div className="mt-4 pt-3 border-t border-white/20 text-[11px] text-emerald-100 font-mono flex items-center justify-between">
+              <span>Buying Cost (COGS):</span>
+              <span className="font-bold text-white">{formatCurrency(combinedCOGS)}</span>
+            </div>
           </div>
-        </div>
+        </MotionStaggerItem>
 
         {/* KPI 3: AVERAGE BASKET & VOLUME (Indigo-Violet Gradient) */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] via-[#4338CA] to-[#3730A3] text-white shadow-lg shadow-indigo-600/15 relative overflow-hidden flex flex-col justify-between group transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">
-                Average Basket & Volume
+        <MotionStaggerItem>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] via-[#4338CA] to-[#3730A3] text-white shadow-lg shadow-indigo-600/15 relative overflow-hidden flex flex-col justify-between group transition-all h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">
+                  Average Basket & Volume
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                  <ShoppingCart className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {formatCurrency(avgBasket)}
+                </div>
+                <div className="mt-2 text-xs text-indigo-100">
+                  Average basket per customer checkout
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/20 text-[11px] text-indigo-100 flex items-center justify-between">
+              <span>Volume Sold:</span>
+              <span className="font-bold text-white font-mono bg-white/20 border border-white/30 px-2 py-0.5 rounded-full text-[11px]">
+                {combinedBills} Bills • {specialAnalytics.units} Units
               </span>
-              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {formatCurrency(avgBasket)}
-              </div>
-              <div className="mt-2 text-xs text-indigo-100">
-                Average basket per customer checkout
-              </div>
             </div>
           </div>
-
-          <div className="mt-4 pt-3 border-t border-white/20 text-[11px] text-indigo-100 flex items-center justify-between">
-            <span>Volume Sold:</span>
-            <span className="font-bold text-white font-mono bg-white/20 border border-white/30 px-2 py-0.5 rounded-full text-[11px]">
-              {combinedBills} Bills • {specialAnalytics.units} Units
-            </span>
-          </div>
-        </div>
+        </MotionStaggerItem>
 
         {/* KPI 4: LOW STOCK WARNINGS (Amber-Orange Gradient) */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#D97706] to-[#B45309] text-white shadow-lg shadow-amber-600/15 relative overflow-hidden flex flex-col justify-between group transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">
-                Low Stock Warnings
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
-                <AlertTriangle className="w-5 h-5" />
+        <MotionStaggerItem>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] via-[#D97706] to-[#B45309] text-white shadow-lg shadow-amber-600/15 relative overflow-hidden flex flex-col justify-between group transition-all h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">
+                  Low Stock Warnings
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {branchLowStockCount}
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-xs">
+                  {branchLowStockCount > 0 ? (
+                    <span className="bg-white/25 border border-white/40 px-2 py-0.5 rounded-full font-semibold text-white text-[11px]">
+                      SKUs below reorder point
+                    </span>
+                  ) : (
+                    <span className="bg-emerald-500/30 border border-emerald-300/40 px-2 py-0.5 rounded-full font-semibold text-emerald-100 text-[11px]">
+                      Branch stock levels healthy
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {branchLowStockCount}
-              </div>
-              <div className="mt-2 flex items-center gap-1.5 text-xs">
-                {branchLowStockCount > 0 ? (
-                  <span className="bg-white/25 border border-white/40 px-2 py-0.5 rounded-full font-semibold text-white text-[11px]">
-                    SKUs below reorder point
-                  </span>
-                ) : (
-                  <span className="bg-emerald-500/30 border border-emerald-300/40 px-2 py-0.5 rounded-full font-semibold text-emerald-100 text-[11px]">
-                    Branch stock levels healthy
-                  </span>
-                )}
-              </div>
+            <div className="mt-4 pt-3 border-t border-white/20 flex items-center justify-between text-xs">
+              <span className="text-amber-100 truncate">{activeBranchName}</span>
+              <Link
+                href="/dashboard/alerts"
+                className="text-white font-bold hover:text-amber-100 underline shrink-0 transition-colors"
+              >
+                Inspect &rarr;
+              </Link>
             </div>
           </div>
-
-          <div className="mt-4 pt-3 border-t border-white/20 flex items-center justify-between text-xs">
-            <span className="text-amber-100 truncate">{activeBranchName}</span>
-            <Link
-              href="/dashboard/alerts"
-              className="text-white font-bold hover:text-amber-100 underline shrink-0 transition-colors"
-            >
-              Inspect &rarr;
-            </Link>
-          </div>
-        </div>
-      </div>
+        </MotionStaggerItem>
+      </MotionStaggerGrid>
 
       {/* =====================================================================
           PART 2A: SALES TIMELINE & CHANNEL REVENUE SPLIT DONUT
@@ -2756,10 +2769,10 @@ export default function DashboardPage() {
                     rank === 1
                       ? 'bg-amber-100 text-amber-900 border-amber-300 font-black shadow-xs'
                       : rank === 2
-                      ? 'bg-slate-200 text-slate-800 border-slate-300 font-black'
-                      : rank === 3
-                      ? 'bg-orange-100 text-orange-900 border-orange-300 font-black'
-                      : 'bg-slate-100 text-slate-600 border-slate-200 font-bold';
+                        ? 'bg-slate-200 text-slate-800 border-slate-300 font-black'
+                        : rank === 3
+                          ? 'bg-orange-100 text-orange-900 border-orange-300 font-black'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 font-bold';
 
                   return (
                     <div
@@ -3730,6 +3743,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </MotionPageShell>
   );
 }

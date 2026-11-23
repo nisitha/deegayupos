@@ -33,6 +33,25 @@ import {
   type TransferProductSearchItem,
   type CreateTransferItemPayload,
 } from '../../../lib/transfers-api';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../components/ui/motion-primitives';
+
+function getBranchChipClass(nameOrId?: string) {
+  const str = (nameOrId || '').toLowerCase();
+  if (str.includes('alawwa') || str === '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54') {
+    return 'bg-blue-50 text-blue-700 border border-blue-200/80 font-bold';
+  }
+  if (str.includes('dambadeniya') || str === 'fa68e4a0-a515-44c8-a082-5b5590366658') {
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold';
+  }
+  if (str.includes('giriulla') || str === '197693d6-4247-48df-b614-6fcde9e34f7d') {
+    return 'bg-amber-50 text-amber-700 border border-amber-200/80 font-bold';
+  }
+  return 'bg-slate-100 text-slate-700 border border-slate-200 font-semibold';
+}
 
 export default function StockTransfersPage() {
   const { user, isOwner, activeCashier, assignedBranchIds, selectedBranchId } = useTenantBranch();
@@ -454,7 +473,7 @@ export default function StockTransfersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <MotionPageShell className="space-y-6">
       {/* =====================================================================
           HEADER SECTION
       ===================================================================== */}
@@ -517,109 +536,117 @@ export default function StockTransfersPage() {
       )}
 
       {/* =====================================================================
-          PART 4: TOP KPI SUMMARY CARDS
+          PART 4: TOP KPI SUMMARY CARDS (ELECTRIC INDIGO & VIOLET LOGISTICS)
       ===================================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <MotionStaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Pending Owner Approval */}
-        <div
-          onClick={() => setActiveTab('PENDING_APPROVAL')}
-          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-amber-500/10 flex flex-col justify-between bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white ${
-            activeTab === 'PENDING_APPROVAL' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
-          }`}
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">
-                Pending Owner Approval
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
-                <Clock className="w-5 h-5" />
+        <MotionStaggerItem>
+          <div
+            onClick={() => setActiveTab('PENDING_APPROVAL')}
+            className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-amber-500/10 flex flex-col justify-between bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white h-full ${
+              activeTab === 'PENDING_APPROVAL' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">
+                  Pending Owner Approval
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
               </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                <span>{metrics.pending}</span>
-                {metrics.pending > 0 && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                )}
-              </div>
-              <div className="mt-2 text-xs text-amber-100">
-                {metrics.pending > 0
-                  ? 'Requests awaiting Owner confirmation'
-                  : 'Zero pending requests in queue'}
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                  <span>{metrics.pending}</span>
+                  {metrics.pending > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-amber-100">
+                  {metrics.pending > 0
+                    ? 'Requests awaiting Owner confirmation'
+                    : 'Zero pending requests in queue'}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </MotionStaggerItem>
 
         {/* KPI 2: Approved & Completed */}
-        <div
-          onClick={() => setActiveTab('APPROVED')}
-          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-emerald-500/10 flex flex-col justify-between bg-gradient-to-br from-[#10B981] to-[#059669] text-white ${
-            activeTab === 'APPROVED' ? 'ring-4 ring-emerald-300/40 -translate-y-0.5' : 'hover:opacity-95'
-          }`}
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
-                Approved & Completed
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
-                <CheckCircle2 className="w-5 h-5" />
+        <MotionStaggerItem>
+          <div
+            onClick={() => setActiveTab('APPROVED')}
+            className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-emerald-500/10 flex flex-col justify-between bg-gradient-to-br from-[#10B981] to-[#059669] text-white h-full ${
+              activeTab === 'APPROVED' ? 'ring-4 ring-emerald-300/40 -translate-y-0.5' : 'hover:opacity-95'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+                  Approved & Completed
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.approved}</div>
+                <div className="mt-2 text-xs text-emerald-100">Successfully executed stock reallocations</div>
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.approved}</div>
-              <div className="mt-2 text-xs text-emerald-100">Successfully executed stock reallocations</div>
-            </div>
           </div>
-        </div>
+        </MotionStaggerItem>
 
         {/* KPI 3: Total Units Transferred */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
-                Total Units Transferred
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
-                <Package className="w-5 h-5" />
+        <MotionStaggerItem>
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">
+                  Total Units Transferred
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
               </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {metrics.totalUnits.toLocaleString('en-US')}
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {metrics.totalUnits.toLocaleString('en-US')}
+                </div>
+                <div className="mt-2 text-xs text-indigo-100">Inventory volume relocated across branches</div>
               </div>
-              <div className="mt-2 text-xs text-blue-100">Inventory volume relocated across branches</div>
             </div>
           </div>
-        </div>
+        </MotionStaggerItem>
 
-        {/* KPI 4: Total Requests */}
-        <div
-          onClick={() => setActiveTab('ALL')}
-          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-indigo-500/10 flex flex-col justify-between bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white ${
-            activeTab === 'ALL' ? 'ring-4 ring-indigo-300/40 -translate-y-0.5' : 'hover:opacity-95'
-          }`}
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">
-                Total Transfer Requests
-              </span>
-              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
-                <FileText className="w-5 h-5" />
+        {/* KPI 4: Total Requests (Electric Violet) */}
+        <MotionStaggerItem>
+          <div
+            onClick={() => setActiveTab('ALL')}
+            className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-purple-500/10 flex flex-col justify-between bg-gradient-to-br from-[#8B5CF6] to-[#7C3AED] text-white h-full ${
+              activeTab === 'ALL' ? 'ring-4 ring-purple-300/40 -translate-y-0.5' : 'hover:opacity-95'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-purple-100 uppercase tracking-wider">
+                  Total Transfer Requests
+                </span>
+                <div className="w-10 h-10 rounded-full bg-white text-purple-600 flex items-center justify-center shadow-md shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
               </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.total}</div>
-              <div className="mt-2 text-xs text-indigo-100">
-                {metrics.rejected > 0 ? `${metrics.rejected} rejected / cancelled` : 'All registered records'}
+              <div className="mt-3">
+                <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.total}</div>
+                <div className="mt-2 text-xs text-purple-100">
+                  {metrics.rejected > 0 ? `${metrics.rejected} rejected / cancelled` : 'All registered records'}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </MotionStaggerItem>
+      </MotionStaggerGrid>
 
       {/* =====================================================================
           FILTER TABS & SEARCH BAR
@@ -721,12 +748,14 @@ export default function StockTransfersPage() {
 
                     {/* Route: From -> To */}
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 font-mono text-[11px]">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200/90 shadow-2xs font-mono text-[11px]">
+                        <span className={`font-bold px-1.5 py-0.5 rounded-md ${getBranchChipClass(t.from_branch_name)}`}>
                           {t.from_branch_name}
                         </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-semibold px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200/60 font-mono text-[11px]">
+                        <span className="text-indigo-600 font-bold px-0.5 flex items-center">
+                          <ArrowRight className="w-3.5 h-3.5 animate-pulse text-[#4F46E5]" />
+                        </span>
+                        <span className={`font-bold px-1.5 py-0.5 rounded-md ${getBranchChipClass(t.to_branch_name)}`}>
                           {t.to_branch_name}
                         </span>
                       </div>
@@ -1552,6 +1581,6 @@ export default function StockTransfersPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

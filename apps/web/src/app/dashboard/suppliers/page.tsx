@@ -16,6 +16,11 @@ import {
 } from 'lucide-react';
 import type { SupplierDto } from '@pixelcraft/types';
 import { supabase } from '../../../lib/supabase';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../components/ui/motion-primitives';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierDto[]>([]);
@@ -184,7 +189,7 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden bg-white select-none">
+    <MotionPageShell className="h-full w-full flex flex-col overflow-hidden bg-[#EEF2F7] select-none">
       {/* Toast Notification */}
       {feedback && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -194,14 +199,14 @@ export default function SuppliersPage() {
       )}
 
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+      <div className="px-6 py-4 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#7052FF] flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#EA580C] border border-orange-200/80 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
             <Truck className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">
-              Suppliers Directory
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">
+              Suppliers & Vendor Directory
             </h1>
             <p className="text-xs text-slate-500">
               {totalCount || 94} Registered Ayurvedic & Pharmaceutical Vendors for Deegayu Weda Madhura
@@ -212,38 +217,71 @@ export default function SuppliersPage() {
         <button
           type="button"
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-95 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm shadow-[#7052FF]/20 transition-all cursor-pointer"
+          className="bg-gradient-to-r from-[#EA580C] to-[#C2410C] hover:from-[#C2410C] hover:to-[#9A3412] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-md shadow-orange-500/20 transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Supplier</span>
         </button>
       </div>
 
-      {/* KPI Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0 text-xs">
-        <div className="bg-white p-3 rounded-xl border border-slate-200/70 shadow-2xs">
-          <div className="text-[11px] text-slate-500 font-medium">Total Suppliers</div>
-          <div className="text-lg font-black text-slate-900 font-mono mt-0.5">{totalCount || 94}</div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-200/70 shadow-2xs">
-          <div className="text-[11px] text-slate-500 font-medium">Active Partners</div>
-          <div className="text-lg font-black text-emerald-600 font-mono mt-0.5">{totalCount || 94}</div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-200/70 shadow-2xs">
-          <div className="text-[11px] text-slate-500 font-medium">Standard Terms</div>
-          <div className="text-lg font-black text-slate-900 font-mono mt-0.5">NET 30</div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-200/70 shadow-2xs">
-          <div className="text-[11px] text-slate-500 font-medium">Deegayu Ingest Status</div>
-          <div className="text-xs font-bold text-[#7052FF] flex items-center gap-1 mt-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Fully Synced</span>
-          </div>
-        </div>
+      {/* Bento KPI Stats Bar */}
+      <div className="px-6 py-3 border-b border-slate-200/80 bg-white shrink-0">
+        <MotionStaggerGrid className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <MotionStaggerItem>
+            <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#EA580C] to-[#C2410C] text-white shadow-md shadow-orange-500/10 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] text-orange-100 font-bold uppercase tracking-wider">Total Suppliers</div>
+                <div className="text-xl font-black text-white font-mono mt-0.5">{totalCount || 94}</div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+                <Truck className="w-4 h-4" />
+              </div>
+            </div>
+          </MotionStaggerItem>
+
+          <MotionStaggerItem>
+            <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#059669] to-[#047857] text-white shadow-md shadow-emerald-500/10 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Active Partners</div>
+                <div className="text-xl font-black text-white font-mono mt-0.5">{totalCount || 94}</div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+          </MotionStaggerItem>
+
+          <MotionStaggerItem>
+            <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#D97706] to-[#B45309] text-white shadow-md shadow-amber-500/10 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] text-amber-100 font-bold uppercase tracking-wider">Standard Terms</div>
+                <div className="text-xl font-black text-white font-mono mt-0.5">NET 30</div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4" />
+              </div>
+            </div>
+          </MotionStaggerItem>
+
+          <MotionStaggerItem>
+            <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#F43F5E] to-[#E11D48] text-white shadow-md shadow-rose-500/10 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] text-rose-100 font-bold uppercase tracking-wider">Catalog Health</div>
+                <div className="text-xs font-extrabold text-white flex items-center gap-1 mt-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Fully Synced</span>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+          </MotionStaggerItem>
+        </MotionStaggerGrid>
       </div>
 
       {/* Search & Filter Station */}
-      <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-white">
+      <div className="px-6 py-3 border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0 bg-white">
         <div className="relative flex-1 max-w-md">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -251,7 +289,7 @@ export default function SuppliersPage() {
             placeholder="Search suppliers by name, code (e.g. SUP-001), or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200/80 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#7052FF] transition-all"
+            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-orange-500/10 transition-all"
           />
         </div>
 
@@ -259,7 +297,7 @@ export default function SuppliersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-[#7052FF]"
+            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:border-[#EA580C]"
           >
             <option value="ALL">All Status</option>
             <option value="ACTIVE">Active Only</option>
@@ -272,27 +310,27 @@ export default function SuppliersPage() {
       </div>
 
       {/* Table Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-6 py-5">
         {isLoading ? (
           <div className="h-64 flex flex-col items-center justify-center text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#7052FF] mb-2" />
-            <p className="text-xs font-medium text-slate-500">Loading 94 Deegayu Suppliers...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-[#EA580C] mb-2" />
+            <p className="text-xs font-medium text-slate-500">Loading Deegayu Suppliers...</p>
           </div>
         ) : filteredSuppliers.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center">
+          <div className="h-64 flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-slate-200/80 p-8 shadow-xs">
             <Building2 className="w-10 h-10 text-slate-300 mb-2" />
             <p className="text-sm font-semibold text-slate-700">No suppliers found</p>
             <p className="text-xs text-slate-400 mt-0.5">Try adjusting your search criteria</p>
           </div>
         ) : (
-          <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs bg-white">
+          <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs bg-white">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#0F172A] border-b border-slate-800 text-white font-semibold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-4 w-28">Code</th>
-                  <th className="py-3 px-4">Supplier Name</th>
+                  <th className="py-3 px-4">Supplier Identity</th>
                   <th className="py-3 px-4">Contact Phone</th>
-                  <th className="py-3 px-4">Terms</th>
+                  <th className="py-3 px-4">Payment Terms</th>
                   <th className="py-3 px-4 text-center">Orders</th>
                   <th className="py-3 px-4 text-center">GRNs</th>
                   <th className="py-3 px-4 text-right">Status</th>
@@ -302,67 +340,71 @@ export default function SuppliersPage() {
                 {filteredSuppliers.map((s) => (
                   <tr
                     key={s.id}
-                    className="hover:bg-purple-50/20 transition-colors group"
+                    className="hover:bg-orange-50/30 transition-colors group"
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                      <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px]">
                         {s.code}
                       </span>
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 group-hover:text-[#7052FF] transition-colors">
-                        {s.name}
-                      </div>
-                      {s.contactPerson && (
-                        <div className="text-[11px] text-slate-400">
-                          Contact: {s.contactPerson}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-100 to-amber-100 text-orange-700 font-bold text-xs flex items-center justify-center shrink-0 border border-orange-200/60 shadow-2xs">
+                          {s.name.slice(0, 2).toUpperCase()}
                         </div>
-                      )}
+                        <div>
+                          <div className="font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors leading-tight">
+                            {s.name}
+                          </div>
+                          {s.contactPerson && (
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <span className="text-slate-400">Contact:</span>
+                              <span className="font-medium text-slate-700">{s.contactPerson}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-600">
+                    <td className="py-3.5 px-4 font-mono text-slate-600">
                       {s.phone ? (
                         <a
                           href={`tel:${s.phone}`}
-                          className="flex items-center gap-1.5 hover:text-[#7052FF] transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-[#EA580C] border border-slate-200/60 transition-colors"
                         >
-                          <Phone className="w-3 h-3 text-slate-400" />
+                          <Phone className="w-3 h-3 text-[#EA580C]" />
                           <span>{s.phone}</span>
                         </a>
                       ) : (
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      <span className="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
+                    <td className="py-3.5 px-4 text-slate-600">
+                      <span className="font-mono text-[11px] bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60 font-semibold">
                         {s.paymentTerms || 'NET_30'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono text-slate-600">
-                      <span className="inline-flex items-center gap-1">
+                    <td className="py-3.5 px-4 text-center font-mono text-slate-600">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/50">
                         <FileText className="w-3 h-3 text-slate-400" />
-                        <span>{s._count?.purchaseOrders || 0}</span>
+                        <span className="font-bold">{s._count?.purchaseOrders || 0}</span>
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono text-slate-600">
-                      <span className="inline-flex items-center gap-1">
+                    <td className="py-3.5 px-4 text-center font-mono text-slate-600">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/50">
                         <ClipboardList className="w-3 h-3 text-slate-400" />
-                        <span>{s._count?.goodsReceivedNotes || 0}</span>
+                        <span className="font-bold">{s._count?.goodsReceivedNotes || 0}</span>
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right">
                       <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
                           s.status === 'ACTIVE'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : 'bg-slate-100 text-slate-500 border-slate-200'
                         }`}
                       >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            s.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-400'
-                          }`}
-                        />
-                        <span>{s.status}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <span>{s.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
                       </span>
                     </td>
                   </tr>
@@ -499,7 +541,7 @@ export default function SuppliersPage() {
                     placeholder="Colombo, Sri Lanka"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
               </div>
@@ -515,7 +557,7 @@ export default function SuppliersPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting || !formData.name.trim()}
-                  className="flex-1 py-2 text-xs font-semibold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-40 rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#EA580C] to-[#C2410C] hover:from-[#C2410C] hover:to-[#9A3412] disabled:opacity-40 rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isSubmitting ? (
                     <>
@@ -531,6 +573,6 @@ export default function SuppliersPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

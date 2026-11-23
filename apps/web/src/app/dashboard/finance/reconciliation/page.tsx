@@ -38,6 +38,7 @@ import {
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import { shiftsApi, formatShiftLabel, type ShiftFinancialAdjustmentDto } from '../../../../lib/api-client';
 import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
+import { MotionPageShell } from '../../../../components/ui/motion-primitives';
 import {
   reconciliationApi,
   SRI_LANKA_DENOMINATIONS,
@@ -1565,15 +1566,15 @@ export default function CashReconciliationPage() {
   }, [consolidatedSummaries]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
+    <MotionPageShell className="min-h-screen bg-[#0B0F19] text-slate-100 p-4 md:p-8">
       {/* ========================================================= */}
       {/* HEADER SECTION */}
       {/* ========================================================= */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <Banknote className="w-6 h-6" />
+            <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400">
+              <Banknote className="w-6 h-6 text-amber-300" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
@@ -5207,6 +5208,6 @@ export default function CashReconciliationPage() {
           </div>
         </div>
       </div>
-    </div>
+    </MotionPageShell>
   );
 }

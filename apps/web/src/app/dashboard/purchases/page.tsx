@@ -33,6 +33,11 @@ import type {
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { getCachedCatalogData } from '../../../lib/catalog-db';
 import { supabase } from '../../../lib/supabase';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../components/ui/motion-primitives';
 
 const BRANCH_TO_WAREHOUSE: Record<string, string> = {
   '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': '42f1fe9d-7e44-48eb-8eb0-10a6439b5619', // Alawwa
@@ -764,7 +769,7 @@ export default function PurchasesPage() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden bg-slate-50/40 select-none">
+    <MotionPageShell className="h-full w-full flex flex-col overflow-hidden bg-[#EEF2F7] select-none">
       {/* Toast Notification */}
       {feedback && (
         <div
@@ -792,7 +797,7 @@ export default function PurchasesPage() {
       {/* Top Header */}
       <div className="px-6 py-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7052FF] border border-purple-200/60 flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#EA580C] border border-orange-200/80 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
             <ClipboardCheck className="w-5 h-5" />
           </div>
           <div>
@@ -815,7 +820,7 @@ export default function PurchasesPage() {
             disabled={isLoading || isRefreshing}
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#7052FF]' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#EA580C]' : ''}`} />
             <span>Refresh</span>
           </button>
 
@@ -823,7 +828,7 @@ export default function PurchasesPage() {
             <button
               type="button"
               onClick={() => setIsGrnModalOpen(true)}
-              className="bg-[#7052FF] hover:bg-[#5E3FE6] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm shadow-[#7052FF]/20 transition-all cursor-pointer"
+              className="bg-gradient-to-r from-[#EA580C] to-[#C2410C] hover:from-[#C2410C] hover:to-[#9A3412] active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-md shadow-orange-500/20 transition-all cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Receive Inventory (New GRN)</span>
@@ -850,71 +855,81 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      {/* KPI Cards Row (Blind Mode for Staff: Only non-financial operational metrics visible) */}
-      <div className={`px-6 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4 shrink-0`}>
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wider">Total GRNs</span>
-              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
-                <ClipboardCheck className="w-5 h-5" />
+      {/* KPI Cards Row (Procurement Palette: Sunset Orange & Coral) */}
+      <div className="px-6 pt-4">
+        <MotionStaggerGrid className={`grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4 shrink-0`}>
+          <MotionStaggerItem>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#EA580C] to-[#C2410C] text-white shadow-lg shadow-orange-500/15 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-orange-100 uppercase tracking-wider">Total GRNs</span>
+                  <div className="w-10 h-10 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-md shrink-0">
+                    <ClipboardCheck className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                  {kpis.totalCount.toLocaleString()}
+                </div>
+                <p className="text-xs text-orange-100 mt-2">Physical goods consignments</p>
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
-              {kpis.totalCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-blue-100 mt-2">Physical goods shipments</p>
-          </div>
-        </div>
+          </MotionStaggerItem>
 
-        {isOwner && (
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wider">Procurement Value</span>
-                <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
-                  <DollarSign className="w-5 h-5" />
+          {isOwner && (
+            <MotionStaggerItem>
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F43F5E] to-[#E11D48] text-white shadow-lg shadow-rose-500/15 flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-rose-100 uppercase tracking-wider">Procurement Value</span>
+                    <div className="w-10 h-10 rounded-full bg-white text-[#F43F5E] flex items-center justify-center shadow-md shrink-0">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                    {formatLkr(kpis.totalValue)}
+                  </div>
+                  <p className="text-xs text-rose-100 mt-2">Total received inventory cost</p>
                 </div>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
-                {formatLkr(kpis.totalValue)}
-              </div>
-              <p className="text-xs text-emerald-100 mt-2">Total received cost</p>
-            </div>
-          </div>
-        )}
+            </MotionStaggerItem>
+          )}
 
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-indigo-100 uppercase tracking-wider">Active Suppliers</span>
-              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
-                <Tag className="w-5 h-5" />
+          <MotionStaggerItem>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FB923C] to-[#EA580C] text-white shadow-lg shadow-orange-500/15 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-orange-100 uppercase tracking-wider">Active Suppliers</span>
+                  <div className="w-10 h-10 rounded-full bg-white text-[#EA580C] flex items-center justify-center shadow-md shrink-0">
+                    <Tag className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                  {suppliers.length}
+                </div>
+                <p className="text-xs text-orange-100 mt-2">Ayurvedic pharma vendors</p>
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
-              {suppliers.length}
-            </div>
-            <p className="text-xs text-indigo-100 mt-2">Ayurvedic pharma vendors</p>
-          </div>
-        </div>
+          </MotionStaggerItem>
 
-        {isOwner && (
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-100 uppercase tracking-wider">Average GRN Value</span>
-                <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
-                  <Package className="w-5 h-5" />
+          {isOwner && (
+            <MotionStaggerItem>
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/15 flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-rose-100 uppercase tracking-wider">Average GRN Value</span>
+                    <div className="w-10 h-10 rounded-full bg-white text-[#E11D48] flex items-center justify-center shadow-md shrink-0">
+                      <Package className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                    {formatLkr(kpis.avgValue)}
+                  </div>
+                  <p className="text-xs text-rose-100 mt-2">Per supplier consignment</p>
                 </div>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
-                {formatLkr(kpis.avgValue)}
-              </div>
-              <p className="text-xs text-amber-100 mt-2">Per supplier consignment</p>
-            </div>
-          </div>
-        )}
+            </MotionStaggerItem>
+          )}
+        </MotionStaggerGrid>
       </div>
 
       {/* Tabs and Filter Toolbar */}
@@ -958,7 +973,7 @@ export default function PurchasesPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-[#7052FF]"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-[#EA580C]"
             />
           </div>
 
@@ -971,7 +986,7 @@ export default function PurchasesPage() {
                 setFilterBranch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-700 font-medium focus:outline-none focus:border-[#7052FF]"
+              className="px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-700 font-medium focus:outline-none focus:border-[#EA580C]"
             >
               <option value="ALL">All Branches</option>
               <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
@@ -989,7 +1004,7 @@ export default function PurchasesPage() {
                 setFilterSupplier(e.target.value);
                 setCurrentPage(1);
               }}
-              className="max-w-[180px] px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-700 font-medium truncate focus:outline-none focus:border-[#7052FF]"
+              className="max-w-[180px] px-2.5 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-700 font-medium truncate focus:outline-none focus:border-[#EA580C]"
             >
               <option value="ALL">All Suppliers (94)</option>
               {suppliers.map((s) => (
@@ -1006,7 +1021,7 @@ export default function PurchasesPage() {
       <div className="flex-1 overflow-y-auto px-6 py-3">
         {isLoading ? (
           <div className="h-64 flex flex-col items-center justify-center text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#7052FF] mb-2" />
+            <Loader2 className="w-8 h-8 animate-spin text-[#EA580C] mb-2" />
             <p className="text-xs font-semibold text-slate-600">Loading procurement ledger...</p>
             <p className="text-[11px] text-slate-400 mt-0.5">Reading goods received notes across branches</p>
           </div>
@@ -1023,7 +1038,7 @@ export default function PurchasesPage() {
                 <button
                   type="button"
                   onClick={() => setIsGrnModalOpen(true)}
-                  className="mt-3 bg-[#7052FF] text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs"
+                  className="mt-3 bg-[#EA580C] text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs"
                 >
                   Launch GRN Receiving Wizard
                 </button>
@@ -1091,7 +1106,7 @@ export default function PurchasesPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenGrnDetails(g)}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:text-[#7052FF] hover:border-[#7052FF]/40 hover:bg-purple-50/50 text-[11px] font-semibold transition-all inline-flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:text-[#EA580C] hover:border-[#EA580C]/40 hover:bg-purple-50/50 text-[11px] font-semibold transition-all inline-flex items-center gap-1"
                         >
                           <Eye className="w-3 h-3" />
                           <span>View Items</span>
@@ -1194,7 +1209,7 @@ export default function PurchasesPage() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7052FF] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#EA580C] flex items-center justify-center">
                   <Package className="w-4 h-4" />
                 </div>
                 <div>
@@ -1266,7 +1281,7 @@ export default function PurchasesPage() {
 
                 {loadingItems ? (
                   <div className="py-12 text-center text-slate-400">
-                    <Loader2 className="w-6 h-6 mx-auto mb-2 text-[#7052FF] animate-spin" />
+                    <Loader2 className="w-6 h-6 mx-auto mb-2 text-[#EA580C] animate-spin" />
                     <p className="text-xs font-medium">Loading line items...</p>
                   </div>
                 ) : viewingGrnItems.length === 0 ? (
@@ -1373,7 +1388,7 @@ export default function PurchasesPage() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7052FF] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#EA580C] flex items-center justify-center">
                   <ClipboardCheck className="w-4 h-4" />
                 </div>
                 <div>
@@ -1418,7 +1433,7 @@ export default function PurchasesPage() {
                     <select
                       value={grnBranchId}
                       onChange={(e) => setGrnBranchId(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF]"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                     >
                       <option value="00f4cdcb-7d1c-4026-b57a-6e66c33b0c54">Alawwa</option>
                       <option value="fa68e4a0-a515-44c8-a082-5b5590366658">Dambadeniya</option>
@@ -1452,7 +1467,7 @@ export default function PurchasesPage() {
                       <button
                         type="button"
                         onClick={() => setIsQuickSupplierOpen(true)}
-                        className="text-[11px] font-bold text-[#7052FF] hover:underline cursor-pointer"
+                        className="text-[11px] font-bold text-[#EA580C] hover:underline cursor-pointer"
                       >
                         + Add Supplier
                       </button>
@@ -1462,7 +1477,7 @@ export default function PurchasesPage() {
                     required
                     value={grnSupplierId}
                     onChange={(e) => setGrnSupplierId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                   >
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1484,7 +1499,7 @@ export default function PurchasesPage() {
                     placeholder="e.g. INV-90412"
                     value={grnInvoiceNo}
                     onChange={(e) => setGrnInvoiceNo(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF] font-mono"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C] font-mono"
                   />
                 </div>
 
@@ -1497,7 +1512,7 @@ export default function PurchasesPage() {
                     placeholder="e.g. Checked by store keeper, expiry verified"
                     value={grnNotes}
                     onChange={(e) => setGrnNotes(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
               </div>
@@ -1506,7 +1521,7 @@ export default function PurchasesPage() {
               <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3">
                 <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Package className="w-4 h-4 text-[#7052FF]" />
+                    <Package className="w-4 h-4 text-[#EA580C]" />
                     <span>Search Catalog Product (3,120 Ayurvedic Items)</span>
                   </div>
                   {catalogProducts.length > 0 && (
@@ -1526,7 +1541,7 @@ export default function PurchasesPage() {
                       setSelectedProduct(null);
                       setProductSearchTerm(e.target.value);
                     }}
-                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#7052FF]"
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-[#EA580C]"
                   />
 
                   {/* Autocomplete Dropdown */}
@@ -1585,7 +1600,7 @@ export default function PurchasesPage() {
                             <button
                               type="button"
                               onClick={() => openQuickAddProduct(productSearchTerm)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7052FF] hover:bg-[#5E3FE6] text-white text-xs font-bold shadow-xs cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold shadow-xs cursor-pointer"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>Create &ldquo;{productSearchTerm}&rdquo; as New Item</span>
@@ -1710,7 +1725,7 @@ export default function PurchasesPage() {
                         <button
                           type="button"
                           onClick={handleAddGrnLine}
-                          className="w-full py-1.5 rounded-lg bg-[#7052FF] hover:bg-[#5E3FE6] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                          className="w-full py-1.5 rounded-lg bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                         >
                           + Add Line
                         </button>
@@ -1843,7 +1858,7 @@ export default function PurchasesPage() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#7052FF]" />
+                <Plus className="w-4 h-4 text-[#EA580C]" />
                 <span>Quick Add Supplier</span>
               </h3>
               <button
@@ -1866,7 +1881,7 @@ export default function PurchasesPage() {
                   placeholder="e.g. Swadeshi Ayurveda Distributors"
                   value={quickSupName}
                   onChange={(e) => setQuickSupName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF]"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#EA580C]"
                 />
               </div>
 
@@ -1879,7 +1894,7 @@ export default function PurchasesPage() {
                   placeholder="e.g. 0771234567"
                   value={quickSupPhone}
                   onChange={(e) => setQuickSupPhone(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF]"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#EA580C]"
                 />
               </div>
 
@@ -1892,7 +1907,7 @@ export default function PurchasesPage() {
                   placeholder="e.g. SUP-SWAD"
                   value={quickSupCode}
                   onChange={(e) => setQuickSupCode(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#EA580C]"
                 />
               </div>
 
@@ -1907,7 +1922,7 @@ export default function PurchasesPage() {
                 <button
                   type="submit"
                   disabled={isSavingSupplier || !quickSupName.trim()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   {isSavingSupplier ? (
                     <>
@@ -1932,7 +1947,7 @@ export default function PurchasesPage() {
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#7052FF]" />
+                <Plus className="w-4 h-4 text-[#EA580C]" />
                 <span>Add New Catalog Item</span>
               </h3>
               <button
@@ -1955,7 +1970,7 @@ export default function PurchasesPage() {
                   placeholder="e.g. Ashwagandhadyaarishtaya 375ml"
                   value={quickProdName}
                   onChange={(e) => setQuickProdName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF]"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#EA580C]"
                 />
               </div>
 
@@ -1970,7 +1985,7 @@ export default function PurchasesPage() {
                     placeholder="e.g. SKU-849201"
                     value={quickProdSku}
                     onChange={(e) => setQuickProdSku(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
 
@@ -1981,7 +1996,7 @@ export default function PurchasesPage() {
                   <select
                     value={quickProdCategoryId}
                     onChange={(e) => setQuickProdCategoryId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#7052FF] bg-white"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#EA580C] bg-white"
                   >
                     <option value="">Select Category...</option>
                     {categories.map((c) => (
@@ -2005,7 +2020,7 @@ export default function PurchasesPage() {
                     required
                     value={quickProdCost}
                     onChange={(e) => setQuickProdCost(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
 
@@ -2020,7 +2035,7 @@ export default function PurchasesPage() {
                     required
                     value={quickProdRetail}
                     onChange={(e) => setQuickProdRetail(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
 
@@ -2032,7 +2047,7 @@ export default function PurchasesPage() {
                     type="text"
                     value={quickProdUnit}
                     onChange={(e) => setQuickProdUnit(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#7052FF]"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-[#EA580C]"
                     placeholder="pcs"
                   />
                 </div>
@@ -2053,7 +2068,7 @@ export default function PurchasesPage() {
                 <button
                   type="submit"
                   disabled={isSavingProduct || !quickProdName.trim() || !quickProdSku.trim()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#7052FF] hover:bg-[#5E3FE6] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#EA580C] to-[#C2410C] hover:from-[#C2410C] hover:to-[#9A3412] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shadow-orange-500/20"
                 >
                   {isSavingProduct ? (
                     <>
@@ -2069,6 +2084,6 @@ export default function PurchasesPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

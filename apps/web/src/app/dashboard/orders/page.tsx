@@ -9,7 +9,6 @@ import {
   Eye,
   RefreshCw,
   Store,
-  DollarSign,
   ShoppingCart,
   RotateCcw,
   CreditCard,
@@ -42,6 +41,25 @@ import { posApi, type SalesSummaryKPI, getColomboDateBounds, formatShiftLabel, g
 import { supabase } from '../../../lib/supabase';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { formatReceiptColomboDateTime } from '../../../lib/date-utils';
+import {
+  MotionPageShell,
+  MotionPillTabs,
+  MotionAnimatedNumber,
+} from '../../../components/ui/motion-primitives';
+
+function getBranchChipClass(nameOrId?: string) {
+  const str = (nameOrId || '').toLowerCase();
+  if (str.includes('alawwa') || str === '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54') {
+    return 'bg-blue-50 text-blue-700 border border-blue-200/80 font-bold';
+  }
+  if (str.includes('dambadeniya') || str === 'fa68e4a0-a515-44c8-a082-5b5590366658') {
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold';
+  }
+  if (str.includes('giriulla') || str === '197693d6-4247-48df-b614-6fcde9e34f7d') {
+    return 'bg-amber-50 text-amber-700 border border-amber-200/80 font-bold';
+  }
+  return 'bg-slate-100 text-slate-700 border border-slate-200 font-semibold';
+}
 
 type PeriodFilter = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom';
 type SortField = 'created_at' | 'total_amount' | 'invoice_number' | 'cashier_name';
@@ -1079,7 +1097,7 @@ export default function SalesOrdersPage() {
   const combinedGrossSales = kpiSummary.totalGross + specialStockSummary.totalGross;
 
   return (
-    <div className="space-y-6">
+    <MotionPageShell className="space-y-6">
       {/* Global Print Styles for Report Modal */}
       <style jsx global>{`
         @media print {
@@ -1324,111 +1342,74 @@ export default function SalesOrdersPage() {
         </div>
       )}
 
-      {/* KPI Cards Row — Accurate Combined Aggregates across POS Catalog & Special Stock Sales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Combined Total Gross Sales */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">Total Gross Sales</span>
-              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
-                <DollarSign className="w-5 h-5" />
-              </div>
+      {/* Revenue Ticker Ribbon — Ocean Cyan & Sky Stream Bespoke Palette */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#0284C7] via-[#0EA5E9] to-[#06B6D4] p-5 text-white shadow-xl shadow-cyan-900/10 relative overflow-hidden">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+          {/* Combined Gross Primary Metric */}
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
+              <Receipt className="w-7 h-7" />
             </div>
-            <div className="mt-3">
-              {loading ? (
-                <div className="h-8 w-36 bg-white/20 animate-pulse rounded-lg my-0.5" />
-              ) : (
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {formatCurrency(combinedGrossSales)}
-                </div>
-              )}
-              <div
-                className="mt-2 text-xs font-medium text-blue-100 truncate flex items-center gap-1.5 flex-wrap"
-                title={`POS Bills: ${formatCurrency(kpiSummary.totalGross)} + Special Stock: ${formatCurrency(specialStockSummary.totalGross)}`}
-              >
-                <span className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-sky-100 flex items-center gap-1.5">
+                <span>Combined Gross Revenue</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+              </div>
+              <div className="text-3xl sm:text-4xl font-black tracking-tight text-white tabular-nums mt-0.5">
+                {loading ? (
+                  <div className="h-9 w-44 bg-white/20 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <MotionAnimatedNumber value={combinedGrossSales} prefix="LKR " decimals={2} />
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 text-xs text-sky-100 flex-wrap">
+                <span className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full font-semibold text-white">
                   POS: {formatCurrency(kpiSummary.totalGross)}
                 </span>
-                <span className="bg-purple-900/40 border border-purple-400/40 px-2 py-0.5 rounded-full text-[11px] font-semibold text-purple-100">
+                <span className="bg-purple-900/40 border border-purple-300/40 px-2 py-0.5 rounded-full font-semibold text-purple-100">
                   Special: {formatCurrency(specialStockSummary.totalGross)}
                 </span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 2: POS Catalog Bills */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">POS Catalog Bills</span>
-              <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
-                <ShoppingCart className="w-5 h-5" />
+          {/* Horizontal Micro-Metrics Ticker */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t lg:border-t-0 lg:border-l border-white/20 pt-4 lg:pt-0 lg:pl-6">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/15 hover:bg-white/15 transition-colors">
+              <div className="text-[11px] font-semibold text-sky-100 flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5 text-sky-200" />
+                <span>POS Bills</span>
               </div>
-            </div>
-            <div className="mt-3">
-              {loading ? (
-                <div className="h-8 w-20 bg-white/20 animate-pulse rounded-lg my-0.5" />
-              ) : (
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {kpiSummary.completedCount.toLocaleString()} <span className="text-xs font-normal text-emerald-100">Bills</span>
-                </div>
-              )}
-              <div className="mt-2 text-xs text-emerald-100">
-                Subtotal: <span className="font-bold text-white">{formatCurrency(kpiSummary.totalGross)}</span> • Fulfilled retail checkouts
+              <div className="text-xl font-black text-white mt-1 tabular-nums">
+                <MotionAnimatedNumber value={kpiSummary.completedCount} />
               </div>
+              <div className="text-[10px] text-sky-100 mt-0.5">Retail checkouts</div>
             </div>
-          </div>
-        </div>
 
-        {/* Card 3: Special Stock Sales */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">Special Stock Sales</span>
-              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
-                <PackagePlus className="w-5 h-5" />
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/15 hover:bg-white/15 transition-colors">
+              <div className="text-[11px] font-semibold text-sky-100 flex items-center gap-1.5">
+                <PackagePlus className="w-3.5 h-3.5 text-sky-200" />
+                <span>Special Sold</span>
               </div>
-            </div>
-            <div className="mt-3">
-              {loading ? (
-                <div className="h-8 w-28 bg-white/20 animate-pulse rounded-lg my-0.5" />
-              ) : (
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {formatCurrency(specialStockSummary.totalGross)}
-                </div>
-              )}
-              <div className="mt-2 text-xs text-indigo-100">
-                <span className="font-bold text-white">{specialStockSummary.totalUnits.toLocaleString()}</span> units across <span className="font-bold text-white">{specialStockSummary.entryCount}</span> shift item(s)
+              <div className="text-xl font-black text-white mt-1 tabular-nums">
+                <MotionAnimatedNumber value={specialStockSummary.totalUnits} suffix=" units" />
               </div>
+              <div className="text-[10px] text-sky-100 mt-0.5">{specialStockSummary.entryCount} shift entries</div>
             </div>
-          </div>
-        </div>
 
-        {/* Card 4: Voided Bills / Average Ticket */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">Voided Bills / Avg Ticket</span>
-              <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
-                <RotateCcw className="w-5 h-5" />
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/15 col-span-2 sm:col-span-1 hover:bg-white/15 transition-colors">
+              <div className="text-[11px] font-semibold text-sky-100 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5 text-sky-200" />
+                <span>Avg Ticket</span>
               </div>
-            </div>
-            <div className="mt-3">
-              {loading ? (
-                <div className="h-8 w-16 bg-white/20 animate-pulse rounded-lg my-0.5" />
-              ) : (
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-baseline gap-2">
-                  <span>{kpiSummary.voidedCount.toLocaleString()}</span>
-                  <span className="text-xs font-normal text-amber-200">Voided</span>
-                  <span className="text-sm font-semibold text-amber-300">|</span>
-                  <span className="text-base sm:text-xl font-bold text-white">{formatCurrency(kpiSummary.avgTicket)}</span>
-                  <span className="text-xs font-normal text-amber-200">Avg</span>
-                </div>
-              )}
-              <div className="mt-2 text-xs text-amber-100">
-                {formatCurrency(kpiSummary.totalVoidedAmount)} reversed • Per POS ticket
+              <div className="text-xl font-black text-white mt-1 tabular-nums">
+                {kpiSummary.completedCount > 0
+                  ? formatCurrency(kpiSummary.totalGross / kpiSummary.completedCount)
+                  : 'LKR 0.00'}
+              </div>
+              <div className="text-[10px] text-sky-100 mt-0.5">
+                {kpiSummary.voidedCount} voided ({formatCurrency(kpiSummary.totalVoidedAmount)})
               </div>
             </div>
           </div>
@@ -1440,73 +1421,41 @@ export default function SalesOrdersPage() {
         {/* Shimmer loading progress bar */}
         <div className="h-1 w-full bg-slate-100 overflow-hidden">
           <div
-            className={`h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-rose-500 transition-all duration-300 ${
+            className={`h-full bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 transition-all duration-300 ${
               loading ? 'w-full animate-pulse' : 'w-0'
             }`}
           />
         </div>
 
-        {/* Filter Tab Switcher (All Transactions | POS Catalog Bills | Special Stock Sales) */}
-        <div className="flex items-center gap-2 px-4 pt-3.5 border-b border-slate-200/80 bg-white">
-          <button
-            type="button"
-            onClick={() => setActiveTransactionTab('ALL')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
-              activeTransactionTab === 'ALL'
-                ? 'border-[#005BD3] text-[#005BD3]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>All Transactions</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                activeTransactionTab === 'ALL' ? 'bg-blue-100 text-[#005BD3]' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {totalCount + specialStockEntries.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTransactionTab('POS')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
-              activeTransactionTab === 'POS'
-                ? 'border-[#005BD3] text-[#005BD3]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            <span>POS Catalog Bills</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                activeTransactionTab === 'POS' ? 'bg-blue-100 text-[#005BD3]' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {totalCount}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTransactionTab('SPECIAL')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
-              activeTransactionTab === 'SPECIAL'
-                ? 'border-rose-600 text-rose-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <PackagePlus className="w-3.5 h-3.5 text-rose-600" />
-            <span>Special Stock Sales</span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                activeTransactionTab === 'SPECIAL' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {specialStockEntries.length}
-            </span>
-          </button>
+        {/* Animated Filter Tab Switcher (All Transactions | POS Catalog Bills | Special Stock Sales) */}
+        <div className="p-3 border-b border-slate-200/80 bg-white flex items-center justify-between flex-wrap gap-2">
+          <MotionPillTabs
+            tabs={[
+              {
+                id: 'ALL',
+                label: 'All Transactions',
+                icon: <Layers className="w-3.5 h-3.5" />,
+                count: totalCount + specialStockEntries.length,
+              },
+              {
+                id: 'POS',
+                label: 'POS Catalog Bills',
+                icon: <ShoppingCart className="w-3.5 h-3.5" />,
+                count: totalCount,
+              },
+              {
+                id: 'SPECIAL',
+                label: 'Special Stock Sales',
+                icon: <PackagePlus className="w-3.5 h-3.5" />,
+                count: specialStockEntries.length,
+              },
+            ]}
+            activeTab={activeTransactionTab}
+            onChange={(tab) => setActiveTransactionTab(tab as any)}
+            layoutId="txTabGlider"
+            activePillClass="bg-gradient-to-r from-[#0284C7] to-[#0EA5E9] text-white shadow-md shadow-sky-500/20"
+            inactiveTabClass="text-slate-600 hover:text-slate-900"
+          />
         </div>
 
         {/* Table Filters & Search Bar */}
@@ -1809,8 +1758,8 @@ export default function SalesOrdersPage() {
                         </td>
 
                         {/* Branch */}
-                        <td className="py-3.5 px-4 font-medium text-slate-700">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100/70 text-rose-800 border border-rose-200/60">
+                        <td className="py-3.5 px-4 font-medium">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${getBranchChipClass(entry.branchName)}`}>
                             {entry.branchName}
                           </span>
                         </td>
@@ -1924,8 +1873,8 @@ export default function SalesOrdersPage() {
                       </td>
 
                       {/* Branch */}
-                      <td className="py-3.5 px-4 font-medium text-slate-700">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                      <td className="py-3.5 px-4 font-medium">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] ${getBranchChipClass(getBranchLabel(sale.branchId))}`}>
                           {getBranchLabel(sale.branchId)}
                         </span>
                       </td>
@@ -2515,6 +2464,6 @@ export default function SalesOrdersPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

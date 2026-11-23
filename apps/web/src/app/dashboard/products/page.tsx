@@ -47,6 +47,7 @@ import {
 import { uploadProductImage } from '../../../lib/upload-product-image';
 import { getProductPhoto, DEFAULT_STUDIO_PHOTO } from '../../../lib/product-image-mapper';
 import { supabase } from '../../../lib/supabase';
+import { MotionPageShell } from '../../../components/ui/motion-primitives';
 
 export interface ManagedProductItem {
   id: string;
@@ -600,7 +601,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <MotionPageShell className="space-y-6">
       {/* 1. Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -781,20 +782,48 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-[#005BD3] border border-blue-200/60">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-[#059669] border border-emerald-200/60">
                           {p.category?.name || 'Uncategorized'}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-amber-50 text-amber-800 border border-amber-200/60">
                           {typeLabel}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right font-mono text-sm text-slate-600">
                         {currency} {Number(p.costPrice || 0).toFixed(2)}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-mono text-sm font-bold text-slate-950">
-                        {currency} {Number(p.retailPrice || 0).toFixed(2)}
+                      <td className="px-4 py-3.5 text-right font-mono">
+                        <div className="text-sm font-bold text-slate-950">
+                          {currency} {Number(p.retailPrice || 0).toFixed(2)}
+                        </div>
+                        {/* Inline Profit Margin Health Bar */}
+                        {(() => {
+                          const cost = Number(p.costPrice || 0);
+                          const retail = Number(p.retailPrice || 0);
+                          const marginPct = retail > 0 ? Math.round(((retail - cost) / retail) * 100) : 0;
+                          const color =
+                            marginPct >= 30
+                              ? { bar: 'bg-[#059669]', text: 'text-emerald-700 bg-emerald-50 border-emerald-200' }
+                              : marginPct >= 15
+                              ? { bar: 'bg-[#D97706]', text: 'text-amber-700 bg-amber-50 border-amber-200' }
+                              : { bar: 'bg-rose-500', text: 'text-rose-700 bg-rose-50 border-rose-200' };
+
+                          return (
+                            <div className="flex items-center justify-end gap-1.5 mt-1" title={`${marginPct}% Profit Margin`}>
+                              <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${color.bar} rounded-full`}
+                                  style={{ width: `${Math.min(100, Math.max(5, marginPct))}%` }}
+                                />
+                              </div>
+                              <span className={`text-[10px] font-bold px-1 rounded border ${color.text}`}>
+                                {marginPct}%
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         {p.status === 'ACTIVE' || p.isActive ? (
@@ -1736,6 +1765,6 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

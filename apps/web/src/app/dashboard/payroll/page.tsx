@@ -40,6 +40,11 @@ import {
   type PayrollRunItemDto,
 } from '../../../lib/payroll-api';
 import { PaySlipA4Modal } from '../../../components/payroll/pay-slip-a4-modal';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../components/ui/motion-primitives';
 
 function formatLKR(val: number | undefined | null): string {
   const num = Number(val || 0);
@@ -491,7 +496,7 @@ function PayrollHubContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans antialiased">
+    <MotionPageShell className="min-h-screen bg-[#0B0F19] text-slate-100 p-4 sm:p-6 lg:p-8 font-sans antialiased">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white text-xs font-semibold rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-2">
@@ -504,13 +509,13 @@ function PayrollHubContent() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              <Coins className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#C026D3] flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+              <Coins className="w-5 h-5 text-amber-300" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
                 Payroll & HR Executive Hub
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   Part 1 & 2 • Live System
                 </span>
               </h1>
@@ -575,13 +580,13 @@ function PayrollHubContent() {
         </div>
       </div>
 
-      {/* NAVIGATION TABS */}
+      {/* NAVIGATION TABS (Treasury Royal Purple & Magenta) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 mt-6 border-b border-slate-800/80 no-scrollbar">
         <button
           onClick={() => setActiveTab('deductions')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
             activeTab === 'deductions'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+              ? 'bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
           }`}
         >
@@ -598,7 +603,7 @@ function PayrollHubContent() {
           onClick={() => setActiveTab('attendance')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
             activeTab === 'attendance'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+              ? 'bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
           }`}
         >
@@ -610,7 +615,7 @@ function PayrollHubContent() {
           onClick={() => setActiveTab('profiles')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
             activeTab === 'profiles'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+              ? 'bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
           }`}
         >
@@ -622,7 +627,7 @@ function PayrollHubContent() {
           onClick={() => setActiveTab('runs')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
             activeTab === 'runs'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+              ? 'bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
           }`}
         >
@@ -634,7 +639,7 @@ function PayrollHubContent() {
       {/* LOADING STATE */}
       {loading ? (
         <div className="py-24 flex flex-col items-center justify-center gap-3">
-          <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
+          <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
             Loading Deegayu Weda Madhura Payroll Records...
           </p>
@@ -646,68 +651,84 @@ function PayrollHubContent() {
           {/* ==================================================================== */}
           {activeTab === 'deductions' && (
             <div className="space-y-6">
-              {/* KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-rose-100">
-                    <span>Pending Shift Shortages</span>
-                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
-                      <AlertTriangle className="w-4 h-4" />
+              {/* KPI Cards (Treasury Royal Purple, Magenta & Gold) */}
+              <MotionStaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <MotionStaggerItem>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10 h-full flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-rose-100">
+                        <span>Pending Shift Shortages</span>
+                        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
+                        {formatLKR(kpis.pendingShortagesAmt)}
+                      </div>
                     </div>
+                    <p className="text-[11px] text-rose-100 mt-2">
+                      Queued to deduct in monthly payroll
+                    </p>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
-                    {formatLKR(kpis.pendingShortagesAmt)}
-                  </div>
-                  <p className="text-[11px] text-rose-100 mt-1">
-                    Queued to deduct in monthly payroll
-                  </p>
-                </div>
+                </MotionStaggerItem>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-100">
-                    <span>Waived / Deferred</span>
-                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
-                      <ShieldCheck className="w-4 h-4" />
+                <MotionStaggerItem>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#EAB308] to-[#CA8A04] text-white shadow-lg shadow-amber-500/10 h-full flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-100">
+                        <span>Waived / Deferred</span>
+                        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
+                        {formatLKR(kpis.waivedDeferredAmt)}
+                      </div>
                     </div>
+                    <p className="text-[11px] text-amber-100 mt-2">
+                      {kpis.waivedDeferredCount} recorded cases exempt/delayed
+                    </p>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
-                    {formatLKR(kpis.waivedDeferredAmt)}
-                  </div>
-                  <p className="text-[11px] text-amber-100 mt-1">
-                    {kpis.waivedDeferredCount} recorded cases exempt/delayed
-                  </p>
-                </div>
+                </MotionStaggerItem>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-100">
-                    <span>Active Salary Advances</span>
-                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
-                      <Wallet className="w-4 h-4" />
+                <MotionStaggerItem>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-500/10 h-full flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-purple-100">
+                        <span>Active Salary Advances</span>
+                        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                          <Wallet className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
+                        {formatLKR(kpis.pendingAdvancesAmt)}
+                      </div>
                     </div>
+                    <p className="text-[11px] text-purple-100 mt-2">
+                      {advances.filter((a) => a.status === 'pending').length} pending cash advances
+                    </p>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
-                    {formatLKR(kpis.pendingAdvancesAmt)}
-                  </div>
-                  <p className="text-[11px] text-indigo-100 mt-1">
-                    {advances.filter((a) => a.status === 'pending').length} pending cash advances
-                  </p>
-                </div>
+                </MotionStaggerItem>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-100">
-                    <span>Total Deductible</span>
-                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
-                      <TrendingDown className="w-4 h-4" />
+                <MotionStaggerItem>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#C026D3] to-[#A21CAF] text-white shadow-lg shadow-fuchsia-500/10 h-full flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-fuchsia-100">
+                        <span>Total Deductible</span>
+                        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                          <TrendingDown className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
+                        {formatLKR(kpis.totalDeductible)}
+                      </div>
                     </div>
+                    <p className="text-[11px] text-fuchsia-100 mt-2">
+                      Shortages + Advances for {formatMonthLabel(selectedMonth)}
+                    </p>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
-                    {formatLKR(kpis.totalDeductible)}
-                  </div>
-                  <p className="text-[11px] text-emerald-100 mt-1">
-                    Shortages + Advances for {formatMonthLabel(selectedMonth)}
-                  </p>
-                </div>
-              </div>
+                </MotionStaggerItem>
+              </MotionStaggerGrid>
 
               {/* ACTION TOOLBAR */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
@@ -2222,7 +2243,7 @@ function PayrollHubContent() {
         items={currentRun?.items || []}
         selectedItem={selectedPaySlipItem}
       />
-    </div>
+    </MotionPageShell>
   );
 }
 

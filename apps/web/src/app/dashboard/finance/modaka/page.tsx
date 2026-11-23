@@ -30,6 +30,11 @@ import {
   ModakaItemConfigDto,
 } from '../../../../lib/api-client';
 import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../../components/ui/motion-primitives';
 
 function getTodaySriLanka(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -355,13 +360,13 @@ export default function ModakaLedgerPage() {
   }
 
   return (
-    <div className="space-y-6 pb-16 print:p-0 print:space-y-4">
+    <MotionPageShell className="space-y-6 pb-16 print:p-0 print:space-y-4">
       {/* Top Header & Actions */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
-              <FileSpreadsheet className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7C3AED] to-[#C026D3] flex items-center justify-center text-white shadow-md shadow-purple-500/20">
+              <FileSpreadsheet className="w-5 h-5 text-amber-300" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
@@ -381,7 +386,7 @@ export default function ModakaLedgerPage() {
             onClick={handleOpenConfigModal}
             className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
           >
-            <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+            <Edit3 className="w-3.5 h-3.5 text-[#7C3AED]" />
             <span>Edit Special Items & Rates</span>
           </button>
           <button
@@ -497,89 +502,117 @@ export default function ModakaLedgerPage() {
         </div>
       </div>
 
-      {/* KPI Highlights Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 print:hidden">
+      {/* KPI Highlights Bar (Treasury Palette: Royal Purple, Magenta, Gold) */}
+      <MotionStaggerGrid className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 print:hidden">
         {/* Metric 1 */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-100 block">
-            Recorded Shifts
-          </span>
-          <span className="text-xl font-black font-mono text-white mt-1 block">
-            {metrics.shiftCount} Shifts
-          </span>
-          <span className="text-[10px] text-blue-100">Day & Evening shifts</span>
-        </div>
+        <MotionStaggerItem>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-500/10 h-full flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-100 block">
+                Recorded Shifts
+              </span>
+              <span className="text-xl font-black font-mono text-white mt-1 block">
+                {metrics.shiftCount} Shifts
+              </span>
+            </div>
+            <span className="text-[10px] text-purple-200 mt-2 block">Day & Evening shifts</span>
+          </div>
+        </MotionStaggerItem>
 
         {/* Metric 2 */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-500/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-100 block">
-            Special Units Sold
-          </span>
-          <span className="text-xl font-black font-mono text-white mt-1 block">
-            {metrics.totalModakaUnits} units
-          </span>
-          <span className="text-[10px] text-purple-100">Across active special varieties</span>
-        </div>
+        <MotionStaggerItem>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#C026D3] to-[#A21CAF] text-white shadow-lg shadow-fuchsia-500/10 h-full flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-100 block">
+                Special Units Sold
+              </span>
+              <span className="text-xl font-black font-mono text-white mt-1 block">
+                {metrics.totalModakaUnits} units
+              </span>
+            </div>
+            <span className="text-[10px] text-fuchsia-200 mt-2 block">Across active varieties</span>
+          </div>
+        </MotionStaggerItem>
 
         {/* Metric 3 */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-100 block">
-            Special Sales Value
-          </span>
-          <span className="text-xl font-black font-mono text-white mt-1 block">
-            LKR {metrics.totalModakaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[10px] text-indigo-200 font-bold">Total (Σ F)</span>
-        </div>
+        <MotionStaggerItem>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#EAB308] to-[#CA8A04] text-white shadow-lg shadow-amber-500/10 h-full flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-100 block">
+                Special Sales Value
+              </span>
+              <span className="text-xl font-black font-mono text-white mt-1 block">
+                LKR {metrics.totalModakaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-amber-100 font-bold mt-2 block">Total Special (Σ F)</span>
+          </div>
+        </MotionStaggerItem>
 
         {/* Metric 4 */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 block">
-            POS Gross Sales
-          </span>
-          <span className="text-xl font-black font-mono text-white mt-1 block">
-            LKR {metrics.totalGrossSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[10px] text-emerald-100 font-semibold">
-            Cash: LKR {metrics.totalCashSales.toFixed(0)}
-          </span>
-        </div>
+        <MotionStaggerItem>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#059669] to-[#047857] text-white shadow-lg shadow-emerald-500/10 h-full flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 block">
+                POS Gross Sales
+              </span>
+              <span className="text-xl font-black font-mono text-white mt-1 block">
+                LKR {metrics.totalGrossSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-emerald-100 font-semibold mt-2 block">
+              Cash: LKR {metrics.totalCashSales.toFixed(0)}
+            </span>
+          </div>
+        </MotionStaggerItem>
 
         {/* Metric 5 */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0284C7] to-[#0369A1] text-white shadow-lg shadow-sky-500/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 block">
-            Banked Amount
-          </span>
-          <span className="text-xl font-black font-mono text-white mt-1 block">
-            LKR {metrics.totalBanked.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[10px] text-sky-100">Deposited to company</span>
-        </div>
+        <MotionStaggerItem>
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1E3A8A] to-[#172554] text-white shadow-lg shadow-blue-900/10 h-full flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200 block">
+                Banked Amount
+              </span>
+              <span className="text-xl font-black font-mono text-white mt-1 block">
+                LKR {metrics.totalBanked.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-blue-200 mt-2 block">Deposited to company</span>
+          </div>
+        </MotionStaggerItem>
 
         {/* Metric 6 */}
-        <div className={`p-4 rounded-2xl text-white shadow-lg ${
-          metrics.netVariance === 0
-            ? 'bg-gradient-to-br from-slate-700 to-slate-800'
-            : metrics.netVariance > 0
-            ? 'bg-gradient-to-br from-[#059669] to-[#047857]'
-            : 'bg-gradient-to-br from-[#E11D48] to-[#BE123C]'
-        }`}>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 block">
-            Cash Variance
-          </span>
-          <span className="text-xl font-black font-mono mt-1 block text-white">
-            {metrics.netVariance > 0 ? '+' : ''}
-            LKR {metrics.netVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[10px] font-bold text-white/90">
-            {metrics.netVariance === 0
-              ? 'Balanced'
+        <MotionStaggerItem>
+          <div className={`p-4 rounded-2xl text-white shadow-lg h-full flex flex-col justify-between ${
+            metrics.netVariance === 0
+              ? 'bg-gradient-to-br from-slate-700 to-slate-800'
               : metrics.netVariance > 0
-              ? 'Net Excess'
-              : 'Net Shortage'}
-          </span>
-        </div>
-      </div>
+              ? 'bg-gradient-to-br from-[#059669] to-[#047857]'
+              : 'bg-gradient-to-br from-[#E11D48] to-[#BE123C]'
+          }`}>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 block">
+                Cash Variance
+              </span>
+              <span className="text-xl font-black font-mono mt-1 block text-white">
+                {metrics.netVariance > 0 ? '+' : ''}
+                LKR {metrics.netVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="mt-2">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                metrics.netVariance === 0
+                  ? 'bg-white/20 text-white'
+                  : metrics.netVariance > 0
+                  ? 'bg-emerald-400/30 text-emerald-100'
+                  : 'bg-rose-400/30 text-rose-100'
+              }`}>
+                {metrics.netVariance === 0 ? '✓ Balanced' : metrics.netVariance > 0 ? '▲ Net Excess' : '▼ Net Shortage'}
+              </span>
+            </div>
+          </div>
+        </MotionStaggerItem>
+      </MotionStaggerGrid>
 
       {/* Printable Header (Visible only when printing) */}
       <div className="hidden print:block text-center border-b pb-4 mb-4">
@@ -1109,6 +1142,6 @@ export default function ModakaLedgerPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }

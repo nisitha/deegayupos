@@ -33,6 +33,11 @@ import {
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { supabase } from '../../../lib/supabase';
 import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
+import {
+  MotionPageShell,
+  MotionStaggerGrid,
+  MotionStaggerItem,
+} from '../../../components/ui/motion-primitives';
 
 // ==========================================
 // 1. DATA MODELS & INTERFACES
@@ -982,7 +987,7 @@ export default function BranchInventoryAnalyticsPage() {
   // ==========================================
 
   return (
-    <div className="min-h-screen bg-[#EEF2F7] text-slate-900 pb-20">
+    <MotionPageShell className="min-h-screen bg-[#EEF2F7] text-slate-900 pb-20">
       {/* Toast Notification */}
       {adjustToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-250">
@@ -1160,113 +1165,123 @@ export default function BranchInventoryAnalyticsPage() {
         {/* ==========================================
             2. EXECUTIVE BRANCH KPI STRIP (5 CARDS)
         ========================================== */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+        <MotionStaggerGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
           {/* 1. Retail Valuation */}
-          <div className="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white p-5 rounded-2xl shadow-lg shadow-blue-500/10 relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Retail Stock Valuation</span>
-                <div className="w-9 h-9 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
-                  <Banknote className="w-4 h-4" />
+          <MotionStaggerItem>
+            <div className="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white p-5 rounded-2xl shadow-lg shadow-blue-500/10 relative overflow-hidden flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Retail Stock Valuation</span>
+                  <div className="w-9 h-9 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+                    <Banknote className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-white tracking-tight">
+                  {formatCurrency(currentBranchSummary.retailValuation)}
+                </div>
+                <p className="text-xs text-blue-100 mt-2 flex items-center gap-1 flex-wrap">
+                  <span className="font-semibold">{currentBranchSummary.totalUnits.toLocaleString()} units</span>
+                  <span>•</span>
+                  <span>{currentBranchSummary.totalSkus.toLocaleString()} SKUs</span>
+                </p>
               </div>
-              <div className="text-2xl font-black text-white tracking-tight">
-                {formatCurrency(currentBranchSummary.retailValuation)}
-              </div>
-              <p className="text-xs text-blue-100 mt-2 flex items-center gap-1 flex-wrap">
-                <span className="font-semibold">{currentBranchSummary.totalUnits.toLocaleString()} units</span>
-                <span>•</span>
-                <span>{currentBranchSummary.totalSkus.toLocaleString()} SKUs</span>
-              </p>
             </div>
-          </div>
+          </MotionStaggerItem>
 
           {/* 2. Cost Valuation & Margin */}
-          <div className="bg-gradient-to-br from-[#10B981] to-[#059669] text-white p-5 rounded-2xl shadow-lg shadow-emerald-500/10 relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-100">Cost Valuation</span>
-                <div className="w-9 h-9 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
-                  <TrendingUp className="w-4 h-4" />
+          <MotionStaggerItem>
+            <div className="bg-gradient-to-br from-[#10B981] to-[#059669] text-white p-5 rounded-2xl shadow-lg shadow-emerald-500/10 relative overflow-hidden flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-100">Cost Valuation</span>
+                  <div className="w-9 h-9 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-white tracking-tight">
+                  {formatCurrency(currentBranchSummary.costValuation)}
+                </div>
+                <p className="text-xs text-emerald-100 font-semibold mt-2">
+                  Margin: +{formatCurrency(estimatedGrossMargin.margin)} ({estimatedGrossMargin.marginPct.toFixed(1)}%)
+                </p>
               </div>
-              <div className="text-2xl font-black text-white tracking-tight">
-                {formatCurrency(currentBranchSummary.costValuation)}
-              </div>
-              <p className="text-xs text-emerald-100 font-semibold mt-2">
-                Margin: +{formatCurrency(estimatedGrossMargin.margin)} ({estimatedGrossMargin.marginPct.toFixed(1)}%)
-              </p>
             </div>
-          </div>
+          </MotionStaggerItem>
 
           {/* 3. Healthy Stock Items */}
-          <div className="bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white p-5 rounded-2xl shadow-lg shadow-indigo-500/10 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Healthy Stock</span>
-                <div className="w-9 h-9 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
-                  <CheckCircle2 className="w-4 h-4" />
+          <MotionStaggerItem>
+            <div className="bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white p-5 rounded-2xl shadow-lg shadow-indigo-500/10 relative overflow-hidden flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Healthy Stock</span>
+                  <div className="w-9 h-9 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-white tracking-tight">
+                  {currentBranchSummary.healthyCount.toLocaleString()}
+                </div>
+                <p className="text-xs text-indigo-100 mt-2">
+                  {currentBranchSummary.totalSkus > 0
+                    ? `${((currentBranchSummary.healthyCount / currentBranchSummary.totalSkus) * 100).toFixed(1)}% of catalog stable`
+                    : 'Optimal inventory levels'}
+                </p>
               </div>
-              <div className="text-2xl font-black text-white tracking-tight">
-                {currentBranchSummary.healthyCount.toLocaleString()}
-              </div>
-              <p className="text-xs text-indigo-100 mt-2">
-                {currentBranchSummary.totalSkus > 0
-                  ? `${((currentBranchSummary.healthyCount / currentBranchSummary.totalSkus) * 100).toFixed(1)}% of catalog stable`
-                  : 'Optimal inventory levels'}
-              </p>
             </div>
-          </div>
+          </MotionStaggerItem>
 
           {/* 4. Low Stock Alerts (Clickable to switch tab) */}
-          <button
-            onClick={() => setActiveTab('low')}
-            className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-amber-500/10 bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white ${
-              activeTab === 'low' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-100">Low Stock Alerts</span>
-                <div className="w-9 h-9 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
+          <MotionStaggerItem>
+            <button
+              onClick={() => setActiveTab('low')}
+              className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-amber-500/10 bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white w-full h-full ${
+                activeTab === 'low' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-100">Low Stock Alerts</span>
+                  <div className="w-9 h-9 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-white tracking-tight">
+                  {currentBranchSummary.lowStockCount.toLocaleString()}
+                </div>
+                <p className="text-xs text-amber-100 font-medium mt-2 flex items-center gap-1">
+                  <span>Running out soon</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </p>
               </div>
-              <div className="text-2xl font-black text-white tracking-tight">
-                {currentBranchSummary.lowStockCount.toLocaleString()}
-              </div>
-              <p className="text-xs text-amber-100 font-medium mt-2 flex items-center gap-1">
-                <span>Running out soon</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </p>
-            </div>
-          </button>
+            </button>
+          </MotionStaggerItem>
 
           {/* 5. Out of Stock (Clickable to switch tab) */}
-          <button
-            onClick={() => setActiveTab('out')}
-            className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-rose-500/10 bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white ${
-              activeTab === 'out' ? 'ring-4 ring-rose-300/40 -translate-y-0.5' : 'hover:opacity-95'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-rose-100">Out of Stock</span>
-                <div className="w-9 h-9 rounded-full bg-white text-rose-600 flex items-center justify-center shadow-md shrink-0">
-                  <PackageX className="w-4 h-4" />
+          <MotionStaggerItem>
+            <button
+              onClick={() => setActiveTab('out')}
+              className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-rose-500/10 bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white w-full h-full ${
+                activeTab === 'out' ? 'ring-4 ring-rose-300/40 -translate-y-0.5' : 'hover:opacity-95'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-100">Out of Stock</span>
+                  <div className="w-9 h-9 rounded-full bg-white text-rose-600 flex items-center justify-center shadow-md shrink-0">
+                    <PackageX className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-white tracking-tight">
+                  {currentBranchSummary.outOfStockCount.toLocaleString()}
+                </div>
+                <p className="text-xs text-rose-100 font-medium mt-2 flex items-center gap-1">
+                  <span>0 remaining on hand</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </p>
               </div>
-              <div className="text-2xl font-black text-white tracking-tight">
-                {currentBranchSummary.outOfStockCount.toLocaleString()}
-              </div>
-              <p className="text-xs text-rose-100 font-medium mt-2 flex items-center gap-1">
-                <span>0 remaining on hand</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </p>
-            </div>
-          </button>
-        </section>
+            </button>
+          </MotionStaggerItem>
+        </MotionStaggerGrid>
 
         {/* ==========================================
             3. INTERACTIVE VISUAL GRAPHS & ANALYTICS
@@ -1851,18 +1866,18 @@ export default function BranchInventoryAnalyticsPage() {
                           <div className="font-black text-sm text-slate-900">
                             {formatUnits(item.quantityOnHand, item.unit)}
                           </div>
-                          {/* Mini Stock Level Bar */}
-                          <div className="w-20 ml-auto h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                          {/* Enhanced Visual Stock Gauge Bar */}
+                          <div className="w-24 ml-auto h-2 bg-slate-100 rounded-full overflow-hidden mt-1.5 p-0.5 border border-slate-200/60 shadow-inner">
                             <div
                               style={{
-                                width: `${Math.min(100, Math.max(5, (item.quantityOnHand / Math.max(item.alertQuantity * 2, 20)) * 100))}%`,
+                                width: `${Math.min(100, Math.max(6, (item.quantityOnHand / Math.max(item.alertQuantity * 2, 20)) * 100))}%`,
                               }}
-                              className={`h-full rounded-full ${
+                              className={`h-full rounded-full transition-all duration-300 ${
                                 item.quantityOnHand <= 0
-                                  ? 'bg-rose-500'
+                                  ? 'bg-gradient-to-r from-rose-500 to-rose-600'
                                   : item.quantityOnHand <= item.alertQuantity
-                                  ? 'bg-amber-400'
-                                  : 'bg-emerald-500'
+                                  ? 'bg-gradient-to-r from-amber-400 to-amber-500'
+                                  : 'bg-gradient-to-r from-emerald-500 to-teal-500'
                               }`}
                             />
                           </div>
@@ -2159,7 +2174,7 @@ export default function BranchInventoryAnalyticsPage() {
           </div>
         </div>
       )}
-    </div>
+    </MotionPageShell>
   );
 }
 
