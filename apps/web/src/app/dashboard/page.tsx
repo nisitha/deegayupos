@@ -40,7 +40,7 @@ import {
 } from 'recharts';
 import type { DashboardActivityItem } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi, legacySyncApi, type LegacySyncConfigDto } from '../../lib/api-client';
+import { dashboardApi, legacySyncApi, getColomboDateStr, type LegacySyncConfigDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
 import { useRealtimePosSync } from '../../hooks/use-realtime-pos-sync';
 import { supabase } from '../../lib/supabase';
@@ -497,7 +497,7 @@ async function fetchDateRangeDataset(
   const bounds = getColomboBounds(preset, customStart, customEnd);
 
   // Parallel transaction queries: Sales (ranges 0..999, 1000..1999, 2000..2999), Shifts (0..999, 1000..1999), Reconciliations, and Activity
-  const [s0, s1, s2, sh0, sh1, recRes, actRes] = await Promise.all([
+  const [s0, s1, s2, sh0, sh1, shEnded, recRes, actRes] = await Promise.all([
     supabase
       .from('sales')
       .select('id, invoice_number, branch_id, cashier_id, cashier_name, total_amount, subtotal, discount_amount, status, created_at, sold_at, shift_id, legacy_sale_id')
@@ -539,6 +539,14 @@ async function fetchDateRangeDataset(
       .order('shift_date', { ascending: false })
       .range(1000, 1999),
     supabase
+      .from('cashier_shifts')
+      .select('id, branch_id, cashier_id, shift_date, shift_number, status, opening_float, closing_float, closing_drawer_float, modaka_total_sold_qty, modaka_total_amount, started_at, ended_at, notes, cash_variance')
+      .gte('ended_at', bounds.from)
+      .lte('ended_at', bounds.to)
+      .in('branch_id', ACTIVE_BRANCH_IDS)
+      .order('ended_at', { ascending: false })
+      .range(0, 999),
+    supabase
       .from('daily_cash_reconciliations')
       .select('id, branch_id, reconciliation_date, physical_cash_c, system_cash_sales, variance_amount, status, notes, submitted_by')
       .gte('reconciliation_date', bounds.startDateStr)
@@ -556,7 +564,7 @@ async function fetchDateRangeDataset(
   const allSales = Array.from(salesMap.values());
 
   const shiftsMap = new Map<string, RawShift>();
-  [sh0.data, sh1.data].forEach((chunk) => {
+  [sh0.data, sh1.data, shEnded.data].forEach((chunk) => {
     if (chunk) {
       chunk.forEach((item: any) => shiftsMap.set(item.id, item));
     }
@@ -564,6 +572,12 @@ async function fetchDateRangeDataset(
   const allShifts = Array.from(shiftsMap.values());
 
   allShifts.forEach((s) => {
+    if (s.status === 'closed' && s.ended_at) {
+      const closingDate = getColomboDateStr(new Date(s.ended_at));
+      if (closingDate) {
+        s.shift_date = closingDate;
+      }
+    }
     const u = mData.usersMap.get(s.cashier_id);
     s.users = u
       ? { id: u.id, full_name: u.full_name, role: u.role }

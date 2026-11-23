@@ -38,7 +38,7 @@ import {
 import type { SaleDto, SalePaymentMethod, SaleStatus } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
 import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
-import { posApi, type SalesSummaryKPI, getColomboDateBounds, formatShiftLabel } from '../../../lib/api-client';
+import { posApi, type SalesSummaryKPI, getColomboDateBounds, formatShiftLabel, getColomboDateStr } from '../../../lib/api-client';
 import { supabase } from '../../../lib/supabase';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
 
@@ -330,6 +330,54 @@ export default function SalesOrdersPage() {
           shiftOffset += shiftChunkSize;
           if (shiftOffset >= 5000) break;
         }
+
+        // Also fetch closed shifts whose ended_at falls within Colombo date bounds
+        if (bounds.from && bounds.to) {
+          let endedShiftsQuery = supabase
+            .from('cashier_shifts')
+            .select(`
+              id,
+              tenant_id,
+              branch_id,
+              cashier_id,
+              shift_date,
+              shift_number,
+              status,
+              started_at,
+              ended_at,
+              modaka_total_sold_qty,
+              modaka_total_amount,
+              users (id, full_name)
+            `)
+            .gte('ended_at', bounds.from)
+            .lte('ended_at', bounds.to)
+            .order('ended_at', { ascending: false })
+            .range(0, 999);
+
+          if (branchId && branchId !== 'ALL') {
+            endedShiftsQuery = endedShiftsQuery.eq('branch_id', branchId);
+          } else {
+            endedShiftsQuery = endedShiftsQuery.in('branch_id', ACTIVE_BRANCH_IDS);
+          }
+
+          const { data: endedData } = await endedShiftsQuery;
+          if (endedData && endedData.length > 0) {
+            allShifts.push(...endedData);
+          }
+        }
+
+        // Deduplicate by shift id and attribute closed shifts to Colombo closing date
+        const shiftDedupMap = new Map<string, any>();
+        allShifts.forEach((s: any) => {
+          if (s.status === 'closed' && s.ended_at) {
+            const closingDate = getColomboDateStr(new Date(s.ended_at));
+            if (closingDate) {
+              s.shift_date = closingDate;
+            }
+          }
+          shiftDedupMap.set(s.id, s);
+        });
+        allShifts = Array.from(shiftDedupMap.values());
 
         // Apply Cashier filter if specified
         if (cashierNameFilter && cashierNameFilter !== 'ALL') {

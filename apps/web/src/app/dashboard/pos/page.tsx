@@ -29,6 +29,7 @@ import {
   Printer,
   QrCode,
   AlertCircle,
+  AlertTriangle,
   Check,
   Pencil,
   RotateCcw,
@@ -321,6 +322,22 @@ export default function ConfidencyPosPage() {
   const [isModakaStockInModalOpen, setIsModakaStockInModalOpen] = useState(false);
   const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
+
+  // 16-Hour Overdue Open Shift calculation
+  const isShiftOverdue16h = useMemo(() => {
+    if (!activeShift || activeShift.status !== 'open') return false;
+    const startedTime = activeShift.startedAt ? new Date(activeShift.startedAt).getTime() : 0;
+    if (!startedTime || isNaN(startedTime)) return false;
+    const elapsedMs = Date.now() - startedTime;
+    return elapsedMs > 16 * 60 * 60 * 1000;
+  }, [activeShift]);
+
+  const shiftDurationHours = useMemo(() => {
+    if (!activeShift?.startedAt) return 0;
+    const startedTime = new Date(activeShift.startedAt).getTime();
+    if (isNaN(startedTime)) return 0;
+    return Math.floor((Date.now() - startedTime) / (1000 * 60 * 60));
+  }, [activeShift]);
 
   // Checkout & Payment Confirmation Modal State
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -1693,6 +1710,25 @@ export default function ConfidencyPosPage() {
             </button>
           </div>
         </div>
+
+        {/* 16-Hour Overdue Open Shift Alert Banner */}
+        {isShiftOverdue16h && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-3 text-amber-900 bg-amber-50 shrink-0 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0 animate-pulse" />
+              <span className="text-xs sm:text-sm font-medium text-amber-900">
+                <strong className="text-amber-800 font-bold">Shift Overdue ({shiftDurationHours}h):</strong> This shift has been open for more than 16 hours. Please complete <strong>End Shift Handover</strong> before continuing.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEndShiftModalOpen(true)}
+              className="shrink-0 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs active:scale-95"
+            >
+              Complete Handover
+            </button>
+          </div>
+        )}
 
         {/* 2. Sleek Horizontal Action Pills (Universal fluid grid: 2 cols on mobile, 3 on sm, 5 on lg) */}
         <div className="px-2.5 sm:px-4 lg:px-5 py-2 bg-slate-100/70 border-b border-slate-200/80 shrink-0">

@@ -3381,13 +3381,17 @@ export interface EndShiftPayload {
   }[];
 }
 
-function getSriLankaDateStr(d: Date = new Date()): string {
+export function getColomboDateStr(d: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Colombo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(d);
+}
+
+function getSriLankaDateStr(d: Date = new Date()): string {
+  return getColomboDateStr(d);
 }
 
 export function formatShiftLabel(shiftNumber?: number | null): string {
@@ -4298,7 +4302,9 @@ export const shiftsApi = {
         .eq('id', payload.shiftId)
         .maybeSingle();
 
-      const shiftDate = shiftRow?.shift_date || getSriLankaDateStr();
+      // Attribute closed shift to its Asia/Colombo closing date so any shift closed on Day X is reported on Day X
+      const closingColomboDate = getColomboDateStr(new Date());
+      const shiftDate = closingColomboDate;
       const shiftNumber = shiftRow?.shift_number || 1;
       const shiftStartedAt = shiftRow?.started_at;
 
@@ -4663,6 +4669,10 @@ export const shiftsApi = {
         error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
       };
     }
+  },
+
+  closeShift: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
+    return shiftsApi.closeShiftHandover(payload);
   },
 
   getShiftLedgers: async (params?: {
