@@ -100,18 +100,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    /* Outer Viewport Canvas: Edge-to-edge on POS, subtle canvas tint on Admin */
+    /* Outer Viewport Canvas: Edge-to-edge on POS, rich deep navy on Admin */
     <div
       className={`h-dvh w-screen max-w-full overflow-x-hidden ${
-        isPosPage ? 'p-0 bg-[#0F1222]' : 'bg-[#EDE9FE] p-0 sm:p-2 md:p-3 lg:p-5'
-      } overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#7052FF] selection:text-white`}
+        isPosPage ? 'p-0 bg-[#0F1222]' : 'bg-[#0B1437] p-0 sm:p-2 md:p-3 lg:p-4'
+      } overflow-hidden box-border flex items-center justify-center antialiased selection:bg-[#2563EB] selection:text-white`}
     >
       {/* Inner Surface: Full Edge-to-Edge on POS, Floating on Admin */}
       <div
         className={`${
           isPosPage
             ? 'rounded-none border-0 shadow-none bg-[#0F1222]'
-            : 'rounded-none sm:rounded-2xl lg:rounded-3xl shadow-none sm:shadow-2xl border-0 sm:border border-slate-200/60 bg-white'
+            : 'rounded-none sm:rounded-2xl lg:rounded-3xl shadow-none sm:shadow-2xl border-0 sm:border border-slate-800/80 bg-[#0B1437]'
         } w-full h-full flex overflow-hidden relative`}
       >
         {/* Left Column: Categorized Navigation Sidebar / Mobile Slide-Over Drawer */}
@@ -121,7 +121,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <AutoUpdateWatcher />
 
         {/* Main Content Viewport */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-white">
           {/* Executive Header: Render exclusively on non-POS pages; POS page has its own dedicated top bar */}
           {!isPosPage && <Header />}
 
@@ -130,7 +130,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             className={`flex-1 min-w-0 overflow-x-hidden ${
               isPosPage
                 ? 'overflow-hidden p-0 h-full bg-[#E6EAF2]'
-                : 'overflow-y-auto p-3 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-slate-50/50'
+                : 'overflow-y-auto p-3 sm:p-5 lg:p-6 pb-20 lg:pb-6 bg-[#EEF2F7] md:rounded-tl-3xl'
             }`}
           >
             {children}

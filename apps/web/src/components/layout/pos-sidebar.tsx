@@ -291,7 +291,7 @@ export function PosSidebar() {
           />
 
           {/* Slide-over Content Surface */}
-          <div className="relative w-[280px] max-w-[85vw] bg-[#0F1222] border-r border-slate-800 h-full flex flex-col justify-between z-10 shadow-2xl animate-in slide-in-from-left duration-250 select-none">
+          <div className="relative w-[280px] max-w-[85vw] bg-[#0B1437] border-r border-slate-800 h-full flex flex-col justify-between z-10 shadow-2xl animate-in slide-in-from-left duration-250 select-none">
             {/* Header with Close Button */}
             <div className="p-4 pb-3 border-b border-slate-800/60">
               <div className="flex items-center justify-between">
@@ -384,7 +384,7 @@ export function PosSidebar() {
                           }}
                           className={`w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all group ${
                             isActive
-                              ? 'bg-gradient-to-r from-[#5B46F6] to-[#4F46E5] text-white font-medium shadow-md'
+                              ? 'bg-[#2563EB] text-white font-semibold shadow-md shadow-blue-900/40'
                               : 'text-slate-300 hover:text-white hover:bg-white/[0.06] font-medium'
                           }`}
                         >
@@ -449,7 +449,7 @@ export function PosSidebar() {
       <aside
         className={`hidden md:flex ${
           isCollapsed ? 'w-[68px]' : 'w-64'
-        } bg-[#0F1222] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30 transition-all duration-200`}
+        } bg-[#0B1437] border-r border-slate-800/80 flex-col justify-between h-full shrink-0 select-none z-30 transition-all duration-200`}
       >
       {/* 1. Brand Header */}
       <div className={`border-b border-slate-800/60 ${isCollapsed ? 'p-3 pb-3 flex flex-col items-center gap-2.5' : 'p-4 pb-3'}`}>
@@ -584,14 +584,14 @@ export function PosSidebar() {
                       }}
                       className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group relative ${
                         isActive
-                          ? 'bg-gradient-to-r from-[#5B46F6] to-[#4F46E5] text-white shadow-md shadow-indigo-950/50'
+                          ? 'bg-[#2563EB] text-white shadow-md shadow-blue-900/40'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
                       }`}
                       title={item.name}
                     >
                       <Icon className="w-5 h-5 shrink-0" />
                       {item.badge && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#5B46F6] ring-2 ring-[#0F1222]" />
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#2563EB] ring-2 ring-[#0B1437]" />
                       )}
                     </Link>
                   );
@@ -609,7 +609,7 @@ export function PosSidebar() {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all group ${
                       isActive
-                        ? 'bg-gradient-to-r from-[#5B46F6] to-[#4F46E5] text-white font-medium shadow-md shadow-indigo-950/50'
+                        ? 'bg-[#2563EB] text-white font-semibold shadow-md shadow-blue-900/40'
                         : 'text-slate-300 hover:text-white hover:bg-white/[0.06] font-medium'
                     }`}
                   >
@@ -643,12 +643,23 @@ export function PosSidebar() {
         ))}
       </div>
 
-      {/* 4. Bottom User Profile & Sign Out */}
+      {/* 4. Bottom User Profile & Status Card */}
       <div className={`border-t border-white/10 bg-white/[0.02] ${isCollapsed ? 'p-2 flex flex-col items-center gap-2' : 'p-3'}`}>
+        {!isCollapsed && (
+          <div className="mb-2 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-200 truncate">Telemetry Active</span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-400/20 shrink-0">
+              3 Branches
+            </span>
+          </div>
+        )}
         {isCollapsed ? (
           <>
             <div
-              className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5B46F6] to-[#7052FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10 cursor-pointer"
+              className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2563EB] to-[#1D4ED8] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10 cursor-pointer"
               title={`${displayName} (${userEmail})`}
             >
               {displayName.charAt(0)}
@@ -665,7 +676,7 @@ export function PosSidebar() {
         ) : (
           <div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white/[0.05] transition-colors">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5B46F6] to-[#7052FF] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2563EB] to-[#1D4ED8] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs border border-white/10">
                 {displayName.charAt(0)}
               </div>
               <div className="min-w-0">
