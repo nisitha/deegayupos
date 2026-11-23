@@ -22,7 +22,6 @@ import {
   CashierShiftDto,
   EndShiftPayload,
   shiftsApi,
-  formatShiftLabel,
   ShiftCashBillItem,
 } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
@@ -586,7 +585,7 @@ export function ShiftEndModal({
                   End Shift Handover
                 </h3>
                 <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                  {formatShiftLabel(currentShift?.shiftNumber).toUpperCase()}
+                  Cashier: {cashierName}
                 </span>
               </div>
               <p className="text-sm text-slate-400 mt-0.5">
@@ -697,8 +696,7 @@ export function ShiftEndModal({
               <CheckCircle2 className="w-16 h-16 text-emerald-600 mx-auto animate-bounce" />
               <h4 className="text-2xl font-bold text-slate-900">Shift Handover Completed!</h4>
               <p className="text-sm text-slate-600 max-w-md mx-auto">
-                {formatShiftLabel(currentShift.shiftNumber)} has been officially closed and verified. Signing out cashier{' '}
-                <strong className="text-emerald-700 font-bold">{cashierName}</strong> to allow the next shift cashier to sign in...
+                Shift for <strong className="text-emerald-700 font-bold">{cashierName}</strong> has been officially closed and verified. Completing handover...
               </p>
             </div>
           ) : (
@@ -1056,7 +1054,7 @@ export function ShiftEndModal({
                               </span>
                               {Number(currentShift?.shiftNumber || localShift?.shiftNumber || 1) > 1 && (
                                 <span className="text-[11px] text-amber-700/90 block mt-0.5 font-medium">
-                                  Earlier bills from today belong to {formatShiftLabel(Number(currentShift?.shiftNumber || localShift?.shiftNumber || 2) - 1)} and are accounted for in that shift&apos;s handover.
+                                  Earlier bills from today belong to previous cashier handover and are accounted for in that handover.
                                 </span>
                               )}
                             </div>

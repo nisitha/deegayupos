@@ -759,9 +759,8 @@ export async function generateMonthlyPayrollRun(
 
     const shortageBreakdowns: ShortageItemBreakdown[] = empShortages.map((s: any) => {
       const bObj = s.branch_id ? branchMap.get(s.branch_id) : undefined;
-      const bName = bObj ? bObj.name : 'Main Store';
-      const shiftNum = Number(s.shift_number || 1);
-      const shiftLabel = shiftNum === 1 ? 'Shift A' : shiftNum === 2 ? 'Shift B' : `Shift ${shiftNum}`;
+      const bName = bObj ? bObj.name : 'Branch';
+      const shiftLabel = s.employee_name ? `Cashier: ${s.employee_name}` : 'Cashier Shift';
       return {
         id: s.id,
         date: String(s.adjustment_date).split('T')[0] || String(s.adjustment_date || ''),

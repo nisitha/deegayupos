@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, PackagePlus, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
-import { CashierShiftDto, shiftsApi, formatShiftLabel } from '../../lib/api-client';
+import { CashierShiftDto, shiftsApi } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
 
 interface ModakaItemRow {
@@ -241,7 +241,7 @@ export function ModakaStockInModal({
                   Special Stock In (B)
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/20">
-                  {activeShift ? formatShiftLabel(activeShift.shiftNumber) : 'Active Shift'}
+                  {activeShift ? (activeShift.cashierName ? `Cashier: ${activeShift.cashierName}` : 'Active Shift') : 'Active Shift'}
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-rose-100 font-medium">

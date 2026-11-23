@@ -1278,9 +1278,9 @@ export default function DashboardPage() {
   // Tab 2: Shift-Wise
   const shiftBreakdown = useMemo(() => {
     const shiftConfigs = [
-      { num: 1, name: 'Shift A (Morning)', timing: '07:00 – 14:30' },
-      { num: 2, name: 'Shift B (Evening)', timing: '14:30 – 21:00' },
-      { num: 3, name: 'Shift C (Night / Cutover)', timing: '21:00 – Late' },
+      { num: 1, name: 'Morning Roster', timing: '07:00 – 14:30' },
+      { num: 2, name: 'Evening Roster', timing: '14:30 – 21:00' },
+      { num: 3, name: 'Night / Cutover', timing: '21:00 – Late' },
     ];
 
     return shiftConfigs.map((sc) => {
@@ -1829,9 +1829,9 @@ export default function DashboardPage() {
               className="w-full px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">All Shifts</option>
-              <option value="1">Shift A (Morning)</option>
-              <option value="2">Shift B (Evening)</option>
-              <option value="3">Shift C (Night / Cutover)</option>
+              <option value="1">Morning (07:00 – 14:30)</option>
+              <option value="2">Evening (14:30 – 21:00)</option>
+              <option value="3">Night / Cutover (21:00 – Late)</option>
             </select>
           </div>
 

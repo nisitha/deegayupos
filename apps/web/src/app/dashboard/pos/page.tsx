@@ -34,6 +34,7 @@ import {
   Pencil,
   RotateCcw,
   LogOut,
+  Layers,
   PackagePlus,
   Store,
   Menu,
@@ -47,7 +48,7 @@ import type {
   SaleDto,
 } from '@pixelcraft/types';
 import { useTenantBranch } from '../../../context/tenant-branch-context';
-import { posApi, shiftsApi, formatShiftLabel, isOwnerUser, resolveWarehouseId, type CashierShiftDto } from '../../../lib/api-client';
+import { posApi, shiftsApi, isOwnerUser, resolveWarehouseId, type CashierShiftDto } from '../../../lib/api-client';
 import { formatSriLankaHeaderClock } from '../../../lib/date-utils';
 import { performAppLogout } from '../../../lib/auth-utils';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
@@ -321,6 +322,8 @@ export default function ConfidencyPosPage() {
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
   const [isModakaStockInModalOpen, setIsModakaStockInModalOpen] = useState(false);
   const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
+  const [resumableTodayShift, setResumableTodayShift] = useState<any | null>(null);
+  const [isResumingShift, setIsResumingShift] = useState(false);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
 
   // 16-Hour Overdue Open Shift calculation
@@ -387,6 +390,7 @@ export default function ConfidencyPosPage() {
   // Reset active shift immediately upon switching branches to avoid cross-branch leak
   useEffect(() => {
     setActiveShift(null);
+    setResumableTodayShift(null);
   }, [selectedBranchId]);
 
   // Active Cashier Shift Lifecycle
@@ -403,12 +407,62 @@ export default function ConfidencyPosPage() {
         { isOwner }
       );
       if (res.success && res.data) {
-        setActiveShift(res.data);
-      } else if (res.success && !res.data) {
+        if (res.data.canResumeTodayShift) {
+          setResumableTodayShift(res.data.resumableShift || res.data);
+          setActiveShift(null);
+        } else {
+          setActiveShift(res.data);
+          setResumableTodayShift(null);
+        }
+      } else {
         setActiveShift(null);
+        setResumableTodayShift(null);
       }
     } catch (err) {
       console.warn('[POS] refreshActiveShift error:', err);
+    }
+  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
+
+  const handleResumeShift = useCallback(async () => {
+    if (!resumableTodayShift?.id) return;
+    setIsResumingShift(true);
+    try {
+      const res = await shiftsApi.resumeShift(resumableTodayShift.id, selectedBranchId || undefined, cashierId);
+      if (res.success && res.data) {
+        setActiveShift(res.data);
+        setResumableTodayShift(null);
+        setScanFeedback('Shift resumed. Terminal ready.');
+        setTimeout(() => setScanFeedback(null), 3000);
+      } else {
+        alert(res.error?.message || 'Failed to resume shift');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to resume shift');
+    } finally {
+      setIsResumingShift(false);
+    }
+  }, [resumableTodayShift?.id, selectedBranchId, cashierId]);
+
+  const handleStartFreshShift = useCallback(async () => {
+    if (!selectedBranchId) return;
+    const currentCashierId = activeCashier?.id || user?.id;
+    if (!currentCashierId) return;
+    setIsResumingShift(true);
+    try {
+      const res = await shiftsApi.getOrCreateActiveShift(
+        selectedBranchId,
+        currentCashierId,
+        cashierName,
+        { isOwner, forceNewShift: true }
+      );
+      if (res.success && res.data) {
+        setActiveShift(res.data);
+        setResumableTodayShift(null);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to start new shift');
+    } finally {
+      setIsResumingShift(false);
     }
   }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
 
@@ -1269,6 +1323,10 @@ export default function ConfidencyPosPage() {
         const effectiveCashierName = activeCashier?.fullName || user?.fullName || cashierName;
         const effectiveBranchId = selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
 
+        if (!isOwner && activeShift?.handoverRequired) {
+          throw new Error(`Cannot process sale: Handover required for ${activeShift.openShiftCashierName || 'previous cashier'}.`);
+        }
+
         let currentShiftId = activeShift?.id;
         if (!currentShiftId && effectiveBranchId && !isOwner) {
           try {
@@ -1591,8 +1649,8 @@ export default function ConfidencyPosPage() {
                 <span className="hidden xl:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
                   {activeShift ? (
                     <>
-                      <span className="font-semibold text-slate-900">Branch Shift:</span>{' '}
-                      {formatShiftLabel(activeShift.shiftNumber)} ({activeShift.cashierName || 'Cashier'})
+                      <span className="font-semibold text-slate-900">Active Shift:</span>{' '}
+                      Cashier: <strong className="text-slate-900 font-bold">{activeShift.cashierName || 'Cashier'}</strong>
                     </>
                   ) : (
                     <span className="text-slate-500 italic">No Active Cashier Shift</span>
@@ -1678,8 +1736,8 @@ export default function ConfidencyPosPage() {
                 <LogOut className="w-4 h-4" />
                 <span className="whitespace-nowrap">End Shift</span>
                 {activeShift && (
-                  <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-mono shrink-0 font-bold">
-                    {formatShiftLabel(activeShift.shiftNumber)}
+                  <span className="hidden sm:inline-block bg-rose-700 text-white text-xs px-2 py-0.5 rounded-md font-medium shrink-0">
+                    {activeShift.cashierName || cashierName}
                   </span>
                 )}
               </button>
@@ -3201,9 +3259,9 @@ export default function ConfidencyPosPage() {
         onClose={() => setIsEndShiftModalOpen(false)}
         activeShift={activeShift}
         branchId={selectedBranchId}
-        cashierId={cashierId}
+        cashierId={activeShift?.openShiftCashierId || activeShift?.cashierId || cashierId}
         branchName={currentBranchName}
-        cashierName={cashierName}
+        cashierName={activeShift?.openShiftCashierName || activeShift?.cashierName || cashierName}
         isOwner={isOwner}
         onConfirmEndShift={() => {
           refreshActiveShift();
@@ -3211,6 +3269,111 @@ export default function ConfidencyPosPage() {
           setTimeout(() => setScanFeedback(null), 3000);
         }}
       />
+
+      {/* Handover Lock Gate (Mandatory Handover between staff) */}
+      {Boolean(!isOwner && activeShift?.handoverRequired) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-amber-200/90 p-6 text-slate-900 space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3.5 text-amber-600">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle className="w-7 h-7 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Mandatory Shift Handover Gate</h3>
+                <p className="text-xs text-slate-500 font-medium">Terminal Locked • Branch: {currentBranchName}</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-4 text-xs text-amber-950 space-y-2 leading-relaxed">
+              <p>
+                <strong className="text-amber-900 font-bold">{activeShift?.openShiftCashierName || 'Previous Cashier'}</strong> currently has an active open shift at this branch.
+              </p>
+              <p className="text-amber-800">
+                To maintain physical cash drawer accountability and prevent mixing cashier sales, <strong>{activeShift?.openShiftCashierName || 'the outgoing cashier'}</strong> must complete their End Shift Handover before another cashier can start billing.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsEndShiftModalOpen(true)}
+                className="w-full sm:flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Complete Handover for {activeShift?.openShiftCashierName || 'Cashier'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Switch User</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resume Today's Shift Prompt */}
+      {Boolean(!isOwner && resumableTodayShift && !activeShift) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 text-slate-900 space-y-5 animate-scaleUp">
+            <div className="flex items-center gap-3.5 text-indigo-600">
+              <div className="w-12 h-12 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 shadow-xs">
+                <RotateCcw className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Resume Today&apos;s Shift</h3>
+                <p className="text-xs text-slate-500 font-medium">{currentBranchName} • {cashierName}</p>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 text-xs text-indigo-950 space-y-1.5 leading-relaxed">
+              <p>
+                You previously closed a shift today on <strong>{resumableTodayShift.shift_date || resumableTodayShift.shiftDate}</strong>.
+              </p>
+              <p className="text-slate-600">
+                Would you like to resume today&apos;s shift so all sales, stock, and profits continue under the same daily record without double-counting?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isResumingShift}
+                onClick={handleResumeShift}
+                className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isResumingShift ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                <span>Resume Today&apos;s Shift ({cashierName})</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isResumingShift}
+                onClick={handleStartFreshShift}
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Start New Shift Instead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Discount Picker Modal */}
       <DiscountPickerModal

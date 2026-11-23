@@ -12,7 +12,7 @@ import {
   Loader2,
   Calculator,
 } from 'lucide-react';
-import { formatShiftLabel, shiftsApi, type CashierShiftDto } from '../../lib/api-client';
+import { shiftsApi, type CashierShiftDto } from '../../lib/api-client';
 
 interface ShiftStartModalProps {
   isOpen: boolean;
@@ -126,8 +126,6 @@ export function ShiftStartModal({
 
   if (!isOpen || !activeShift || isOwner) return null;
 
-  const shiftLabel = formatShiftLabel(activeShift.shiftNumber || 1);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
@@ -148,7 +146,7 @@ export function ShiftStartModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 id="shift-start-modal-title" className="text-base font-bold text-white tracking-tight">
-                  Start {shiftLabel} — Opening Drawer Cash Count
+                  Start Shift for {cashierName} — Opening Drawer Cash Count
                 </h3>
               </div>
               <div className="flex items-center gap-2 text-xs text-indigo-200/80 mt-0.5">

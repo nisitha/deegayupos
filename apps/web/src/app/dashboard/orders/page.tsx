@@ -1789,7 +1789,7 @@ export default function SalesOrdersPage() {
                           <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono mt-0.5">
                             <Clock className="w-2.5 h-2.5 text-rose-500" />
                             <span>
-                              {entry.shiftDate} • {formatShiftLabel(entry.shiftNumber)}
+                              {entry.shiftDate} • {entry.cashierName ? `Cashier: ${entry.cashierName}` : formatShiftLabel(entry.shiftNumber, entry.cashierName)}
                             </span>
                           </div>
                         </td>

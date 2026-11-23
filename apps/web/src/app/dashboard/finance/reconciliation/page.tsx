@@ -672,7 +672,7 @@ export default function CashReconciliationPage() {
         branchId: sh.branch_id,
         branchName: sh.branch_name || getBranchName(sh.branch_id),
         shiftNumber: sh.shift_number || 1,
-        shiftLabel: formatShiftLabel(sh.shift_number),
+        shiftLabel: formatShiftLabel(sh.shift_number, sh.cashier_name || 'Staff Cashier'),
         cashierName: sh.cashier_name || 'Staff Cashier',
         expectedCash: expectedDrawer,
         actualCash: countedDrawer,
@@ -697,7 +697,7 @@ export default function CashReconciliationPage() {
         branchId: adj.branchId,
         branchName: getBranchName(adj.branchId),
         shiftNumber: adj.shiftNumber || 1,
-        shiftLabel: formatShiftLabel(adj.shiftNumber),
+        shiftLabel: formatShiftLabel(adj.shiftNumber, adj.employeeName || 'Staff Cashier'),
         cashierName: adj.employeeName || 'Staff Cashier',
         expectedCash: 0,
         actualCash: 0,
@@ -919,7 +919,7 @@ export default function CashReconciliationPage() {
       return [
         sh.shift_date,
         sh.branch_name,
-        formatShiftLabel(sh.shift_number),
+        formatShiftLabel(sh.shift_number, sh.cashier_name),
         sh.cashier_name,
         openedAtStr,
         closedAtStr,
@@ -2033,7 +2033,7 @@ export default function CashReconciliationPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-sm text-slate-100">{sh.cashier_name}</span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                                {formatShiftLabel(sh.shift_number)}
+                                {formatShiftLabel(sh.shift_number, sh.cashier_name)}
                               </span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                                 {sh.branch_name}
@@ -2343,7 +2343,7 @@ export default function CashReconciliationPage() {
                       const rows = salaryDeductionsLog.map((r) => [
                         r.date,
                         r.branchName,
-                        formatShiftLabel(r.shiftNumber),
+                        formatShiftLabel(r.shiftNumber, r.employeeName),
                         r.employeeName,
                         r.amount,
                         r.notes,
@@ -2384,7 +2384,7 @@ export default function CashReconciliationPage() {
                             <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
                             <td className="py-2.5 px-2 text-center">
                               <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                {formatShiftLabel(r.shiftNumber)}
+                                {formatShiftLabel(r.shiftNumber, r.employeeName)}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
@@ -2421,7 +2421,7 @@ export default function CashReconciliationPage() {
                       const rows = extraIncomeLog.map((r) => [
                         r.date,
                         r.branchName,
-                        formatShiftLabel(r.shiftNumber),
+                        formatShiftLabel(r.shiftNumber, r.employeeName),
                         r.employeeName,
                         r.amount,
                         r.notes,
@@ -2462,7 +2462,7 @@ export default function CashReconciliationPage() {
                             <td className="py-2.5 px-3 text-slate-300 font-sans font-semibold">{r.branchName}</td>
                             <td className="py-2.5 px-2 text-center">
                               <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                {formatShiftLabel(r.shiftNumber)}
+                                {formatShiftLabel(r.shiftNumber, r.employeeName)}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-200 font-sans font-bold">{r.employeeName}</td>
@@ -3710,7 +3710,7 @@ export default function CashReconciliationPage() {
                           <span className="font-bold text-xs text-slate-200">{s.cashier_name}</span>
                         </div>
                         <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {formatShiftLabel(s.shift_number)}
+                          {formatShiftLabel(s.shift_number, s.cashier_name)}
                         </span>
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">
@@ -5104,7 +5104,7 @@ export default function CashReconciliationPage() {
                     <tr key={sh.id}>
                       <td className="p-1.5 font-sans">{sh.shift_date}</td>
                       <td className="p-1.5 font-sans">{sh.branch_name}</td>
-                      <td className="p-1.5 font-sans font-bold">{formatShiftLabel(sh.shift_number)}</td>
+                      <td className="p-1.5 font-sans font-bold">{formatShiftLabel(sh.shift_number, sh.cashier_name)}</td>
                       <td className="p-1.5 font-sans">{sh.cashier_name}</td>
                       <td className="p-1.5 text-right">{inflow.toFixed(2)}</td>
                       <td className="p-1.5 text-right">{paid.toFixed(2)}</td>

@@ -3314,6 +3314,11 @@ export interface CashierShiftDto {
   cashierName?: string;
   shiftDate: string; // YYYY-MM-DD
   shiftNumber: number; // 1, 2, ...
+  handoverRequired?: boolean;
+  openShiftCashierId?: string;
+  openShiftCashierName?: string;
+  canResumeTodayShift?: boolean;
+  resumableShift?: any;
   hasLockedOpeningFloat?: boolean;
   previousShiftLabel?: string;
   previousClosingFloat?: number | null;
@@ -3394,12 +3399,12 @@ function getSriLankaDateStr(d: Date = new Date()): string {
   return getColomboDateStr(d);
 }
 
-export function formatShiftLabel(shiftNumber?: number | null): string {
-  const n = Number(shiftNumber || 1);
-  if (n >= 1 && n <= 26) {
-    return `Shift ${String.fromCharCode(64 + n)}`;
+export function formatShiftLabel(_shiftNumber?: number | string | null, cashierName?: string | null): string {
+  if (cashierName && typeof cashierName === 'string' && cashierName.trim()) {
+    const clean = cashierName.trim();
+    return clean.toLowerCase().startsWith('cashier:') ? clean : `Cashier: ${clean}`;
   }
-  return n > 26 ? `Shift ${n}` : 'Shift A';
+  return 'Cashier Shift';
 }
 
 export const formatShiftLetterLabel = formatShiftLabel;
@@ -3540,13 +3545,23 @@ export const shiftsApi = {
         return { success: true, data: null };
       }
 
-      // If switched cashier PIN within the same branch, update cashier_id on active shift (ONLY for non-owner!)
-      if (!isOwner && cashierId && isValidUuid(cashierId) && openShift.cashier_id !== cashierId) {
-        await supabase
-          .from('cashier_shifts')
-          .update({ cashier_id: cashierId })
-          .eq('id', openShift.id);
-        openShift.cashier_id = cashierId;
+      // Check if switched cashier PIN within the same branch while someone else's shift is active
+      let handoverRequired = false;
+      let openShiftCashierId = openShift.cashier_id;
+      let openShiftCashierName: string | undefined = undefined;
+
+      if (openShift.cashier_id) {
+        try {
+          const { data: u } = await supabase.from('users').select('full_name').eq('id', openShift.cashier_id).maybeSingle();
+          if (u?.full_name) {
+            openShiftCashierName = u.full_name;
+          }
+        } catch { }
+      }
+
+      // If switched cashier PIN within the same branch, enforce Handover Lock Gate (NEVER hijack or update cashier_id!)
+      if (!isOwner && cashierId && isValidUuid(cashierId) && openShift.cashier_id && openShift.cashier_id !== cashierId) {
+        handoverRequired = true;
       }
 
       // Fetch configs
@@ -3743,7 +3758,7 @@ export const shiftsApi = {
           Boolean(openShift.handover_notes?.includes('[PENDING_OPENING_COUNT]'))
         );
 
-      let effectiveCashierName = cashierName;
+      let effectiveCashierName = openShiftCashierName || cashierName;
       if (isOwner && openShift.cashier_id) {
         try {
           const { data: u } = await supabase.from('users').select('full_name').eq('id', openShift.cashier_id).maybeSingle();
@@ -3761,6 +3776,9 @@ export const shiftsApi = {
           branchId: openShift.branch_id,
           cashierId: openShift.cashier_id,
           cashierName: effectiveCashierName,
+          handoverRequired: isOwner ? false : handoverRequired,
+          openShiftCashierId,
+          openShiftCashierName,
           shiftDate: openShift.shift_date,
           shiftNumber: openShift.shift_number || 1,
           hasLockedOpeningFloat,
@@ -3808,10 +3826,11 @@ export const shiftsApi = {
     branchId: string,
     cashierId: string,
     cashierName?: string,
-    options?: { isOwner?: boolean } | boolean
+    options?: { isOwner?: boolean; forceNewShift?: boolean } | boolean
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
       const isOwner = typeof options === 'boolean' ? options : Boolean(options?.isOwner);
+      const forceNewShift = typeof options === 'object' && Boolean(options?.forceNewShift);
 
       if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
         return {
@@ -3831,6 +3850,7 @@ export const shiftsApi = {
               ...active.data,
               needsOpeningCount: false,
               openingConfirmed: true,
+              handoverRequired: false,
             },
           };
         }
@@ -3847,10 +3867,38 @@ export const shiftsApi = {
         return { success: true, data: active.data };
       }
 
-      // 2. Start a new shift
-      const todayDate = getSriLankaDateStr();
+      // 2. If no open shift exists, check if THIS cashier already closed a shift today at this branch!
+      const todayDate = getColomboDateStr(new Date());
 
-      // Check how many closed shifts exist today for this branch (Sequential Shift A -> Shift B -> ...)
+      if (!forceNewShift && cashierId && isValidUuid(cashierId)) {
+        const { data: closedToday } = await supabase
+          .from('cashier_shifts')
+          .select('*')
+          .eq('branch_id', branchId)
+          .eq('cashier_id', cashierId)
+          .eq('shift_date', todayDate)
+          .eq('status', 'closed')
+          .order('ended_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (closedToday) {
+          return {
+            success: true,
+            data: {
+              ...closedToday,
+              canResumeTodayShift: true,
+              resumableShift: closedToday,
+              cashierName,
+              needsOpeningCount: false,
+              openingConfirmed: true,
+            } as any,
+          };
+        }
+      }
+
+      // 3. Start a new shift
+      // Check how many closed shifts exist today for this branch (Sequential shifts)
       const { count: closedCount } = await supabase
         .from('cashier_shifts')
         .select('id', { count: 'exact', head: true })
@@ -4055,6 +4103,98 @@ export const shiftsApi = {
     }
   },
 
+  resumeShift: async (
+    shiftId: string,
+    branchId?: string | null,
+    cashierId?: string | null
+  ): Promise<ApiResponse<CashierShiftDto>> => {
+    try {
+      if (!shiftId || !isValidUuid(shiftId)) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'INVALID_ID', message: 'Valid shift ID is required', statusCode: 400 },
+        };
+      }
+
+      const { data: shift, error: fetchErr } = await supabase
+        .from('cashier_shifts')
+        .select('*')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (fetchErr || !shift) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'NOT_FOUND', message: 'Shift not found', statusCode: 404 },
+        };
+      }
+
+      const targetBranchId = branchId || shift.branch_id;
+
+      // Check if another shift is currently open at this branch
+      const { data: openShift } = await supabase
+        .from('cashier_shifts')
+        .select('id, cashier_id')
+        .eq('branch_id', targetBranchId)
+        .eq('status', 'open')
+        .neq('id', shiftId)
+        .limit(1)
+        .maybeSingle();
+
+      if (openShift) {
+        return {
+          success: false,
+          data: null as any,
+          error: {
+            code: 'BRANCH_HAS_OPEN_SHIFT',
+            message: 'Another shift is currently active at this branch. Please complete handover before resuming.',
+            statusCode: 400,
+          },
+        };
+      }
+
+      const { error: updErr } = await supabase
+        .from('cashier_shifts')
+        .update({
+          status: 'open',
+          ended_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', shiftId);
+
+      if (updErr) {
+        return {
+          success: false,
+          data: null as any,
+          error: { code: 'UPDATE_FAILED', message: updErr.message, statusCode: 500 },
+        };
+      }
+
+      const activeRes = await shiftsApi.getActiveShift(targetBranchId, cashierId || shift.cashier_id);
+      if (activeRes.success && activeRes.data) {
+        return { success: true, data: activeRes.data };
+      }
+
+      return {
+        success: true,
+        data: {
+          ...shift,
+          status: 'open',
+          endedAt: null,
+        } as any,
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] resumeShift fatal:', err);
+      return {
+        success: false,
+        data: null as any,
+        error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
   confirmShiftOpeningCount: async (
     shiftId: string,
     countedOpeningFloat: number,
@@ -4175,6 +4315,7 @@ export const shiftsApi = {
                 tenant_id: shiftRow.tenant_id,
                 branch_id: targetBranchId,
                 reconciliation_date: shiftRow.shift_date,
+                opening_float_a: countedFloat,
                 opening_cash_b: countedFloat,
                 updated_at: new Date().toISOString(),
               },
@@ -4646,8 +4787,10 @@ export const shiftsApi = {
                 tenant_id: shiftRow?.tenant_id || DEEGAYU_TENANT_ID,
                 branch_id: payload.branchId,
                 reconciliation_date: shiftDate,
-                closing_cash_f: closingFloat,
+                opening_float_a: openingFloat,
                 physical_cash_c: closingFloat,
+                closing_cash_f: closingFloat,
+                total_bank_deposits_e: bankedAmount,
                 updated_at: new Date().toISOString(),
               },
               { onConflict: 'branch_id,reconciliation_date' }
