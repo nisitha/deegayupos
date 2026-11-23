@@ -1127,9 +1127,12 @@ export const posApi = {
         if (activeShiftRow?.id) {
           shiftId = activeShiftRow.id;
         } else {
-          const newShiftRes = await shiftsApi.getOrCreateActiveShift(branchId, cashierId, cashierName);
-          if (newShiftRes.success && newShiftRes.data?.id) {
-            shiftId = newShiftRes.data.id;
+          const isOwnerCheckout = shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName });
+          if (!isOwnerCheckout) {
+            const newShiftRes = await shiftsApi.getOrCreateActiveShift(branchId, cashierId, cashierName);
+            if (newShiftRes.success && newShiftRes.data?.id) {
+              shiftId = newShiftRes.data.id;
+            }
           }
         }
       } catch (e) {
@@ -3505,6 +3508,10 @@ export const shiftsApi = {
 
   isOwnerUser: (user?: any | null): boolean => {
     if (!user) return false;
+    const uid = String(user.id || '').trim().toLowerCase();
+    if (uid === '96b2747b-9d22-4266-94ce-b035fadef498' || uid === DEEGAYU_CASHIER_ID) {
+      return true;
+    }
     const email = String(user.email || '').trim().toLowerCase();
     if (email === 'owner@deegayu.pixelcraftlk.com' || email.startsWith('owner@')) {
       return true;
@@ -3545,23 +3552,44 @@ export const shiftsApi = {
         return { success: true, data: null };
       }
 
-      // Check if switched cashier PIN within the same branch while someone else's shift is active
-      let handoverRequired = false;
+      // Check if open shift belongs to an OWNER account (or unassigned/null)
+      let isOpenShiftOwner = false;
       let openShiftCashierId = openShift.cashier_id;
       let openShiftCashierName: string | undefined = undefined;
 
-      if (openShift.cashier_id) {
+      if (!openShift.cashier_id || openShift.cashier_id === DEEGAYU_CASHIER_ID || openShift.cashier_id === '96b2747b-9d22-4266-94ce-b035fadef498') {
+        isOpenShiftOwner = true;
+      } else {
         try {
-          const { data: u } = await supabase.from('users').select('full_name').eq('id', openShift.cashier_id).maybeSingle();
-          if (u?.full_name) {
+          const { data: u } = await supabase.from('users').select('id, full_name, role').eq('id', openShift.cashier_id).maybeSingle();
+          if (u) {
             openShiftCashierName = u.full_name;
+            if (u.role === 'OWNER' || shiftsApi.isOwnerUser(u) || u.id === DEEGAYU_CASHIER_ID) {
+              isOpenShiftOwner = true;
+            }
           }
         } catch { }
       }
 
-      // If switched cashier PIN within the same branch, enforce Handover Lock Gate (NEVER hijack or update cashier_id!)
-      if (!isOwner && cashierId && isValidUuid(cashierId) && openShift.cashier_id && openShift.cashier_id !== cashierId) {
-        handoverRequired = true;
+      let handoverRequired = false;
+
+      // Handle cashier assignment:
+      if (!isOwner && cashierId && isValidUuid(cashierId)) {
+        if (isOpenShiftOwner || !openShift.cashier_id) {
+          // Open shift was stamped as Owner or unassigned.
+          // NEVER lock the branch cashier! Automatically claim/reassign to the logging-in branch cashier.
+          await supabase
+            .from('cashier_shifts')
+            .update({ cashier_id: cashierId, updated_at: new Date().toISOString() })
+            .eq('id', openShift.id);
+          openShift.cashier_id = cashierId;
+          openShiftCashierId = cashierId;
+          openShiftCashierName = cashierName;
+          handoverRequired = false;
+        } else if (openShift.cashier_id !== cashierId) {
+          // Open shift belongs to a DIFFERENT NON-OWNER cashier -> Enforce Handover Gate!
+          handoverRequired = true;
+        }
       }
 
       // Fetch configs
@@ -3840,8 +3868,11 @@ export const shiftsApi = {
         };
       }
 
+      // Check if current user is Owner by ID, email, role, or flag
+      const isOwnerAccount = isOwner || shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName });
+
       // If Owner, strictly perform read-only lookup for existing open shift
-      if (isOwner) {
+      if (isOwnerAccount) {
         const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName, true);
         if (active.success && active.data) {
           return {
@@ -5209,12 +5240,26 @@ export const shiftsApi = {
           .eq('branch_id', branchId)
           .eq('shift_date', todayDate);
 
+        let assignedCashierId: string | null = null;
+        try {
+          const { data: bUsers } = await supabase
+            .from('users')
+            .select('id, assigned_branches, role')
+            .eq('is_active', true)
+            .eq('role', 'STAFF');
+          const matched = (bUsers || []).find((u: any) => {
+            const branches = Array.isArray(u.assigned_branches) ? u.assigned_branches : [];
+            return branches.includes(branchId);
+          });
+          if (matched?.id) assignedCashierId = matched.id;
+        } catch { }
+
         const { error: insErr } = await supabase
           .from('cashier_shifts')
           .insert({
             tenant_id: tenantId,
             branch_id: branchId,
-            cashier_id: DEEGAYU_CASHIER_ID,
+            cashier_id: assignedCashierId,
             shift_date: todayDate,
             shift_number: (count || 0) + 1,
             started_at: new Date().toISOString(),
