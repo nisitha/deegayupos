@@ -41,6 +41,7 @@ import { useRealtimePosSync } from '../../../hooks/use-realtime-pos-sync';
 import { posApi, type SalesSummaryKPI, getColomboDateBounds, formatShiftLabel, getColomboDateStr } from '../../../lib/api-client';
 import { supabase } from '../../../lib/supabase';
 import { ReceiptModal } from '../../../components/pos/receipt-modal';
+import { formatReceiptColomboDateTime } from '../../../lib/date-utils';
 
 type PeriodFilter = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom';
 type SortField = 'created_at' | 'total_amount' | 'invoice_number' | 'cashier_name';
@@ -729,7 +730,7 @@ export default function SalesOrdersPage() {
           const bName = getBranchLabel(s.branchId);
           const cName = s.cashier?.fullName || s.cashierName || 'Staff';
           const custName = s.customerName || 'Walk-in Customer';
-          const dt = new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
+          const dt = formatReceiptColomboDateTime(s.createdAt);
           const pm = s.payments?.[0]?.paymentMethod || 'CASH';
 
           rows.push([
@@ -753,7 +754,7 @@ export default function SalesOrdersPage() {
       // Append Special Stock Sales
       if (activeTransactionTab !== 'POS' && specialStockEntries.length > 0) {
         specialStockEntries.forEach((e) => {
-          const dt = new Date(e.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Colombo' });
+          const dt = formatReceiptColomboDateTime(e.createdAt);
           rows.push([
             '"Special Stock Sales"',
             `"SPEC-${e.shiftDate.replace(/-/g, '')}-S${e.shiftNumber}-${e.productSku || 'ITEM'}"`,
@@ -1905,18 +1906,7 @@ export default function SalesOrdersPage() {
                         </div>
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono mt-0.5">
                           <Clock className="w-2.5 h-2.5" />
-                          {isMounted
-                            ? new Date(sale.createdAt).toLocaleDateString([], {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              }) +
-                              ' ' +
-                              new Date(sale.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : '--:--'}
+                          {isMounted ? formatReceiptColomboDateTime(sale.createdAt) : '--:--'}
                         </div>
                       </td>
 
@@ -2440,13 +2430,7 @@ export default function SalesOrdersPage() {
                             <tr key={sale.id} className={sale.status === 'VOIDED' ? 'bg-rose-50/30' : ''}>
                               <td className="py-1.5 px-3 font-mono font-bold">{sale.invoiceNumber}</td>
                               <td className="py-1.5 px-3 font-mono text-slate-500">
-                                {new Date(sale.createdAt).toLocaleString('en-GB', {
-                                  month: 'short',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  timeZone: 'Asia/Colombo',
-                                })}
+                                {formatReceiptColomboDateTime(sale.createdAt)}
                               </td>
                               <td className="py-1.5 px-3 text-slate-700">{getBranchLabel(sale.branchId)}</td>
                               <td className="py-1.5 px-3 text-slate-700">{sale.cashier?.fullName || sale.cashierName || 'Staff'}</td>

@@ -1398,12 +1398,14 @@ export default function ConfidencyPosPage() {
           throw new Error('Failed to complete checkout transaction');
         }
 
+        const checkoutCompletedAt = new Date().toISOString();
         const currentBranchObj = branches.find((b) => b.id === (selectedBranchId || res.data?.branchId));
-        const branchDisplayName = currentBranchObj?.name || 'Main Store';
+        const branchDisplayName = currentBranchObj?.name || 'Alawwa';
 
         const finalizedSale: SaleDto = {
           ...res.data,
-          branchId: res.data.branchId || selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c',
+          createdAt: res.data.createdAt || (res.data as any).created_at || checkoutCompletedAt,
+          branchId: res.data.branchId || selectedBranchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
           branchName: branchDisplayName,
           cashierId: res.data.cashierId || cashierId,
           cashierName: res.data.cashierName || cashierName,
@@ -1439,8 +1441,8 @@ export default function ConfidencyPosPage() {
             PrinterBridge.printReceipt(finalizedSale, undefined, {
               storeName: business?.name || 'DEEGAYU WEDA MADHURA',
               branchName: branchDisplayName,
-              address: currentBranchObj?.address || business?.address || 'Colombo Road, Kiribathgoda, Sri Lanka',
-              phone: currentBranchObj?.phone || business?.phone || '+94 11 291 4500',
+              address: currentBranchObj?.address || business?.address || 'Deegayu Weda Madhura, Sri Lanka',
+              phone: 'WhatsApp: +94772634497',
               taxNumber: 'VAT-10928392-8000',
             }).catch(() => { });
           }
@@ -1702,11 +1704,10 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('ALL')}
-                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  qtyPopupMode === 'ALL'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${qtyPopupMode === 'ALL'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 title="Clicking any product card immediately pops up the large centered modal"
               >
                 Qty: All
@@ -1714,11 +1715,10 @@ export default function ConfidencyPosPage() {
               <button
                 type="button"
                 onClick={() => setQtyPopupMode('WEIGHT_LIQUID')}
-                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  qtyPopupMode === 'WEIGHT_LIQUID'
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${qtyPopupMode === 'WEIGHT_LIQUID'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 title="Only 1g weight & 1ml liquid items open modal; boxed/discrete items add 1 directly"
               >
                 1g/1ml
@@ -1795,9 +1795,8 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsDiscountModalOpen(true)}
-              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 min-w-0 ${
-                discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
-              }`}
+              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-emerald-600 hover:bg-emerald-700 min-w-0 ${discountType !== 'NONE' ? 'ring-2 ring-emerald-300' : ''
+                }`}
               title="Apply order discount [F8]"
             >
               <div className="flex items-center gap-1.5 min-w-0">
@@ -1832,9 +1831,8 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsCustomerModalOpen(true)}
-              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 min-w-0 ${
-                selectedCustomer ? 'ring-2 ring-blue-300' : ''
-              }`}
+              className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-blue-600 hover:bg-blue-700 min-w-0 ${selectedCustomer ? 'ring-2 ring-blue-300' : ''
+                }`}
               title="Select customer [F3]"
             >
               <div className="flex items-center gap-1.5 min-w-0">
@@ -2145,11 +2143,10 @@ export default function ConfidencyPosPage() {
           <div
             ref={categoryScrollRef}
             onWheel={handleCategoryWheel}
-            className={`flex-1 flex items-center gap-2 transition-all ${
-              isCategoriesExpanded
-                ? 'flex-wrap py-1 max-h-56 overflow-y-auto'
-                : 'flex-nowrap overflow-x-auto no-scrollbar scroll-smooth py-0.5'
-            }`}
+            className={`flex-1 flex items-center gap-2 transition-all ${isCategoriesExpanded
+              ? 'flex-wrap py-1 max-h-56 overflow-y-auto'
+              : 'flex-nowrap overflow-x-auto no-scrollbar scroll-smooth py-0.5'
+              }`}
           >
             {/* All Departments Tab */}
             <button
@@ -2218,11 +2215,10 @@ export default function ConfidencyPosPage() {
           <button
             type="button"
             onClick={() => setIsCategoriesExpanded((prev) => !prev)}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold shrink-0 active:scale-95 flex items-center gap-1.5 border cursor-pointer transition-all ${
-              isCategoriesExpanded
-                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-            }`}
+            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold shrink-0 active:scale-95 flex items-center gap-1.5 border cursor-pointer transition-all ${isCategoriesExpanded
+              ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+              }`}
             title={isCategoriesExpanded ? 'Collapse to single row' : 'Show all categories'}
           >
             <span className="hidden sm:inline">{isCategoriesExpanded ? 'Compact' : 'All Categories'}</span>
@@ -2730,9 +2726,8 @@ export default function ConfidencyPosPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                    className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
-                      isSelected ? tab.activeCls : tab.inactiveCls
-                    }`}
+                    className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${isSelected ? tab.activeCls : tab.inactiveCls
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{tab.label}</span>
@@ -3147,9 +3142,8 @@ export default function ConfidencyPosPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setPaymentMethod(tab.id as typeof paymentMethod)}
-                      className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border text-center ${
-                        isSelected ? tab.activeCls : tab.inactiveCls
-                      }`}
+                      className={`py-2 px-1 rounded-xl font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border text-center ${isSelected ? tab.activeCls : tab.inactiveCls
+                        }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">{tab.label}</span>
@@ -3238,11 +3232,11 @@ export default function ConfidencyPosPage() {
           setActiveShift((prev) =>
             prev
               ? {
-                  ...prev,
-                  openingFloat: confirmedFloat,
-                  needsOpeningCount: false,
-                  openingConfirmed: true,
-                }
+                ...prev,
+                openingFloat: confirmedFloat,
+                needsOpeningCount: false,
+                openingConfirmed: true,
+              }
               : null
           );
           setScanFeedback(`Opening float confirmed (LKR ${confirmedFloat.toLocaleString('en-US', { minimumFractionDigits: 2 })}). Terminal ready.`);
@@ -3507,13 +3501,12 @@ export default function ConfidencyPosPage() {
                           setCheckoutPaymentMethod(m.id);
                           setCheckoutError(null);
                         }}
-                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                          isActive
-                            ? m.id === 'CASH'
-                              ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/30'
-                              : 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/30'
-                            : 'bg-[#131B2E] text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-[#18233C]'
-                        }`}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${isActive
+                          ? m.id === 'CASH'
+                            ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/30'
+                            : 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/30'
+                          : 'bg-[#131B2E] text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-[#18233C]'
+                          }`}
                       >
                         <Icon className="w-4 h-4 mb-1" />
                         <span>{m.label}</span>

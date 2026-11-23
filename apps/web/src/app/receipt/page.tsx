@@ -5,14 +5,12 @@ import Link from 'next/link';
 import {
   CheckCircle2,
   ShieldCheck,
-  Phone,
-  Mail,
   MapPin,
   Banknote,
   Printer,
 } from 'lucide-react';
 import { ReceiptBarcodeBlock } from '@/components/pos/receipt-barcode-block';
-import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '@/lib/date-utils';
+import { formatReceiptColomboDateTime } from '@/lib/date-utils';
 
 export default function PublicReceiptPage() {
   const [invoiceNumber, setInvoiceNumber] = useState<string>('INV-2026-00042');
@@ -37,8 +35,6 @@ export default function PublicReceiptPage() {
   const storeName = 'Deegayu Weda Madhura';
   const legalName = 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd';
   const address = 'Main Street, Kalutara, Western Province, Sri Lanka';
-  const phone = '+94 34 222 3456';
-  const email = 'dispensary@deegayu.pixelcraftlk.com';
   const vatNumber = 'VAT-10928392-8000';
   const footerNote = 'Thank You Come Again! Return within 7 days.';
   const returnPolicy = 'Authentic Ayurvedic preparations in unopened seal condition exchangeable within 7 days with original receipt.';
@@ -118,13 +114,11 @@ export default function PublicReceiptPage() {
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>{address}</span>
               </div>
-              <div className="flex items-center justify-center gap-3">
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3 h-3 text-slate-400" /> {phone}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Mail className="w-3 h-3 text-slate-400" /> {email}
-                </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-center font-mono max-w-xs mx-auto pt-1 text-[11px] font-bold">
+                <div>Giriulla - 0372289339</div>
+                <div>Dambadeniya - 0372266444</div>
+                <div>Alawwa - 0372077180</div>
+                <div>WhatsApp: +94772634497</div>
               </div>
             </div>
             <div className="pt-1 text-[11px] font-mono text-slate-400">
@@ -145,12 +139,12 @@ export default function PublicReceiptPage() {
                 Bill Date & Time (Asia/Colombo)
               </span>
               <span className="font-medium text-slate-700">
-                {formatSriLankaReceiptDate(createdAt)} • {formatSriLankaReceiptTime(createdAt)}
+                {formatReceiptColomboDateTime(createdAt)}
               </span>
             </div>
             <div className="pt-1">
               <span className="text-slate-400 block text-[10px] uppercase font-sans">Outlet</span>
-              <span className="font-bold text-slate-800 font-sans">Main Store</span>
+              <span className="font-bold text-slate-800 font-sans">Alawwa / Dambadeniya / Giriulla</span>
             </div>
             <div className="text-right pt-1">
               <span className="text-slate-400 block text-[10px] uppercase font-sans">Cashier</span>

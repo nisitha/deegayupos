@@ -281,11 +281,16 @@ export function generateEscPosReceipt(
   builder.textLine(options.storeName || 'DEEGAYU WEDA MADHURA');
   builder.size('normal');
 
-  const outletDisplayName = options.branchName || (sale as any).branchName || 'Main Store';
+  const outletDisplayName = options.branchName || (sale as any).branchName || 'Alawwa';
   builder.bold(true).textLine(`Outlet: ${outletDisplayName}`).bold(false);
 
   if (options.address) builder.textLine(options.address);
-  if (options.phone) builder.textLine(`Tel: ${options.phone}`);
+  builder.bold(true);
+  builder.textLine('Giriulla - 0372289339');
+  builder.textLine('Dambadeniya - 0372266444');
+  builder.textLine('Alawwa - 0372077180');
+  builder.textLine('WhatsApp: +94772634497');
+  builder.bold(false);
   if (options.taxNumber) builder.textLine(`Tax Reg: ${options.taxNumber}`);
 
   builder.divider('=');

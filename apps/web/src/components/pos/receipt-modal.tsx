@@ -10,7 +10,6 @@ import {
   Sparkles,
   CheckCircle2,
   Building2,
-  Phone,
   DollarSign,
   Send,
   Radio,
@@ -22,7 +21,7 @@ import { PrinterBridge } from '../../lib/hardware/printer-bridge';
 import { ReceiptBarcodeBlock } from './receipt-barcode-block';
 import { useTenantBranch } from '../../context/tenant-branch-context';
 import { detectUnitConfig } from '../../lib/unit-utils';
-import { formatSriLankaReceiptDate, formatSriLankaReceiptTime } from '../../lib/date-utils';
+import { getReceiptColomboDateAndTime } from '../../lib/date-utils';
 
 function formatReceiptQuantity(productName: string, quantity: number | string): string {
   const num = Number(quantity);
@@ -294,17 +293,17 @@ export function ReceiptModal({
     effectiveSale?.branchName ||
     matchedBranch?.name ||
     receiptData?.branch?.name ||
-    'Main Store';
+    'Alawwa';
   const branchAddress =
     matchedBranch?.address ||
     receiptData?.branch?.address ||
     business?.address ||
-    'Colombo Road, Kiribathgoda, Sri Lanka';
+    'Deegayu Weda Madhura, Sri Lanka';
   const branchPhone =
     matchedBranch?.phone ||
     receiptData?.branch?.phone ||
     business?.phone ||
-    '+94 11 291 4500';
+    '0372077180';
   const cashierName =
     receiptData?.cashier?.fullName ||
     effectiveSale?.cashier?.fullName ||
@@ -312,8 +311,7 @@ export function ReceiptModal({
     activeCashier?.fullName ||
     user?.fullName ||
     'Branch Cashier';
-  const billDate = formatSriLankaReceiptDate(effectiveSale?.createdAt);
-  const billTime = formatSriLankaReceiptTime(effectiveSale?.createdAt);
+  const { dateStr: billDate, timeStr: billTime } = getReceiptColomboDateAndTime(effectiveSale?.createdAt);
   const taxNumber = receiptData?.settings?.taxNumber || 'VAT-10928392-8000';
   const receiptHeader = receiptData?.settings?.receiptHeader;
   const receiptFooter =
@@ -483,7 +481,12 @@ export function ReceiptModal({
                     <div className="text-xs sm:text-sm text-black font-medium mt-0.5 max-w-sm leading-snug">
                       {branchAddress}
                     </div>
-                    <div className="text-xs sm:text-sm text-black font-mono font-bold">Tel: {branchPhone}</div>
+                    <div className="text-xs sm:text-sm text-black font-mono font-bold mt-1 space-y-0.5">
+                      <div>Giriulla - 0372289339</div>
+                      <div>Dambadeniya - 0372266444</div>
+                      <div>Alawwa - 0372077180</div>
+                      <div>WhatsApp: +94772634497</div>
+                    </div>
                     <div className="text-xs sm:text-sm font-bold text-black mt-0.5">
                       VAT / Tax Reg ID: {taxNumber}
                     </div>
@@ -665,12 +668,12 @@ export function ReceiptModal({
                     {branchAddress}
                   </div>
                 )}
-                {branchPhone && (
-                  <div className="text-xs font-bold text-black flex items-center justify-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-black" />
-                    <span>{branchPhone}</span>
-                  </div>
-                )}
+                <div className="text-[11px] sm:text-xs font-bold text-black font-mono space-y-0.5 pt-1 text-center">
+                  <div>Giriulla - 0372289339</div>
+                  <div>Dambadeniya - 0372266444</div>
+                  <div>Alawwa - 0372077180</div>
+                  <div>WhatsApp: +94772634497</div>
+                </div>
                 {showTax && taxNumber && (
                   <div className="text-xs font-bold text-black pt-0.5">
                     VAT / Tax Reg: {taxNumber}

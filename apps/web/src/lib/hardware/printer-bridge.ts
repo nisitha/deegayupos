@@ -224,11 +224,10 @@ export class PrinterBridge {
               <span>${formattedQty} x ${Number(item.unitPrice).toFixed(2)}</span>
               <span style="font-weight: 800; color: #000000 !important;">${currency} ${Number(item.subtotal).toFixed(2)}</span>
             </div>
-            ${
-              item.discountAmount && Number(item.discountAmount) > 0
+            ${item.discountAmount && Number(item.discountAmount) > 0
                 ? `<div style="text-align: right; font-size: ${paperWidth === '58mm' ? '10px' : '11px'}; font-weight: 700; color: #000000 !important;">(Disc: -${currency} ${Number(item.discountAmount).toFixed(2)})</div>`
                 : ''
-            }
+              }
           </div>
         `;
           },
@@ -250,7 +249,7 @@ export class PrinterBridge {
         })
         .join('');
 
-      const resolvedBranchName = storeDetails?.branchName || (sale as any).branchName || 'Main Store';
+      const resolvedBranchName = storeDetails?.branchName || (sale as any).branchName || 'Alawwa';
       const cashierName = sale.cashier?.fullName || sale.cashierName || 'Branch Cashier';
       const billDate = formatSriLankaReceiptDate(sale.createdAt);
       const billTime = formatSriLankaReceiptTime(sale.createdAt);
@@ -316,7 +315,12 @@ export class PrinterBridge {
             Outlet: ${resolvedBranchName}
           </div>
           ${storeDetails?.address ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11px' : '12px'}; margin-top: 2px;">${storeDetails.address}</div>` : ''}
-          ${storeDetails?.phone ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11.5px' : '12.5px'};">Tel: ${storeDetails.phone}</div>` : ''}
+          <div class="center bold" style="font-size: ${paperWidth === '58mm' ? '10.5px' : '11.5px'}; margin-top: 3px; line-height: 1.35;">
+            <div>Giriulla - 0372289339</div>
+            <div>Dambadeniya - 0372266444</div>
+            <div>Alawwa - 0372077180</div>
+            <div>WhatsApp: +94772634497</div>
+          </div>
           ${storeDetails?.taxNumber ? `<div class="center bold" style="font-size: ${paperWidth === '58mm' ? '11px' : '12px'};">Tax Reg: ${storeDetails.taxNumber}</div>` : ''}
 
           <div class="divider-double"></div>
@@ -345,16 +349,14 @@ export class PrinterBridge {
             <span>Subtotal:</span>
             <span>${currency} ${Number(sale.subtotal).toFixed(2)}</span>
           </div>
-          ${
-            sale.discountAmount && Number(sale.discountAmount) > 0
-              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Discount:</span><span>-${currency} ${Number(sale.discountAmount).toFixed(2)}</span></div>`
-              : ''
-          }
-          ${
-            sale.taxAmount && Number(sale.taxAmount) > 0
-              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Tax (VAT):</span><span>${currency} ${Number(sale.taxAmount).toFixed(2)}</span></div>`
-              : ''
-          }
+          ${sale.discountAmount && Number(sale.discountAmount) > 0
+          ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Discount:</span><span>-${currency} ${Number(sale.discountAmount).toFixed(2)}</span></div>`
+          : ''
+        }
+          ${sale.taxAmount && Number(sale.taxAmount) > 0
+          ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'};"><span>Tax (VAT):</span><span>${currency} ${Number(sale.taxAmount).toFixed(2)}</span></div>`
+          : ''
+        }
           <div class="divider-double"></div>
           <div class="row extrabold" style="font-size: ${paperWidth === '58mm' ? '16px' : '19px'}; padding: 2px 0;">
             <span>NET TOTAL:</span>
@@ -363,11 +365,10 @@ export class PrinterBridge {
           <div class="divider-double"></div>
 
           ${paymentsHtml}
-          ${
-            sale.changeDue && Number(sale.changeDue) > 0
-              ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'}; margin-top: 2px;"><span>Change Due:</span><span>${currency} ${Number(sale.changeDue).toFixed(2)}</span></div>`
-              : ''
-          }
+          ${sale.changeDue && Number(sale.changeDue) > 0
+          ? `<div class="row bold" style="font-size: ${paperWidth === '58mm' ? '12px' : '14px'}; margin-top: 2px;"><span>Change Due:</span><span>${currency} ${Number(sale.changeDue).toFixed(2)}</span></div>`
+          : ''
+        }
 
           ${barcodeBlockHtml}
 
@@ -555,7 +556,7 @@ export class PrinterBridge {
     const escposOptions: EscPosReceiptOptions = {
       paperWidth: settings.paperWidth,
       storeName: storeDetails?.storeName || 'DEEGAYU WEDA MADHURA',
-      branchName: storeDetails?.branchName || (sale as any).branchName || 'Main Store',
+      branchName: storeDetails?.branchName || (sale as any).branchName || 'Alawwa',
       address: storeDetails?.address,
       phone: storeDetails?.phone,
       taxNumber: storeDetails?.taxNumber,

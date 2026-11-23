@@ -121,7 +121,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             parsed.branchId = normalizedId;
             localStorage.setItem('pixelcraft_pos_session', JSON.stringify(parsed));
           }
-        } catch {}
+        } catch { }
       } else {
         localStorage.removeItem('pixelcraft_selected_branch');
         localStorage.removeItem('pixelcraft_active_branch_id');
@@ -178,7 +178,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             name: 'Alawwa',
             code: 'BR-ALW',
             address: 'Deegayu Weda Madhura, Alawwa Road, Alawwa',
-            phone: '037-2241088',
+            phone: '0372077180',
             isPrimary: true,
             isActive: true,
           },
@@ -187,7 +187,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             name: 'Dambadeniya',
             code: 'BR-DAB',
             address: 'Deegayu Weda Madhura, Kurunegala Road, Dambadeniya',
-            phone: '037-2287411',
+            phone: '0372266444',
             isPrimary: false,
             isActive: true,
           },
@@ -196,7 +196,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             name: 'Giriulla',
             code: 'BR-GIR',
             address: 'Deegayu Weda Madhura, Negombo Road, Giriulla',
-            phone: '037-2288111',
+            phone: '0372289339',
             isPrimary: false,
             isActive: true,
           },
@@ -321,7 +321,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             return parsed.assignedBranchIds;
           }
         }
-      } catch {}
+      } catch { }
     }
     return [];
   }, [isOwner, branches, activeCashier?.assignedBranchIds, user?.assignedBranchIds]);
@@ -343,7 +343,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
             return parsed.grnBranchIds;
           }
         }
-      } catch {}
+      } catch { }
     }
     return [];
   }, [isOwner, branches, activeCashier?.grnBranchIds, user?.grnBranchIds]);

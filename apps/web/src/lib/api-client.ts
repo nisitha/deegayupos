@@ -1563,7 +1563,13 @@ export const posApi = {
           cashierFullName = 'Branch Cashier';
         }
         if (!resolvedBranchName) {
-          resolvedBranchName = 'Main Store';
+          const branchMap: Record<string, string> = {
+            '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54': 'Alawwa',
+            'fa68e4a0-a515-44c8-a082-5b5590366658': 'Dambadeniya',
+            '197693d6-4247-48df-b614-6fcde9e34f7d': 'Giriulla',
+            '197693d6-1431-4250-aa63-1b2135a6875c': 'Giriulla',
+          };
+          resolvedBranchName = (s.branch_id && branchMap[s.branch_id]) || 'Alawwa';
         }
 
         const sale: SaleDto = {
@@ -1710,16 +1716,16 @@ export const posApi = {
         business: {
           name: 'Deegayu Weda Madhura',
           legalName: 'Deegayu Ayurvedic Products & Health Care (Pvt) Ltd',
-          phone: '0772634497',
-          address: 'Deegayu Weda Madhura, Colombo, Sri Lanka',
-          receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store',
-          receiptFooter: 'Ayubowan! Thank you for purchasing authentic ayurvedic healthcare products.',
+          phone: 'WhatsApp: +94772634497',
+          address: 'Deegayu Weda Madhura, Sri Lanka',
+          receiptHeader: 'Giriulla - 0372289339\nDambadeniya - 0372266444\nAlawwa - 0372077180\nWhatsApp: +94772634497',
+          receiptFooter: 'Thank You Come Again',
         },
         branch: {
-          id: sale.branchId || 'main-branch',
-          name: sale.branchName || 'Main Store',
-          address: 'Colombo Road, Kiribathgoda, Sri Lanka',
-          phone: '+94 11 291 4500',
+          id: sale.branchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+          name: sale.branchName || 'Alawwa',
+          address: 'Deegayu Weda Madhura, Sri Lanka',
+          phone: '0372077180',
         },
         cashier: {
           id: sale.cashierId || 'cashier-1',
@@ -1728,7 +1734,7 @@ export const posApi = {
         },
         settings: {
           taxNumber: 'VAT-10928392-8000',
-          receiptHeader: 'DEEGAYU WEDA MADHURA\nAyurvedic Pharmacy & Healthcare Store',
+          receiptHeader: 'Giriulla - 0372289339\nDambadeniya - 0372266444\nAlawwa - 0372077180\nWhatsApp: +94772634497',
           receiptFooter: 'Thank You Come Again',
           returnPolicyText: 'Authentic ayurvedic medicine once opened is non-refundable.',
           showBarcode: true,
