@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo, useTransition } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -797,67 +797,104 @@ export default function DashboardPage() {
   };
 
   // ============================================================================
-  // BULK EXECUTIVE DATA FETCHER (DECOUPLED FROM DIMENSIONAL FILTERS)
+  // BULK EXECUTIVE DATA FETCHER (SILENT REAL-TIME BACKGROUND SYNC)
   // ============================================================================
-  const fetchExecutiveData = useCallback(async (forceRefresh = false) => {
-    if (!isOwner) return;
+  const isFetchingRef = useRef(false);
+  const hasPendingBackgroundFetchRef = useRef(false);
+  const realtimeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const cacheKey = getCacheKey(datePreset, customStart, customEnd);
-    const cached = dateRangeDatasetCache.get(cacheKey);
+  const fetchExecutiveData = useCallback(
+    async (optsOrForce?: boolean | { forceRefresh?: boolean; silent?: boolean }) => {
+      if (!isOwner) return;
 
-    if (!forceRefresh && cached) {
-      // 0ms instant render from memory cache
-      setSales(cached.sales);
-      setSaleItems(cached.saleItems);
-      setShifts(cached.shifts);
-      setModakaEntries(cached.modakaEntries);
-      setReconciliations(cached.reconciliations);
-      if (cached.activity) setActivity(cached.activity);
-      setLoading(false);
+      const options =
+        typeof optsOrForce === 'boolean'
+          ? { forceRefresh: optsOrForce, silent: false }
+          : optsOrForce || {};
+      const { forceRefresh = false, silent = false } = options;
 
-      // Background revalidation if older than 60s
-      if (Date.now() - cached.timestamp > 60 * 1000) {
-        setIsRevalidating(true);
-      } else {
+      // In-flight guard to eliminate cascading concurrent requests
+      if (isFetchingRef.current) {
+        hasPendingBackgroundFetchRef.current = true;
+        if (!silent) {
+          setIsNavigatingRange(true);
+        }
         return;
       }
-    } else {
-      // Uncached or forced refresh
-      setIsNavigatingRange(true);
-      // keepPreviousData: only show full loading skeleton if we have no prior data at all
-      setSales((prev) => {
-        if (!prev || prev.length === 0) setLoading(true);
-        return prev;
-      });
-    }
+      isFetchingRef.current = true;
 
-    try {
-      const masterData = await fetchMasterData(forceRefresh);
-      setProducts(masterData.products);
-      setStockLevels(masterData.stockLevels);
-      setCashierOptions(masterData.cashierOptions);
+      const cacheKey = getCacheKey(datePreset, customStart, customEnd);
+      const cached = dateRangeDatasetCache.get(cacheKey);
 
-      const dataset = await fetchDateRangeDataset(datePreset, customStart, customEnd, masterData);
-      dateRangeDatasetCache.set(cacheKey, dataset);
+      // Only trigger visual navigation indicators when NOT in silent mode
+      if (!silent) {
+        if (!forceRefresh && cached) {
+          // 0ms instant render from memory cache
+          setSales(cached.sales);
+          setSaleItems(cached.saleItems);
+          setShifts(cached.shifts);
+          setModakaEntries(cached.modakaEntries);
+          setReconciliations(cached.reconciliations);
+          if (cached.activity) setActivity(cached.activity);
+          setLoading(false);
 
-      setSales(dataset.sales);
-      setSaleItems(dataset.saleItems);
-      setShifts(dataset.shifts);
-      setModakaEntries(dataset.modakaEntries);
-      setReconciliations(dataset.reconciliations);
-      setActivity(dataset.activity);
-    } catch (err) {
-      console.error('[Dashboard] Telemetry query error:', err);
-    } finally {
-      setLoading(false);
-      setIsNavigatingRange(false);
-      setIsRevalidating(false);
-    }
-  }, [isOwner, datePreset, customStart, customEnd]);
+          // Background revalidation if older than 60s
+          if (Date.now() - cached.timestamp > 60 * 1000) {
+            setIsRevalidating(true);
+          } else {
+            isFetchingRef.current = false;
+            return;
+          }
+        } else {
+          // User navigation or forced manual refresh
+          setIsNavigatingRange(true);
+          setSales((prev) => {
+            if (!prev || prev.length === 0) setLoading(true);
+            return prev;
+          });
+        }
+      }
+
+      try {
+        const masterData = await fetchMasterData(forceRefresh);
+        const dataset = await fetchDateRangeDataset(datePreset, customStart, customEnd, masterData);
+        dateRangeDatasetCache.set(cacheKey, dataset);
+
+        // Atomic in-place update with zero layout shift or visual flicker
+        setProducts(masterData.products);
+        setStockLevels(masterData.stockLevels);
+        setCashierOptions(masterData.cashierOptions);
+        setSales(dataset.sales);
+        setSaleItems(dataset.saleItems);
+        setShifts(dataset.shifts);
+        setModakaEntries(dataset.modakaEntries);
+        setReconciliations(dataset.reconciliations);
+        setActivity(dataset.activity);
+      } catch (err) {
+        console.error('[Dashboard] Telemetry query error:', err);
+      } finally {
+        isFetchingRef.current = false;
+        if (!silent) {
+          setLoading(false);
+          setIsNavigatingRange(false);
+          setIsRevalidating(false);
+        }
+        // Execute trailing background refresh if updates were queued while in flight
+        if (hasPendingBackgroundFetchRef.current) {
+          hasPendingBackgroundFetchRef.current = false;
+          fetchExecutiveDataRef.current({ forceRefresh: true, silent: true });
+        }
+      }
+    },
+    [isOwner, datePreset, customStart, customEnd]
+  );
+
+  const fetchExecutiveDataRef = useRef(fetchExecutiveData);
+  fetchExecutiveDataRef.current = fetchExecutiveData;
 
   useEffect(() => {
     if (isOwner) {
-      fetchExecutiveData(false);
+      fetchExecutiveData({ forceRefresh: false, silent: false });
     }
   }, [isOwner, fetchExecutiveData]);
 
@@ -884,8 +921,25 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [isOwner, loading]);
 
-  // Real-time listener: triggers background refresh when sales or shifts change
-  useRealtimePosSync(() => fetchExecutiveData(true));
+  // Stable debounced handler for Realtime and polling background sync (800ms debounce)
+  const triggerSilentRefresh = useCallback(() => {
+    if (realtimeTimerRef.current) {
+      clearTimeout(realtimeTimerRef.current);
+    }
+    realtimeTimerRef.current = setTimeout(() => {
+      fetchExecutiveDataRef.current({ forceRefresh: true, silent: true });
+    }, 800);
+  }, []);
+
+  useRealtimePosSync(triggerSilentRefresh);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeTimerRef.current) {
+        clearTimeout(realtimeTimerRef.current);
+      }
+    };
+  }, []);
 
   // ============================================================================
   // DERIVED FILTERING & EXACT PROFIT CALCULATION ENGINE
@@ -1726,7 +1780,7 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => fetchExecutiveData(true)}
+              onClick={() => fetchExecutiveData({ forceRefresh: true, silent: false })}
               disabled={loading || isNavigatingRange}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
             >
@@ -2206,6 +2260,7 @@ export default function DashboardPage() {
                   />
                   <Tooltip content={<CustomTimelineTooltip currency={currency} />} />
                   <Area
+                    key="area-sales"
                     type="monotone"
                     dataKey="sales"
                     stroke="#2563EB"
@@ -2213,8 +2268,10 @@ export default function DashboardPage() {
                     fillOpacity={1}
                     fill="url(#revenueGrad)"
                     name="sales"
+                    isAnimationActive={false}
                   />
                   <Area
+                    key="area-profit"
                     type="monotone"
                     dataKey="profit"
                     stroke="#10B981"
@@ -2222,6 +2279,7 @@ export default function DashboardPage() {
                     fillOpacity={1}
                     fill="url(#profitGrad)"
                     name="profit"
+                    isAnimationActive={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>

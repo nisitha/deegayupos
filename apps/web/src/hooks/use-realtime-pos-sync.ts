@@ -91,6 +91,11 @@ export function useRealtimePosSync(
         { event: '*', schema: 'public', table: 'shift_modaka_entries' },
         () => debouncedReload('📦 Special Stock updated')
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'stock_levels' },
+        () => debouncedReload('📦 Stock updated')
+      )
       .subscribe();
 
     // 2. Silent 15-second background interval fallback
