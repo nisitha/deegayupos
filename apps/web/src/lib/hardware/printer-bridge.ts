@@ -217,9 +217,15 @@ export class PrinterBridge {
               formattedQty = `${num.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${conf.baseUnit}`;
             }
 
+            const isBulk = String(item.productName || '').includes('(25-Pack Bulk)') || (item as any).isSpecialBulk;
+            const bulkSubline = isBulk
+              ? `<div style="font-size: 11px; font-weight: 600; color: #222222; margin-top: 1px;">${item.quantity} × 25-Pack = ${Number(item.quantity) * 25} units @ LKR ${(Number(item.unitPrice) / 25).toFixed(2)}</div>`
+              : '';
+
             return `
           <div style="margin-bottom: 5px;">
             <div style="font-weight: 700; font-size: ${paperWidth === '58mm' ? '12px' : '13.5px'}; color: #000000 !important; line-height: 1.25;">${item.productName}</div>
+            ${bulkSubline}
             <div style="display: flex; justify-content: space-between; font-size: ${paperWidth === '58mm' ? '11px' : '12.5px'}; font-weight: 700; color: #000000 !important; margin-top: 1px;">
               <span>${formattedQty} x ${Number(item.unitPrice).toFixed(2)}</span>
               <span style="font-weight: 800; color: #000000 !important;">${currency} ${Number(item.subtotal).toFixed(2)}</span>

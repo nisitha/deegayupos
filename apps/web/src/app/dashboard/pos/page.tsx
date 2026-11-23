@@ -55,6 +55,7 @@ import { ReceiptModal } from '../../../components/pos/receipt-modal';
 import { ShiftStartModal } from '../../../components/pos/shift-start-modal';
 import { ShiftEndModal } from '../../../components/pos/shift-end-modal';
 import { ModakaStockInModal } from '../../../components/pos/modaka-stock-in-modal';
+import { SpecialBulkModal, type SpecialBulkSelection } from '../../../components/pos/special-bulk-modal';
 import { DiscountPickerModal } from '../../../components/pos/discount-picker-modal';
 import { CustomSaleModal } from '../../../components/pos/custom-sale-modal';
 import { CashierSwitcherModal } from '../../../components/pos/cashier-switcher-modal';
@@ -321,6 +322,7 @@ export default function ConfidencyPosPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isEndShiftModalOpen, setIsEndShiftModalOpen] = useState(false);
   const [isModakaStockInModalOpen, setIsModakaStockInModalOpen] = useState(false);
+  const [isSpecialBulkModalOpen, setIsSpecialBulkModalOpen] = useState(false);
   const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
   const [resumableTodayShift, setResumableTodayShift] = useState<any | null>(null);
   const [isResumingShift, setIsResumingShift] = useState(false);
@@ -1102,7 +1104,14 @@ export default function ConfidencyPosPage() {
     setCart((prev) =>
       prev.map((it) => {
         if (it.id !== itemId) return it;
-        return { ...it, quantity: it.quantity + 1 };
+        const newQty = it.quantity + 1;
+        const isBulk = (it as any).isSpecialBulk;
+        return {
+          ...it,
+          quantity: newQty,
+          displayQuantity: newQty,
+          totalUnits: isBulk ? newQty * 25 : (it as any).totalUnits,
+        };
       })
     );
   };
@@ -1112,11 +1121,63 @@ export default function ConfidencyPosPage() {
       prev
         .map((it) => {
           if (it.id !== itemId) return it;
-          return { ...it, quantity: Math.max(0, it.quantity - 1) };
+          const newQty = Math.max(0, it.quantity - 1);
+          const isBulk = (it as any).isSpecialBulk;
+          return {
+            ...it,
+            quantity: newQty,
+            displayQuantity: newQty,
+            totalUnits: isBulk ? newQty * 25 : (it as any).totalUnits,
+          };
         })
         .filter((it) => it.quantity > 0)
     );
   };
+
+  const handleAddSpecialBulkToCart = useCallback((bulkItem: SpecialBulkSelection) => {
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex(
+        (ci) => ci.productId === bulkItem.productId && (ci as any).isSpecialBulk
+      );
+
+      if (existingIndex >= 0 && prevCart[existingIndex]) {
+        const next = [...prevCart];
+        const existing = next[existingIndex]!;
+        const newPacks = (existing.quantity || 1) + bulkItem.packsCount;
+        const newTotalUnits = newPacks * 25;
+        next[existingIndex] = {
+          ...existing,
+          quantity: newPacks,
+          displayQuantity: newPacks,
+          totalUnits: newTotalUnits,
+          price: bulkItem.packPrice,
+        } as any;
+        return next;
+      }
+
+      const newCartItem: CartItem = {
+        id: `bulk-${bulkItem.productId}-${Date.now()}`,
+        productId: bulkItem.productId,
+        name: `${bulkItem.productName} (25-Pack Bulk)`,
+        sku: bulkItem.productSku || 'SPECIAL-BULK',
+        price: bulkItem.packPrice,
+        originalUnitPrice: bulkItem.packPrice,
+        costPrice: 0,
+        quantity: bulkItem.packsCount,
+        stockOnHand: bulkItem.totalUnits,
+        unit: 'pack',
+        isSpecialBulk: true,
+        packsCount: bulkItem.packsCount,
+        unitsPerPack: 25,
+        totalUnits: bulkItem.totalUnits,
+      } as any;
+
+      return [...prevCart, newCartItem];
+    });
+
+    setScanFeedback(`Added ${bulkItem.packsCount} pack(s) of ${bulkItem.productName} (25-Pack) to cart`);
+    setTimeout(() => setScanFeedback(null), 3000);
+  }, []);
 
   const clearCart = useCallback(() => {
     setEditingItemId(null);
@@ -1376,6 +1437,9 @@ export default function ConfidencyPosPage() {
             subtotal: item.price * item.quantity,
             discountAmount: 0,
             taxAmount: 0,
+            isSpecialBulk: (item as any).isSpecialBulk,
+            packsCount: (item as any).packsCount,
+            totalUnits: (item as any).totalUnits,
           })),
           payments: [
             {
@@ -1469,7 +1533,8 @@ export default function ConfidencyPosPage() {
         const soldQtyMap = new Map<string, number>();
         cart.forEach((cItem) => {
           const current = soldQtyMap.get(cItem.productId) || 0;
-          soldQtyMap.set(cItem.productId, current + cItem.quantity);
+          const units = Number((cItem as any).totalUnits || ((cItem as any).isSpecialBulk ? cItem.quantity * 25 : cItem.quantity));
+          soldQtyMap.set(cItem.productId, current + units);
         });
 
         setProducts((prevProducts) =>
@@ -1788,9 +1853,9 @@ export default function ConfidencyPosPage() {
           </div>
         )}
 
-        {/* 2. Sleek Horizontal Action Pills (Universal fluid grid: 2 cols on mobile, 3 on sm, 5 on lg) */}
+        {/* 2. Sleek Horizontal Action Pills (Universal fluid grid: 2 cols on mobile, 3 on sm, 6 on lg) */}
         <div className="px-2.5 sm:px-4 lg:px-5 py-2 bg-slate-100/70 border-b border-slate-200/80 shrink-0">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
             {/* Pill 1: Discount [F8] */}
             <button
               type="button"
@@ -1901,7 +1966,7 @@ export default function ConfidencyPosPage() {
             <button
               type="button"
               onClick={() => setIsModakaStockInModalOpen(true)}
-              className="col-span-2 sm:col-span-1 lg:col-span-1 h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700 min-w-0"
+              className="h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-rose-600 hover:bg-rose-700 min-w-0"
               title="Record incoming Special Stock [F7]"
             >
               <div className="flex items-center gap-1.5 min-w-0">
@@ -1910,6 +1975,22 @@ export default function ConfidencyPosPage() {
               </div>
               <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
                 F7
+              </span>
+            </button>
+
+            {/* Pill 6: Special Bulk (25-Pack) */}
+            <button
+              type="button"
+              onClick={() => setIsSpecialBulkModalOpen(true)}
+              className="h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-1.5 text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer select-none bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 min-w-0"
+              title="Add Special Item (25-Pack Bulk) to Bill"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Package className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                <span className="text-xs xl:text-sm font-bold whitespace-nowrap truncate">Special Bulk (25-Pk)</span>
+              </div>
+              <span className="text-[10px] xl:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-black/20 text-white shrink-0">
+                25-Pk
               </span>
             </button>
           </div>
@@ -2074,7 +2155,21 @@ export default function ConfidencyPosPage() {
                                       : 'text-emerald-600 font-semibold'
                                 }
                               >
-                                {item.stockOnHand <= 0 ? 'Out of Stock (0)' : `In Stock: ${item.stockOnHand}`}
+                                {item.stockOnHand <= 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                                    <span>Out of Stock (0)</span>
+                                    <a
+                                      href={`/dashboard/transfers?search=${encodeURIComponent(item.name)}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline decoration-indigo-400"
+                                      title="Check stock at other branches and request transfer"
+                                    >
+                                      Check Other Branches &rarr;
+                                    </a>
+                                  </span>
+                                ) : (
+                                  `In Stock: ${item.stockOnHand}`
+                                )}
                               </span>
                             </div>
                           </div>
@@ -2307,9 +2402,19 @@ export default function ConfidencyPosPage() {
                         {/* High-Contrast Branch Stock Badge */}
                         <div className="mt-1.5 flex items-center">
                           {product.stockOnHand <= 0 ? (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-mono shadow-2xs">
-                              Out of Stock (0)
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-mono shadow-2xs">
+                                Out of Stock (0)
+                              </span>
+                              <a
+                                href={`/dashboard/transfers?search=${encodeURIComponent(product.name)}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-0.5"
+                                title="Check stock at other branches and request transfer"
+                              >
+                                Check Other Branches &rarr;
+                              </a>
+                            </div>
                           ) : product.stockOnHand <= 5 ? (
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-mono shadow-2xs">
                               Low Stock: {product.stockOnHand}
@@ -2490,6 +2595,11 @@ export default function ConfidencyPosPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-md shrink-0 ${theme.unitBadge}`}>
                           {unitBadge.label}
                         </span>
+                        {(item as any).isSpecialBulk && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-300 shrink-0 font-mono">
+                            25-Pack Bulk ({(item as any).totalUnits || (item.quantity * 25)} units)
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -2927,6 +3037,11 @@ export default function ConfidencyPosPage() {
                           <span className={`text-xs px-2 py-0.5 rounded-md shrink-0 ${theme.unitBadge}`}>
                             {unitBadge.label}
                           </span>
+                          {(item as any).isSpecialBulk && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-300 shrink-0 font-mono">
+                              25-Pack Bulk ({(item as any).totalUnits || (item.quantity * 25)} units)
+                            </span>
+                          )}
                         </div>
                       </div>
                       <button
@@ -3219,6 +3334,16 @@ export default function ConfidencyPosPage() {
           setScanFeedback('Special incoming stock (B) updated.');
           setTimeout(() => setScanFeedback(null), 3000);
         }}
+      />
+
+      {/* Special Item 25-Pack Bulk Modal */}
+      <SpecialBulkModal
+        isOpen={isSpecialBulkModalOpen}
+        onClose={() => setIsSpecialBulkModalOpen(false)}
+        activeShift={activeShift}
+        branchId={selectedBranchId || ''}
+        branchName={currentBranchName}
+        onAddToCart={handleAddSpecialBulkToCart}
       />
 
       {/* 1. Start Shift Opening Drawer Count Modal (Mandatory Blind Count - Cashiers Only) */}

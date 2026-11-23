@@ -339,10 +339,10 @@ export function ReceiptModal({
             left: 0 !important;
             top: 0 !important;
             width: ${paperSize === 'MM_58'
-              ? '58mm'
-              : paperSize === 'A4'
-              ? '100%'
-              : paperSize === 'A5'
+          ? '58mm'
+          : paperSize === 'A4'
+            ? '100%'
+            : paperSize === 'A5'
               ? '148mm'
               : '80mm'} !important;
             margin: 0 !important;
@@ -355,10 +355,10 @@ export function ReceiptModal({
           @page {
             margin: 0;
             size: ${paperSize === 'A4'
-              ? 'A4 portrait'
-              : paperSize === 'A5'
-              ? 'A5 portrait'
-              : paperSize === 'MM_58'
+          ? 'A4 portrait'
+          : paperSize === 'A5'
+            ? 'A5 portrait'
+            : paperSize === 'MM_58'
               ? '58mm auto'
               : '80mm auto'};
           }
@@ -399,11 +399,10 @@ export function ReceiptModal({
                 key={size.id}
                 type="button"
                 onClick={() => setPaperSize(size.id)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  paperSize === size.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${paperSize === size.id
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+                  }`}
               >
                 {size.label}
               </button>
@@ -421,13 +420,12 @@ export function ReceiptModal({
 
         {directPrintStatus && (
           <div
-            className={`px-5 py-2 text-xs font-semibold flex items-center justify-between border-b ${
-              directPrintStatus.startsWith('✓')
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : directPrintStatus.startsWith('❌')
+            className={`px-5 py-2 text-xs font-semibold flex items-center justify-between border-b ${directPrintStatus.startsWith('✓')
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : directPrintStatus.startsWith('❌')
                 ? 'bg-rose-50 text-rose-800 border-rose-200'
                 : 'bg-indigo-50 text-indigo-800 border-indigo-200'
-            }`}
+              }`}
           >
             <span>{directPrintStatus}</span>
             <button
@@ -549,7 +547,12 @@ export function ReceiptModal({
                       <tr key={idx} className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-3 text-black font-bold">{idx + 1}</td>
                         <td className="py-2.5 px-3 font-sans font-bold text-black">
-                          {item.productName}
+                          <div>{item.productName}</div>
+                          {(item.productName.includes('(25-Pack Bulk)') || (item as any).isSpecialBulk) && (
+                            <div className="text-[11px] text-slate-600 font-mono font-normal">
+                              {item.quantity} × 25-Pack = {item.quantity * 25} units @ LKR {(Number(item.unitPrice) / 25).toFixed(2)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-black font-semibold">{item.sku || 'N/A'}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-black">{Number(item.unitPrice).toFixed(2)}</td>
@@ -741,6 +744,11 @@ export function ReceiptModal({
                         {formatCurrency(Number(item.subtotal))}
                       </span>
                     </div>
+                    {(item.productName.includes('(25-Pack Bulk)') || (item as any).isSpecialBulk) && (
+                      <div className="text-[11px] text-slate-700 font-mono font-semibold">
+                        {item.quantity} × 25-Pack = {item.quantity * 25} units @ LKR {(Number(item.unitPrice) / 25).toFixed(2)}
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs font-bold text-black">
                       <span>{formatReceiptQuantity(item.productName, item.quantity)} x {formatCurrency(Number(item.unitPrice))}</span>
                       {item.discountAmount && Number(item.discountAmount) > 0 && (
@@ -936,22 +944,20 @@ export function ReceiptModal({
                   <button
                     type="button"
                     onClick={() => setShareMode('SMS')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                      shareMode === 'SMS'
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${shareMode === 'SMS'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
                   >
                     SMS
                   </button>
                   <button
                     type="button"
                     onClick={() => setShareMode('EMAIL')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                      shareMode === 'EMAIL'
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${shareMode === 'EMAIL'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
                   >
                     Email
                   </button>

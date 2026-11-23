@@ -1263,6 +1263,9 @@ export const posApi = {
     for (const item of data.items) {
       if (item.productId && isValidUuid(item.productId)) {
         try {
+          const isBulk = (item as any).isSpecialBulk || String(item.productName || '').includes('(25-Pack Bulk)') || String(item.productName || '').includes('25-Pack');
+          const qtyToDeduct = Number((item as any).totalUnits || (isBulk ? Number(item.quantity || 1) * 25 : (item.quantity || 1)));
+
           const { data: stockRow, error: sErr } = await supabase
             .from('stock_levels')
             .select('id, quantity_on_hand')
@@ -1272,7 +1275,7 @@ export const posApi = {
 
           if (!sErr && stockRow) {
             const currentQty = Number(stockRow.quantity_on_hand) || 0;
-            const nextQty = Math.max(0, currentQty - Number(item.quantity || 1));
+            const nextQty = Math.max(0, currentQty - qtyToDeduct);
             await supabase
               .from('stock_levels')
               .update({
@@ -1292,6 +1295,37 @@ export const posApi = {
                 quantity_reserved: 0,
                 updated_at: new Date().toISOString(),
               });
+          }
+
+          // If item is Special Stock (25-Pack bulk item), sync active shift's shift_modaka_entries
+          if (shiftId && isBulk) {
+            try {
+              const { data: smeRow } = await supabase
+                .from('shift_modaka_entries')
+                .select('id, opening_qty, in_qty, total_available_qty, sold_qty, applied_rate')
+                .eq('shift_id', shiftId)
+                .eq('product_id', item.productId)
+                .maybeSingle();
+
+              if (smeRow) {
+                const currentSold = Number(smeRow.sold_qty) || 0;
+                const newSold = currentSold + qtyToDeduct;
+                const totalAvail = Number(smeRow.total_available_qty) || (Number(smeRow.opening_qty) + Number(smeRow.in_qty));
+                const newClosing = Math.max(0, totalAvail - newSold);
+                const rate = Number(smeRow.applied_rate) || 250;
+                await supabase
+                  .from('shift_modaka_entries')
+                  .update({
+                    sold_qty: newSold,
+                    closing_qty: newClosing,
+                    total_amount: newSold * rate,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', smeRow.id);
+              }
+            } catch (smeErr) {
+              console.warn('[posApi.checkout] Shift special stock sync note:', smeErr);
+            }
           }
         } catch (stockErr) {
           console.warn(`[posApi.checkout] Stock decrement warning for product ${item.productId} at warehouse ${targetWarehouseId}:`, stockErr);
@@ -3393,6 +3427,7 @@ export interface EndShiftPayload {
     soldQty: number;
     appliedRate: number;
   }[];
+  posBulkSpecialSalesTotal?: number;
 }
 
 export function getColomboDateStr(d: Date = new Date()): string {
@@ -3432,6 +3467,8 @@ export interface LiveShiftPosSalesData {
   posCashSales: number;
   posGrossSales: number;
   bills: ShiftCashBillItem[];
+  posBulkSpecialSalesTotal?: number;
+  posBulkSpecialUnitsMap?: Record<string, { packs: number; units: number; amount: number }>;
 }
 
 export const shiftsApi = {
@@ -4641,8 +4678,10 @@ export const shiftsApi = {
           ? payload.declaredShiftSale
           : posCash
       );
-      const specialStockSalesTotal = modakaTotalAmount;
-      const totalCashInflow = Math.round((openingFloat + systemPosCashSales + specialStockSalesTotal) * 100) / 100;
+      // Double-counting prevention: POS bulk special sales are already counted in systemPosCashSales
+      const posBulkSpecialSalesTotal = Number(payload.posBulkSpecialSalesTotal || 0);
+      const counterRetailSpecialSales = Math.max(0, modakaTotalAmount - posBulkSpecialSalesTotal);
+      const totalCashInflow = Math.round((openingFloat + systemPosCashSales + counterRetailSpecialSales) * 100) / 100;
 
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
@@ -5185,6 +5224,40 @@ export const shiftsApi = {
         }
       });
 
+      // Special item 25-pack bulk POS sales analysis to avoid double-counting in shift reconciliation
+      let posBulkSpecialSalesTotal = 0;
+      const posBulkSpecialUnitsMap: Record<string, { packs: number; units: number; amount: number }> = {};
+
+      const matchingSaleIds = bills.map((b) => b.id);
+      if (matchingSaleIds.length > 0) {
+        try {
+          const { data: shiftSaleItems } = await supabase
+            .from('sale_items')
+            .select('sale_id, product_id, product_name, quantity, unit_price, subtotal')
+            .in('sale_id', matchingSaleIds);
+
+          (shiftSaleItems || []).forEach((item: any) => {
+            const pName = String(item.product_name || '');
+            const isBulk = pName.includes('(25-Pack Bulk)') || pName.includes('25-Pack');
+            if (isBulk && item.product_id) {
+              const packs = Number(item.quantity || 1);
+              const units = packs * 25;
+              const amt = Number(item.subtotal ?? (packs * Number(item.unit_price || 0)));
+
+              posBulkSpecialSalesTotal += amt;
+              const prevEntry = posBulkSpecialUnitsMap[item.product_id] || { packs: 0, units: 0, amount: 0 };
+              posBulkSpecialUnitsMap[item.product_id] = {
+                packs: prevEntry.packs + packs,
+                units: prevEntry.units + units,
+                amount: prevEntry.amount + amt,
+              };
+            }
+          });
+        } catch (itemErr) {
+          console.warn('[shiftsApi] getLiveShiftPosSales sale_items query error:', itemErr);
+        }
+      }
+
       return {
         success: true,
         data: {
@@ -5192,6 +5265,8 @@ export const shiftsApi = {
           posCashSales: Math.round(Number(posCashSales || 0) * 100) / 100,
           posGrossSales: Math.round(Number(posGrossSales || 0) * 100) / 100,
           bills,
+          posBulkSpecialSalesTotal: Math.round(posBulkSpecialSalesTotal * 100) / 100,
+          posBulkSpecialUnitsMap,
         },
       };
     } catch (err: any) {

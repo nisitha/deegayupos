@@ -115,6 +115,8 @@ export function ShiftEndModal({
   // Section 3: Shift Cash & Expense Summary state
   const [openingFloat, setOpeningFloat] = useState<number>(0);
   const [declaredShiftSale, setDeclaredShiftSale] = useState<number>(0);
+  const [posBulkSpecialSalesTotal, setPosBulkSpecialSalesTotal] = useState<number>(0);
+  const [posBulkSpecialUnitsMap, setPosBulkSpecialUnitsMap] = useState<Record<string, { packs: number; units: number; amount: number }>>({});
   const [livePosBillCount, setLivePosBillCount] = useState<number>(0);
   const [liveCashBills, setLiveCashBills] = useState<ShiftCashBillItem[]>([]);
   const [isCashBillsExpanded, setIsCashBillsExpanded] = useState<boolean>(false);
@@ -306,15 +308,21 @@ export function ShiftEndModal({
             setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
             setLivePosBillCount(Number(liveSalesRes.data.posBills || 0));
             setLiveCashBills(liveSalesRes.data.bills || []);
+            setPosBulkSpecialSalesTotal(Number(liveSalesRes.data.posBulkSpecialSalesTotal || 0));
+            setPosBulkSpecialUnitsMap(liveSalesRes.data.posBulkSpecialUnitsMap || {});
           } else {
             setDeclaredShiftSale(0);
             setLivePosBillCount(0);
             setLiveCashBills([]);
+            setPosBulkSpecialSalesTotal(0);
+            setPosBulkSpecialUnitsMap({});
           }
         } catch {
           setDeclaredShiftSale(0);
           setLivePosBillCount(0);
           setLiveCashBills([]);
+          setPosBulkSpecialSalesTotal(0);
+          setPosBulkSpecialUnitsMap({});
         }
 
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
@@ -405,10 +413,15 @@ export function ShiftEndModal({
 
   // Step 02 & 03 Math: totalDrawerCashCounted, bankDepositAmount, remainingDrawerCash defined at component top
 
-  // 1. Total Cash Inflow = openingFloat + declaredShiftSale (POS cash) + modakaSalesTotal (Special stock sales)
+  // Double-counting prevention: POS bulk special sales are already inside declaredShiftSale
+  const counterRetailSpecialSales = useMemo(() => {
+    return Math.max(0, Math.round((modakaSalesTotal - posBulkSpecialSalesTotal) * 100) / 100);
+  }, [modakaSalesTotal, posBulkSpecialSalesTotal]);
+
+  // 1. Total Cash Inflow = openingFloat + declaredShiftSale (POS cash) + counterRetailSpecialSales (Manual counter special stock sales)
   const totalCashInflow = useMemo(() => {
-    return Math.round((openingFloat + declaredShiftSale + modakaSalesTotal) * 100) / 100;
-  }, [openingFloat, declaredShiftSale, modakaSalesTotal]);
+    return Math.round((openingFloat + declaredShiftSale + counterRetailSpecialSales) * 100) / 100;
+  }, [openingFloat, declaredShiftSale, counterRetailSpecialSales]);
 
   const currentShift = activeShift || localShift;
 
@@ -467,6 +480,8 @@ export function ShiftEndModal({
         setDeclaredShiftSale(Number(liveSalesRes.data.posCashSales || 0));
         setLivePosBillCount(Number(liveSalesRes.data.posBills || 0));
         setLiveCashBills(liveSalesRes.data.bills || []);
+        setPosBulkSpecialSalesTotal(Number(liveSalesRes.data.posBulkSpecialSalesTotal || 0));
+        setPosBulkSpecialUnitsMap(liveSalesRes.data.posBulkSpecialUnitsMap || {});
       }
     } catch (err) {
       console.warn('[ShiftEndModal] refreshLiveSales error:', err);
@@ -554,6 +569,7 @@ export function ShiftEndModal({
       closingDrawerFloat: remainingDrawerCash,
       denominationsJson: counts,
       handoverNotes: finalHandoverNotes,
+      posBulkSpecialSalesTotal,
       modakaEntries: modakaRows.map((r) => ({
         productId: r.productId,
         openingQty: r.openingQty,
@@ -773,6 +789,7 @@ export function ShiftEndModal({
                           const totalAvail = row.openingQty + actualStockInUnits;
                           const closing = Math.max(0, totalAvail - row.soldQty);
                           const lineSales = row.soldQty * row.appliedRate;
+                          const bulkInfo = posBulkSpecialUnitsMap[row.productId];
                           return (
                             <tr key={row.productId} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-2.5 px-3">
@@ -787,9 +804,16 @@ export function ShiftEndModal({
                                     >
                                       {row.productName}
                                     </span>
-                                    <span className="font-mono text-[11px] text-slate-500 block">
-                                      {row.productSku || `SKU-337${idx + 1}`}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                      <span className="font-mono text-[11px] text-slate-500">
+                                        {row.productSku || `SKU-337${idx + 1}`}
+                                      </span>
+                                      {bulkInfo && bulkInfo.units > 0 && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                          POS Bulk Sold: {bulkInfo.packs} pk ({bulkInfo.units} u)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1155,18 +1179,25 @@ export function ShiftEndModal({
                         </div>
 
                         {/* 3. Special Stock Sales */}
-                        <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 flex items-center justify-between gap-3">
-                          <div>
-                            <span className="font-bold text-[15px] text-purple-950 block">
-                              Special Stock Sales
-                            </span>
-                            <span className="text-xs text-purple-700 block mt-0.5">
-                              Auto-calculated from Step 1 Special Stock ({modakaUnitsTotal} units)
+                        <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200 space-y-1.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <span className="font-bold text-[15px] text-purple-950 block">
+                                Special Stock Sales
+                              </span>
+                              <span className="text-xs text-purple-700 block mt-0.5">
+                                Total Special Stock sold: {modakaUnitsTotal} units (LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                              </span>
+                            </div>
+                            <span className="font-mono text-lg font-bold text-purple-900 shrink-0">
+                              + LKR {counterRetailSpecialSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <span className="font-mono text-lg font-bold text-purple-900 shrink-0">
-                            + LKR {modakaSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
+                          {posBulkSpecialSalesTotal > 0 && (
+                            <div className="text-[11px] text-purple-800 bg-purple-100/70 p-2 rounded-lg font-medium">
+                              Note: LKR {posBulkSpecialSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of Special Stock was sold via POS Bulk and is already counted in POS Cash Sales above. Adding LKR {counterRetailSpecialSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} counter retail.
+                            </div>
+                          )}
                         </div>
 
                         {/* Subtotal: Total Shift Cash Hero Box */}
@@ -1267,11 +1298,10 @@ export function ShiftEndModal({
                               placeholder="0.00"
                               value={bankDepositAmountInput}
                               onChange={(e) => setBankDepositAmountInput(e.target.value)}
-                              className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg border focus:outline-none focus:ring-2 ${
-                                isBankDepositExceeding
-                                  ? 'bg-rose-50 text-rose-900 border-rose-400 focus:ring-rose-200'
-                                  : 'bg-rose-50/50 text-rose-900 border-rose-200 focus:border-rose-400 focus:ring-rose-200'
-                              }`}
+                              className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg border focus:outline-none focus:ring-2 ${isBankDepositExceeding
+                                ? 'bg-rose-50 text-rose-900 border-rose-400 focus:ring-rose-200'
+                                : 'bg-rose-50/50 text-rose-900 border-rose-200 focus:border-rose-400 focus:ring-rose-200'
+                                }`}
                             />
                           </div>
                         </div>
