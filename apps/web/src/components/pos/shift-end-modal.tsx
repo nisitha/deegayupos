@@ -121,25 +121,42 @@ export function ShiftEndModal({
   const [isRefreshingSales, setIsRefreshingSales] = useState<boolean>(false);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
-  const [countedRemainingCashInput, setCountedRemainingCashInput] = useState<string>('');
+  const [bankDepositAmountInput, setBankDepositAmountInput] = useState<string>('');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [customBankDetails, setCustomBankDetails] = useState<string>('');
   const [handoverNotes, setHandoverNotes] = useState<string>('');
   const openingMetadataRef = useRef<Record<string, any> | null>(null);
 
-  const enteredRemainingCash = useMemo(() => {
-    const trimmed = countedRemainingCashInput.trim();
-    if (!trimmed) return 0;
-    const num = Number(trimmed);
-    return !isNaN(num) && num >= 0 ? Math.round(num * 100) / 100 : 0;
-  }, [countedRemainingCashInput]);
+  // Step 02 Drawer Cash Count: Sum of all physical notes & coins counted in drawer
+  const totalDrawerCashCounted = useMemo(() => {
+    return DENOMINATIONS.reduce((acc, d) => acc + d * (counts[d] || 0), 0);
+  }, [counts]);
 
-  const isRemainingCashValid = useMemo(() => {
-    const trimmed = countedRemainingCashInput.trim();
-    if (!trimmed) return false;
-    const num = Number(trimmed);
-    return !isNaN(num) && num >= 0;
-  }, [countedRemainingCashInput]);
+
+  // Step 03 Manual Bank Deposit Amount (Entered by cashier)
+  const bankDepositAmount = useMemo(() => {
+    const trimmed = bankDepositAmountInput.trim();
+    if (!trimmed) return 0;
+    const num = parseFloat(trimmed);
+    return !isNaN(num) && num >= 0 ? Math.round(num * 100) / 100 : 0;
+  }, [bankDepositAmountInput]);
+
+  const isBankDepositExceeding = useMemo(() => {
+    return bankDepositAmount > totalDrawerCashCounted;
+  }, [bankDepositAmount, totalDrawerCashCounted]);
+
+  const isBankDepositValid = useMemo(() => {
+    const trimmed = bankDepositAmountInput.trim();
+    if (!trimmed) return true;
+    const num = parseFloat(trimmed);
+    return !isNaN(num) && num >= 0 && num <= totalDrawerCashCounted;
+  }, [bankDepositAmountInput, totalDrawerCashCounted]);
+
+  // Step 03 Auto-Calculated Remaining Cash Left in Drawer (Total Drawer Cash − Bank Deposit)
+  const remainingDrawerCash = useMemo(() => {
+    return Math.max(0, Math.round((totalDrawerCashCounted - bankDepositAmount) * 100) / 100);
+  }, [totalDrawerCashCounted, bankDepositAmount]);
+
 
   useEffect(() => {
     if (activeShift) {
@@ -155,7 +172,7 @@ export function ShiftEndModal({
     setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMessage(null);
-    setCountedRemainingCashInput('');
+    setBankDepositAmountInput('');
 
     const initShift = async () => {
       let shift = activeShift;
@@ -386,14 +403,7 @@ export function ShiftEndModal({
   const modakaUnitsTotal = modakaTotals.sumD;
   const modakaSalesTotal = modakaTotals.sumF;
 
-  // Exact Shift Tally Math:
-  // Tab 2 Denominations = Notes & coins bundled for Bank Deposit
-  const denominationsTotal = useMemo(() => {
-    return DENOMINATIONS.reduce((acc, d) => acc + d * (counts[d] || 0), 0);
-  }, [counts]);
-
-  // Bank Deposit Amount is auto-populated from Tab 2 Denomination Counter
-  const bankedAmount = denominationsTotal;
+  // Step 02 & 03 Math: totalDrawerCashCounted, bankDepositAmount, remainingDrawerCash defined at component top
 
   // 1. Total Cash Inflow = openingFloat + declaredShiftSale (POS cash) + modakaSalesTotal (Special stock sales)
   const totalCashInflow = useMemo(() => {
@@ -495,16 +505,20 @@ export function ShiftEndModal({
       return;
     }
 
-    if (!isRemainingCashValid) {
-      setErrorMessage('Please enter a valid numeric amount for Remaining Cash Left in Drawer.');
+    if (isBankDepositExceeding) {
+      setErrorMessage('Bank deposit cannot exceed total counted drawer cash.');
       setIsSubmitting(false);
       return;
     }
 
-    const countedCash = Math.round(Number(countedRemainingCashInput) * 100) / 100;
+    if (!isBankDepositValid) {
+      setErrorMessage('Please enter a valid numeric amount for Bank Deposit.');
+      setIsSubmitting(false);
+      return;
+    }
 
     let selectedBankStr = '';
-    if (bankedAmount > 0) {
+    if (bankDepositAmount > 0) {
       const foundBank = bankAccounts.find((b) => b.id === selectedBankId);
       if (foundBank) {
         selectedBankStr = `${foundBank.bankName} (${foundBank.accountNumber} - ${foundBank.accountName}${foundBank.branchName ? ` • ${foundBank.branchName}` : ''
@@ -533,11 +547,11 @@ export function ShiftEndModal({
       declaredShiftSale,
       goodsPurchasedPaid,
       otherExpenses,
-      bankedAmount: denominationsTotal,
+      bankedAmount: bankDepositAmount,
       bankAccountDetails: selectedBankStr,
-      countedDrawerCash: countedCash,
-      countedRemainingDrawerCash: countedCash,
-      closingDrawerFloat: countedCash,
+      countedDrawerCash: totalDrawerCashCounted,
+      countedRemainingDrawerCash: remainingDrawerCash,
+      closingDrawerFloat: remainingDrawerCash,
       denominationsJson: counts,
       handoverNotes: finalHandoverNotes,
       modakaEntries: modakaRows.map((r) => ({
@@ -622,17 +636,15 @@ export function ShiftEndModal({
               {
                 id: 'DENOMINATIONS',
                 stepNum: '02',
-                label: 'Bank Denominations',
-                badge: `LKR ${denominationsTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+                label: 'Drawer Cash Count',
+                badge: `LKR ${totalDrawerCashCounted.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
                 icon: Banknote,
               },
               {
                 id: 'SUMMARY',
                 stepNum: '03',
                 label: 'Cash & Reconciliation',
-                badge: isRemainingCashValid
-                  ? `Next Float: LKR ${enteredRemainingCash.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                  : 'Manual Entry',
+                badge: `Next Float: LKR ${remainingDrawerCash.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
                 icon: Receipt,
               },
             ].map((step) => {
@@ -845,7 +857,7 @@ export function ShiftEndModal({
                       onClick={() => setActiveTab('DENOMINATIONS')}
                       className="min-h-[44px] px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer w-full sm:w-auto"
                     >
-                      <span>Proceed to Denomination Counter</span>
+                      <span>Proceed to Drawer Cash Count</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -858,10 +870,10 @@ export function ShiftEndModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-lg font-bold text-slate-900">
-                        Bank Deposit Denomination Counter
+                        Drawer Cash Count (Total Cash in Drawer)
                       </h4>
                       <p className="text-sm text-slate-500 mt-0.5">
-                        Count notes &amp; coins bundled for bank deposit. Total automatically populates Bank Deposit Amount in Step 3.
+                        Count all physical notes and coins currently inside the cash drawer. Enter the quantity of each denomination below.
                       </p>
                     </div>
                     <button
@@ -921,15 +933,15 @@ export function ShiftEndModal({
                       </div>
                       <div>
                         <h5 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
-                          Bank Deposit Denomination Total
+                          Total Cash Counted in Drawer
                         </h5>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Counted bundle auto-populates Bank Deposit Amount in Step 3.
+                          Total physical drawer cash counted before any bank deposits.
                         </p>
                       </div>
                     </div>
                     <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 tabular-nums">
-                      LKR {denominationsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      LKR {totalDrawerCashCounted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
 
@@ -947,7 +959,7 @@ export function ShiftEndModal({
                       onClick={() => setActiveTab('SUMMARY')}
                       className="min-h-[44px] px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                     >
-                      <span>Proceed to Shift Summary</span>
+                      <span>Proceed to Cash &amp; Reconciliation</span>
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   </div>
@@ -959,13 +971,47 @@ export function ShiftEndModal({
                 <div className="space-y-4">
                   <div className={!isOwner ? 'max-w-2xl mx-auto' : ''}>
                     <h4 className="text-lg font-bold text-slate-900">
-                      Shift Cash &amp; Expense Summary
+                      Cash &amp; Shift Reconciliation
                     </h4>
                     <p className="text-sm text-slate-500 mt-0.5">
                       {isOwner
                         ? 'Side-by-side reconciliation of shift inflows, expenses, bank deposits, and next shift drawer float.'
                         : 'Reconciliation of shift expenses, bank deposits, and physical drawer cash for next shift.'}
                     </p>
+                  </div>
+
+                  {/* Top Summary Card: Total Cash Counted in Drawer */}
+                  <div className={`p-4 rounded-2xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm border border-slate-800 ${!isOwner ? 'max-w-2xl mx-auto' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+                        <Banknote className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                            Total Physical Cash in Drawer
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Counted in Step 02
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Physical notes &amp; coins in drawer before bank deposit.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <span className="text-2xl font-black font-mono text-emerald-400 tabular-nums">
+                        LKR {totalDrawerCashCounted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('DENOMINATIONS')}
+                        className="text-xs font-bold text-indigo-300 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Recount
+                      </button>
+                    </div>
                   </div>
 
                   {/* 2-Column Responsive Layout for Owner vs Clean Centered Layout for Staff */}
@@ -1199,33 +1245,47 @@ export function ShiftEndModal({
                         </div>
                       </div>
 
-                      {/* Bank Deposit Amount */}
+                      {/* Bank Deposit Amount (Manual Input) */}
                       <div className="pt-1 space-y-2">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                           <div>
                             <span className="font-semibold text-[15px] text-slate-900 block">
-                              Bank Deposit Amount
+                              Bank Deposit Amount (LKR)
                             </span>
                             <span className="text-xs text-slate-500 block mt-0.5">
-                              Auto-populated directly from Step 2 Denominations
+                              Cash taken out of drawer to deposit in bank (optional, default 0)
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs font-bold text-rose-600">- LKR</span>
-                            <span className="h-11 px-3 flex items-center justify-end font-mono text-lg font-bold tabular-nums text-slate-900 bg-slate-100 border border-slate-200 rounded-lg">
-                              {denominationsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('DENOMINATIONS')}
-                              className="text-xs font-bold text-indigo-700 hover:text-indigo-900 px-2.5 py-2 bg-indigo-50 border border-indigo-200 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Edit Notes
-                            </button>
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <span className="text-xs font-bold text-rose-600 font-mono">- LKR</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max={totalDrawerCashCounted}
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={bankDepositAmountInput}
+                              onChange={(e) => setBankDepositAmountInput(e.target.value)}
+                              className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg border focus:outline-none focus:ring-2 ${
+                                isBankDepositExceeding
+                                  ? 'bg-rose-50 text-rose-900 border-rose-400 focus:ring-rose-200'
+                                  : 'bg-rose-50/50 text-rose-900 border-rose-200 focus:border-rose-400 focus:ring-rose-200'
+                              }`}
+                            />
                           </div>
                         </div>
 
-                        {bankedAmount > 0 && (
+                        {isBankDepositExceeding && (
+                          <div className="p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                            <span>
+                              Bank deposit (LKR {bankDepositAmount.toLocaleString()}) cannot exceed total counted drawer cash (LKR {totalDrawerCashCounted.toLocaleString()}).
+                            </span>
+                          </div>
+                        )}
+
+                        {bankDepositAmount > 0 && !isBankDepositExceeding && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
                             <div>
                               <label className="text-[10px] font-bold text-slate-500 block uppercase">
@@ -1262,29 +1322,30 @@ export function ShiftEndModal({
                         )}
                       </div>
 
-                      {/* Remaining Cash Left in Drawer (Strict Blind Manual Input) */}
-                      <div className="p-3.5 rounded-xl border-2 border-emerald-500/70 bg-emerald-50/20 space-y-2">
+                      {/* Remaining Cash Left in Drawer (Auto-Calculated Formula) */}
+                      <div className="p-4 rounded-xl border-2 border-emerald-500/70 bg-emerald-50/30 space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                           <div>
-                            <span className="font-bold text-[15px] text-slate-900 block">
-                              Remaining Cash Left in Drawer (LKR) <span className="text-rose-500">*</span>
-                            </span>
-                            <span className="text-xs text-slate-600 block mt-0.5 leading-relaxed">
-                              Count physical cash remaining in drawer — carries forward as next shift&apos;s Opening Float.
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[15px] text-slate-900 block">
+                                Remaining Cash Left in Drawer
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-800 border border-emerald-300">
+                                Carried Forward
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                              Auto-calculated: <strong>Total Drawer Cash</strong> (LKR {totalDrawerCashCounted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) − <strong>Bank Deposit</strong> (LKR {bankDepositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                            </p>
+                            <p className="text-[11px] text-emerald-700 font-medium mt-1">
+                              Automatically carries forward as the Opening Float for the next shift today or tomorrow morning.
+                            </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                             <span className="text-xs font-bold text-emerald-800 font-mono">LKR</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              inputMode="decimal"
-                              placeholder="Enter counted cash..."
-                              value={countedRemainingCashInput}
-                              onChange={(e) => setCountedRemainingCashInput(e.target.value)}
-                              className="w-44 h-11 px-3 text-right font-mono text-base font-bold tabular-nums bg-white text-emerald-950 border border-emerald-400 rounded-lg focus:border-emerald-600 focus:ring-2 focus:ring-emerald-300/40 focus:outline-none placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans"
-                            />
+                            <span className="w-44 h-11 px-3 flex items-center justify-end font-mono text-xl font-black tabular-nums bg-white text-emerald-950 border border-emerald-400 rounded-lg shadow-2xs">
+                              {remainingDrawerCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1313,7 +1374,7 @@ export function ShiftEndModal({
                       className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-200/90 shadow-2xs"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      <span>Back to Denominations</span>
+                      <span>Back to Drawer Cash Count</span>
                     </button>
                   </div>
                 </div>
@@ -1327,11 +1388,14 @@ export function ShiftEndModal({
           <div className="shrink-0 border-t border-slate-200/90 bg-white px-6 py-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-sm text-slate-700 shadow-xs">
             {/* Left: Summary Tally Pills */}
             <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 flex-wrap">
+              <span className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-900 font-medium text-xs sm:text-sm">
+                Drawer Counted: <strong className="font-mono text-slate-950 font-bold ml-1">LKR {totalDrawerCashCounted.toFixed(2)}</strong>
+              </span>
               <span className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 font-medium text-xs sm:text-sm">
-                Bank Deposit: <strong className="font-mono text-indigo-950 font-bold ml-1">LKR {denominationsTotal.toFixed(2)}</strong>
+                Bank Deposit: <strong className="font-mono text-indigo-950 font-bold ml-1">LKR {bankDepositAmount.toFixed(2)}</strong>
               </span>
               <span className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium text-xs sm:text-sm">
-                Declared Closing Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {enteredRemainingCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                Remaining Drawer Float: <strong className="font-mono text-emerald-950 font-bold ml-1">LKR {remainingDrawerCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
               </span>
             </div>
 
@@ -1352,7 +1416,7 @@ export function ShiftEndModal({
                   onClick={() => setActiveTab('DENOMINATIONS')}
                   className="min-h-[44px] px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
                 >
-                  <span>Proceed to Denominations</span>
+                  <span>Proceed to Drawer Cash Count</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
@@ -1363,7 +1427,7 @@ export function ShiftEndModal({
                   onClick={() => setActiveTab('SUMMARY')}
                   className="min-h-[44px] px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
                 >
-                  <span>Proceed to Shift Tally</span>
+                  <span>Proceed to Cash &amp; Reconciliation</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
@@ -1372,7 +1436,7 @@ export function ShiftEndModal({
                 <button
                   type="button"
                   onClick={handleFinalSubmit}
-                  disabled={isSubmitting || !isRemainingCashValid}
+                  disabled={isSubmitting || isBankDepositExceeding || !isBankDepositValid}
                   className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (

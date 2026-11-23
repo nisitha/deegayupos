@@ -4646,34 +4646,37 @@ export const shiftsApi = {
 
       const goodsPurchasedPaid = Number(payload.goodsPurchasedPaid || 0);
       const otherExpenses = Number(payload.otherExpenses || 0);
-      let bankedAmount = Number(payload.bankedAmount || 0);
-      if (bankedAmount === 0 && payload.denominationsJson && typeof payload.denominationsJson === 'object') {
+
+      // Step 02: Total physical cash counted in drawer before bank deposit
+      let totalDrawerCashCounted = Number(payload.countedDrawerCash || 0);
+      if (totalDrawerCashCounted === 0 && payload.denominationsJson && typeof payload.denominationsJson === 'object') {
         const denomSum = Object.entries(payload.denominationsJson).reduce((acc, [denom, cnt]) => {
           return acc + (Number(denom) * (Number(cnt) || 0));
         }, 0);
-        if (denomSum > 0) bankedAmount = denomSum;
+        if (denomSum > 0) totalDrawerCashCounted = denomSum;
       }
 
-      // Expected Remaining Drawer Cash = Total Cash Inflow - goodsPurchasedPaid - otherExpenses - bankedAmount
-      const expectedRemainingDrawerCash = Math.round(
-        (totalCashInflow - goodsPurchasedPaid - otherExpenses - bankedAmount) * 100
-      ) / 100;
+      // Step 03: Manually entered Bank Deposit Amount
+      const bankedAmount = Number(payload.bankedAmount || 0);
 
-      // Counted Remaining Drawer Cash = entered directly in Tab 3 (physical cash left in drawer)
-      const countedRemainingDrawerCash = Math.round(
-        Number(
-          payload.countedRemainingDrawerCash !== undefined
-            ? payload.countedRemainingDrawerCash
-            : payload.countedDrawerCash || 0
-        ) * 100
-      ) / 100;
+      // Step 03: Auto-calculated Remaining Drawer Cash to carry forward
+      const remainingDrawerCash = payload.countedRemainingDrawerCash !== undefined
+        ? Number(payload.countedRemainingDrawerCash)
+        : Math.max(0, Math.round((totalDrawerCashCounted - bankedAmount) * 100) / 100);
 
-      // Cash Variance = Counted Remaining Drawer Cash - Expected Remaining Drawer Cash
-      const cashVariance = Math.round((countedRemainingDrawerCash - expectedRemainingDrawerCash) * 100) / 100;
+      // Expected Cash before Bank Deposit = Total Inflow - Goods Paid - Expenses
+      const expectedCashBeforeBank = Math.round((totalCashInflow - goodsPurchasedPaid - otherExpenses) * 100) / 100;
 
-      // Carry-Forward to Next Shift: Save closing_float = Counted Remaining Drawer Cash
-      const closingFloat = countedRemainingDrawerCash;
-      const closingDrawerFloat = countedRemainingDrawerCash;
+      // Expected Remaining Drawer Cash after Bank Deposit
+      const expectedRemainingDrawerCash = Math.round((expectedCashBeforeBank - bankedAmount) * 100) / 100;
+
+      // Cash Variance = Counted Drawer Cash - Expected Cash Before Bank (or Remaining Drawer Cash - Expected Remaining Drawer Cash)
+      const cashVariance = Math.round((totalDrawerCashCounted - expectedCashBeforeBank) * 100) / 100;
+
+      // Carry-Forward to Next Shift: Save closing_float = Remaining Drawer Cash
+      const closingFloat = remainingDrawerCash;
+      const closingDrawerFloat = remainingDrawerCash;
+      const countedRemainingDrawerCash = remainingDrawerCash;
 
       // Auto-Record Shortage or Excess on Submit
       let tallyStatus: 'balanced' | 'shortage' | 'excess' = 'balanced';
@@ -4786,8 +4789,8 @@ export const shiftsApi = {
           total_cash_available: totalCashInflow,
           goods_purchased_paid: goodsPurchasedPaid,
           other_expenses: otherExpenses,
-          expected_cash_before_bank: totalCashInflow - goodsPurchasedPaid - otherExpenses,
-          counted_drawer_cash: countedRemainingDrawerCash,
+          expected_cash_before_bank: expectedCashBeforeBank,
+          counted_drawer_cash: totalDrawerCashCounted,
           denominations_json: payload.denominationsJson || {},
           banked_amount: bankedAmount,
           closing_drawer_float: closingDrawerFloat,
@@ -4825,7 +4828,7 @@ export const shiftsApi = {
                 branch_id: payload.branchId,
                 reconciliation_date: shiftDate,
                 opening_float_a: openingFloat,
-                physical_cash_c: closingFloat,
+                physical_cash_c: totalDrawerCashCounted,
                 closing_cash_f: closingFloat,
                 total_bank_deposits_e: bankedAmount,
                 updated_at: new Date().toISOString(),

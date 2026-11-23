@@ -55,7 +55,8 @@ export function ShiftStartModal({
     if (!isOpen) {
       return undefined;
     }
-    setCountedCashInput('');
+    const prefillFloat = activeShift?.openingFloat ? Number(activeShift.openingFloat) : 0;
+    setCountedCashInput(prefillFloat > 0 ? prefillFloat.toString() : '');
     setDenomCounts({});
     setShowDenomCounter(false);
     setErrorMsg(null);
@@ -66,7 +67,7 @@ export function ShiftStartModal({
     return () => {
       clearTimeout(timer);
     };
-  }, [isOpen, activeShift?.id]);
+  }, [isOpen, activeShift?.id, activeShift?.openingFloat]);
 
   const denomSum = useMemo(() => {
     return SRI_LANKA_DENOMINATIONS.reduce((acc, d) => {
@@ -174,6 +175,33 @@ export function ShiftStartModal({
             </div>
           </div>
 
+          {/* Carried Forward Opening Float Banner */}
+          {Number(activeShift?.openingFloat || 0) > 0 && (
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 shrink-0">
+                  <Banknote className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 block">
+                    Carried Forward from Previous Shift
+                  </span>
+                  <span className="text-[11px] text-emerald-700">
+                    Previous shift closing drawer float was verified at this amount
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="font-mono text-base font-black text-emerald-800 tabular-nums block">
+                  LKR {Number(activeShift.openingFloat).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                  Auto-Carried Float
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Primary Numeric Input */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -271,11 +299,10 @@ export function ShiftStartModal({
             <button
               type="submit"
               disabled={!isValidAmount || isSubmitting}
-              className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
-                isValidAmount && !isSubmitting
-                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/25 hover:shadow-indigo-600/35 active:scale-[0.99]'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              }`}
+              className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${isValidAmount && !isSubmitting
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/25 hover:shadow-indigo-600/35 active:scale-[0.99]'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                }`}
             >
               {isSubmitting ? (
                 <>
