@@ -26,20 +26,20 @@ export default function PricingEnginePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Retail Standard</div>
-          <div className="text-2xl font-black text-slate-900 mt-2">100% MSP</div>
-          <p className="text-xs text-slate-500 mt-1">Default markup for counter walk-ins</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
+          <div className="text-xs font-bold text-blue-100 uppercase tracking-wider">Retail Standard</div>
+          <div className="text-2xl font-bold text-white mt-2">100% MSP</div>
+          <p className="text-xs text-blue-100 mt-1">Default markup for counter walk-ins</p>
         </div>
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Wholesale Tier</div>
-          <div className="text-2xl font-black text-emerald-600 mt-2">-15% to -25%</div>
-          <p className="text-xs text-slate-500 mt-1">Automatic tier for verified pharmacy dealers</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+          <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Wholesale Tier</div>
+          <div className="text-2xl font-bold text-white mt-2">-15% to -25%</div>
+          <p className="text-xs text-emerald-100 mt-1">Automatic tier for verified pharmacy dealers</p>
         </div>
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ayurvedic Clinic Tier</div>
-          <div className="text-2xl font-black text-purple-600 mt-2">-20% Flat</div>
-          <p className="text-xs text-slate-500 mt-1">Special dispensary rate for licensed Weda Mahaththaya</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+          <div className="text-xs font-bold text-indigo-100 uppercase tracking-wider">Ayurvedic Clinic Tier</div>
+          <div className="text-2xl font-bold text-white mt-2">-20% Flat</div>
+          <p className="text-xs text-indigo-100 mt-1">Special dispensary rate for licensed Weda Mahaththaya</p>
         </div>
       </div>
     </div>

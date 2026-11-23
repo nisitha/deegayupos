@@ -496,74 +496,74 @@ export default function CustomersManagementPage() {
       {/* 2. KPI Telemetry Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Customers */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs hover:border-slate-200 transition-all flex items-center justify-between">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-blue-100 uppercase tracking-wider block">
               Total Customers
             </span>
-            <div className="text-2xl font-black text-slate-900 mt-1 font-mono">
+            <div className="text-2xl sm:text-3xl font-black text-white mt-1 font-mono tracking-tight">
               {telemetry.totalCustomers}
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
+            <span className="text-[11px] text-blue-100 mt-1 block">
               Registered clinic clients
             </span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-            <Users className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+            <Users className="w-5 h-5" />
           </div>
         </div>
 
         {/* Outstanding Receivables */}
-        <div className="bg-white p-4 rounded-2xl border border-rose-100 shadow-xs hover:border-rose-200 transition-all flex items-center justify-between bg-gradient-to-br from-white to-rose-50/20">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-rose-100 uppercase tracking-wider block">
               Outstanding Debt
             </span>
-            <div className="text-2xl font-black text-rose-700 mt-1 font-mono">
+            <div className="text-2xl sm:text-3xl font-black text-white mt-1 font-mono tracking-tight">
               LKR {telemetry.totalReceivables.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <span className="text-[10px] text-rose-500 font-medium mt-0.5 block">
+            <span className="text-[11px] text-rose-100 mt-1 block">
               Total uncollected receivables
             </span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
-            <TrendingUp className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-full bg-white text-rose-600 flex items-center justify-center shadow-md shrink-0">
+            <TrendingUp className="w-5 h-5" />
           </div>
         </div>
 
         {/* Active Credit Accounts */}
-        <div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-xs hover:border-amber-200 transition-all flex items-center justify-between bg-gradient-to-br from-white to-amber-50/20">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-amber-100 uppercase tracking-wider block">
               Active Debtors
             </span>
-            <div className="text-2xl font-black text-amber-700 mt-1 font-mono">
-              {telemetry.activeCreditAccounts} <span className="text-xs text-slate-400 font-sans font-normal">accounts</span>
+            <div className="text-2xl sm:text-3xl font-black text-white mt-1 font-mono tracking-tight">
+              {telemetry.activeCreditAccounts} <span className="text-xs text-amber-200 font-sans font-normal">accounts</span>
             </div>
-            <span className="text-[10px] text-amber-600 font-medium mt-0.5 block">
+            <span className="text-[11px] text-amber-100 mt-1 block">
               Customers with positive debt
             </span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
-            <BookOpen className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+            <BookOpen className="w-5 h-5" />
           </div>
         </div>
 
         {/* Total Credit Exposure */}
-        <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-xs hover:border-emerald-200 transition-all flex items-center justify-between bg-gradient-to-br from-white to-emerald-50/20">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider block">
               Total Credit Limit
             </span>
-            <div className="text-2xl font-black text-emerald-700 mt-1 font-mono">
+            <div className="text-2xl sm:text-3xl font-black text-white mt-1 font-mono tracking-tight">
               LKR {telemetry.totalCreditLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <span className="text-[10px] text-emerald-600 font-medium mt-0.5 block">
+            <span className="text-[11px] text-emerald-100 mt-1 block">
               Approved credit ceiling
             </span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-            <CreditCard className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+            <CreditCard className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -632,7 +632,7 @@ export default function CustomersManagementPage() {
       <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-semibold">
+            <thead className="bg-[#0F172A] border-b border-slate-800 text-white uppercase tracking-wider font-semibold text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">Customer Name & NIC</th>
                 <th className="py-3.5 px-4">Contact Info</th>

@@ -1898,45 +1898,51 @@ export default function CashReconciliationPage() {
           {/* 1. 5 Executive KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {/* 1. Total Cash Inflow */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cash Inflow</span>
-                <Coins className="w-4 h-4 text-indigo-400" />
+                <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wider">Total Cash Inflow</span>
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                  <Coins className="w-4 h-4" />
+                </div>
               </div>
-              <div className="text-xl font-black text-slate-100 font-mono mt-1.5">
+              <div className="text-xl font-black text-white font-mono mt-1.5 tabular-nums">
                 LKR {shiftTallyKPIs.totalCashInflow.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
+              <div className="text-[10px] text-blue-100 mt-1 flex flex-col gap-0.5">
                 <span>Opening (LKR {shiftTallyKPIs.totalOpeningFloat.toLocaleString('en-LK', { minimumFractionDigits: 0 })}) + POS Cash (LKR {shiftTallyKPIs.totalPosCash.toLocaleString('en-LK', { minimumFractionDigits: 0 })})</span>
-                <span className="text-purple-300 font-medium">+ Special Sales (LKR {shiftTallyKPIs.totalSpecialSales.toLocaleString('en-LK', { minimumFractionDigits: 0 })})</span>
+                <span className="text-blue-200 font-medium">+ Special Sales (LKR {shiftTallyKPIs.totalSpecialSales.toLocaleString('en-LK', { minimumFractionDigits: 0 })})</span>
               </div>
             </div>
 
             {/* 2. Banked & Paid Out */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Banked & Paid Out</span>
-                <Wallet className="w-4 h-4 text-amber-400" />
+                <span className="text-[11px] font-bold text-amber-100 uppercase tracking-wider">Banked & Paid Out</span>
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                  <Wallet className="w-4 h-4" />
+                </div>
               </div>
-              <div className="text-xl font-black text-amber-400 font-mono mt-1.5">
+              <div className="text-xl font-black text-white font-mono mt-1.5 tabular-nums">
                 LKR {shiftTallyKPIs.totalPaidOut.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
+              <div className="text-[10px] text-amber-100 mt-1 flex flex-col gap-0.5">
                 <span>Bank Deposits: LKR {shiftTallyKPIs.totalBanked.toLocaleString('en-LK', { minimumFractionDigits: 0 })}</span>
                 <span>Purchases + Expenses: LKR {(shiftTallyKPIs.totalGoodsPaid + shiftTallyKPIs.totalOtherExpenses).toLocaleString('en-LK', { minimumFractionDigits: 0 })}</span>
               </div>
             </div>
 
             {/* 3. Counted Remaining Drawer */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Counted Remaining Drawer</span>
-                <Banknote className="w-4 h-4 text-emerald-400" />
+                <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wider">Counted Remaining Drawer</span>
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                  <Banknote className="w-4 h-4" />
+                </div>
               </div>
-              <div className="text-xl font-black text-emerald-400 font-mono mt-1.5">
+              <div className="text-xl font-black text-white font-mono mt-1.5 tabular-nums">
                 LKR {shiftTallyKPIs.totalCountedRemaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">
+              <p className="text-[10px] text-emerald-100 mt-1">
                 Physical Notes Counted → Next Shift Opening
               </p>
             </div>
@@ -1944,40 +1950,44 @@ export default function CashReconciliationPage() {
             {/* 4. Staff Salary Deductions (Shortages) - Clickable to open Shortages Tab */}
             <div
               onClick={() => setActiveTab('shortages')}
-              className="p-4 rounded-2xl bg-slate-900 border border-rose-900/40 bg-rose-950/20 shadow-md cursor-pointer hover:border-rose-700/60 hover:bg-rose-950/30 transition group"
+              className="p-4 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10 cursor-pointer hover:brightness-110 transition group"
               title="Click to view Cashier Shortages & Payroll Deduction Ledger"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider group-hover:text-rose-300">
+                <span className="text-[11px] font-bold text-rose-100 uppercase tracking-wider group-hover:text-white">
                   Salary Deductions
                 </span>
-                <AlertTriangle className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                  <AlertTriangle className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </div>
               </div>
-              <div className="text-xl font-black text-rose-400 font-mono mt-1.5">
+              <div className="text-xl font-black text-white font-mono mt-1.5 tabular-nums">
                 {shiftTallyKPIs.totalShortageAmount > 0 ? '-' : ''}
                 LKR {shiftTallyKPIs.totalShortageAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-rose-300/80">
+                <span className="text-rose-100">
                   {shiftTallyKPIs.shortageShiftsCount} {shiftTallyKPIs.shortageShiftsCount === 1 ? 'shift shortage' : 'shift shortages'} recorded
                 </span>
-                <span className="text-rose-400 font-semibold group-hover:underline">
+                <span className="text-white font-semibold group-hover:underline">
                   View Ledger →
                 </span>
               </div>
             </div>
 
             {/* 5. Extra Income (Cash Excess) */}
-            <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-900/40 bg-emerald-950/20 shadow-md">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Extra Income (Excess)</span>
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="text-[11px] font-bold text-indigo-100 uppercase tracking-wider">Extra Income (Excess)</span>
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
               </div>
-              <div className="text-xl font-black text-emerald-400 font-mono mt-1.5">
+              <div className="text-xl font-black text-white font-mono mt-1.5 tabular-nums">
                 {shiftTallyKPIs.totalExcessAmount > 0 ? '+' : ''}
                 LKR {shiftTallyKPIs.totalExcessAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
               </div>
-              <p className="text-[10px] text-emerald-300/80 mt-1">
+              <p className="text-[10px] text-indigo-100 mt-1">
                 {shiftTallyKPIs.excessShiftsCount} {shiftTallyKPIs.excessShiftsCount === 1 ? 'shift excess' : 'shift excesses'} recorded
               </p>
             </div>
@@ -2361,7 +2371,7 @@ export default function CashReconciliationPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      <tr className="bg-[#0F172A] border-b border-slate-800 text-[10px] text-white uppercase font-semibold tracking-wider">
                         <th className="py-2 px-3">Date</th>
                         <th className="py-2 px-3">Branch</th>
                         <th className="py-2 px-2 text-center">Shift</th>
@@ -2439,7 +2449,7 @@ export default function CashReconciliationPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      <tr className="bg-[#0F172A] border-b border-slate-800 text-[10px] text-white uppercase font-semibold tracking-wider">
                         <th className="py-2 px-3">Date</th>
                         <th className="py-2 px-3">Branch</th>
                         <th className="py-2 px-2 text-center">Shift</th>
@@ -2709,7 +2719,7 @@ export default function CashReconciliationPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-[#0F172A] text-white text-xs uppercase tracking-wider font-semibold border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4">Branch</th>
@@ -2967,7 +2977,7 @@ export default function CashReconciliationPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-[#0F172A] text-white text-xs uppercase tracking-wider font-semibold border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4">Branch</th>
@@ -3241,7 +3251,7 @@ export default function CashReconciliationPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800 select-none">
+                <thead className="bg-[#0F172A] text-white text-xs uppercase tracking-wider font-semibold border-b border-slate-800 select-none">
                   <tr>
                     <th
                       onClick={() => handleSortClick('date')}
@@ -3437,7 +3447,7 @@ export default function CashReconciliationPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-[#0F172A] text-white text-xs uppercase tracking-wider font-semibold border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4">Branch</th>
@@ -4657,7 +4667,7 @@ export default function CashReconciliationPage() {
             {/* Denomination Notes & Coins Grid */}
             <div className="border border-slate-800 rounded-xl overflow-hidden">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-[#0F172A] text-white uppercase tracking-wider font-semibold border-b border-slate-800">
                   <tr>
                     <th className="py-2.5 px-3">Denomination</th>
                     <th className="py-2.5 px-3 text-center">Type</th>

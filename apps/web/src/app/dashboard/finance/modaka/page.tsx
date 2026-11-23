@@ -500,88 +500,78 @@ export default function ModakaLedgerPage() {
       {/* KPI Highlights Bar */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 print:hidden">
         {/* Metric 1 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-100 block">
             Recorded Shifts
           </span>
-          <span className="text-xl font-black font-mono text-slate-900 mt-1 block">
+          <span className="text-xl font-black font-mono text-white mt-1 block">
             {metrics.shiftCount} Shifts
           </span>
-          <span className="text-[10px] text-slate-500">Day & Evening shifts</span>
+          <span className="text-[10px] text-blue-100">Day & Evening shifts</span>
         </div>
 
         {/* Metric 2 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-white shadow-lg shadow-purple-500/10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-100 block">
             Special Units Sold
           </span>
-          <span className="text-xl font-black font-mono text-purple-700 mt-1 block">
+          <span className="text-xl font-black font-mono text-white mt-1 block">
             {metrics.totalModakaUnits} units
           </span>
-          <span className="text-[10px] text-slate-500">Across active special varieties</span>
+          <span className="text-[10px] text-purple-100">Across active special varieties</span>
         </div>
 
         {/* Metric 3 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-100 block">
             Special Sales Value
           </span>
-          <span className="text-xl font-black font-mono text-purple-700 mt-1 block">
+          <span className="text-xl font-black font-mono text-white mt-1 block">
             LKR {metrics.totalModakaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
-          <span className="text-[10px] text-purple-600 font-bold">Total (Σ F)</span>
+          <span className="text-[10px] text-indigo-200 font-bold">Total (Σ F)</span>
         </div>
 
         {/* Metric 4 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 block">
             POS Gross Sales
           </span>
-          <span className="text-xl font-black font-mono text-slate-900 mt-1 block">
+          <span className="text-xl font-black font-mono text-white mt-1 block">
             LKR {metrics.totalGrossSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
-          <span className="text-[10px] text-emerald-600 font-semibold">
+          <span className="text-[10px] text-emerald-100 font-semibold">
             Cash: LKR {metrics.totalCashSales.toFixed(0)}
           </span>
         </div>
 
         {/* Metric 5 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0284C7] to-[#0369A1] text-white shadow-lg shadow-sky-500/10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-100 block">
             Banked Amount
           </span>
-          <span className="text-xl font-black font-mono text-indigo-700 mt-1 block">
+          <span className="text-xl font-black font-mono text-white mt-1 block">
             LKR {metrics.totalBanked.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
-          <span className="text-[10px] text-slate-500">Deposited to company</span>
+          <span className="text-[10px] text-sky-100">Deposited to company</span>
         </div>
 
         {/* Metric 6 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className={`p-4 rounded-2xl text-white shadow-lg ${
+          metrics.netVariance === 0
+            ? 'bg-gradient-to-br from-slate-700 to-slate-800'
+            : metrics.netVariance > 0
+            ? 'bg-gradient-to-br from-[#059669] to-[#047857]'
+            : 'bg-gradient-to-br from-[#E11D48] to-[#BE123C]'
+        }`}>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 block">
             Cash Variance
           </span>
-          <span
-            className={`text-xl font-black font-mono mt-1 block ${
-              metrics.netVariance === 0
-                ? 'text-slate-800'
-                : metrics.netVariance > 0
-                ? 'text-emerald-700'
-                : 'text-rose-600'
-            }`}
-          >
+          <span className="text-xl font-black font-mono mt-1 block text-white">
             {metrics.netVariance > 0 ? '+' : ''}
             LKR {metrics.netVariance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
-          <span
-            className={`text-[10px] font-bold ${
-              metrics.netVariance === 0
-                ? 'text-slate-500'
-                : metrics.netVariance > 0
-                ? 'text-emerald-600'
-                : 'text-rose-600'
-            }`}
-          >
+          <span className="text-[10px] font-bold text-white/90">
             {metrics.netVariance === 0
               ? 'Balanced'
               : metrics.netVariance > 0
@@ -702,7 +692,7 @@ export default function ModakaLedgerPage() {
 
                     <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
                       <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+                        <thead className="bg-[#0F172A] text-white uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
                           <tr>
                             <th className="py-2 px-2 text-center w-7">#</th>
                             <th className="py-2 px-2.5">Special Item</th>
@@ -1002,7 +992,7 @@ export default function ModakaLedgerPage() {
 
               <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-10">#</th>
                       <th className="py-2.5 px-3">Catalog Item</th>

@@ -488,75 +488,75 @@ export default function StaffManagementPage() {
 
         {/* 2. Top Telemetry Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-5 rounded-2xl text-white shadow-lg shadow-blue-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">
                 Total Team
               </span>
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#7052FF] flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold">
                 <Users className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.total}</div>
-            <div className="text-xs text-slate-400 mt-1">Across all branches</div>
+            <div className="text-2xl font-bold text-white mt-3 tabular-nums">{metrics.total}</div>
+            <div className="text-xs text-blue-100 mt-1">Across all branches</div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="bg-gradient-to-br from-[#4F46E5] to-[#4338CA] p-5 rounded-2xl text-white shadow-lg shadow-indigo-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-bold text-indigo-100 uppercase tracking-wider">
                 Active Cashiers
               </span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold">
                 <Layers className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.cashiers}</div>
-            <div className="text-xs text-slate-400 mt-1">POS sales enabled</div>
+            <div className="text-2xl font-bold text-white mt-3 tabular-nums">{metrics.cashiers}</div>
+            <div className="text-xs text-indigo-100 mt-1">POS sales enabled</div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="bg-gradient-to-br from-[#F59E0B] to-[#D97706] p-5 rounded-2xl text-white shadow-lg shadow-amber-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-bold text-amber-100 uppercase tracking-wider">
                 PIN Access
               </span>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold">
                 <KeyRound className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-3">{metrics.pinEnabled}</div>
-            <div className="text-xs text-slate-400 mt-1">4-digit login set</div>
+            <div className="text-2xl font-bold text-white mt-3 tabular-nums">{metrics.pinEnabled}</div>
+            <div className="text-xs text-amber-100 mt-1">4-digit login set</div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-2xs">
+          <div className="bg-gradient-to-br from-[#10B981] to-[#059669] p-5 rounded-2xl text-white shadow-lg shadow-emerald-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-bold text-emerald-100 uppercase tracking-wider">
                 Awarded Incentives
               </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold">
                 <Sparkles className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-600 mt-3">
+            <div className="text-2xl font-bold text-white mt-3 tabular-nums">
               LKR {metrics.totalIncentives.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-xs text-emerald-700/80 mt-1 font-semibold">
+            <div className="text-xs text-emerald-100 mt-1 font-semibold">
               {incentivesList.length} bonus records
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-rose-200/80 shadow-2xs">
+          <div className="bg-gradient-to-br from-[#E11D48] to-[#BE123C] p-5 rounded-2xl text-white shadow-lg shadow-rose-500/10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-bold text-rose-100 uppercase tracking-wider">
                 Pending Deductions
               </span>
-              <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+              <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold">
                 <Coins className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-rose-600 mt-3">
+            <div className="text-2xl font-bold text-white mt-3 tabular-nums">
               LKR {metrics.totalPendingShortages.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-xs text-rose-700/80 mt-1 font-semibold">
+            <div className="text-xs text-rose-100 mt-1 font-semibold">
               {metrics.pendingShortagesCount} shortages to deduct
             </div>
           </div>
@@ -628,7 +628,7 @@ export default function StaffManagementPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <tr className="bg-[#0F172A] border-b border-slate-800 text-[11px] font-semibold text-white uppercase tracking-wider">
                   <th className="py-3.5 px-5">Staff Member</th>
                   <th className="py-3.5 px-4">Role & Access</th>
                   <th className="py-3.5 px-4">Assigned Branch & GRN</th>

@@ -649,7 +649,7 @@ export default function PayrollAttendancePage() {
         <section className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
+              <thead className="bg-[#0F172A] text-white uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-4 py-3.5">Staff Member</th>
                   <th className="px-4 py-3.5">Assigned Branch</th>
@@ -1136,7 +1136,7 @@ function CsvBulkImportModal({
             {/* Preview Table */}
             <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200 sticky top-0">
+                <thead className="bg-[#0F172A] text-white uppercase text-[10px] font-semibold border-b border-slate-800 sticky top-0">
                   <tr>
                     <th className="px-3 py-2">Code & Name</th>
                     <th className="px-3 py-2">Date</th>

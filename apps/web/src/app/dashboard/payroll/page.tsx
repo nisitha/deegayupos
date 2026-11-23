@@ -648,54 +648,62 @@ function PayrollHubContent() {
             <div className="space-y-6">
               {/* KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-rose-900/40 bg-gradient-to-br from-slate-900 to-rose-950/20 shadow-lg">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-rose-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-rose-100">
                     <span>Pending Shift Shortages</span>
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-rose-400">
+                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
                     {formatLKR(kpis.pendingShortagesAmt)}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-rose-100 mt-1">
                     Queued to deduct in monthly payroll
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-900/40 bg-gradient-to-br from-slate-900 to-amber-950/20 shadow-lg">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-100">
                     <span>Waived / Deferred</span>
-                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-amber-400">
+                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
                     {formatLKR(kpis.waivedDeferredAmt)}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-amber-100 mt-1">
                     {kpis.waivedDeferredCount} recorded cases exempt/delayed
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-indigo-900/40 bg-gradient-to-br from-slate-900 to-indigo-950/20 shadow-lg">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-100">
                     <span>Active Salary Advances</span>
-                    <Wallet className="w-4 h-4 text-indigo-400" />
+                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                      <Wallet className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-indigo-400">
+                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
                     {formatLKR(kpis.pendingAdvancesAmt)}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-indigo-100 mt-1">
                     {advances.filter((a) => a.status === 'pending').length} pending cash advances
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-900/40 bg-gradient-to-br from-slate-900 to-emerald-950/20 shadow-lg">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-100">
                     <span>Total Deductible</span>
-                    <TrendingDown className="w-4 h-4 text-emerald-400" />
+                    <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
+                      <TrendingDown className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="mt-2 text-2xl font-black font-mono text-emerald-400">
+                  <div className="mt-2 text-2xl font-black font-mono text-white tabular-nums">
                     {formatLKR(kpis.totalDeductible)}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-emerald-100 mt-1">
                     Shortages + Advances for {formatMonthLabel(selectedMonth)}
                   </p>
                 </div>
@@ -751,7 +759,7 @@ function PayrollHubContent() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-bold">
+                      <thead className="bg-[#0F172A] text-white border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
                         <tr>
                           <th className="py-3 px-4">Date</th>
                           <th className="py-3 px-4">Employee</th>
@@ -861,7 +869,7 @@ function PayrollHubContent() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-bold">
+                      <thead className="bg-[#0F172A] text-white border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
                         <tr>
                           <th className="py-3 px-4">Date</th>
                           <th className="py-3 px-4">Employee</th>
@@ -936,38 +944,38 @@ function PayrollHubContent() {
             <div className="space-y-6">
               {/* Top Controls & KPI */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-100">
                     Total Present Records
                   </div>
-                  <div className="mt-1.5 text-2xl font-black font-mono text-emerald-400">
+                  <div className="mt-1.5 text-2xl font-black font-mono text-white tabular-nums">
                     {kpis.presentCount}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-100">
                     Normal OT (1.5x) Hours
                   </div>
-                  <div className="mt-1.5 text-2xl font-black font-mono text-indigo-400">
+                  <div className="mt-1.5 text-2xl font-black font-mono text-white tabular-nums">
                     {kpis.normalOtHours.toFixed(2)} hrs
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-amber-100">
                     Double OT (2.0x) Hours
                   </div>
-                  <div className="mt-1.5 text-2xl font-black font-mono text-amber-400">
+                  <div className="mt-1.5 text-2xl font-black font-mono text-white tabular-nums">
                     {kpis.doubleOtHours.toFixed(2)} hrs
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-100">
                     Registered Holidays
                   </div>
-                  <div className="mt-1.5 text-2xl font-black font-mono text-rose-400">
+                  <div className="mt-1.5 text-2xl font-black font-mono text-white tabular-nums">
                     {holidays.length} days
                   </div>
                 </div>
@@ -1026,7 +1034,7 @@ function PayrollHubContent() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-bold">
+                      <thead className="bg-[#0F172A] text-white border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
                         <tr>
                           <th className="py-3 px-4">Work Date</th>
                           <th className="py-3 px-4">Employee</th>
@@ -1115,7 +1123,7 @@ function PayrollHubContent() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-bold">
+                    <thead className="bg-[#0F172A] text-white border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
                       <tr>
                         <th className="py-3 px-4">Code</th>
                         <th className="py-3 px-4">Staff Member</th>
@@ -1280,37 +1288,37 @@ function PayrollHubContent() {
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {currentRun ? (
                     <>
-                      <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 shadow-sm">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
+                        <span className="text-[10px] uppercase font-bold text-blue-100 tracking-wider block">
                           Total Gross Remuneration
                         </span>
-                        <div className="text-xl font-black font-mono text-white mt-1">
+                        <div className="text-xl font-black font-mono text-white mt-1 tabular-nums">
                           {formatLKR(currentRun.total_gross)}
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-blue-100 mt-1">
                           Basic + Allowances + OT + Bonus
                         </p>
                       </div>
 
-                      <div className="p-4 rounded-xl bg-slate-950/80 border border-rose-900/30 bg-gradient-to-br from-slate-950 to-rose-950/10 shadow-sm">
-                        <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider block">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-lg shadow-rose-500/10">
+                        <span className="text-[10px] uppercase font-bold text-rose-100 tracking-wider block">
                           Cashier Shortages Deducted
                         </span>
-                        <div className="text-xl font-black font-mono text-rose-400 mt-1">
+                        <div className="text-xl font-black font-mono text-white mt-1 tabular-nums">
                           {formatLKR(
                             currentRun.items.reduce((s, i) => s + (i.shortage_deduction_total || 0), 0)
                           )}
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-rose-100 mt-1">
                           Directly recovered from cashiers
                         </p>
                       </div>
 
-                      <div className="p-4 rounded-xl bg-slate-950/80 border border-indigo-900/30 bg-gradient-to-br from-slate-950 to-indigo-950/10 shadow-sm">
-                        <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider block">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+                        <span className="text-[10px] uppercase font-bold text-indigo-100 tracking-wider block">
                           EPF (8%) & Advances
                         </span>
-                        <div className="text-xl font-black font-mono text-indigo-300 mt-1">
+                        <div className="text-xl font-black font-mono text-white mt-1 tabular-nums">
                           {formatLKR(
                             currentRun.items.reduce(
                               (s, i) => s + (i.epf_employee_8 || 0) + (i.salary_advance_deduction || 0),
@@ -1318,19 +1326,19 @@ function PayrollHubContent() {
                             )
                           )}
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-indigo-100 mt-1">
                           Statutory pension + Cash advances
                         </p>
                       </div>
 
-                      <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-900/40 bg-gradient-to-br from-slate-950 to-emerald-950/20 shadow-sm">
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+                        <span className="text-[10px] uppercase font-bold text-emerald-100 tracking-wider block">
                           Total Net Payable
                         </span>
-                        <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
+                        <div className="text-2xl font-black font-mono text-white mt-1 tabular-nums">
                           {formatLKR(currentRun.total_net)}
                         </div>
-                        <p className="text-[10px] text-emerald-500/80 mt-1">
+                        <p className="text-[10px] text-emerald-100 mt-1">
                           Total bank transfer disbursement
                         </p>
                       </div>
@@ -1400,7 +1408,7 @@ function PayrollHubContent() {
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+                      <thead className="bg-[#0F172A] text-white uppercase text-[10px] font-semibold tracking-wider border-b border-slate-800">
                         <tr>
                           <th className="py-3 px-4">Employee</th>
                           <th className="py-3 px-4">Branch</th>
@@ -1810,7 +1818,7 @@ function PayrollHubContent() {
               {parsedCsvRows.length > 0 && (
                 <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-xl">
                   <table className="w-full text-left text-[11px]">
-                    <thead className="bg-slate-950 text-slate-400 uppercase text-[9px] font-bold sticky top-0">
+                    <thead className="bg-[#0F172A] text-white uppercase text-[9px] font-semibold sticky top-0 border-b border-slate-800">
                       <tr>
                         <th className="p-2">Employee</th>
                         <th className="p-2">Date</th>
@@ -1914,7 +1922,7 @@ function PayrollHubContent() {
               {/* Holiday List */}
               <div className="max-h-64 overflow-y-auto border border-slate-800 rounded-xl">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400 uppercase text-[9px] font-bold sticky top-0">
+                  <thead className="bg-[#0F172A] text-white uppercase text-[9px] font-semibold sticky top-0 border-b border-slate-800">
                     <tr>
                       <th className="py-2 px-3">Date</th>
                       <th className="py-2 px-3">Holiday Name</th>

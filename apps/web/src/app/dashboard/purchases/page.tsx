@@ -851,52 +851,68 @@ export default function PurchasesPage() {
       )}
 
       {/* KPI Cards Row (Blind Mode for Staff: Only non-financial operational metrics visible) */}
-      <div className={`px-6 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-3 shrink-0`}>
-        <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase">Total GRNs</span>
-            <ClipboardCheck className="w-4 h-4 text-[#7052FF]" />
+      <div className={`px-6 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4 shrink-0`}>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wider">Total GRNs</span>
+              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+                <ClipboardCheck className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+              {kpis.totalCount.toLocaleString()}
+            </div>
+            <p className="text-xs text-blue-100 mt-2">Physical goods shipments</p>
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {kpis.totalCount.toLocaleString()}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Physical goods shipments</p>
         </div>
 
         {isOwner && (
-          <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase">Procurement Value</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wider">Procurement Value</span>
+                <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                {formatLkr(kpis.totalValue)}
+              </div>
+              <p className="text-xs text-emerald-100 mt-2">Total received cost</p>
             </div>
-            <div className="text-xl font-black text-slate-900 mt-1">
-              {formatLkr(kpis.totalValue)}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Total received cost</p>
           </div>
         )}
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase">Active Suppliers</span>
-            <Tag className="w-4 h-4 text-blue-600" />
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-100 uppercase tracking-wider">Active Suppliers</span>
+              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                <Tag className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+              {suppliers.length}
+            </div>
+            <p className="text-xs text-indigo-100 mt-2">Ayurvedic pharma vendors</p>
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {suppliers.length}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Ayurvedic pharma vendors</p>
         </div>
 
         {isOwner && (
-          <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase">Average GRN Value</span>
-              <Package className="w-4 h-4 text-purple-600" />
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-100 uppercase tracking-wider">Average GRN Value</span>
+                <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-white mt-3 tracking-tight">
+                {formatLkr(kpis.avgValue)}
+              </div>
+              <p className="text-xs text-amber-100 mt-2">Per supplier consignment</p>
             </div>
-            <div className="text-xl font-black text-slate-900 mt-1">
-              {formatLkr(kpis.avgValue)}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Per supplier consignment</p>
           </div>
         )}
       </div>
@@ -1017,7 +1033,7 @@ export default function PurchasesPage() {
             <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs bg-white">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200/70 text-slate-600 font-semibold text-[11px] uppercase tracking-wider">
+                  <tr className="bg-[#0F172A] border-b border-slate-800 text-white font-semibold text-[11px] uppercase tracking-wider">
                     <th className="py-3 px-4">GRN Number</th>
                     <th className="py-3 px-4">Branch</th>
                     <th className="py-3 px-4">Supplier</th>
@@ -1132,7 +1148,7 @@ export default function PurchasesPage() {
             <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs bg-white">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200/70 text-slate-600 font-semibold text-[11px] uppercase tracking-wider">
+                  <tr className="bg-[#0F172A] border-b border-slate-800 text-white font-semibold text-[11px] uppercase tracking-wider">
                     <th className="py-3 px-4">PO Number</th>
                     <th className="py-3 px-4">Supplier</th>
                     <th className="py-3 px-4">Order Date</th>

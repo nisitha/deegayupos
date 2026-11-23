@@ -848,7 +848,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/60 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Calendar Month</th>
                       <th className="px-4 py-3 text-right">Bills Completed</th>
@@ -964,7 +964,7 @@ export default function ReportsSuitePage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Invoice Number</th>
                       <th className="px-4 py-3">Date & Time</th>
@@ -1123,7 +1123,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Category Name</th>
                       <th className="px-4 py-3 text-right">Items Sold</th>
@@ -1189,7 +1189,7 @@ export default function ReportsSuitePage() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Product Name</th>
                       <th className="px-4 py-3">SKU / Barcode</th>
@@ -1295,7 +1295,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Branch Location</th>
                       <th className="px-4 py-3 text-right">Unique Items</th>
@@ -1354,7 +1354,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Product Name</th>
                       <th className="px-4 py-3">SKU</th>
@@ -1433,7 +1433,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Cashier / Staff Member</th>
                       <th className="px-4 py-3 text-right">Bills Completed</th>
@@ -1501,7 +1501,7 @@ export default function ReportsSuitePage() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left text-slate-300">
-                    <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                    <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                       <tr>
                         <th className="px-4 py-3">Payment Method</th>
                         <th className="px-4 py-3 text-right">Transactions</th>
@@ -1630,7 +1630,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Supplier Name</th>
                       <th className="px-4 py-3">Code</th>
@@ -1694,7 +1694,7 @@ export default function ReportsSuitePage() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">GRN Number</th>
                       <th className="px-4 py-3">Received Date</th>
@@ -1809,7 +1809,7 @@ export default function ReportsSuitePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left text-slate-300">
-                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                  <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Customer Name</th>
                       <th className="px-4 py-3">Phone</th>
@@ -1999,7 +1999,7 @@ export default function ReportsSuitePage() {
                       Itemized Breakdown ({selectedDrawerItem.data.items?.length || 0} Products)
                     </div>
                     <table className="w-full text-xs text-left text-slate-300">
-                      <thead className="bg-slate-900/60 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                      <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                         <tr>
                           <th className="px-3 py-2">Product Name</th>
                           <th className="px-3 py-2 text-right">Qty</th>
@@ -2139,7 +2139,7 @@ export default function ReportsSuitePage() {
                       Received Items List ({selectedDrawerItem.data.items?.length || 0})
                     </div>
                     <table className="w-full text-xs text-left text-slate-300">
-                      <thead className="bg-slate-900/60 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                      <thead className="bg-[#0F172A] text-white uppercase font-semibold border-b border-slate-800">
                         <tr>
                           <th className="px-3 py-2">Product Name</th>
                           <th className="px-3 py-2 text-right">Received Qty</th>

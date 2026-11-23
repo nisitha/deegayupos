@@ -523,31 +523,31 @@ export default function StockTransfersPage() {
         {/* KPI 1: Pending Owner Approval */}
         <div
           onClick={() => setActiveTab('PENDING_APPROVAL')}
-          className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-pos-card flex flex-col justify-between ${
-            activeTab === 'PENDING_APPROVAL'
-              ? 'border-amber-500 ring-2 ring-amber-100'
-              : 'border-slate-200/80 hover:border-amber-400/50'
+          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-amber-500/10 flex flex-col justify-between bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white ${
+            activeTab === 'PENDING_APPROVAL' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pending Owner Approval
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-amber-100 uppercase tracking-wider">
+                Pending Owner Approval
+              </span>
+              <div className="w-10 h-10 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-amber-600 tracking-tight flex items-center gap-2">
-              <span>{metrics.pending}</span>
-              {metrics.pending > 0 && (
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-              )}
-            </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {metrics.pending > 0
-                ? 'Requests awaiting Owner confirmation'
-                : 'Zero pending requests in queue'}
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                <span>{metrics.pending}</span>
+                {metrics.pending > 0 && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                )}
+              </div>
+              <div className="mt-2 text-xs text-amber-100">
+                {metrics.pending > 0
+                  ? 'Requests awaiting Owner confirmation'
+                  : 'Zero pending requests in queue'}
+              </div>
             </div>
           </div>
         </div>
@@ -555,65 +555,67 @@ export default function StockTransfersPage() {
         {/* KPI 2: Approved & Completed */}
         <div
           onClick={() => setActiveTab('APPROVED')}
-          className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-pos-card flex flex-col justify-between ${
-            activeTab === 'APPROVED'
-              ? 'border-emerald-500 ring-2 ring-emerald-100'
-              : 'border-slate-200/80 hover:border-emerald-400/50'
+          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-emerald-500/10 flex flex-col justify-between bg-gradient-to-br from-[#10B981] to-[#059669] text-white ${
+            activeTab === 'APPROVED' ? 'ring-4 ring-emerald-300/40 -translate-y-0.5' : 'hover:opacity-95'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Approved & Completed
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+                Approved & Completed
+              </span>
+              <div className="w-10 h-10 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-emerald-600 tracking-tight">{metrics.approved}</div>
-            <div className="mt-1 text-xs text-slate-500">Successfully executed stock reallocations</div>
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.approved}</div>
+              <div className="mt-2 text-xs text-emerald-100">Successfully executed stock reallocations</div>
+            </div>
           </div>
         </div>
 
         {/* KPI 3: Total Units Transferred */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Units Transferred
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center">
-              <Package className="w-4 h-4" />
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
+                Total Units Transferred
+              </span>
+              <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+                <Package className="w-5 h-5" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900 tracking-tight">
-              {metrics.totalUnits.toLocaleString('en-US')}
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {metrics.totalUnits.toLocaleString('en-US')}
+              </div>
+              <div className="mt-2 text-xs text-blue-100">Inventory volume relocated across branches</div>
             </div>
-            <div className="mt-1 text-xs text-slate-500">Inventory volume relocated across branches</div>
           </div>
         </div>
 
         {/* KPI 4: Total Requests */}
         <div
           onClick={() => setActiveTab('ALL')}
-          className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-pos-card flex flex-col justify-between ${
-            activeTab === 'ALL'
-              ? 'border-slate-800 ring-2 ring-slate-100'
-              : 'border-slate-200/80 hover:border-slate-400/50'
+          className={`p-5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-indigo-500/10 flex flex-col justify-between bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white ${
+            activeTab === 'ALL' ? 'ring-4 ring-indigo-300/40 -translate-y-0.5' : 'hover:opacity-95'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Transfer Requests
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center">
-              <FileText className="w-4 h-4" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-indigo-100 uppercase tracking-wider">
+                Total Transfer Requests
+              </span>
+              <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900 tracking-tight">{metrics.total}</div>
-            <div className="mt-1 text-xs text-slate-500">
-              {metrics.rejected > 0 ? `${metrics.rejected} rejected / cancelled` : 'All registered records'}
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">{metrics.total}</div>
+              <div className="mt-2 text-xs text-indigo-100">
+                {metrics.rejected > 0 ? `${metrics.rejected} rejected / cancelled` : 'All registered records'}
+              </div>
             </div>
           </div>
         </div>
@@ -689,7 +691,7 @@ export default function StockTransfersPage() {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-pos-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+            <thead className="bg-[#0F172A] text-white font-semibold border-b border-slate-800 uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4">Reference #</th>
                 <th className="py-3 px-4">Date / Time (Colombo)</th>

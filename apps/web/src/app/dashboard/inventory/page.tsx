@@ -982,7 +982,7 @@ export default function BranchInventoryAnalyticsPage() {
   // ==========================================
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20">
+    <div className="min-h-screen bg-[#EEF2F7] text-slate-900 pb-20">
       {/* Toast Notification */}
       {adjustToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-250">
@@ -1162,103 +1162,109 @@ export default function BranchInventoryAnalyticsPage() {
         ========================================== */}
         <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
           {/* 1. Retail Valuation */}
-          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Retail Stock Valuation</span>
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                <Banknote className="w-4 h-4" />
+          <div className="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white p-5 rounded-2xl shadow-lg shadow-blue-500/10 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Retail Stock Valuation</span>
+                <div className="w-9 h-9 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md shrink-0">
+                  <Banknote className="w-4 h-4" />
+                </div>
               </div>
+              <div className="text-2xl font-black text-white tracking-tight">
+                {formatCurrency(currentBranchSummary.retailValuation)}
+              </div>
+              <p className="text-xs text-blue-100 mt-2 flex items-center gap-1 flex-wrap">
+                <span className="font-semibold">{currentBranchSummary.totalUnits.toLocaleString()} units</span>
+                <span>•</span>
+                <span>{currentBranchSummary.totalSkus.toLocaleString()} SKUs</span>
+              </p>
             </div>
-            <div className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(currentBranchSummary.retailValuation)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-              <span>{currentBranchSummary.totalUnits.toLocaleString()} units on hand</span>
-              <span>•</span>
-              <span>{currentBranchSummary.totalSkus.toLocaleString()} SKUs</span>
-            </p>
           </div>
 
           {/* 2. Cost Valuation & Margin */}
-          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cost Valuation</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <TrendingUp className="w-4 h-4" />
+          <div className="bg-gradient-to-br from-[#10B981] to-[#059669] text-white p-5 rounded-2xl shadow-lg shadow-emerald-500/10 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-100">Cost Valuation</span>
+                <div className="w-9 h-9 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-md shrink-0">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
               </div>
+              <div className="text-2xl font-black text-white tracking-tight">
+                {formatCurrency(currentBranchSummary.costValuation)}
+              </div>
+              <p className="text-xs text-emerald-100 font-semibold mt-2">
+                Margin: +{formatCurrency(estimatedGrossMargin.margin)} ({estimatedGrossMargin.marginPct.toFixed(1)}%)
+              </p>
             </div>
-            <div className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatCurrency(currentBranchSummary.costValuation)}
-            </div>
-            <p className="text-xs text-emerald-600 font-semibold mt-1">
-              Est. Margin: +{formatCurrency(estimatedGrossMargin.margin)} ({estimatedGrossMargin.marginPct.toFixed(1)}%)
-            </p>
           </div>
 
           {/* 3. Healthy Stock Items */}
-          <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Healthy Stock</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <CheckCircle2 className="w-4 h-4" />
+          <div className="bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white p-5 rounded-2xl shadow-lg shadow-indigo-500/10 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Healthy Stock</span>
+                <div className="w-9 h-9 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-md shrink-0">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
               </div>
+              <div className="text-2xl font-black text-white tracking-tight">
+                {currentBranchSummary.healthyCount.toLocaleString()}
+              </div>
+              <p className="text-xs text-indigo-100 mt-2">
+                {currentBranchSummary.totalSkus > 0
+                  ? `${((currentBranchSummary.healthyCount / currentBranchSummary.totalSkus) * 100).toFixed(1)}% of catalog stable`
+                  : 'Optimal inventory levels'}
+              </p>
             </div>
-            <div className="text-2xl font-black text-emerald-700 tracking-tight">
-              {currentBranchSummary.healthyCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {currentBranchSummary.totalSkus > 0
-                ? `${((currentBranchSummary.healthyCount / currentBranchSummary.totalSkus) * 100).toFixed(1)}% of catalog stable`
-                : 'Optimal inventory levels'}
-            </p>
           </div>
 
           {/* 4. Low Stock Alerts (Clickable to switch tab) */}
           <button
             onClick={() => setActiveTab('low')}
-            className={`text-left p-4.5 rounded-xl border transition cursor-pointer ${
-              activeTab === 'low'
-                ? 'bg-amber-50/70 border-amber-400 ring-2 ring-amber-400/20 shadow-xs'
-                : 'bg-white hover:bg-amber-50/40 border-slate-200/90 shadow-xs'
+            className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-amber-500/10 bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white ${
+              activeTab === 'low' ? 'ring-4 ring-amber-300/40 -translate-y-0.5' : 'hover:opacity-95'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Low Stock Alerts</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-100/70 flex items-center justify-center text-amber-700">
-                <AlertTriangle className="w-4 h-4" />
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-100">Low Stock Alerts</span>
+                <div className="w-9 h-9 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-md shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
               </div>
+              <div className="text-2xl font-black text-white tracking-tight">
+                {currentBranchSummary.lowStockCount.toLocaleString()}
+              </div>
+              <p className="text-xs text-amber-100 font-medium mt-2 flex items-center gap-1">
+                <span>Running out soon</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </p>
             </div>
-            <div className="text-2xl font-black text-amber-700 tracking-tight">
-              {currentBranchSummary.lowStockCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
-              <span>Running out soon</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </p>
           </button>
 
           {/* 5. Out of Stock (Clickable to switch tab) */}
           <button
             onClick={() => setActiveTab('out')}
-            className={`text-left p-4.5 rounded-xl border transition cursor-pointer ${
-              activeTab === 'out'
-                ? 'bg-rose-50/70 border-rose-400 ring-2 ring-rose-400/20 shadow-xs'
-                : 'bg-white hover:bg-rose-50/40 border-slate-200/90 shadow-xs'
+            className={`text-left p-5 rounded-2xl transition-all cursor-pointer flex flex-col justify-between shadow-lg shadow-rose-500/10 bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white ${
+              activeTab === 'out' ? 'ring-4 ring-rose-300/40 -translate-y-0.5' : 'hover:opacity-95'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-800">Out of Stock</span>
-              <div className="w-8 h-8 rounded-lg bg-rose-100/70 flex items-center justify-center text-rose-700">
-                <PackageX className="w-4 h-4" />
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-100">Out of Stock</span>
+                <div className="w-9 h-9 rounded-full bg-white text-rose-600 flex items-center justify-center shadow-md shrink-0">
+                  <PackageX className="w-4 h-4" />
+                </div>
               </div>
+              <div className="text-2xl font-black text-white tracking-tight">
+                {currentBranchSummary.outOfStockCount.toLocaleString()}
+              </div>
+              <p className="text-xs text-rose-100 font-medium mt-2 flex items-center gap-1">
+                <span>0 remaining on hand</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </p>
             </div>
-            <div className="text-2xl font-black text-rose-700 tracking-tight">
-              {currentBranchSummary.outOfStockCount.toLocaleString()}
-            </div>
-            <p className="text-xs text-rose-600 font-medium mt-1 flex items-center gap-1">
-              <span>0 remaining on hand</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </p>
           </button>
         </section>
 
@@ -1558,7 +1564,7 @@ export default function BranchInventoryAnalyticsPage() {
           <div className="bg-slate-950/60 rounded-xl border border-indigo-500/20 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-indigo-950/60 text-slate-300 uppercase tracking-wider text-[11px] font-bold border-b border-indigo-800/40">
+                <thead className="bg-[#0F172A] text-white uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                   <tr>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Special Item Name</th>
@@ -1781,7 +1787,7 @@ export default function BranchInventoryAnalyticsPage() {
           {/* Inventory Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
+              <thead className="bg-[#0F172A] text-white uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-4 py-3.5">Product & SKU</th>
                   <th className="px-4 py-3.5">Branch / Warehouse</th>

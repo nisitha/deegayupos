@@ -288,7 +288,7 @@ export default function SuppliersPage() {
           <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs bg-white">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/70 text-slate-600 font-semibold">
+                <tr className="bg-[#0F172A] border-b border-slate-800 text-white font-semibold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-4 w-28">Code</th>
                   <th className="py-3 px-4">Supplier Name</th>
                   <th className="py-3 px-4">Contact Phone</th>

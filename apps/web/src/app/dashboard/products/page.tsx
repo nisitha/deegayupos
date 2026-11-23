@@ -640,7 +640,7 @@ export default function ProductsPage() {
 
               <button
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#005BD3] hover:bg-[#004CB5] text-white font-semibold text-xs shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs shadow-sm transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Product</span>
@@ -715,7 +715,7 @@ export default function ProductsPage() {
       <div className="rounded-2xl bg-white border border-slate-200/80 shadow-pos-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider text-xs font-bold border-b border-slate-200">
+            <thead className="bg-[#0F172A] text-white uppercase tracking-wider text-xs font-semibold border-b border-slate-800">
               <tr>
                 <th className="px-4 py-3.5">Product Name & SKU</th>
                 <th className="px-4 py-3.5">Barcode</th>

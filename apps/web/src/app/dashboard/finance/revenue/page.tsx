@@ -257,55 +257,55 @@ export default function RevenueDeskPage() {
       {/* 4 Core Financial KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Revenue */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gross Sales</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005BD3]">
+            <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Gross Sales</span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="text-2xl font-bold tracking-tight text-white tabular-nums">
               {formatCurrency(analytics?.grossSales)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-blue-100">
               {analytics?.billCount ?? 0} settled transactions
             </div>
           </div>
         </div>
 
         {/* Cost of Goods Sold (COGS) */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white shadow-lg shadow-amber-500/10">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total COGS</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+            <span className="text-xs font-bold text-amber-100 uppercase tracking-wider">Total COGS</span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white">
               <Package className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="text-2xl font-bold tracking-tight text-white tabular-nums">
               {formatCurrency(analytics?.totalCost)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-amber-100">
               Direct inventory procurement cost
             </div>
           </div>
         </div>
 
         {/* Net Profit */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Net Profit</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+            <span className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Net Profit</span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-emerald-600 tracking-tight">
+            <div className="text-2xl font-bold tracking-tight text-white tabular-nums">
               {formatCurrency(analytics?.netProfit)}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-100">
+              <span className="font-bold bg-white/20 px-1.5 py-0.5 rounded font-mono text-white">
                 {analytics?.profitMargin ?? 0}%
               </span>
               <span>Profit Margin</span>
@@ -314,18 +314,18 @@ export default function RevenueDeskPage() {
         </div>
 
         {/* Khata Credit Outstanding */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-pos-card">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Khata Receivables</span>
-            <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+            <span className="text-xs font-bold text-indigo-100 uppercase tracking-wider">Khata Receivables</span>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-purple-700 tracking-tight">
+            <div className="text-2xl font-bold tracking-tight text-white tabular-nums">
               {formatCurrency(analytics?.paymentBreakdown.credit)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-indigo-100">
               Pending credit settlement
             </div>
           </div>
@@ -508,7 +508,7 @@ export default function RevenueDeskPage() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+              <thead className="bg-[#0F172A] text-white font-semibold border-b border-slate-800 uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3 px-4">Item Description</th>
                   <th className="py-3 px-4">SKU</th>

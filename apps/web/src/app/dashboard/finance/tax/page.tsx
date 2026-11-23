@@ -26,20 +26,20 @@ export default function TaxEnginePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ayurvedic Exemption</div>
-          <div className="text-2xl font-black text-emerald-600 mt-2">0% (VAT Exempt)</div>
-          <p className="text-xs text-slate-500 mt-1">Prescription herbal preparations</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white shadow-lg shadow-emerald-500/10">
+          <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Ayurvedic Exemption</div>
+          <div className="text-2xl font-bold text-white mt-2">0% (VAT Exempt)</div>
+          <p className="text-xs text-emerald-100 mt-1">Prescription herbal preparations</p>
         </div>
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Standard FMCG Rate</div>
-          <div className="text-2xl font-black text-slate-900 mt-2">18.00% VAT</div>
-          <p className="text-xs text-slate-500 mt-1">General cosmetics and packaged drinks</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-blue-500/10">
+          <div className="text-xs font-bold text-blue-100 uppercase tracking-wider">Standard FMCG Rate</div>
+          <div className="text-2xl font-bold text-white mt-2">18.00% VAT</div>
+          <p className="text-xs text-blue-100 mt-1">General cosmetics and packaged drinks</p>
         </div>
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Social Security (SSCL)</div>
-          <div className="text-2xl font-black text-slate-900 mt-2">2.50%</div>
-          <p className="text-xs text-slate-500 mt-1">Applicable commercial wholesale sales</p>
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-lg shadow-indigo-500/10">
+          <div className="text-xs font-bold text-indigo-100 uppercase tracking-wider">Social Security (SSCL)</div>
+          <div className="text-2xl font-bold text-white mt-2">2.50%</div>
+          <p className="text-xs text-indigo-100 mt-1">Applicable commercial wholesale sales</p>
         </div>
       </div>
     </div>

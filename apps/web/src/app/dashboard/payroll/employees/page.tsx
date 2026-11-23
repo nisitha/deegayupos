@@ -364,7 +364,7 @@ export default function PayrollEmployeesPage() {
         <section className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
+              <thead className="bg-[#0F172A] text-white uppercase tracking-wider text-[11px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-4 py-3.5">Code & Staff Name</th>
                   <th className="px-4 py-3.5">Contact & NIC</th>
