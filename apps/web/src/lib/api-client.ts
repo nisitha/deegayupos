@@ -3334,6 +3334,63 @@ export interface ShiftModakaEntryDto {
   totalAmount: number; // F = D * appliedRate
 }
 
+/**
+ * Canonical 1–7 Special Stock / Modaka Item Order Definition
+ * 1. #1 — SKU-1805 — Kameshwari Rasayanaya Rawana 300 (Rate: 300)
+ * 2. #2 — SKU-108  — Kameshwari Rasayanaya Rawana Rathu (Rate: 250)
+ * 3. #3 — SKU-3268 — Kameshwari Rasayanaya Sewanagala Gold 300 (Rate: 300)
+ * 4. #4 — SKU-105  — Rawana Kaha 200 (Rate: 200)
+ * 5. #5 — SKU-3252 — Kameshwari Rasayanaya Sewanagala Kaha 250 (Rate: 250)
+ * 6. #6 — SKU-3325 — Kameshwari Rasayanaya Chathuri Kola 250 (Rate: 250)
+ * 7. #7 — SKU-3377 — Kameshwari Rasayanaya Chathuri Rathu 300 (Rate: 300)
+ * (Any additional future SKU not in the 7 above should sort after #7 alphabetically by name.)
+ */
+export function getSpecialStockCanonicalRank(item: {
+  sku?: string | null;
+  productSku?: string | null;
+  name?: string | null;
+  productName?: string | null;
+}): number {
+  const rawSku = (item.sku || item.productSku || (item as any).product_sku || '').trim().toUpperCase();
+  const rawName = (item.name || item.productName || (item as any).product_name || '').trim().toLowerCase();
+
+  // Match by SKU first
+  if (rawSku === 'SKU-1805') return 1;
+  if (rawSku === 'SKU-108') return 2;
+  if (rawSku === 'SKU-3268') return 3;
+  if (rawSku === 'SKU-105') return 4;
+  if (rawSku === 'SKU-3252') return 5;
+  if (rawSku === 'SKU-3325') return 6;
+  if (rawSku === 'SKU-3377') return 7;
+
+  // Normalized product name fallback
+  if (rawName.includes('rawana') && rawName.includes('300')) return 1;
+  if (rawName.includes('rawana') && rawName.includes('rathu')) return 2;
+  if (rawName.includes('sewanagala') && rawName.includes('gold')) return 3;
+  if (rawName.includes('rawana') && rawName.includes('kaha')) return 4;
+  if (rawName.includes('sewanagala') && rawName.includes('kaha')) return 5;
+  if (rawName.includes('chathuri') && rawName.includes('kola')) return 6;
+  if (rawName.includes('chathuri') && rawName.includes('rathu')) return 7;
+
+  return 999;
+}
+
+export function sortSpecialStockItems<T extends {
+  sku?: string | null;
+  productSku?: string | null;
+  name?: string | null;
+  productName?: string | null;
+}>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const rankA = getSpecialStockCanonicalRank(a);
+    const rankB = getSpecialStockCanonicalRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    const nameA = (a.name || a.productName || (a as any).product_name || '').toLowerCase();
+    const nameB = (b.name || b.productName || (b as any).product_name || '').toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+}
+
 export interface ShiftFinancialAdjustmentDto {
   id: string;
   adjustmentDate: string;
@@ -3509,7 +3566,7 @@ export const shiftsApi = {
         updatedAt: row.updated_at,
       }));
 
-      return { success: true, data: list };
+      return { success: true, data: sortSpecialStockItems(list) };
     } catch (err: any) {
       console.error('[shiftsApi] getModakaConfigs fatal:', err);
       return { success: false, data: [] };
@@ -3883,7 +3940,7 @@ export const shiftsApi = {
           closingDrawerFloat: Number(openShift.closing_drawer_float || 0),
           cashVariance: Number(openShift.cash_variance || 0),
           handoverNotes: openShift.handover_notes,
-          modakaEntries: finalEntries,
+          modakaEntries: sortSpecialStockItems(finalEntries),
           createdAt: openShift.created_at,
         },
       };
@@ -4495,7 +4552,7 @@ export const shiftsApi = {
         totalAmount: Number(e.total_amount || 0),
       }));
 
-      return { success: true, data: formatted };
+      return { success: true, data: sortSpecialStockItems(formatted) };
     } catch (err: any) {
       return { success: false, data: [], error: { code: 'FATAL_ERROR', message: err.message, statusCode: 500 } };
     }
@@ -4996,7 +5053,7 @@ export const shiftsApi = {
         salaryDeductionAmount: Number(s.salary_deduction_amount || 0),
         extraIncomeAmount: Number(s.extra_income_amount || 0),
         handoverNotes: s.handover_notes,
-        modakaEntries: entriesByShiftId.get(s.id) || [],
+        modakaEntries: sortSpecialStockItems(entriesByShiftId.get(s.id) || []),
         createdAt: s.created_at,
         updatedAt: s.updated_at,
       }));

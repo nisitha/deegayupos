@@ -11,7 +11,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { shiftsApi } from '../../lib/api-client';
+import { shiftsApi, sortSpecialStockItems } from '../../lib/api-client';
 
 export interface SpecialBulkSelection {
   productId: string;
@@ -126,9 +126,10 @@ export function SpecialBulkModal({
             };
           });
 
-          setItems(combined);
-          if (combined.length > 0 && !selectedProductId) {
-            setSelectedProductId(combined[0]!.productId);
+          const sortedCombined = sortSpecialStockItems(combined);
+          setItems(sortedCombined);
+          if (sortedCombined.length > 0 && !selectedProductId) {
+            setSelectedProductId(sortedCombined[0]!.productId);
           }
         }
       } catch (err) {

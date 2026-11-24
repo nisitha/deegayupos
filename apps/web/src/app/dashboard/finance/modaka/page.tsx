@@ -28,6 +28,7 @@ import {
   formatShiftLabel,
   CashierShiftDto,
   ModakaItemConfigDto,
+  sortSpecialStockItems,
 } from '../../../../lib/api-client';
 import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
 import {
@@ -105,8 +106,9 @@ export default function ModakaLedgerPage() {
         }
 
         if (configsRes.success) {
+          const sortedConfigs = sortSpecialStockItems(configsRes.data || []);
           setConfigs((prev) =>
-            JSON.stringify(prev) !== JSON.stringify(configsRes.data) ? configsRes.data : prev
+            JSON.stringify(prev) !== JSON.stringify(sortedConfigs) ? sortedConfigs : prev
           );
         }
       } catch (err) {
@@ -134,12 +136,14 @@ export default function ModakaLedgerPage() {
         const prods = res.data?.items || [];
         if (prods.length > 0) {
           setCatalogProducts(
-            prods.map((p) => ({
-              id: p.id,
-              name: p.name,
-              sku: p.sku || '',
-              price: Number(p.retailPrice || 0),
-            }))
+            sortSpecialStockItems(
+              prods.map((p) => ({
+                id: p.id,
+                name: p.name,
+                sku: p.sku || '',
+                price: Number(p.retailPrice || 0),
+              }))
+            )
           );
         }
       });
@@ -156,14 +160,15 @@ export default function ModakaLedgerPage() {
     setSelectedDate(`${yyyy}-${mm}-${dd}`);
   };
 
-  // Open config modal
+  // Open config modal with strict canonical 1-7 sort order
   const handleOpenConfigModal = () => {
+    const sorted = sortSpecialStockItems(configs);
     setEditingConfigs(
-      configs.map((c) => ({
+      sorted.map((c, idx) => ({
         id: c.id,
         productId: c.productId,
         productName: c.productName,
-        sortOrder: c.sortOrder,
+        sortOrder: idx + 1,
         customRate: c.customRate,
         isActive: c.isActive,
       }))
@@ -172,18 +177,22 @@ export default function ModakaLedgerPage() {
     setIsConfigModalOpen(true);
   };
 
-  // Save configs
+  // Save configs enforcing canonical 1-7 sort order
   const handleSaveConfigs = async () => {
     setIsSavingConfigs(true);
     setConfigSuccessMsg(null);
-    const res = await shiftsApi.updateModakaConfigs(editingConfigs);
+    const configsToSave = editingConfigs.map((c, idx) => ({
+      ...c,
+      sortOrder: idx + 1,
+    }));
+    const res = await shiftsApi.updateModakaConfigs(configsToSave);
     setIsSavingConfigs(false);
 
     if (res.success) {
       setConfigSuccessMsg('Special rates & variety configs saved successfully.');
       setTimeout(() => {
         setIsConfigModalOpen(false);
-        loadData();
+        loadData(false);
       }, 1000);
     }
   };
@@ -252,7 +261,7 @@ export default function ModakaLedgerPage() {
     const rows: string[][] = [];
 
     shifts.forEach((s) => {
-      const entries = s.modakaEntries || [];
+      const entries = sortSpecialStockItems(s.modakaEntries || []);
       if (entries.length === 0) {
         rows.push([
           s.shiftDate,
@@ -658,7 +667,7 @@ export default function ModakaLedgerPage() {
       ) : (
         <div className="space-y-6">
           {shifts.map((shift) => {
-            const entries = shift.modakaEntries || [];
+            const entries = sortSpecialStockItems(shift.modakaEntries || []);
             let totalModakaValue = 0;
             entries.forEach((e) => (totalModakaValue += e.totalAmount));
 

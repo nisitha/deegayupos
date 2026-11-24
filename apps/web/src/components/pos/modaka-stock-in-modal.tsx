@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, PackagePlus, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
-import { CashierShiftDto, shiftsApi } from '../../lib/api-client';
+import { CashierShiftDto, shiftsApi, sortSpecialStockItems } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
 
 interface ModakaItemRow {
@@ -74,18 +74,21 @@ export function ModakaStockInModal({
       if (activeShift && activeShift.modakaEntries && activeShift.modakaEntries.length > 0) {
         setResolvedShiftId(activeShift.id);
         setItems(
-          activeShift.modakaEntries.map((e) => {
-            const bStock = stockMap.get(e.productId) || 0;
-            const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
-            return {
-              productId: e.productId,
-              productName: e.productName || 'Special Item',
-              openingQty: open,
-              currentInQty: Number(e.inQty || 0),
-              appliedRate: Number(e.appliedRate || 250),
-              branchStock: bStock,
-            };
-          })
+          sortSpecialStockItems(
+            activeShift.modakaEntries.map((e) => {
+              const bStock = stockMap.get(e.productId) || 0;
+              const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+              return {
+                productId: e.productId,
+                productName: e.productName || 'Special Item',
+                productSku: e.productSku || '',
+                openingQty: open,
+                currentInQty: Number(e.inQty || 0),
+                appliedRate: Number(e.appliedRate || 250),
+                branchStock: bStock,
+              };
+            })
+          )
         );
         setIsLoading(false);
         return;
@@ -103,18 +106,21 @@ export function ModakaStockInModal({
           const entries = shiftRes.data.modakaEntries || [];
           if (entries.length > 0) {
             setItems(
-              entries.map((e) => {
-                const bStock = stockMap.get(e.productId) || 0;
-                const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
-                return {
-                  productId: e.productId,
-                  productName: e.productName || 'Special Item',
-                  openingQty: open,
-                  currentInQty: Number(e.inQty || 0),
-                  appliedRate: Number(e.appliedRate || 250),
-                  branchStock: bStock,
-                };
-              })
+              sortSpecialStockItems(
+                entries.map((e) => {
+                  const bStock = stockMap.get(e.productId) || 0;
+                  const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+                  return {
+                    productId: e.productId,
+                    productName: e.productName || 'Special Item',
+                    productSku: e.productSku || '',
+                    openingQty: open,
+                    currentInQty: Number(e.inQty || 0),
+                    appliedRate: Number(e.appliedRate || 250),
+                    branchStock: bStock,
+                  };
+                })
+              )
             );
             setIsLoading(false);
             return;
@@ -127,17 +133,20 @@ export function ModakaStockInModal({
       if (configsRes.success && configsRes.data) {
         const activeConfigs = configsRes.data.filter((c) => c.isActive);
         setItems(
-          activeConfigs.map((c) => {
-            const bStock = stockMap.get(c.productId) || 0;
-            return {
-              productId: c.productId,
-              productName: c.productName,
-              openingQty: bStock,
-              currentInQty: 0,
-              appliedRate: c.customRate,
-              branchStock: bStock,
-            };
-          })
+          sortSpecialStockItems(
+            activeConfigs.map((c) => {
+              const bStock = stockMap.get(c.productId) || 0;
+              return {
+                productId: c.productId,
+                productName: c.productName,
+                productSku: c.productSku || '',
+                openingQty: bStock,
+                currentInQty: 0,
+                appliedRate: c.customRate,
+                branchStock: bStock,
+              };
+            })
+          )
         );
       }
     } catch (err: any) {

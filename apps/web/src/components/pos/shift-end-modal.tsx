@@ -23,6 +23,7 @@ import {
   EndShiftPayload,
   shiftsApi,
   ShiftCashBillItem,
+  sortSpecialStockItems,
 } from '../../lib/api-client';
 import { supabase } from '../../lib/supabase';
 
@@ -267,7 +268,7 @@ export function ShiftEndModal({
           }
         }
 
-        setModakaRows(rows);
+        setModakaRows(sortSpecialStockItems(rows));
 
         // Initialize denominations from JSON or 0 (including 2000 LKR notes)
         const initialCounts: Record<number, number> = {
