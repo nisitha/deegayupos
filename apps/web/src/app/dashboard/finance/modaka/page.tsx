@@ -722,14 +722,19 @@ export default function ModakaLedgerPage() {
                 <div className="grid grid-cols-1 xl:grid-cols-12 divide-y xl:divide-y-0 xl:divide-x divide-slate-200">
                   {/* LEFT COLUMN: SPECIAL STOCK TABLE (Span 7) */}
                   <div className="xl:col-span-7 p-5 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                         <FileSpreadsheet className="w-4 h-4 text-purple-600" />
                         <span>Special Stock & Sales Summary</span>
                       </h4>
-                      <span className="text-xs font-mono font-bold text-purple-700">
-                        Sold: {shift.modakaTotalSoldQty} units
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-full">
+                          Sold: {shift.modakaTotalSoldQty} units
+                        </span>
+                        <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs">
+                          Remaining Balance: {entries.reduce((acc, e) => acc + e.closingQty, 0)} units
+                        </span>
+                      </div>
                     </div>
 
                     <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
@@ -742,7 +747,9 @@ export default function ModakaLedgerPage() {
                             <th className="py-2 px-1.5 text-center w-12 bg-amber-50 text-amber-900">+ B</th>
                             <th className="py-2 px-1.5 text-center w-12 bg-slate-50">= C</th>
                             <th className="py-2 px-1.5 text-center w-12 bg-purple-50 text-purple-900">- D</th>
-                            <th className="py-2 px-1.5 text-center w-12 bg-emerald-50 text-emerald-900">= E</th>
+                            <th className="py-2.5 px-2 text-center w-24 bg-emerald-600 text-white font-extrabold tracking-wide shadow-xs border-x border-emerald-700">
+                              = E (BAL)
+                            </th>
                             <th className="py-2 px-2 text-right w-16">Rate</th>
                             <th className="py-2 px-2.5 text-right w-24 bg-purple-100/60 text-purple-950 font-black">
                               F: Value
@@ -772,8 +779,18 @@ export default function ModakaLedgerPage() {
                               <td className="py-2 px-1.5 text-center font-mono font-bold text-purple-700 bg-purple-50/40">
                                 {entry.soldQty}
                               </td>
-                              <td className="py-2 px-1.5 text-center font-mono font-black text-emerald-700 bg-emerald-50/40">
-                                {entry.closingQty}
+                              <td className="py-2 px-1.5 text-center bg-emerald-50/60 border-x border-emerald-100/80">
+                                <span
+                                  className={`inline-flex items-center justify-center min-w-[3.5rem] px-3 py-1 rounded-lg text-base font-black tabular-nums shadow-sm ring-1 ${
+                                    entry.closingQty > 20
+                                      ? 'bg-emerald-100 text-emerald-950 ring-emerald-400/80'
+                                      : entry.closingQty > 0
+                                      ? 'bg-amber-100 text-amber-950 ring-amber-400/80'
+                                      : 'bg-rose-100 text-rose-900 ring-rose-400/80'
+                                  }`}
+                                >
+                                  {entry.closingQty}
+                                </span>
                               </td>
                               <td className="py-2 px-2 text-right font-mono text-slate-600">
                                 {entry.appliedRate.toFixed(0)}
@@ -801,8 +818,10 @@ export default function ModakaLedgerPage() {
                             <td className="py-2 px-1.5 text-center text-purple-800">
                               {entries.reduce((acc, e) => acc + e.soldQty, 0)}
                             </td>
-                            <td className="py-2 px-1.5 text-center text-emerald-800">
-                              {entries.reduce((acc, e) => acc + e.closingQty, 0)}
+                            <td className="py-2.5 px-1.5 text-center bg-emerald-50 border-x border-emerald-200">
+                              <span className="inline-flex items-center justify-center bg-emerald-600 text-white text-lg font-black px-4 py-1.5 rounded-xl shadow-md tabular-nums">
+                                {entries.reduce((acc, e) => acc + e.closingQty, 0)}
+                              </span>
                             </td>
                             <td className="py-2 px-2 text-right text-slate-500">—</td>
                             <td className="py-2 px-2.5 text-right font-black text-purple-950 bg-purple-200/60">
