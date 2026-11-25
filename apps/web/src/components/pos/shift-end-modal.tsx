@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import {
   CashierShiftDto,
@@ -79,6 +80,9 @@ export function ShiftEndModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Read-only lock if the shift is closed and user is not OWNER
+  const isClosedLocked = Boolean((activeShift?.status === 'closed' || localShift?.status === 'closed') && !isOwner);
 
   // Bank accounts
   const [bankAccounts, setBankAccounts] = useState<
@@ -521,6 +525,12 @@ export function ShiftEndModal({
       return;
     }
 
+    if (isClosedLocked) {
+      setErrorMessage('This shift has already been closed and locked. Only the Owner can modify closed shift records.');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (isBankDepositExceeding) {
       setErrorMessage('Bank deposit cannot exceed total counted drawer cash.');
       setIsSubmitting(false);
@@ -580,7 +590,7 @@ export function ShiftEndModal({
       })),
     };
 
-    const res = await shiftsApi.closeShiftHandover(payload);
+    const res = await shiftsApi.closeShiftHandover(payload, { isOwner });
     setIsSubmitting(false);
 
     if (res.success && res.data) {
@@ -708,6 +718,16 @@ export function ShiftEndModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 bg-[#F8FAFC]">
+          {isClosedLocked && (
+            <div className="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-center gap-3 shadow-xs">
+              <Lock className="w-5 h-5 shrink-0 text-amber-600" />
+              <div>
+                <span className="font-bold block">Closed Shift — Read-Only Mode</span>
+                <span className="text-xs text-amber-700">This shift has already been closed and locked. Only the Owner can modify closed shift records.</span>
+              </div>
+            </div>
+          )}
+
           {errorMessage && (
             <div className="mb-4 p-4 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-sm flex items-center gap-2.5">
               <AlertTriangle className="w-5 h-5 shrink-0 text-rose-600" />
@@ -826,9 +846,10 @@ export function ShiftEndModal({
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
+                                  disabled={isClosedLocked}
                                   value={row.inQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'inQty', e.target.value)}
-                                  className="w-20 h-10 px-2 text-center font-bold font-mono text-base bg-amber-50/50 text-amber-900 border border-amber-300/80 rounded-lg focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/15"
+                                  className="w-20 h-10 px-2 text-center font-bold font-mono text-base bg-amber-50/50 text-amber-900 border border-amber-300/80 rounded-lg focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                               </td>
                               <td className="py-2.5 px-2 text-center font-mono text-sm font-bold text-slate-700 bg-slate-50/40">
@@ -839,9 +860,10 @@ export function ShiftEndModal({
                                   type="text"
                                   inputMode="numeric"
                                   placeholder="0"
+                                  disabled={isClosedLocked}
                                   value={row.soldQty || ''}
                                   onChange={(e) => handleModakaChange(idx, 'soldQty', e.target.value)}
-                                  className="w-20 h-10 px-2 text-center font-bold font-mono text-base bg-indigo-50/50 text-indigo-900 border border-indigo-300/80 rounded-lg focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/15"
+                                  className="w-20 h-10 px-2 text-center font-bold font-mono text-base bg-indigo-50/50 text-indigo-900 border border-indigo-300/80 rounded-lg focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                               </td>
                               <td className="py-2.5 px-2 text-center font-mono text-sm font-bold text-emerald-700 bg-emerald-50/20">
@@ -903,8 +925,9 @@ export function ShiftEndModal({
                     </div>
                     <button
                       type="button"
+                      disabled={isClosedLocked}
                       onClick={handleClearDenominations}
-                      className="text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                      className="text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       Clear All Counts
                     </button>
@@ -932,9 +955,10 @@ export function ShiftEndModal({
                               type="text"
                               inputMode="numeric"
                               placeholder="0"
+                              disabled={isClosedLocked}
                               value={count > 0 ? count : ''}
                               onChange={(e) => handleCountChange(d, e.target.value)}
-                              className="w-20 h-10 px-2 text-center font-mono font-bold text-base bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/15"
+                              className="w-20 h-10 px-2 text-center font-mono font-bold text-base bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div className="text-right">
@@ -1246,9 +1270,10 @@ export function ShiftEndModal({
                             step="0.01"
                             inputMode="decimal"
                             placeholder="0.00"
+                            disabled={isClosedLocked}
                             value={goodsPurchasedPaid || ''}
                             onChange={(e) => setGoodsPurchasedPaid(parseFloat(e.target.value) || 0)}
-                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-rose-50/50 text-rose-900 border border-rose-200 rounded-lg focus:border-rose-400 focus:ring-2 focus:ring-rose-200 focus:outline-none"
+                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-rose-50/50 text-rose-900 border border-rose-200 rounded-lg focus:border-rose-400 focus:ring-2 focus:ring-rose-200 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -1270,9 +1295,10 @@ export function ShiftEndModal({
                             step="0.01"
                             inputMode="decimal"
                             placeholder="0.00"
+                            disabled={isClosedLocked}
                             value={otherExpenses || ''}
                             onChange={(e) => setOtherExpenses(parseFloat(e.target.value) || 0)}
-                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-rose-50/50 text-rose-900 border border-rose-200 rounded-lg focus:border-rose-400 focus:ring-2 focus:ring-rose-200 focus:outline-none"
+                            className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-rose-50/50 text-rose-900 border border-rose-200 rounded-lg focus:border-rose-400 focus:ring-2 focus:ring-rose-200 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -1297,9 +1323,10 @@ export function ShiftEndModal({
                               max={totalDrawerCashCounted}
                               inputMode="decimal"
                               placeholder="0.00"
+                              disabled={isClosedLocked}
                               value={bankDepositAmountInput}
                               onChange={(e) => setBankDepositAmountInput(e.target.value)}
-                              className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg border focus:outline-none focus:ring-2 ${isBankDepositExceeding
+                              className={`w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums rounded-lg border focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${isBankDepositExceeding
                                 ? 'bg-rose-50 text-rose-900 border-rose-400 focus:ring-rose-200'
                                 : 'bg-rose-50/50 text-rose-900 border-rose-200 focus:border-rose-400 focus:ring-rose-200'
                                 }`}
@@ -1324,8 +1351,9 @@ export function ShiftEndModal({
                               </label>
                               <select
                                 value={selectedBankId}
+                                disabled={isClosedLocked}
                                 onChange={(e) => setSelectedBankId(e.target.value)}
-                                className="w-full mt-1 px-3 py-2 text-xs font-medium bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                                className="w-full mt-1 px-3 py-2 text-xs font-medium bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 {bankAccounts.map((b) => (
                                   <option key={b.id} value={b.id}>
@@ -1343,9 +1371,10 @@ export function ShiftEndModal({
                                 <input
                                   type="text"
                                   placeholder="Bank, Branch, Reference"
+                                  disabled={isClosedLocked}
                                   value={customBankDetails}
                                   onChange={(e) => setCustomBankDetails(e.target.value)}
-                                  className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                                  className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                               </div>
                             )}
@@ -1389,9 +1418,10 @@ export function ShiftEndModal({
                         <textarea
                           rows={2}
                           placeholder="Optional remarks for Admin..."
+                          disabled={isClosedLocked}
                           value={handoverNotes}
                           onChange={(e) => setHandoverNotes(e.target.value)}
-                          className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/15"
+                          className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border border-slate-200 focus:border-indigo-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
@@ -1464,24 +1494,31 @@ export function ShiftEndModal({
               )}
 
               {activeTab === 'SUMMARY' && (
-                <button
-                  type="button"
-                  onClick={handleFinalSubmit}
-                  disabled={isSubmitting || isBankDepositExceeding || !isBankDepositValid}
-                  className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Closing Shift...</span>
-                    </>
-                  ) : (
-                    <>
-                      <LogOut className="w-5 h-5" />
-                      <span>Submit Shift Handover &amp; Sign Out</span>
-                    </>
-                  )}
-                </button>
+                isClosedLocked ? (
+                  <div className="min-h-[44px] px-6 py-2.5 bg-amber-100 border border-amber-300 text-amber-800 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-xs">
+                    <Lock className="w-4 h-4 text-amber-700" />
+                    <span>Shift Locked (Read-Only)</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleFinalSubmit}
+                    disabled={isSubmitting || isBankDepositExceeding || !isBankDepositValid}
+                    className="min-h-[44px] px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-[14px] sm:text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Closing Shift...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-5 h-5" />
+                        <span>Submit Shift Handover &amp; Sign Out</span>
+                      </>
+                    )}
+                  </button>
+                )
               )}
             </div>
           </div>

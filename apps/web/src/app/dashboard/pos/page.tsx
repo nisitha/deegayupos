@@ -409,7 +409,7 @@ export default function ConfidencyPosPage() {
         { isOwner }
       );
       if (res.success && res.data) {
-        if (res.data.canResumeTodayShift) {
+        if (isOwner && res.data.canResumeTodayShift) {
           setResumableTodayShift(res.data.resumableShift || res.data);
           setActiveShift(null);
         } else {
@@ -429,7 +429,12 @@ export default function ConfidencyPosPage() {
     if (!resumableTodayShift?.id) return;
     setIsResumingShift(true);
     try {
-      const res = await shiftsApi.resumeShift(resumableTodayShift.id, selectedBranchId || undefined, cashierId);
+      const res = await shiftsApi.resumeShift(
+        resumableTodayShift.id,
+        selectedBranchId || undefined,
+        cashierId,
+        { isOwner, user }
+      );
       if (res.success && res.data) {
         setActiveShift(res.data);
         setResumableTodayShift(null);
@@ -443,7 +448,7 @@ export default function ConfidencyPosPage() {
     } finally {
       setIsResumingShift(false);
     }
-  }, [resumableTodayShift?.id, selectedBranchId, cashierId]);
+  }, [resumableTodayShift?.id, selectedBranchId, cashierId, isOwner, user]);
 
   const handleStartFreshShift = useCallback(async () => {
     if (!selectedBranchId) return;
@@ -3504,8 +3509,8 @@ export default function ConfidencyPosPage() {
         </div>
       )}
 
-      {/* Resume Today's Shift Prompt */}
-      {Boolean(!isOwner && resumableTodayShift && !activeShift) && (
+      {/* Resume Today's Shift Prompt (Owner Only) */}
+      {Boolean(isOwner && resumableTodayShift && !activeShift) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fadeIn"
           role="dialog"

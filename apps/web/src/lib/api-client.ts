@@ -4033,7 +4033,34 @@ export const shiftsApi = {
             },
           };
         }
-        // If no open shift exists, Owner NEVER creates a shift!
+        // If no open shift exists, check if Owner can resume a closed shift from today at this branch!
+        const todayDate = getColomboDateStr(new Date());
+        if (!forceNewShift) {
+          const { data: closedToday } = await supabase
+            .from('cashier_shifts')
+            .select('*')
+            .eq('branch_id', branchId)
+            .eq('shift_date', todayDate)
+            .eq('status', 'closed')
+            .order('ended_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (closedToday) {
+            return {
+              success: true,
+              data: {
+                ...closedToday,
+                canResumeTodayShift: true,
+                resumableShift: closedToday,
+                needsOpeningCount: false,
+                openingConfirmed: true,
+                handoverRequired: false,
+              } as any,
+            };
+          }
+        }
+        // If no open or closed shift exists, Owner NEVER creates a shift!
         return {
           success: true,
           data: null as any,
@@ -4046,35 +4073,10 @@ export const shiftsApi = {
         return { success: true, data: active.data };
       }
 
-      // 2. If no open shift exists, check if THIS cashier already closed a shift today at this branch!
+      // 2. For branch staff (STAFF role), closed shifts are permanently immutable.
+      // canResumeTodayShift is NEVER true for staff.
+      // Staff must start a brand-new sequential shift (Shift #2, Shift #3, etc.) carrying forward the previous closing float.
       const todayDate = getColomboDateStr(new Date());
-
-      if (!forceNewShift && cashierId && isValidUuid(cashierId)) {
-        const { data: closedToday } = await supabase
-          .from('cashier_shifts')
-          .select('*')
-          .eq('branch_id', branchId)
-          .eq('cashier_id', cashierId)
-          .eq('shift_date', todayDate)
-          .eq('status', 'closed')
-          .order('ended_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (closedToday) {
-          return {
-            success: true,
-            data: {
-              ...closedToday,
-              canResumeTodayShift: true,
-              resumableShift: closedToday,
-              cashierName,
-              needsOpeningCount: false,
-              openingConfirmed: true,
-            } as any,
-          };
-        }
-      }
 
       // 3. Start a new shift
       // Check how many closed shifts exist today for this branch (Sequential shifts)
@@ -4285,7 +4287,8 @@ export const shiftsApi = {
   resumeShift: async (
     shiftId: string,
     branchId?: string | null,
-    cashierId?: string | null
+    cashierId?: string | null,
+    opts?: { isOwner?: boolean; user?: any }
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
       if (!shiftId || !isValidUuid(shiftId)) {
@@ -4293,6 +4296,34 @@ export const shiftsApi = {
           success: false,
           data: null as any,
           error: { code: 'INVALID_ID', message: 'Valid shift ID is required', statusCode: 400 },
+        };
+      }
+
+      // SECURITY LOCK: Only OWNER can re-open / resume a closed shift
+      let isOwnerCaller = Boolean(
+        opts?.isOwner ||
+        shiftsApi.isOwnerUser(opts?.user) ||
+        (cashierId && shiftsApi.isOwnerUser({ id: cashierId }))
+      );
+
+      if (!isOwnerCaller) {
+        try {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser && shiftsApi.isOwnerUser(authUser)) {
+            isOwnerCaller = true;
+          }
+        } catch { }
+      }
+
+      if (!isOwnerCaller) {
+        return {
+          success: false,
+          data: null as any,
+          error: {
+            code: 'PERMISSION_DENIED',
+            message: 'Permission denied: Only the Owner can re-open a closed shift.',
+            statusCode: 403,
+          },
         };
       }
 
@@ -4529,9 +4560,40 @@ export const shiftsApi = {
 
   recordModakaStockIn: async (
     shiftId: string,
-    entries: { productId: string; inQty: number }[]
+    entries: { productId: string; inQty: number }[],
+    opts?: { isOwner?: boolean; user?: any }
   ): Promise<ApiResponse<boolean>> => {
     try {
+      // SECURITY LOCK: If shift is already closed, reject modifications unless caller is Owner
+      const { data: targetShift } = await supabase
+        .from('cashier_shifts')
+        .select('status')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (targetShift?.status === 'closed') {
+        let isOwnerCaller = Boolean(opts?.isOwner || shiftsApi.isOwnerUser(opts?.user));
+        if (!isOwnerCaller) {
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser && shiftsApi.isOwnerUser(authUser)) {
+              isOwnerCaller = true;
+            }
+          } catch { }
+        }
+        if (!isOwnerCaller) {
+          return {
+            success: false,
+            data: false,
+            error: {
+              code: 'SHIFT_LOCKED',
+              message: 'This shift has already been closed and locked. Only the Owner can modify closed shift records.',
+              statusCode: 403,
+            },
+          };
+        }
+      }
+
       for (const e of entries) {
         if (Number(e.inQty) <= 0) continue;
         const { data: current } = await supabase
@@ -4606,7 +4668,10 @@ export const shiftsApi = {
     }
   },
 
-  closeShiftHandover: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
+  closeShiftHandover: async (
+    payload: EndShiftPayload,
+    opts?: { isOwner?: boolean; user?: any }
+  ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
       if (!payload.branchId || payload.branchId === 'all' || payload.branchId === 'ALL' || !isValidUuid(payload.branchId)) {
         return {
@@ -4618,9 +4683,39 @@ export const shiftsApi = {
       // Fetch shift metadata upfront for started_at window and financial adjustments audit
       const { data: shiftRow } = await supabase
         .from('cashier_shifts')
-        .select('tenant_id, shift_date, shift_number, cashier_id, branch_id, started_at')
+        .select('tenant_id, shift_date, shift_number, cashier_id, branch_id, started_at, status')
         .eq('id', payload.shiftId)
         .maybeSingle();
+
+      // SECURITY LOCK: Closed shifts are immutable. Non-owners cannot modify closed shift records.
+      if (shiftRow?.status === 'closed') {
+        let isOwnerCaller = Boolean(
+          opts?.isOwner ||
+          shiftsApi.isOwnerUser(opts?.user) ||
+          (payload.cashierId && shiftsApi.isOwnerUser({ id: payload.cashierId }))
+        );
+
+        if (!isOwnerCaller) {
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser && shiftsApi.isOwnerUser(authUser)) {
+              isOwnerCaller = true;
+            }
+          } catch { }
+        }
+
+        if (!isOwnerCaller) {
+          return {
+            success: false,
+            data: null as any,
+            error: {
+              code: 'SHIFT_LOCKED',
+              message: 'This shift has already been closed and locked. Only the Owner can modify closed shift records.',
+              statusCode: 403,
+            },
+          };
+        }
+      }
 
       // Attribute closed shift to its Asia/Colombo closing date so any shift closed on Day X is reported on Day X
       const closingColomboDate = getColomboDateStr(new Date());
@@ -4998,8 +5093,11 @@ export const shiftsApi = {
     }
   },
 
-  closeShift: async (payload: EndShiftPayload): Promise<ApiResponse<CashierShiftDto>> => {
-    return shiftsApi.closeShiftHandover(payload);
+  closeShift: async (
+    payload: EndShiftPayload,
+    opts?: { isOwner?: boolean; user?: any }
+  ): Promise<ApiResponse<CashierShiftDto>> => {
+    return shiftsApi.closeShiftHandover(payload, opts);
   },
 
   getShiftLedgers: async (params?: {
