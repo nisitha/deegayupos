@@ -1380,9 +1380,16 @@ export default function ConfidencyPosPage() {
             : selectedCustomer.name
           : 'Walk-in Customer';
 
-        const effectiveCashierId = activeCashier?.id || user?.id || cashierId;
-        const effectiveCashierName = activeCashier?.fullName || user?.fullName || cashierName;
+        let effectiveCashierId = activeCashier?.id || user?.id || cashierId;
+        let effectiveCashierName = activeCashier?.fullName || user?.fullName || cashierName;
         const effectiveBranchId = selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
+
+        // Bind sale cashier attribution: if logged in as Owner without a switched cashier,
+        // bind to on-duty branch cashier from activeShift
+        if (isOwner && !activeCashier && activeShift?.cashierId && !isOwnerUser({ id: activeShift.cashierId })) {
+          effectiveCashierId = activeShift.cashierId;
+          effectiveCashierName = activeShift.cashierName || activeShift.openShiftCashierName || effectiveCashierName;
+        }
 
         if (!isOwner && activeShift?.handoverRequired) {
           throw new Error(`Cannot process sale: Handover required for ${activeShift.openShiftCashierName || 'previous cashier'}.`);
@@ -1405,9 +1412,18 @@ export default function ConfidencyPosPage() {
           }
         }
 
+        // STRICT CHECK: Every POS checkout must belong to an active shift
+        const resolvedShiftId = activeShift?.id || currentShiftId;
+        if (!resolvedShiftId) {
+          throw new Error(
+            'Cannot complete sale: No active cashier shift is open for this branch. ' +
+            'Please sign in with your branch cashier account (e.g. Shashini, Tharindu, Kumari) and open your shift before billing.'
+          );
+        }
+
         const payload: CheckoutPayload = {
           branchId: effectiveBranchId,
-          shiftId: activeShift?.id || currentShiftId || undefined,
+          shiftId: resolvedShiftId,
           cashierId: effectiveCashierId,
           cashierName: effectiveCashierName,
           customerId: selectedCustomer?.id || undefined,
@@ -1713,11 +1729,32 @@ export default function ConfidencyPosPage() {
                   <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
                   Owner • All Branches
                 </span>
+                {activeCashier ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsCashierModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 transition-colors cursor-pointer shadow-2xs"
+                    title="Switch Cashier PIN"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Cashier: {activeCashier.fullName}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCashierModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-900 transition-colors cursor-pointer shadow-2xs"
+                    title="Select Cashier Profile"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                    <span>Select Cashier PIN</span>
+                  </button>
+                )}
                 <span className="hidden xl:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
                   {activeShift ? (
                     <>
                       <span className="font-semibold text-slate-900">Active Shift:</span>{' '}
-                      Cashier: <strong className="text-slate-900 font-bold">{activeShift.cashierName || 'Cashier'}</strong>
+                      Cashier: <strong className="text-slate-900 font-bold">{activeShift.cashierName || activeShift.openShiftCashierName || 'Cashier'}</strong>
                     </>
                   ) : (
                     <span className="text-slate-500 italic">No Active Cashier Shift</span>
@@ -1833,6 +1870,34 @@ export default function ConfidencyPosPage() {
             </button>
           </div>
         </div>
+
+        {/* Owner Session Active & Unswitched Cashier Warning Banner */}
+        {isOwner && !activeCashier && (
+          <div className="bg-amber-50 border-b border-amber-300 px-3.5 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-amber-950 shrink-0 animate-in fade-in duration-200 shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0" />
+              <div className="text-xs sm:text-sm leading-snug">
+                <strong className="text-amber-900 font-bold">Counter Terminal Notice:</strong> Currently logged in as <strong className="text-amber-950 font-bold">Dr. Deegayu (Owner)</strong>. On-duty branch staff must sign in with their branch cashier account (<code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">shashini@...</code>, <code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">tharindu@...</code>, <code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">kumari@...</code>) or click <strong>PIN Switch</strong> to assign sales to their profile.
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCashierModalOpen(true)}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
+              >
+                PIN Switch
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 16-Hour Overdue Open Shift Alert Banner */}
         {isShiftOverdue16h && (

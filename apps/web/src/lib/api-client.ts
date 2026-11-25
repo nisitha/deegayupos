@@ -1112,31 +1112,79 @@ export const posApi = {
     const validCustomerId = isValidUuid(data.customerId) ? data.customerId : null;
     const customerName = data.customerName || (validCustomerId ? null : 'Walk-in Customer');
 
-    // 4b. Resolve Shift ID with fallback to active open shift for branch
+    // 4b. Enforce active open shift for branch & bind cashier attribution
     let shiftId = isValidUuid(data.shiftId) ? data.shiftId : null;
-    if (!shiftId && branchId) {
+    let activeShiftCashierId: string | null = null;
+
+    if (branchId) {
       try {
-        const { data: activeShiftRow } = await supabase
-          .from('cashier_shifts')
-          .select('id')
-          .eq('branch_id', branchId)
-          .eq('status', 'open')
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let activeShiftRow: any = null;
+        if (shiftId) {
+          const { data: sRow } = await supabase
+            .from('cashier_shifts')
+            .select('id, cashier_id, status')
+            .eq('id', shiftId)
+            .eq('branch_id', branchId)
+            .eq('status', 'open')
+            .maybeSingle();
+          activeShiftRow = sRow;
+        }
+
+        if (!activeShiftRow) {
+          const { data: latestOpenShift } = await supabase
+            .from('cashier_shifts')
+            .select('id, cashier_id, status')
+            .eq('branch_id', branchId)
+            .eq('status', 'open')
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          activeShiftRow = latestOpenShift;
+        }
+
         if (activeShiftRow?.id) {
           shiftId = activeShiftRow.id;
-        } else {
-          const isOwnerCheckout = shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName });
-          if (!isOwnerCheckout) {
-            const newShiftRes = await shiftsApi.getOrCreateActiveShift(branchId, cashierId, cashierName);
-            if (newShiftRes.success && newShiftRes.data?.id) {
-              shiftId = newShiftRes.data.id;
-            }
-          }
+          activeShiftCashierId = activeShiftRow.cashier_id;
         }
       } catch (e) {
-        console.warn('[posApi.checkout] Shift auto-resolution warning:', e);
+        console.warn('[posApi.checkout] Shift resolution warning:', e);
+      }
+    }
+
+    // STRICT CHECK: Every POS checkout must attach to an active open shift! Zero shiftless sales permitted.
+    if (!shiftId) {
+      throw new Error(
+        'Cannot complete sale: No active cashier shift is currently open for this branch. ' +
+        'Please sign in with your branch cashier account (e.g. Shashini, Tharindu, Kumari) and open your shift before processing sales.'
+      );
+    }
+
+    // 4c. Bind cashier attribution: If session is Owner without switched cashier, bind to active shift's on-duty branch cashier
+    const isOwnerSession = shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName }) ||
+      cashierId === DEEGAYU_CASHIER_ID ||
+      cashierId === '96b2747b-9d22-4266-94ce-b035fadef498';
+
+    if (isOwnerSession && activeShiftCashierId && activeShiftCashierId !== DEEGAYU_CASHIER_ID && activeShiftCashierId !== '96b2747b-9d22-4266-94ce-b035fadef498') {
+      cashierId = activeShiftCashierId;
+      try {
+        const { data: cashierUser } = await supabase
+          .from('users')
+          .select('full_name')
+          .eq('id', activeShiftCashierId)
+          .maybeSingle();
+        if (cashierUser?.full_name) {
+          cashierName = cashierUser.full_name;
+        } else {
+          if (activeShiftCashierId === '41363aeb-ba28-44b7-8822-983f1de593c0') cashierName = 'Shashini';
+          else if (activeShiftCashierId === '0f1d46e2-e943-4f24-b69e-f1ba5278a750') cashierName = 'Tharindu';
+          else if (activeShiftCashierId === '1de49278-b4aa-466a-8493-d88c0c4d56de') cashierName = 'Anusha';
+          else if (activeShiftCashierId === '1b50a131-4b75-4b22-86ee-bdd74665aeab') cashierName = 'Kumari';
+        }
+      } catch {
+        if (activeShiftCashierId === '41363aeb-ba28-44b7-8822-983f1de593c0') cashierName = 'Shashini';
+        else if (activeShiftCashierId === '0f1d46e2-e943-4f24-b69e-f1ba5278a750') cashierName = 'Tharindu';
+        else if (activeShiftCashierId === '1de49278-b4aa-466a-8493-d88c0c4d56de') cashierName = 'Anusha';
+        else if (activeShiftCashierId === '1b50a131-4b75-4b22-86ee-bdd74665aeab') cashierName = 'Kumari';
       }
     }
 
