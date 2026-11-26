@@ -120,6 +120,11 @@ export interface GoodsReceivedNoteDto {
   receivedDate: string;
   status: GrnStatus;
   totalCost: number;
+  paymentMethod?: 'CASH' | 'CHEQUE' | 'CREDIT' | 'BANK_TRANSFER' | string;
+  chequeNumber?: string | null;
+  chequeDate?: string | null;
+  chequeStatus?: 'PENDING' | 'CLEARED' | string | null;
+  shiftId?: string | null;
   receivedByUserId?: string | null;
   receivedByName?: string | null;
   notes?: string | null;
@@ -144,6 +149,11 @@ export interface CreateGrnDto {
   supplierInvoiceNo?: string;
   supplierInvoiceNumber?: string;
   receivedDate?: string;
+  paymentMethod?: 'CASH' | 'CHEQUE' | 'CREDIT' | 'BANK_TRANSFER' | string;
+  chequeNumber?: string;
+  chequeDate?: string;
+  chequeStatus?: 'PENDING' | 'CLEARED' | string;
+  shiftId?: string | null;
   notes?: string;
   items?: CreateGrnItemDto[];
 }

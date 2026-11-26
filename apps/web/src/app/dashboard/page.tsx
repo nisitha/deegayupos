@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import {
+  CheckCircle2,
   DollarSign,
   ShoppingCart,
   TrendingUp,
@@ -45,7 +46,7 @@ import {
 } from 'recharts';
 import type { DashboardActivityItem } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi, legacySyncApi, getColomboDateStr, type LegacySyncConfigDto } from '../../lib/api-client';
+import { dashboardApi, legacySyncApi, procurementApi, getColomboDateStr, type LegacySyncConfigDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
 import { useRealtimePosSync } from '../../hooks/use-realtime-pos-sync';
 import { supabase } from '../../lib/supabase';
@@ -819,6 +820,93 @@ export default function DashboardPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [activeBreakdownTab, setActiveBreakdownTab] = useState<'BRANCH' | 'SHIFT' | 'CASHIER' | 'PEAK'>('BRANCH');
+
+  // Upcoming Cheque Payments State (Part 3)
+  interface PendingChequeItem {
+    id: string;
+    grnNumber: string;
+    supplierInvoiceNo?: string;
+    supplierName: string;
+    branchId: string;
+    branchName: string;
+    chequeNumber: string;
+    chequeDate: string;
+    chequeStatus: string;
+    totalCost: number;
+    createdAt: string;
+  }
+
+  const [pendingCheques, setPendingCheques] = useState<PendingChequeItem[]>([]);
+  const [isLoadingCheques, setIsLoadingCheques] = useState<boolean>(false);
+  const [clearingChequeId, setClearingChequeId] = useState<string | null>(null);
+  const [chequeActionToast, setChequeActionToast] = useState<string | null>(null);
+
+  const fetchPendingCheques = useCallback(async () => {
+    setIsLoadingCheques(true);
+    try {
+      const res = await procurementApi.getUpcomingCheques(selectedBranch);
+      if (res.success && res.data) {
+        setPendingCheques(
+          res.data.map((g: any) => ({
+            ...g,
+            branchName: BRANCH_MAP[g.branchId] || 'Branch',
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn('[Dashboard] fetchPendingCheques error:', e);
+    } finally {
+      setIsLoadingCheques(false);
+    }
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    fetchPendingCheques();
+  }, [fetchPendingCheques]);
+
+  const handleMarkChequeCleared = async (grnId: string, chequeNumber: string) => {
+    setClearingChequeId(grnId);
+    try {
+      const res = await procurementApi.markChequeCleared(grnId);
+      if (res.success) {
+        setPendingCheques((prev) => prev.filter((c) => c.id !== grnId));
+        setChequeActionToast(`Cheque #${chequeNumber} marked as CLEARED.`);
+        setTimeout(() => setChequeActionToast(null), 3500);
+      } else {
+        alert(res.error?.message || 'Failed to mark cheque cleared');
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to mark cheque cleared');
+    } finally {
+      setClearingChequeId(null);
+    }
+  };
+
+  const chequeKPIs = useMemo(() => {
+    const todayStr = getColomboDateStr(new Date());
+    const sevenDaysDate = new Date();
+    sevenDaysDate.setDate(sevenDaysDate.getDate() + 7);
+    const sevenDaysStr = getColomboDateStr(sevenDaysDate);
+
+    const totalCount = pendingCheques.length;
+    const totalAmount = pendingCheques.reduce((sum, c) => sum + c.totalCost, 0);
+
+    const dueOrOverdue = pendingCheques.filter((c) => c.chequeDate && c.chequeDate <= todayStr);
+    const dueOrOverdueCount = dueOrOverdue.length;
+    const dueOrOverdueAmount = dueOrOverdue.reduce((sum, c) => sum + c.totalCost, 0);
+
+    const dueIn7Days = pendingCheques.filter((c) => c.chequeDate && c.chequeDate > todayStr && c.chequeDate <= sevenDaysStr);
+    const dueIn7DaysAmount = dueIn7Days.reduce((sum, c) => sum + c.totalCost, 0);
+
+    return {
+      totalCount,
+      totalAmount,
+      dueOrOverdueCount,
+      dueOrOverdueAmount,
+      dueIn7DaysAmount,
+      todayStr,
+    };
+  }, [pendingCheques]);
   const [inventoryBranch, setInventoryBranch] = useState<string>('ALL');
   const [inventoryChannel, setInventoryChannel] = useState<'ALL' | 'POS' | 'SPECIAL'>('ALL');
   const [cashierSortField, setCashierSortField] = useState<'revenue' | 'profit' | 'bills' | 'variance'>('revenue');
@@ -3582,6 +3670,215 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* =====================================================================
+          UPCOMING CHEQUE PAYMENTS (GRN) — POST-DATED CHEQUE RECONCILIATION
+      ===================================================================== */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-pos-card overflow-hidden">
+        {/* Card Header */}
+        <div className="p-4 sm:p-5 border-b border-slate-200/80 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-xs border border-amber-200">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Upcoming Cheque Payments (GRN)
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                  {chequeKPIs.totalCount} Pending
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Scheduled post-dated supplier cheques across {activeBranchName}. Reconcile bank balances for encashment.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fetchPendingCheques()}
+              disabled={isLoadingCheques}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCheques ? 'animate-spin text-amber-600' : ''}`} />
+              <span>Refresh Cheques</span>
+            </button>
+            <Link
+              href="/dashboard/purchases"
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1 transition-colors shadow-2xs"
+            >
+              <span>+ New GRN</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Action Toast Feedback */}
+        {chequeActionToast && (
+          <div className="px-5 py-2.5 bg-emerald-50 border-b border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-150">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{chequeActionToast}</span>
+          </div>
+        )}
+
+        {/* KPI Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-b border-slate-200/80 bg-white">
+          <div className="p-4 sm:p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pending Cheques</p>
+              <h3 className="text-xl font-bold font-mono text-slate-900 mt-1">
+                LKR {chequeKPIs.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+              {chequeKPIs.totalCount} Cheque{chequeKPIs.totalCount === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div className="p-4 sm:p-5 flex items-center justify-between bg-amber-50/30">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">Due Today / Overdue</p>
+                {chequeKPIs.dueOrOverdueCount > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                )}
+              </div>
+              <h3 className={`text-xl font-bold font-mono mt-1 ${
+                chequeKPIs.dueOrOverdueCount > 0 ? 'text-rose-700' : 'text-slate-700'
+              }`}>
+                LKR {chequeKPIs.dueOrOverdueAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
+              chequeKPIs.dueOrOverdueCount > 0 ? 'bg-rose-100 text-rose-800 border border-rose-200 font-extrabold' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {chequeKPIs.dueOrOverdueCount} Immediate
+            </span>
+          </div>
+
+          <div className="p-4 sm:p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Due In Next 7 Days</p>
+              <h3 className="text-xl font-bold font-mono text-indigo-700 mt-1">
+                LKR {chequeKPIs.dueIn7DaysAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
+              Cash Planning
+            </span>
+          </div>
+        </div>
+
+        {/* Cheques Table */}
+        {pendingCheques.length === 0 ? (
+          <div className="p-10 text-center flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">No Pending Cheques</h4>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-sm">
+              All supplier cheque payments for {activeBranchName} are cleared or no post-dated cheques have been issued.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-4">Due Date</th>
+                  <th className="py-3 px-4">Cheque Number</th>
+                  <th className="py-3 px-4">Supplier</th>
+                  <th className="py-3 px-4">Branch</th>
+                  <th className="py-3 px-4">GRN Ref</th>
+                  <th className="py-3 px-4 text-right">Amount (LKR)</th>
+                  <th className="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {pendingCheques.map((chq) => {
+                  const todayStr = chequeKPIs.todayStr;
+                  const isOverdue = chq.chequeDate && chq.chequeDate < todayStr;
+                  const isDueToday = chq.chequeDate && chq.chequeDate === todayStr;
+
+                  // Days calculation
+                  let daysDiff: number | null = null;
+                  if (chq.chequeDate) {
+                    const dTarget = new Date(chq.chequeDate).getTime();
+                    const dNow = new Date(todayStr).getTime();
+                    daysDiff = Math.round((dTarget - dNow) / (1000 * 60 * 60 * 24));
+                  }
+
+                  return (
+                    <tr key={chq.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold font-mono text-slate-900">
+                            {chq.chequeDate
+                              ? new Date(chq.chequeDate).toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
+                              : '—'}
+                          </span>
+                          {isOverdue ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight bg-rose-100 text-rose-800 border border-rose-300">
+                              OVERDUE
+                            </span>
+                          ) : isDueToday ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              DUE TODAY
+                            </span>
+                          ) : daysDiff !== null && daysDiff <= 7 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight bg-yellow-100 text-yellow-900 border border-yellow-300">
+                              DUE IN {daysDiff}D
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight bg-blue-50 text-blue-700 border border-blue-200">
+                              UPCOMING
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {chq.chequeNumber}
+                      </td>
+                      <td className="py-3 px-4 text-slate-800 font-semibold max-w-[180px] truncate">
+                        {chq.supplierName}
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {chq.branchName}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">
+                        {chq.grnNumber}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {chq.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          disabled={clearingChequeId === chq.id}
+                          onClick={() => handleMarkChequeCleared(chq.id, chq.chequeNumber)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                          title="Mark cheque as cleared from bank account"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{clearingChequeId === chq.id ? 'Clearing...' : 'Mark Cleared'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* =====================================================================
           QUICK ACTION SHORTCUTS & AUDIT LOGS

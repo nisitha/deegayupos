@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
+  Package,
   X,
   CheckCircle2,
   AlertTriangle,
@@ -127,6 +128,16 @@ export function ShiftEndModal({
   const [isCashBillsExpanded, setIsCashBillsExpanded] = useState<boolean>(false);
   const [isRefreshingSales, setIsRefreshingSales] = useState<boolean>(false);
   const [goodsPurchasedPaid, setGoodsPurchasedPaid] = useState<number>(0);
+  const [shiftCashGrns, setShiftCashGrns] = useState<
+    Array<{
+      id: string;
+      grnNumber: string;
+      supplierInvoiceNo?: string;
+      supplierName: string;
+      totalCost: number;
+      createdAt: string;
+    }>
+  >([]);
   const [otherExpenses, setOtherExpenses] = useState<number>(0);
   const [bankDepositAmountInput, setBankDepositAmountInput] = useState<string>('');
   const [selectedBankId, setSelectedBankId] = useState<string>('');
@@ -331,6 +342,24 @@ export function ShiftEndModal({
         }
 
         setGoodsPurchasedPaid(Number(shift.goodsPurchasedPaid || 0));
+
+        // Auto-fetch Cash GRNs paid out during this shift
+        if (shift.branchId) {
+          shiftsApi.getShiftCashGrns(
+            shift.branchId,
+            shift.id,
+            shift.startedAt || (shift as any).openedAt
+          ).then((res) => {
+            if (res.success && res.data) {
+              setShiftCashGrns(res.data.grns);
+              if (res.data.totalAmount > 0 && !shift.goodsPurchasedPaid) {
+                setGoodsPurchasedPaid(res.data.totalAmount);
+              }
+            }
+          }).catch((err) => {
+            console.warn('[ShiftEndModal] Auto-fetch Cash GRNs error:', err);
+          });
+        }
         setOtherExpenses(Number(shift.otherExpenses || 0));
 
         // Cleanly separate system JSON opening metadata from cashier human remarks
@@ -1295,6 +1324,50 @@ export function ShiftEndModal({
                             onChange={(e) => setGoodsPurchasedPaid(parseFloat(e.target.value) || 0)}
                             className="w-36 h-11 px-3 text-right font-mono text-lg font-bold tabular-nums bg-rose-50/50 text-rose-900 border border-rose-200 rounded-lg focus:border-rose-400 focus:ring-2 focus:ring-rose-200 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                           />
+                        </div>
+                      </div>
+
+                      {/* Itemized Cash GRNs Breakdown Card */}
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cash GRN Payouts Included ({shiftCashGrns.length})</span>
+                          </span>
+                          <span className="font-mono font-bold text-rose-700">
+                            LKR {shiftCashGrns.reduce((sum, g) => sum + g.totalCost, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        {shiftCashGrns.length > 0 ? (
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            {shiftCashGrns.map((grn) => (
+                              <div
+                                key={grn.id}
+                                className="flex items-center justify-between text-[11px] py-1.5 px-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs font-mono"
+                              >
+                                <div className="flex items-center gap-2 text-slate-700 truncate">
+                                  <span className="font-bold text-slate-900 shrink-0">{grn.grnNumber}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-slate-600 truncate">{grn.supplierName}</span>
+                                  {grn.supplierInvoiceNo && (
+                                    <span className="text-slate-400 text-[10px] hidden sm:inline truncate">({grn.supplierInvoiceNo})</span>
+                                  )}
+                                </div>
+                                <span className="font-bold text-rose-700 shrink-0 ml-2">
+                                  LKR {grn.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-slate-400 italic py-1 text-center">
+                            No Cash GRN payouts during this shift.
+                          </div>
+                        )}
+
+                        <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-200/60 leading-tight">
+                          Cheque, Credit, and Bank Transfer GRNs are automatically excluded from drawer cash.
                         </div>
                       </div>
 

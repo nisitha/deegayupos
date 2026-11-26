@@ -2660,12 +2660,23 @@ export const procurementApi = {
     const grnNumber = `GRN-${Date.now().toString().slice(-6)}`;
     const effectiveBranch = payload.branchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
     const effectiveWarehouse = payload.warehouseId || '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
+    const paymentMethod = payload.paymentMethod || 'CASH';
+    const chequeNumber = payload.chequeNumber || undefined;
+    const chequeDate = payload.chequeDate || undefined;
+    const chequeStatus = payload.chequeStatus || (paymentMethod === 'CHEQUE' ? 'PENDING' : undefined);
+    const shiftId = payload.shiftId || undefined;
+
     const grn: GoodsReceivedNoteDto = {
       id: grnId,
       grnNumber,
       supplierId: payload.supplierId,
       branchId: effectiveBranch,
       warehouseId: effectiveWarehouse,
+      paymentMethod,
+      chequeNumber,
+      chequeDate,
+      chequeStatus,
+      shiftId,
       status: 'RECEIVED' as any,
       receivedDate: new Date().toISOString(),
       totalCost: payload.totalCost || payload.totalAmount || 0,
@@ -2684,11 +2695,67 @@ export const procurementApi = {
         notes: payload.notes || undefined,
         total_cost: payload.totalCost || payload.totalAmount || 0,
         status: 'RECEIVED',
+        payment_method: paymentMethod,
+        cheque_number: chequeNumber,
+        cheque_date: chequeDate,
+        cheque_status: chequeStatus,
+        shift_id: shiftId,
       });
     } catch (e) {
       console.warn('[createGrn] Supabase insert note:', e);
     }
     return { success: true, data: grn };
+  },
+  getUpcomingCheques: async (branchId?: string | null): Promise<ApiResponse<any[]>> => {
+    try {
+      let query = supabase
+        .from('goods_received_notes')
+        .select('id, grn_number, supplier_invoice_no, total_cost, cheque_number, cheque_date, cheque_status, branch_id, created_at, suppliers(id, name)')
+        .eq('payment_method', 'CHEQUE')
+        .eq('cheque_status', 'PENDING');
+
+      if (branchId && branchId !== 'ALL' && branchId !== 'all') {
+        query = query.eq('branch_id', branchId);
+      }
+
+      const { data, error } = await query.order('cheque_date', { ascending: true });
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: (data || []).map((g: any) => ({
+          id: g.id,
+          grnNumber: g.grn_number || 'GRN',
+          supplierInvoiceNo: g.supplier_invoice_no,
+          supplierName: g.suppliers?.name || 'Ayurvedic Supplier',
+          branchId: g.branch_id,
+          chequeNumber: g.cheque_number || '—',
+          chequeDate: g.cheque_date,
+          chequeStatus: g.cheque_status || 'PENDING',
+          totalCost: Number(g.total_cost || 0),
+          createdAt: g.created_at,
+        })),
+      };
+    } catch (e: any) {
+      console.warn('[getUpcomingCheques] query error:', e);
+      return { success: false, data: [], error: { code: 'CHEQUE_QUERY_ERROR', message: e?.message, statusCode: 500 } };
+    }
+  },
+  markChequeCleared: async (grnId: string): Promise<ApiResponse<{ id: string; chequeStatus: string }>> => {
+    try {
+      const { data, error } = await supabase
+        .from('goods_received_notes')
+        .update({ cheque_status: 'CLEARED' })
+        .eq('id', grnId)
+        .select('id, cheque_status')
+        .single();
+
+      if (error) throw error;
+      return { success: true, data: { id: data.id, chequeStatus: data.cheque_status } };
+    } catch (e: any) {
+      console.warn('[markChequeCleared] update error:', e);
+      return { success: false, data: null as any, error: { code: 'UPDATE_ERROR', message: e?.message, statusCode: 500 } };
+    }
   },
 };
 
@@ -5488,6 +5555,62 @@ export const shiftsApi = {
     } catch (err: any) {
       console.error('[shiftsApi] getLiveShiftPosSales fatal:', err);
       return { success: false, data: { posBills: 0, posCashSales: 0, posGrossSales: 0, bills: [] } };
+    }
+  },
+
+  getShiftCashGrns: async (
+    branchId: string,
+    shiftId?: string,
+    startedAt?: string
+  ): Promise<ApiResponse<{ grns: any[]; totalAmount: number }>> => {
+    try {
+      if (!branchId) {
+        return { success: true, data: { grns: [], totalAmount: 0 } };
+      }
+
+      let query = supabase
+        .from('goods_received_notes')
+        .select('id, grn_number, supplier_invoice_no, total_cost, payment_method, shift_id, created_at, received_date, suppliers(id, name)')
+        .eq('branch_id', branchId)
+        .eq('payment_method', 'CASH');
+
+      if (shiftId && startedAt) {
+        query = query.or(`shift_id.eq.${shiftId},and(shift_id.is.null,created_at.gte.${startedAt})`);
+      } else if (shiftId) {
+        query = query.eq('shift_id', shiftId);
+      } else if (startedAt) {
+        query = query.gte('created_at', startedAt);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const grns = (data || []).map((g: any) => ({
+        id: g.id,
+        grnNumber: g.grn_number || 'GRN',
+        supplierInvoiceNo: g.supplier_invoice_no || undefined,
+        supplierName: g.suppliers?.name || 'Ayurvedic Supplier',
+        totalCost: Number(g.total_cost || 0),
+        createdAt: g.created_at || g.received_date,
+        shiftId: g.shift_id,
+      }));
+
+      const totalAmount = grns.reduce((sum, g) => sum + g.totalCost, 0);
+
+      return {
+        success: true,
+        data: {
+          grns,
+          totalAmount: Math.round(totalAmount * 100) / 100,
+        },
+      };
+    } catch (err: any) {
+      console.warn('[shiftsApi] getShiftCashGrns query error:', err);
+      return {
+        success: false,
+        data: { grns: [], totalAmount: 0 },
+        error: { code: 'GRN_QUERY_ERROR', message: err?.message || 'Failed to fetch cash GRNs', statusCode: 500 },
+      };
     }
   },
 

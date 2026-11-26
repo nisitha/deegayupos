@@ -1147,6 +1147,11 @@ model GoodsReceivedNote {
   receivedDate      DateTime  @default(now()) @map("received_date")
   status            GrnStatus @default(RECEIVED)
   totalCost         Decimal   @default(0.00) @map("total_cost") @db.Decimal(12, 2)
+  paymentMethod     String?   @default("CASH") @map("payment_method")
+  chequeNumber      String?   @map("cheque_number")
+  chequeDate        DateTime? @map("cheque_date") @db.Date
+  chequeStatus      String?   @default("PENDING") @map("cheque_status")
+  shiftId           String?   @map("shift_id") @db.Uuid
   receivedByUserId  String?   @map("received_by_user_id") @db.Uuid
   notes             String?   @db.Text
   createdAt         DateTime  @default(now()) @map("created_at")

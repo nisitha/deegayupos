@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
+  Banknote,
+  CreditCard,
   ClipboardCheck,
   FileText,
   Plus,
@@ -121,6 +123,9 @@ export default function PurchasesPage() {
   const [grnSupplierId, setGrnSupplierId] = useState<string>('');
   const [grnInvoiceNo, setGrnInvoiceNo] = useState<string>('');
   const [grnNotes, setGrnNotes] = useState<string>('');
+  const [grnPaymentMethod, setGrnPaymentMethod] = useState<'CASH' | 'CHEQUE' | 'CREDIT' | 'BANK_TRANSFER'>('CASH');
+  const [grnChequeNumber, setGrnChequeNumber] = useState<string>('');
+  const [grnChequeDate, setGrnChequeDate] = useState<string>('');
   const [grnItems, setGrnItems] = useState<
     {
       productId: string;
@@ -293,6 +298,11 @@ export default function PurchasesPage() {
             receivedDate: g.received_date || g.created_at || new Date().toISOString(),
             status: (g.status || 'RECEIVED') as GrnStatus,
             totalCost: Number(g.total_cost || g.total_amount || 0),
+            paymentMethod: g.payment_method || 'CASH',
+            chequeNumber: g.cheque_number || undefined,
+            chequeDate: g.cheque_date || undefined,
+            chequeStatus: g.cheque_status || undefined,
+            shiftId: g.shift_id || undefined,
             createdAt: g.created_at || new Date().toISOString(),
             updatedAt: g.updated_at || new Date().toISOString(),
             items: [],
@@ -638,6 +648,17 @@ export default function PurchasesPage() {
       return;
     }
 
+    if (grnPaymentMethod === 'CHEQUE') {
+      if (!grnChequeNumber.trim()) {
+        alert('Please enter the Cheque Number.');
+        return;
+      }
+      if (!grnChequeDate.trim()) {
+        alert('Please select the Cheque Due Date.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const newGrnId = crypto.randomUUID();
@@ -648,6 +669,26 @@ export default function PurchasesPage() {
       const effectiveWarehouse = BRANCH_TO_WAREHOUSE[effectiveBranch] || '42f1fe9d-7e44-48eb-8eb0-10a6439b5619';
       const receivedBy = activeCashier?.id || user?.id || '96b2747b-9d22-4266-94ce-b035fadef498';
       const totalCost = grnItems.reduce((acc, i) => acc + Number(i.receivedQuantity) * Number(i.unitCost), 0);
+
+      // Resolve active open shift if paid by Cash from register drawer
+      let activeShiftIdForGrn: string | null = null;
+      if (grnPaymentMethod === 'CASH') {
+        try {
+          const { data: openShift } = await supabase
+            .from('cashier_shifts')
+            .select('id')
+            .eq('branch_id', effectiveBranch)
+            .eq('status', 'open')
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (openShift?.id) {
+            activeShiftIdForGrn = openShift.id;
+          }
+        } catch (shiftErr) {
+          console.warn('Could not resolve active shift for cash GRN:', shiftErr);
+        }
+      }
 
       // 1. Insert into goods_received_notes
       const { error: grnErr } = await supabase.from('goods_received_notes').insert({
@@ -663,6 +704,11 @@ export default function PurchasesPage() {
         total_cost: totalCost,
         received_by_user_id: receivedBy,
         notes: grnNotes.trim() || undefined,
+        payment_method: grnPaymentMethod,
+        cheque_number: grnPaymentMethod === 'CHEQUE' ? grnChequeNumber.trim() : null,
+        cheque_date: grnPaymentMethod === 'CHEQUE' ? grnChequeDate.trim() : null,
+        cheque_status: grnPaymentMethod === 'CHEQUE' ? 'PENDING' : null,
+        shift_id: grnPaymentMethod === 'CASH' ? activeShiftIdForGrn : null,
       });
 
       if (grnErr) {
@@ -749,6 +795,9 @@ export default function PurchasesPage() {
       setGrnItems([]);
       setGrnInvoiceNo('');
       setGrnNotes('');
+      setGrnPaymentMethod('CASH');
+      setGrnChequeNumber('');
+      setGrnChequeDate('');
       await Promise.all([fetchData(true), fetchBranchStock(effectiveWarehouse)]);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Error receiving GRN');
@@ -1052,6 +1101,7 @@ export default function PurchasesPage() {
                     <th className="py-3 px-4">GRN Number</th>
                     <th className="py-3 px-4">Branch</th>
                     <th className="py-3 px-4">Supplier</th>
+                    <th className="py-3 px-4">Payment Method</th>
                     <th className="py-3 px-4">Invoice Ref</th>
                     <th className="py-3 px-4">Received Date</th>
                     {isOwner ? (
@@ -1076,6 +1126,42 @@ export default function PurchasesPage() {
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-slate-800">
                         {g.supplierName}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {g.paymentMethod === 'CHEQUE' ? (
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-300 font-mono">
+                              <CreditCard className="w-3 h-3 text-amber-600" />
+                              <span>#{g.chequeNumber || '—'}</span>
+                            </span>
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono">
+                              <span>Due: {g.chequeDate ? new Date(g.chequeDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                              <span className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
+                                g.chequeStatus === 'CLEARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {g.chequeStatus || 'PENDING'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : g.paymentMethod === 'CREDIT' ? (
+                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            Credit
+                          </span>
+                        ) : g.paymentMethod === 'BANK_TRANSFER' ? (
+                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                            Bank Transfer
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-0.5 items-start">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <Banknote className="w-3 h-3 text-emerald-600" />
+                              <span>Cash (Paid Out)</span>
+                            </span>
+                            {g.shiftId && (
+                              <span className="text-[10px] text-emerald-600 font-medium">Linked to Shift</span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-slate-500">
                         {g.supplierInvoiceNo || '—'}
@@ -1271,6 +1357,42 @@ export default function PurchasesPage() {
                     {viewingGrn.status}
                   </span>
                 </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Payment Method</span>
+                  <span className="font-bold text-slate-900">
+                    {viewingGrn.paymentMethod === 'CHEQUE'
+                      ? 'Cheque'
+                      : viewingGrn.paymentMethod === 'CREDIT'
+                        ? 'Credit'
+                        : viewingGrn.paymentMethod === 'BANK_TRANSFER'
+                          ? 'Bank Transfer'
+                          : 'Cash (Drawer Paid Out)'}
+                  </span>
+                </div>
+                {viewingGrn.paymentMethod === 'CHEQUE' && (
+                  <>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block">Cheque Number</span>
+                      <span className="font-bold font-mono text-amber-900">
+                        {viewingGrn.chequeNumber || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block">Cheque Due Date</span>
+                      <span className="font-bold font-mono text-amber-900">
+                        {viewingGrn.chequeDate ? new Date(viewingGrn.chequeDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block">Cheque Status</span>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        viewingGrn.chequeStatus === 'CLEARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {viewingGrn.chequeStatus || 'PENDING'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Line Items Table */}
@@ -1515,6 +1637,112 @@ export default function PurchasesPage() {
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#EA580C]"
                   />
                 </div>
+              </div>
+
+              {/* Payment Method & Cheque Details */}
+              <div className="p-3.5 bg-slate-50/80 border border-slate-200/90 rounded-2xl space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                    Payment Method / Terms
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGrnPaymentMethod('CASH')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        grnPaymentMethod === 'CASH'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Banknote className="w-3.5 h-3.5" />
+                      <span>Cash (Drawer Payout)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGrnPaymentMethod('CHEQUE')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        grnPaymentMethod === 'CHEQUE'
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Cheque (Post-Dated)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGrnPaymentMethod('CREDIT')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        grnPaymentMethod === 'CREDIT'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>Credit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGrnPaymentMethod('BANK_TRANSFER')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        grnPaymentMethod === 'BANK_TRANSFER'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>Bank Transfer</span>
+                    </button>
+                  </div>
+                </div>
+
+                {grnPaymentMethod === 'CASH' && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span>
+                      <strong>Drawer Cash Paid Out:</strong> Automatically links to the active open shift at{' '}
+                      <strong>{effectiveBranchName}</strong> and populates on the cashier&apos;s shift handover tally.
+                    </span>
+                  </div>
+                )}
+
+                {grnPaymentMethod === 'CHEQUE' && (
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                      <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Cheque Issue Details (Tracked on Owner Dashboard)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-amber-900 block mb-1">
+                          Cheque Number <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. CHQ-004512"
+                          value={grnChequeNumber}
+                          onChange={(e) => setGrnChequeNumber(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-amber-300 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-amber-900 block mb-1">
+                          Cheque Due Date (Encashment Date) <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={grnChequeDate}
+                          onChange={(e) => setGrnChequeDate(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-amber-300 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-amber-800 leading-tight">
+                      Cheque payments do NOT deduct from daily POS counter drawer cash. They are scheduled on the Owner Dashboard for bank deposit tracking.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Product Autocomplete Picker */}
