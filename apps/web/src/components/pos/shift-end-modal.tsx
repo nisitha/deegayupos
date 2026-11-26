@@ -245,10 +245,9 @@ export function ShiftEndModal({
       }
 
       if (shift) {
-        // Initialize Modaka rows with fallback to branch stock when openingQty === 0
+        // Initialize Modaka rows directly from shift entries
         let rows = (shift.modakaEntries || []).map((e) => {
-          const bStock = stockMap.get(e.productId) || 0;
-          const open = Number(e.openingQty || 0) === 0 ? bStock : Number(e.openingQty || 0);
+          const open = Number(e.openingQty ?? 0);
           return {
             productId: e.productId,
             productName: e.productName || 'Special Item',

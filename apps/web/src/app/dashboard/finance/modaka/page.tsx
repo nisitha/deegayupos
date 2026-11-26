@@ -20,6 +20,7 @@ import {
   Check,
   X,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import {
@@ -44,6 +45,74 @@ function getTodaySriLanka(): string {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
+}
+
+function formatShiftTimes(
+  startedAt?: string | null,
+  endedAt?: string | null,
+  status?: string
+): { startedText: string; endedText: string; isOvernight: boolean } {
+  if (!startedAt) {
+    return {
+      startedText: 'Started: N/A',
+      endedText: status === 'open' ? 'Ended: In Progress' : 'Ended: N/A',
+      isOvernight: false,
+    };
+  }
+
+  const startDate = new Date(startedAt);
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Colombo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Colombo',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  const colomboDateStr = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+
+  const startDay = colomboDateStr(startDate);
+  const startTime = timeFormatter.format(startDate);
+
+  if (!endedAt || status === 'open') {
+    return {
+      startedText: `Started: ${startTime}`,
+      endedText: 'Ended: In Progress',
+      isOvernight: false,
+    };
+  }
+
+  const endDate = new Date(endedAt);
+  const endDay = colomboDateStr(endDate);
+  const endTime = timeFormatter.format(endDate);
+  const isOvernight = startDay !== endDay;
+
+  if (isOvernight) {
+    const startShortDate = dateFormatter.format(startDate);
+    const endShortDate = dateFormatter.format(endDate);
+    return {
+      startedText: `Started: ${startShortDate}, ${startTime}`,
+      endedText: `Ended: ${endShortDate}, ${endTime}`,
+      isOvernight: true,
+    };
+  }
+
+  return {
+    startedText: `Started: ${startTime}`,
+    endedText: `Ended: ${endTime}`,
+    isOvernight: false,
+  };
 }
 
 export default function ModakaLedgerPage() {
@@ -702,6 +771,46 @@ export default function ModakaLedgerPage() {
                         <strong className="text-white">{shift.cashierName}</strong> • Date:{' '}
                         <span className="font-mono">{shift.shiftDate}</span>
                       </p>
+                      {(() => {
+                        const { startedText, endedText, isOvernight } = formatShiftTimes(
+                          shift.startedAt || (shift as any).openedAt,
+                          shift.endedAt,
+                          shift.status
+                        );
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap pt-1.5">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-mono font-medium bg-white/10 text-slate-200 border border-white/15 backdrop-blur-xs">
+                              <Clock className="w-3 h-3 text-purple-300 shrink-0" />
+                              <span>{startedText}</span>
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-mono font-medium border backdrop-blur-xs ${
+                                shift.status === 'open'
+                                  ? 'bg-amber-500/15 text-amber-300 border-amber-400/30'
+                                  : isOvernight
+                                  ? 'bg-rose-500/15 text-rose-300 border-rose-400/30'
+                                  : 'bg-white/10 text-slate-200 border-white/15'
+                              }`}
+                            >
+                              <Clock
+                                className={`w-3 h-3 shrink-0 ${
+                                  shift.status === 'open'
+                                    ? 'text-amber-400'
+                                    : isOvernight
+                                    ? 'text-rose-400'
+                                    : 'text-purple-300'
+                                }`}
+                              />
+                              <span>{endedText}</span>
+                              {isOvernight && (
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/30 text-rose-200 border border-rose-400/40">
+                                  Overnight
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

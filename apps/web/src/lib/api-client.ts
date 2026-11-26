@@ -3537,6 +3537,7 @@ export interface CashierShiftDto {
   openingConfirmed?: boolean;
   notes?: string | null;
   startedAt: string;
+  openedAt?: string;
   endedAt?: string | null;
   status: 'open' | 'closed';
   posTotalBills: number;
@@ -3839,6 +3840,32 @@ export const shiftsApi = {
       const entryMap = new Map<string, any>();
       (entries || []).forEach((e: any) => entryMap.set(e.product_id, e));
 
+      // Prior closed shift entries for fallback when active shift misses entries
+      const priorClosingMap = new Map<string, number>();
+      let hasPriorClosedEntries = false;
+      const { data: priorClosedShift } = await supabase
+        .from('cashier_shifts')
+        .select('id')
+        .eq('branch_id', openShift.branch_id)
+        .eq('status', 'closed')
+        .order('ended_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (priorClosedShift?.id) {
+        const { data: priorEntries } = await supabase
+          .from('shift_modaka_entries')
+          .select('product_id, closing_qty')
+          .eq('shift_id', priorClosedShift.id);
+        if (priorEntries && priorEntries.length > 0) {
+          hasPriorClosedEntries = true;
+          (priorEntries || []).forEach((pe: any) => {
+            priorClosingMap.set(pe.product_id, Number(pe.closing_qty || 0));
+          });
+        }
+      }
+
       const finalEntries: ShiftModakaEntryDto[] = [];
       const missingEntries: any[] = [];
 
@@ -3849,23 +3876,6 @@ export const shiftsApi = {
           const currentOpen = Number(existing.opening_qty || 0);
           const currentIn = Number(existing.in_qty || 0);
           const currentSold = Number(existing.sold_qty || 0);
-          let effectiveOpen = currentOpen;
-
-          // If opening_qty is 0 but branch stock exists in stock_levels, update to branch stock
-          if (currentOpen === 0 && bStock > 0) {
-            effectiveOpen = bStock;
-            const updatedAvail = effectiveOpen + currentIn;
-            const updatedClosing = updatedAvail - currentSold;
-            await supabase
-              .from('shift_modaka_entries')
-              .update({
-                opening_qty: effectiveOpen,
-                total_available_qty: updatedAvail,
-                closing_qty: updatedClosing,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existing.id);
-          }
 
           finalEntries.push({
             id: existing.id,
@@ -3874,25 +3884,29 @@ export const shiftsApi = {
             productId: existing.product_id,
             productName: existing.products?.name || cfg.productName,
             productSku: existing.products?.sku || cfg.productSku,
-            openingQty: effectiveOpen,
+            openingQty: currentOpen,
             inQty: currentIn,
-            totalAvailableQty: effectiveOpen + currentIn,
+            totalAvailableQty: currentOpen + currentIn,
             soldQty: currentSold,
-            closingQty: (effectiveOpen + currentIn) - currentSold,
+            closingQty: (currentOpen + currentIn) - currentSold,
             appliedRate: Number(existing.applied_rate || cfg.customRate),
             totalAmount: Number(existing.total_amount || 0),
           });
         } else {
+          const seedOpen = hasPriorClosedEntries
+            ? (priorClosingMap.get(cfg.productId) ?? 0)
+            : (bStock || 0);
+
           const newRow = {
             tenant_id: openShift.tenant_id,
             shift_id: openShift.id,
             branch_id: openShift.branch_id,
             product_id: cfg.productId,
-            opening_qty: bStock,
+            opening_qty: seedOpen,
             in_qty: 0,
-            total_available_qty: bStock,
+            total_available_qty: seedOpen,
             sold_qty: 0,
-            closing_qty: bStock,
+            closing_qty: seedOpen,
             applied_rate: cfg.customRate,
             total_amount: 0,
           };
@@ -3903,11 +3917,11 @@ export const shiftsApi = {
             productId: cfg.productId,
             productName: cfg.productName,
             productSku: cfg.productSku,
-            openingQty: bStock,
+            openingQty: seedOpen,
             inQty: 0,
-            totalAvailableQty: bStock,
+            totalAvailableQty: seedOpen,
             soldQty: 0,
-            closingQty: bStock,
+            closingQty: seedOpen,
             appliedRate: cfg.customRate,
             totalAmount: 0,
           });
@@ -4134,7 +4148,8 @@ export const shiftsApi = {
         .select('id, shift_number, closing_drawer_float, closing_float, counted_remaining_drawer_cash')
         .eq('branch_id', branchId)
         .eq('status', 'closed')
-        .order('ended_at', { ascending: false })
+        .order('ended_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -4151,14 +4166,46 @@ export const shiftsApi = {
 
       // Previous shift's modaka closing stock
       const prevClosingMap = new Map<string, number>();
+      let hasPriorClosedEntries = false;
       if (prevShift?.id) {
         const { data: prevEntries } = await supabase
           .from('shift_modaka_entries')
           .select('product_id, closing_qty')
           .eq('shift_id', prevShift.id);
-        (prevEntries || []).forEach((e: any) => {
-          prevClosingMap.set(e.product_id, Number(e.closing_qty || 0));
-        });
+        if (prevEntries && prevEntries.length > 0) {
+          hasPriorClosedEntries = true;
+          (prevEntries || []).forEach((e: any) => {
+            prevClosingMap.set(e.product_id, Number(e.closing_qty || 0));
+          });
+        }
+      }
+
+      // If prevShift had no entries (edge case), query recent closed shifts at this branch to find entries
+      if (!hasPriorClosedEntries) {
+        const { data: priorClosedShifts } = await supabase
+          .from('cashier_shifts')
+          .select('id')
+          .eq('branch_id', branchId)
+          .eq('status', 'closed')
+          .order('ended_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        for (const ps of (priorClosedShifts || [])) {
+          const { data: pEntries } = await supabase
+            .from('shift_modaka_entries')
+            .select('product_id, closing_qty')
+            .eq('shift_id', ps.id);
+          if (pEntries && pEntries.length > 0) {
+            hasPriorClosedEntries = true;
+            (pEntries || []).forEach((e: any) => {
+              if (!prevClosingMap.has(e.product_id)) {
+                prevClosingMap.set(e.product_id, Number(e.closing_qty || 0));
+              }
+            });
+            break;
+          }
+        }
       }
 
       // Branch warehouse stock fallback
@@ -4226,8 +4273,12 @@ export const shiftsApi = {
       const activeConfigs = (configsRes.data || []).filter((c) => c.isActive);
 
       const entriesToInsert = activeConfigs.map((cfg) => {
-        let opening = prevClosingMap.get(cfg.productId);
-        if (opening === undefined || opening === null || (!prevShift && opening === 0)) {
+        let opening = 0;
+        if (hasPriorClosedEntries) {
+          // Strictly inherit prior closed shift's closing quantity (even if 0)
+          opening = prevClosingMap.get(cfg.productId) ?? 0;
+        } else {
+          // Fallback to stock_levels ONLY if branch has ZERO prior closed shifts with modaka entries
           opening = branchStockMap.get(cfg.productId) || 0;
         }
         return {
@@ -4250,8 +4301,10 @@ export const shiftsApi = {
       }
 
       const formattedEntries: ShiftModakaEntryDto[] = activeConfigs.map((cfg) => {
-        let opening = prevClosingMap.get(cfg.productId);
-        if (opening === undefined || opening === null || (!prevShift && opening === 0)) {
+        let opening = 0;
+        if (hasPriorClosedEntries) {
+          opening = prevClosingMap.get(cfg.productId) ?? 0;
+        } else {
           opening = branchStockMap.get(cfg.productId) || 0;
         }
         return {
@@ -4910,6 +4963,36 @@ export const shiftsApi = {
         }
       }
 
+      // Sync branch warehouse public.stock_levels for Special Stock items
+      try {
+        const { data: branchWh } = await supabase
+          .from('warehouses')
+          .select('id')
+          .eq('branch_id', payload.branchId)
+          .limit(1)
+          .maybeSingle();
+
+        if (branchWh?.id && Array.isArray(payload.modakaEntries) && payload.modakaEntries.length > 0) {
+          for (const item of payload.modakaEntries) {
+            if (!item.productId) continue;
+            const open = Number(item.openingQty || 0);
+            const inQ = Number(item.inQty || 0);
+            const sold = Number(item.soldQty || 0);
+            const closing = open + inQ - sold;
+            await supabase
+              .from('stock_levels')
+              .update({
+                quantity_on_hand: closing,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('warehouse_id', branchWh.id)
+              .eq('product_id', item.productId);
+          }
+        }
+      } catch (stockSyncErr) {
+        console.warn('[shiftsApi] Special stock_levels sync error:', stockSyncErr);
+      }
+
       // 3. Exact Shift Cash Tally Math & Financial Adjustments
       const openingFloat = Number(payload.openingFloat || 0);
       const systemPosCashSales = Number(
@@ -5139,6 +5222,74 @@ export const shiftsApi = {
     return shiftsApi.closeShiftHandover(payload, opts);
   },
 
+  saveShiftModakaEntries: async (
+    shiftId: string,
+    branchId: string,
+    entries: Array<{
+      productId: string;
+      openingQty?: number;
+      inQty?: number;
+      soldQty?: number;
+      appliedRate?: number;
+    }>
+  ): Promise<ApiResponse<boolean>> => {
+    try {
+      if (!isValidUuid(shiftId) || !isValidUuid(branchId)) {
+        return { success: false, data: false, error: { code: 'INVALID_ID', message: 'Valid shift and branch IDs required', statusCode: 400 } };
+      }
+
+      const { data: wh } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('branch_id', branchId)
+        .limit(1)
+        .maybeSingle();
+
+      for (const e of entries) {
+        if (!e.productId) continue;
+        const open = Number(e.openingQty || 0);
+        const inQ = Number(e.inQty || 0);
+        const totalAvail = open + inQ;
+        const sold = Number(e.soldQty || 0);
+        const closing = totalAvail - sold;
+        const rate = Number(e.appliedRate || 250);
+        const amt = sold * rate;
+
+        await supabase
+          .from('shift_modaka_entries')
+          .upsert({
+            shift_id: shiftId,
+            branch_id: branchId,
+            product_id: e.productId,
+            opening_qty: open,
+            in_qty: inQ,
+            total_available_qty: totalAvail,
+            sold_qty: sold,
+            closing_qty: closing,
+            applied_rate: rate,
+            total_amount: amt,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'shift_id,product_id' });
+
+        if (wh?.id) {
+          await supabase
+            .from('stock_levels')
+            .update({
+              quantity_on_hand: closing,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('warehouse_id', wh.id)
+            .eq('product_id', e.productId);
+        }
+      }
+
+      return { success: true, data: true };
+    } catch (err: any) {
+      console.error('[shiftsApi] saveShiftModakaEntries fatal:', err);
+      return { success: false, data: false, error: { code: 'SAVE_ERROR', message: err.message, statusCode: 500 } };
+    }
+  },
+
   getShiftLedgers: async (params?: {
     branchId?: string;
     shiftDate?: string;
@@ -5240,6 +5391,7 @@ export const shiftsApi = {
         shiftDate: s.shift_date,
         shiftNumber: s.shift_number || 1,
         startedAt: s.started_at,
+        openedAt: s.started_at,
         endedAt: s.ended_at,
         status: s.status as 'open' | 'closed',
         posTotalBills: s.pos_total_bills || 0,
