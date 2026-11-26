@@ -304,13 +304,20 @@ export function ReceiptModal({
     receiptData?.branch?.phone ||
     business?.phone ||
     '0372077180';
-  const cashierName =
-    receiptData?.cashier?.fullName ||
-    effectiveSale?.cashier?.fullName ||
-    effectiveSale?.cashierName ||
-    activeCashier?.fullName ||
-    user?.fullName ||
-    'Branch Cashier';
+  const isOwnerSale =
+    effectiveSale?.cashierId === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+    effectiveSale?.cashier?.id === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+    String(effectiveSale?.cashierName || '').includes('Owner') ||
+    String(effectiveSale?.cashier?.fullName || '').includes('Owner');
+
+  const cashierName = isOwnerSale
+    ? 'Dr. Deegayu (Owner)'
+    : receiptData?.cashier?.fullName ||
+      effectiveSale?.cashier?.fullName ||
+      effectiveSale?.cashierName ||
+      activeCashier?.fullName ||
+      user?.fullName ||
+      'Branch Cashier';
   const { dateStr: billDate, timeStr: billTime } = getReceiptColomboDateAndTime(effectiveSale?.createdAt);
   const taxNumber = receiptData?.settings?.taxNumber || 'VAT-10928392-8000';
   const receiptHeader = receiptData?.settings?.receiptHeader;
@@ -523,7 +530,7 @@ export function ReceiptModal({
                 <div className="text-right font-mono text-xs sm:text-sm text-black font-bold">
                   <div>Outlet: <span className="font-extrabold text-black">{branchName}</span></div>
                   <div>Station: REG-01</div>
-                  <div>Dispensed By: <span className="font-extrabold text-black">{cashierName}</span></div>
+                  <div>{isOwnerSale ? 'Issued By:' : 'Dispensed By:'} <span className="font-extrabold text-black">{cashierName}</span></div>
                   <div className="text-black font-extrabold">Original Customer Copy</div>
                 </div>
               </div>
@@ -715,7 +722,7 @@ export function ReceiptModal({
                   <span>REG-01</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Cashier:</span>
+                  <span>{isOwnerSale ? 'Issued By:' : 'Cashier:'}</span>
                   <span className="font-extrabold text-black">{cashierName}</span>
                 </div>
                 {effectiveSale?.customerName && (

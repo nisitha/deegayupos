@@ -64,14 +64,24 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     if (typeof window !== 'undefined') {
       try {
         const storedUser = localStorage.getItem('pixelcraft_user');
+        let isOwnerSession = false;
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
+          const r = String(parsed?.role || '').toUpperCase();
+          const fn = String(parsed?.fullName || '');
+          const em = String(parsed?.email || '');
+          if (r === 'OWNER' || r === 'ADMIN' || fn.includes('Owner') || em.includes('owner') || parsed?.isSuperAdmin) {
+            isOwnerSession = true;
+          }
         }
 
         const storedCashier = localStorage.getItem('pixelcraft_active_cashier');
-        if (storedCashier) {
+        if (storedCashier && !isOwnerSession) {
           setActiveCashierState(JSON.parse(storedCashier));
+        } else if (isOwnerSession) {
+          setActiveCashierState(null);
+          localStorage.removeItem('pixelcraft_active_cashier');
         }
 
         const storedTenant = localStorage.getItem('pixelcraft_tenant');
@@ -107,6 +117,13 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     if (!isOwnerRef.current && selectedBranchId && normalizedId && normalizedId !== selectedBranchId) {
       console.warn('Branch switching is locked for staff sessions. Please logout to switch shop.');
       return;
+    }
+    // If Owner is switching branches, 1-click immediate switch with activeCashier staying null (Owner Direct Mode)
+    if (isOwnerRef.current) {
+      setActiveCashierState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('pixelcraft_active_cashier');
+      }
     }
     setSelectedBranchIdState(normalizedId);
     if (typeof window !== 'undefined') {

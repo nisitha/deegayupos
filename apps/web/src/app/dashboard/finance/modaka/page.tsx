@@ -876,6 +876,11 @@ export default function ModakaLedgerPage() {
                           <span className="text-[10px] text-purple-600 font-mono">
                             POS Cash: LKR {shift.posCashSales.toFixed(2)}
                           </span>
+                          {Number(shift.ownerBillsCount || 0) > 0 && (
+                            <span className="text-[10px] text-amber-800 font-semibold block mt-0.5">
+                              Includes {shift.ownerBillsCount} Owner-issued bill(s): LKR {Number(shift.ownerBillsTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          )}
                         </div>
                         <span className="font-mono font-bold text-purple-700">
                           LKR {shift.declaredShiftSale.toLocaleString(undefined, { minimumFractionDigits: 2 })}

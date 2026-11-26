@@ -1161,6 +1161,21 @@ export function ShiftEndModal({
                             </div>
                           </div>
 
+                          {/* Owner Bills Notice in Step 03 */}
+                          {(() => {
+                            const ownerBills = liveCashBills.filter((b) => b.isOwner);
+                            const ownerBillsTotal = ownerBills.reduce((sum, b) => sum + (b.cashAmount || 0), 0);
+                            if (ownerBills.length === 0) return null;
+                            return (
+                              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 px-2.5 py-1.5 rounded-lg shadow-2xs">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                <span>
+                                  Includes {ownerBills.length} Owner-issued bill(s): LKR {ownerBillsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            );
+                          })()}
+
                           {/* Expandable Breakdown of Included Cash Invoices */}
                           {isCashBillsExpanded && liveCashBills.length > 0 && (
                             <div className="mt-2.5 pt-2.5 border-t border-indigo-100/80 space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -1187,6 +1202,11 @@ export function ShiftEndModal({
                                       <span className="font-semibold text-slate-900">{b.invoiceNumber}</span>
                                       <span className="text-slate-300">•</span>
                                       <span className="text-slate-500 text-[11px]">{timeStr}</span>
+                                      {b.isOwner && (
+                                        <span className="bg-amber-500 text-slate-950 text-[10px] font-sans px-1.5 py-0.5 rounded font-extrabold border border-amber-600">
+                                          Owner Bill
+                                        </span>
+                                      )}
                                       {b.isSplit && (
                                         <span className="bg-amber-100 text-amber-800 text-[10px] font-sans px-1.5 py-0.5 rounded font-medium">
                                           Split Cash

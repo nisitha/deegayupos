@@ -328,8 +328,6 @@ function ConfidencyPosPageContent() {
   const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
   const [isLoadingShift, setIsLoadingShift] = useState<boolean>(true);
   const [pendingShiftHandover, setPendingShiftHandover] = useState<boolean>(false);
-  const [resumableTodayShift, setResumableTodayShift] = useState<any | null>(null);
-  const [isResumingShift, setIsResumingShift] = useState(false);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
 
   // 16-Hour Overdue Open Shift calculation
@@ -396,7 +394,6 @@ function ConfidencyPosPageContent() {
   // Reset active shift immediately upon switching branches to avoid cross-branch leak
   useEffect(() => {
     setActiveShift(null);
-    setResumableTodayShift(null);
   }, [selectedBranchId]);
 
   // Active Cashier Shift Lifecycle
@@ -420,71 +417,14 @@ function ConfidencyPosPageContent() {
         { isOwner }
       );
       if (res.success && res.data) {
-        if (isOwner && res.data.canResumeTodayShift) {
-          setResumableTodayShift(res.data.resumableShift || res.data);
-          setActiveShift(null);
-        } else {
-          setActiveShift(res.data);
-          setResumableTodayShift(null);
-        }
+        setActiveShift(res.data);
       } else {
         setActiveShift(null);
-        setResumableTodayShift(null);
       }
     } catch (err) {
       console.warn('[POS] refreshActiveShift error:', err);
     } finally {
       setIsLoadingShift(false);
-    }
-  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
-
-  const handleResumeShift = useCallback(async () => {
-    if (!resumableTodayShift?.id) return;
-    setIsResumingShift(true);
-    try {
-      const res = await shiftsApi.resumeShift(
-        resumableTodayShift.id,
-        selectedBranchId || undefined,
-        cashierId,
-        { isOwner, user }
-      );
-      if (res.success && res.data) {
-        setActiveShift(res.data);
-        setResumableTodayShift(null);
-        setIsLoadingShift(false);
-        setScanFeedback('Shift resumed. Terminal ready.');
-        setTimeout(() => setScanFeedback(null), 3000);
-      } else {
-        alert(res.error?.message || 'Failed to resume shift');
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Failed to resume shift');
-    } finally {
-      setIsResumingShift(false);
-    }
-  }, [resumableTodayShift?.id, selectedBranchId, cashierId, isOwner, user]);
-
-  const handleStartFreshShift = useCallback(async () => {
-    if (!selectedBranchId) return;
-    const currentCashierId = activeCashier?.id || user?.id;
-    if (!currentCashierId) return;
-    setIsResumingShift(true);
-    try {
-      const res = await shiftsApi.getOrCreateActiveShift(
-        selectedBranchId,
-        currentCashierId,
-        cashierName,
-        { isOwner, forceNewShift: true }
-      );
-      if (res.success && res.data) {
-        setActiveShift(res.data);
-        setResumableTodayShift(null);
-        setIsLoadingShift(false);
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Failed to start new shift');
-    } finally {
-      setIsResumingShift(false);
     }
   }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
 
@@ -1422,13 +1362,11 @@ function ConfidencyPosPageContent() {
 
         let effectiveCashierId = activeCashier?.id || user?.id || cashierId;
         let effectiveCashierName = activeCashier?.fullName || user?.fullName || cashierName;
-        const effectiveBranchId = selectedBranchId || '85d48a94-b6a3-4b9f-a746-0ac2ff61355c';
+        const effectiveBranchId = selectedBranchId || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
 
-        // Bind sale cashier attribution: if logged in as Owner without a switched cashier,
-        // bind to on-duty branch cashier from activeShift
-        if (isOwner && !activeCashier && activeShift?.cashierId && !isOwnerUser({ id: activeShift.cashierId })) {
-          effectiveCashierId = activeShift.cashierId;
-          effectiveCashierName = activeShift.cashierName || activeShift.openShiftCashierName || effectiveCashierName;
+        if (isOwner && !activeCashier) {
+          effectiveCashierId = '96b2747b-9d22-4266-94ce-b035fadef498';
+          effectiveCashierName = 'Dr. Deegayu (Owner)';
         }
 
         if (!isOwner && activeShift?.handoverRequired) {
@@ -1452,9 +1390,9 @@ function ConfidencyPosPageContent() {
           }
         }
 
-        // STRICT CHECK: Every POS checkout must belong to an active shift
+        // STRICT CHECK: Every POS checkout for staff must belong to an active shift
         const resolvedShiftId = activeShift?.id || currentShiftId;
-        if (!resolvedShiftId) {
+        if (!isOwner && !resolvedShiftId) {
           throw new Error(
             'Cannot complete sale: No active cashier shift is open for this branch. ' +
             'Please sign in with your branch cashier account (e.g. Shashini, Tharindu, Kumari) and open your shift before billing.'
@@ -1764,40 +1702,19 @@ function ConfidencyPosPageContent() {
             </div>
 
             {isOwner ? (
-              <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                <span className="flex items-center gap-1.5 bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-1 rounded-lg text-[13px] sm:text-sm font-bold shadow-2xs">
-                  <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
-                  Owner • All Branches
+              <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  Owner Direct Mode • {currentBranchName}
                 </span>
-                {activeCashier ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsCashierModalOpen(true)}
-                    className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-800 transition-colors cursor-pointer shadow-2xs"
-                    title="Switch Cashier PIN"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span>Cashier: {activeCashier.fullName}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsCashierModalOpen(true)}
-                    className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-900 transition-colors cursor-pointer shadow-2xs"
-                    title="Select Cashier Profile"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                    <span>Select Cashier PIN</span>
-                  </button>
-                )}
-                <span className="hidden xl:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
                   {activeShift ? (
                     <>
                       <span className="font-semibold text-slate-900">Active Shift:</span>{' '}
-                      Cashier: <strong className="text-slate-900 font-bold">{activeShift.cashierName || activeShift.openShiftCashierName || 'Cashier'}</strong>
+                      <strong className="text-slate-900 font-bold">{activeShift.cashierName || activeShift.openShiftCashierName || 'Staff'}</strong>
                     </>
                   ) : (
-                    <span className="text-slate-500 italic">No Active Cashier Shift</span>
+                    <span className="text-slate-500 italic">No Active Staff Shift</span>
                   )}
                 </span>
               </div>
@@ -1910,34 +1827,6 @@ function ConfidencyPosPageContent() {
             </button>
           </div>
         </div>
-
-        {/* Owner Session Active & Unswitched Cashier Warning Banner */}
-        {isOwner && !activeCashier && (
-          <div className="bg-amber-50 border-b border-amber-300 px-3.5 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-amber-950 shrink-0 animate-in fade-in duration-200 shadow-2xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0" />
-              <div className="text-xs sm:text-sm leading-snug">
-                <strong className="text-amber-900 font-bold">Counter Terminal Notice:</strong> Currently logged in as <strong className="text-amber-950 font-bold">Dr. Deegayu (Owner)</strong>. On-duty branch staff must sign in with their branch cashier account (<code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">shashini@...</code>, <code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">tharindu@...</code>, <code className="font-mono bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-bold">kumari@...</code>) or click <strong>PIN Switch</strong> to assign sales to their profile.
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsCashierModalOpen(true)}
-                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
-              >
-                PIN Switch
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 16-Hour Overdue Open Shift Alert Banner */}
         {isShiftOverdue16h && (
@@ -3538,61 +3427,6 @@ function ConfidencyPosPageContent() {
               >
                 <LogOut className="w-4 h-4" />
                 <span>Switch User</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resume Today's Shift Prompt (Owner Only) */}
-      {Boolean(isOwner && resumableTodayShift && !activeShift) && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fadeIn"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 text-slate-900 space-y-5 animate-scaleUp">
-            <div className="flex items-center gap-3.5 text-indigo-600">
-              <div className="w-12 h-12 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 shadow-xs">
-                <RotateCcw className="w-6 h-6 text-indigo-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Resume Today&apos;s Shift</h3>
-                <p className="text-xs text-slate-500 font-medium">{currentBranchName} • {cashierName}</p>
-              </div>
-            </div>
-
-            <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 text-xs text-indigo-950 space-y-1.5 leading-relaxed">
-              <p>
-                You previously closed a shift today on <strong>{resumableTodayShift.shift_date || resumableTodayShift.shiftDate}</strong>.
-              </p>
-              <p className="text-slate-600">
-                Would you like to resume today&apos;s shift so all sales, stock, and profits continue under the same daily record without double-counting?
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2.5 pt-1">
-              <button
-                type="button"
-                disabled={isResumingShift}
-                onClick={handleResumeShift}
-                className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isResumingShift ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-4 h-4" />
-                )}
-                <span>Resume Today&apos;s Shift ({cashierName})</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isResumingShift}
-                onClick={handleStartFreshShift}
-                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Start New Shift Instead
               </button>
             </div>
           </div>

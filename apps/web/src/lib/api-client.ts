@@ -1114,11 +1114,10 @@ export const posApi = {
 
     // 4b. Enforce active open shift for branch & bind cashier attribution
     let shiftId = isValidUuid(data.shiftId) ? data.shiftId : null;
-    let activeShiftCashierId: string | null = null;
+    let activeShiftRow: any = null;
 
     if (branchId) {
       try {
-        let activeShiftRow: any = null;
         if (shiftId) {
           const { data: sRow } = await supabase
             .from('cashier_shifts')
@@ -1144,48 +1143,44 @@ export const posApi = {
 
         if (activeShiftRow?.id) {
           shiftId = activeShiftRow.id;
-          activeShiftCashierId = activeShiftRow.cashier_id;
         }
       } catch (e) {
         console.warn('[posApi.checkout] Shift resolution warning:', e);
       }
     }
 
-    // STRICT CHECK: Every POS checkout must attach to an active open shift! Zero shiftless sales permitted.
-    if (!shiftId) {
-      throw new Error(
-        'Cannot complete sale: No active cashier shift is currently open for this branch. ' +
-        'Please sign in with your branch cashier account (e.g. Shashini, Tharindu, Kumari) and open your shift before processing sales.'
-      );
-    }
-
-    // 4c. Bind cashier attribution: If session is Owner without switched cashier, bind to active shift's on-duty branch cashier
+    // Check if current checkout session is Owner
     const isOwnerSession = shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName }) ||
       cashierId === DEEGAYU_CASHIER_ID ||
-      cashierId === '96b2747b-9d22-4266-94ce-b035fadef498';
+      cashierId === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+      (typeof window !== 'undefined' && (() => {
+        try {
+          const userStr = localStorage.getItem('pixelcraft_user');
+          if (userStr) {
+            const u = JSON.parse(userStr);
+            return shiftsApi.isOwnerUser(u);
+          }
+        } catch {}
+        return false;
+      })());
 
-    if (isOwnerSession && activeShiftCashierId && activeShiftCashierId !== DEEGAYU_CASHIER_ID && activeShiftCashierId !== '96b2747b-9d22-4266-94ce-b035fadef498') {
-      cashierId = activeShiftCashierId;
-      try {
-        const { data: cashierUser } = await supabase
-          .from('users')
-          .select('full_name')
-          .eq('id', activeShiftCashierId)
-          .maybeSingle();
-        if (cashierUser?.full_name) {
-          cashierName = cashierUser.full_name;
-        } else {
-          if (activeShiftCashierId === '41363aeb-ba28-44b7-8822-983f1de593c0') cashierName = 'Shashini';
-          else if (activeShiftCashierId === '0f1d46e2-e943-4f24-b69e-f1ba5278a750') cashierName = 'Tharindu';
-          else if (activeShiftCashierId === '1de49278-b4aa-466a-8493-d88c0c4d56de') cashierName = 'Anusha';
-          else if (activeShiftCashierId === '1b50a131-4b75-4b22-86ee-bdd74665aeab') cashierName = 'Kumari';
-        }
-      } catch {
-        if (activeShiftCashierId === '41363aeb-ba28-44b7-8822-983f1de593c0') cashierName = 'Shashini';
-        else if (activeShiftCashierId === '0f1d46e2-e943-4f24-b69e-f1ba5278a750') cashierName = 'Tharindu';
-        else if (activeShiftCashierId === '1de49278-b4aa-466a-8493-d88c0c4d56de') cashierName = 'Anusha';
-        else if (activeShiftCashierId === '1b50a131-4b75-4b22-86ee-bdd74665aeab') cashierName = 'Kumari';
+    if (!isOwnerSession) {
+      // STRICT CHECK: For non-owner staff, every POS checkout must attach to an active open shift! Zero shiftless sales permitted.
+      if (!shiftId) {
+        throw new Error(
+          'Cannot complete sale: No active cashier shift is currently open for this branch. ' +
+          'Please sign in with your branch cashier account (e.g. Shashini, Tharindu, Kumari) and open your shift before processing sales.'
+        );
       }
+    } else {
+      // OWNER SESSION (Dr. Deegayu Direct Mode):
+      // Explicitly stamp cashier as Dr. Deegayu (Owner) — never overwrite with staff cashier's name
+      cashierId = DEEGAYU_CASHIER_ID;
+      cashierName = DEEGAYU_CASHIER_NAME;
+      // Drawer Reconciliation Linkage:
+      // If branch currently has an active open staff shift, link shiftId so physical drawer cash reconciles accurately!
+      // If no staff shift is open at that branch, allow Owner checkout to succeed cleanly with shiftId = null.
+      shiftId = activeShiftRow?.id || data.shiftId || null;
     }
 
     // 5. Generate clean, unique invoice number
@@ -3505,6 +3500,8 @@ export interface CashierShiftDto {
   extraIncomeAmount?: number;
   handoverNotes?: string | null;
   modakaEntries?: ShiftModakaEntryDto[];
+  ownerBillsCount?: number;
+  ownerBillsTotal?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -3565,6 +3562,9 @@ export interface ShiftCashBillItem {
   cashAmount: number;
   totalAmount: number;
   isSplit?: boolean;
+  cashierId?: string;
+  cashierName?: string;
+  isOwner?: boolean;
 }
 
 export interface LiveShiftPosSalesData {
@@ -4006,7 +4006,6 @@ export const shiftsApi = {
   ): Promise<ApiResponse<CashierShiftDto>> => {
     try {
       const isOwner = typeof options === 'boolean' ? options : Boolean(options?.isOwner);
-      const forceNewShift = typeof options === 'object' && Boolean(options?.forceNewShift);
 
       if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
         return {
@@ -4019,10 +4018,10 @@ export const shiftsApi = {
       // Check if current user is Owner by ID, email, role, or flag
       const isOwnerAccount = isOwner || shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName });
 
-      // If Owner, strictly perform read-only lookup for existing open shift
+      // If Owner, strictly perform read-only lookup for existing open branch shift (e.g. Shashini, Tharindu, Anusha)
       if (isOwnerAccount) {
         const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName, true);
-        if (active.success && active.data) {
+        if (active.success && active.data && active.data.status === 'open') {
           return {
             success: true,
             data: {
@@ -4033,34 +4032,7 @@ export const shiftsApi = {
             },
           };
         }
-        // If no open shift exists, check if Owner can resume a closed shift from today at this branch!
-        const todayDate = getColomboDateStr(new Date());
-        if (!forceNewShift) {
-          const { data: closedToday } = await supabase
-            .from('cashier_shifts')
-            .select('*')
-            .eq('branch_id', branchId)
-            .eq('shift_date', todayDate)
-            .eq('status', 'closed')
-            .order('ended_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (closedToday) {
-            return {
-              success: true,
-              data: {
-                ...closedToday,
-                canResumeTodayShift: true,
-                resumableShift: closedToday,
-                needsOpeningCount: false,
-                openingConfirmed: true,
-                handoverRequired: false,
-              } as any,
-            };
-          }
-        }
-        // If no open or closed shift exists, Owner NEVER creates a shift!
+        // When Owner is active in Direct Mode, never create a shift row and never trigger shift resumption prompts
         return {
           success: true,
           data: null as any,
@@ -5160,6 +5132,37 @@ export const shiftsApi = {
         entriesByShiftId.set(e.shift_id, list);
       });
 
+      const shiftIds = (shifts || []).map((s: any) => s.id).filter(Boolean);
+      const ownerBillsStatsByShiftId = new Map<string, { count: number; total: number }>();
+
+      if (shiftIds.length > 0) {
+        try {
+          const { data: shiftSales } = await supabase
+            .from('sales')
+            .select('shift_id, cashier_id, cashier_name, total_amount, paid_amount, status')
+            .in('shift_id', shiftIds);
+
+          (shiftSales || []).forEach((sale: any) => {
+            const st = String(sale.status || '').toUpperCase();
+            if (['VOID', 'VOIDED', 'CANCELLED', 'CANCELED', 'REFUNDED'].includes(st)) return;
+
+            const isOwner =
+              sale.cashier_id === DEEGAYU_CASHIER_ID ||
+              sale.cashier_id === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+              String(sale.cashier_name || '').includes('Owner');
+
+            if (isOwner && sale.shift_id) {
+              const current = ownerBillsStatsByShiftId.get(sale.shift_id) || { count: 0, total: 0 };
+              current.count += 1;
+              current.total += Math.round(Number(sale.total_amount ?? sale.paid_amount ?? 0) * 100) / 100;
+              ownerBillsStatsByShiftId.set(sale.shift_id, current);
+            }
+          });
+        } catch (salesErr) {
+          console.warn('[shiftsApi] getShiftLedgers sales query error:', salesErr);
+        }
+      }
+
       const result: CashierShiftDto[] = (shifts || []).map((s: any) => ({
         id: s.id,
         tenantId: s.tenant_id,
@@ -5199,6 +5202,8 @@ export const shiftsApi = {
         salaryDeductionAmount: Number(s.salary_deduction_amount || 0),
         extraIncomeAmount: Number(s.extra_income_amount || 0),
         handoverNotes: s.handover_notes,
+        ownerBillsCount: ownerBillsStatsByShiftId.get(s.id)?.count || 0,
+        ownerBillsTotal: ownerBillsStatsByShiftId.get(s.id)?.total || 0,
         modakaEntries: sortSpecialStockItems(entriesByShiftId.get(s.id) || []),
         createdAt: s.created_at,
         updatedAt: s.updated_at,
@@ -5412,6 +5417,11 @@ export const shiftsApi = {
         if (billHasCash && billCashPortion > 0) {
           posBills += 1;
           posCashSales += billCashPortion;
+          const isOwnerBill =
+            s.cashier_id === DEEGAYU_CASHIER_ID ||
+            s.cashier_id === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+            String(s.cashier_name || '').includes('Owner');
+
           bills.push({
             id: s.id,
             invoiceNumber: s.invoice_number || `INV-${s.id.slice(0, 8)}`,
@@ -5419,6 +5429,9 @@ export const shiftsApi = {
             cashAmount: Math.round(billCashPortion * 100) / 100,
             totalAmount: grandTotal,
             isSplit: payments.length > 1,
+            cashierId: s.cashier_id,
+            cashierName: s.cashier_name,
+            isOwner: isOwnerBill,
           });
         }
 

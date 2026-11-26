@@ -1886,23 +1886,47 @@ export default function SalesOrdersPage() {
 
                       {/* Cashier with 1-Click Quick Filter & Branch Badge */}
                       <td className="py-3.5 px-4 text-slate-600">
-                        <div className="flex flex-col gap-1 items-start">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
-                              handleCashierChange(cName);
-                            }}
-                            title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
-                          >
-                            <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
-                            <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
-                          </button>
-                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded">
-                            {getBranchLabel(sale.branchId)}
-                          </span>
-                        </div>
+                        {(() => {
+                          const isOwnerBill =
+                            sale.cashierId === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+                            sale.cashier?.id === '96b2747b-9d22-4266-94ce-b035fadef498' ||
+                            String(sale.cashierName || '').includes('Owner') ||
+                            String(sale.cashier?.fullName || '').includes('Owner');
+
+                          if (isOwnerBill) {
+                            return (
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500 text-slate-950 font-black text-[11px] shadow-xs tracking-tight border border-amber-600">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-950 shrink-0" />
+                                  Owner • {getBranchLabel(sale.branchId)}
+                                </span>
+                                <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                  Issued by Dr. Deegayu (Owner)
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="flex flex-col gap-1 items-start">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cName = sale.cashier?.fullName || sale.cashierName || 'Staff';
+                                  handleCashierChange(cName);
+                                }}
+                                title={`Click to filter only bills by ${sale.cashier?.fullName || sale.cashierName || 'Staff'}`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-[#005BD3] border border-transparent hover:border-blue-200 text-[11px] font-semibold transition-all group/cashier"
+                              >
+                                <User className="w-3 h-3 text-slate-400 group-hover/cashier:text-[#005BD3]" />
+                                <span>{sale.cashier?.fullName || sale.cashierName || 'Staff'}</span>
+                              </button>
+                              <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded">
+                                {getBranchLabel(sale.branchId)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Items */}
