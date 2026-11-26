@@ -218,8 +218,60 @@ function ConfidencyPosPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const actionParam = searchParams.get('action');
-  const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
-  const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
+  const { selectedBranchId, setSelectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
+
+  // Operating branch definitions (Strictly Alawwa, Dambadeniya, Giriulla — Zero Main Branch)
+  const OPERATING_BRANCHES: { id: string; name: string; code: string }[] = useMemo(() => {
+    const list = branches.filter((b) => {
+      const code = (b.code || '').toUpperCase();
+      const name = (b.name || '').toLowerCase();
+      if (name.includes('main') || code.includes('MAIN')) return false;
+      return (
+        b.id === '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54' ||
+        b.id === 'fa68e4a0-a515-44c8-a082-5b5590366658' ||
+        b.id === '197693d6-4247-48df-b614-6fcde9e34f7d' ||
+        code.includes('ALW') ||
+        code.includes('DAB') ||
+        code.includes('GIR')
+      );
+    });
+    if (list.length > 0) return list;
+    return [
+      { id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54', name: 'Alawwa', code: 'BR-ALW' },
+      { id: 'fa68e4a0-a515-44c8-a082-5b5590366658', name: 'Dambadeniya', code: 'BR-DAB' },
+      { id: '197693d6-4247-48df-b614-6fcde9e34f7d', name: 'Giriulla', code: 'BR-GIR' },
+    ];
+  }, [branches]);
+
+  // Resolve active branch for POS Terminal (Strictly defaults to Alawwa if unselected, never Main Branch)
+  const currentBranch = useMemo(() => {
+    if (selectedBranchId && selectedBranchId !== 'all' && selectedBranchId !== 'ALL') {
+      const found = OPERATING_BRANCHES.find((b) => b.id === selectedBranchId);
+      if (found) return found;
+    }
+    return OPERATING_BRANCHES[0] || {
+      id: '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54',
+      name: 'Alawwa',
+      code: 'BR-ALW',
+    };
+  }, [selectedBranchId, OPERATING_BRANCHES]);
+
+  const effectiveBranchId = currentBranch.id;
+  const currentBranchName = currentBranch.name;
+
+  // Auto-resolve branch if unset or set to 'all' in dashboard context:
+  // Strictly default to Alawwa (never Main Branch)
+  useEffect(() => {
+    if (
+      !selectedBranchId ||
+      selectedBranchId === 'all' ||
+      selectedBranchId === 'ALL' ||
+      !OPERATING_BRANCHES.some((b) => b.id === selectedBranchId)
+    ) {
+      const fallbackId = OPERATING_BRANCHES[0]?.id || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
+      setSelectedBranchId(fallbackId);
+    }
+  }, [selectedBranchId, OPERATING_BRANCHES, setSelectedBranchId]);
   const [currentDateStr, setCurrentDateStr] = useState<string>('');
 
   useEffect(() => {
@@ -329,6 +381,44 @@ function ConfidencyPosPageContent() {
   const [isLoadingShift, setIsLoadingShift] = useState<boolean>(true);
   const [pendingShiftHandover, setPendingShiftHandover] = useState<boolean>(false);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close branch selector dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setIsBranchDropdownOpen(false);
+      }
+    }
+    if (isBranchDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBranchDropdownOpen]);
+
+  // 1-Click Owner Branch Switcher handler
+  const handleOwnerSwitchBranch = useCallback(
+    (branchId: string, branchName: string) => {
+      if (!isOwnerUser(user)) return;
+      if (branchId === selectedBranchId) {
+        setIsBranchDropdownOpen(false);
+        return;
+      }
+      // 1. Clear cart items from previous branch
+      setCart([]);
+      // 2. Set new branch immediately via context (1-click, Owner Direct Mode)
+      setSelectedBranchId(branchId);
+      // 3. Close dropdown
+      setIsBranchDropdownOpen(false);
+      // 4. Show brief toast confirmation
+      setScanFeedback(`Switched to ${branchName}`);
+      setTimeout(() => setScanFeedback(null), 3000);
+    },
+    [user, selectedBranchId, setSelectedBranchId]
+  );
 
   // 16-Hour Overdue Open Shift calculation
   const isShiftOverdue16h = useMemo(() => {
@@ -398,7 +488,8 @@ function ConfidencyPosPageContent() {
 
   // Active Cashier Shift Lifecycle
   const refreshActiveShift = useCallback(async () => {
-    if (!selectedBranchId) {
+    const branchToQuery = selectedBranchId || effectiveBranchId;
+    if (!branchToQuery) {
       setIsLoadingShift(false);
       return;
     }
@@ -411,7 +502,7 @@ function ConfidencyPosPageContent() {
     setIsLoadingShift(true);
     try {
       const res = await shiftsApi.getOrCreateActiveShift(
-        selectedBranchId,
+        branchToQuery,
         currentCashierId,
         cashierName,
         { isOwner }
@@ -426,7 +517,7 @@ function ConfidencyPosPageContent() {
     } finally {
       setIsLoadingShift(false);
     }
-  }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
+  }, [selectedBranchId, effectiveBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
 
   useEffect(() => {
     refreshActiveShift();
@@ -483,7 +574,7 @@ function ConfidencyPosPageContent() {
     setIsLoadingProducts(true);
     setCatalogError(null);
 
-    const activeWarehouseId = resolveWarehouseId(selectedBranchId);
+    const activeWarehouseId = resolveWarehouseId(effectiveBranchId);
     const branchCacheKey = `deegayu_catalog_${activeWarehouseId}`;
 
     // 1. Immediately read from IndexedDB with ZERO blocking spinner
@@ -643,7 +734,7 @@ function ConfidencyPosPageContent() {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [selectedBranchId]);
+  }, [effectiveBranchId]);
 
   useEffect(() => {
     initCatalog();
@@ -1694,12 +1785,27 @@ function ConfidencyPosPageContent() {
               <Menu className="w-5 h-5 text-slate-700" />
             </button>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[13px] sm:text-sm font-bold text-indigo-700 shrink-0 whitespace-nowrap shadow-2xs">
-              <Store className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>POS Terminal</span>
-              <span className="text-indigo-400">•</span>
-              <span className="whitespace-nowrap truncate max-w-[120px] sm:max-w-none">{currentBranchName}</span>
-            </div>
+            {isOwner ? (
+              <button
+                type="button"
+                onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 text-[13px] sm:text-sm font-bold text-indigo-700 shrink-0 whitespace-nowrap shadow-2xs transition-colors cursor-pointer group"
+                title="Click to switch operating branch"
+              >
+                <Store className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>POS Terminal</span>
+                <span className="text-indigo-400">•</span>
+                <span className="whitespace-nowrap truncate max-w-[120px] sm:max-w-none">{currentBranchName}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-indigo-500 opacity-75 group-hover:translate-y-0.5 transition-transform" />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[13px] sm:text-sm font-bold text-indigo-700 shrink-0 whitespace-nowrap shadow-2xs">
+                <Store className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>POS Terminal</span>
+                <span className="text-indigo-400">•</span>
+                <span className="whitespace-nowrap truncate max-w-[120px] sm:max-w-none">{currentBranchName}</span>
+              </div>
+            )}
 
             {isOwner ? (
               <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
@@ -1802,17 +1908,56 @@ function ConfidencyPosPageContent() {
               </button>
             )}
 
-            {/* Switch Shop (Logout) Button - only shown for Owner */}
+            {/* 1-Click Owner Branch Switcher Dropdown (Replaces old Switch Shop button) */}
             {isOwner && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="hidden md:flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 bg-white px-3 h-8.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
-                title="Switch Shop / Change Branch"
-              >
-                <Store className="w-4 h-4 text-slate-500" />
-                <span>Switch Shop</span>
-              </button>
+              <div className="relative" ref={branchDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-[13px] sm:text-sm font-bold text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-300 hover:border-indigo-300 bg-white px-3 h-8.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-2xs active:scale-98"
+                  title="Switch Operating Branch (1-Click Owner Mode)"
+                >
+                  <Store className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="font-semibold text-slate-500 hidden sm:inline">Branch:</span>
+                  <span className="font-bold text-slate-900">{currentBranchName}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isBranchDropdownOpen && (
+                  <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-2 border-b border-slate-100">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Operating Branch</p>
+                      <p className="text-xs font-semibold text-slate-800">1-Click Direct Switch</p>
+                    </div>
+                    <div className="p-1 space-y-0.5">
+                      {OPERATING_BRANCHES.map((b) => {
+                        const isSelected = b.id === effectiveBranchId;
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => handleOwnerSwitchBranch(b.id, b.name)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer text-left ${
+                              isSelected
+                                ? 'bg-indigo-50 text-indigo-700 font-extrabold'
+                                : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                              <div>
+                                <span className="block leading-tight">{b.name}</span>
+                                <span className="text-[10px] font-mono text-slate-400 block leading-tight">{b.code}</span>
+                              </div>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Top-Right Logout Button */}

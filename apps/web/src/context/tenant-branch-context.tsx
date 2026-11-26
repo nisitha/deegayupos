@@ -376,7 +376,7 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
     if (!isLoading && branches.length > 0 && !isOwner) {
       if (allowedBranches.length > 0) {
         if (!selectedBranchId || !allowedBranches.some((b) => b.id === selectedBranchId)) {
-          const fallback = allowedBranches[0]?.id || null;
+          const fallback = allowedBranches[0]?.id || '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54';
           setSelectedBranchIdState(fallback);
           if (fallback && typeof window !== 'undefined') {
             localStorage.setItem('pixelcraft_selected_branch', fallback);
