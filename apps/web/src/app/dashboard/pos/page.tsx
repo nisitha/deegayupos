@@ -1,8 +1,8 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CreditCard,
   Banknote,
@@ -214,8 +214,10 @@ const CART_ITEM_THEMES = [
   },
 ];
 
-export default function ConfidencyPosPage() {
+function ConfidencyPosPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const actionParam = searchParams.get('action');
   const { selectedBranchId, user, activeCashier, setActiveCashier, business, branches } = useTenantBranch();
   const currentBranchName = branches.find((b) => b.id === selectedBranchId)?.name || 'Main Branch';
   const [currentDateStr, setCurrentDateStr] = useState<string>('');
@@ -324,6 +326,8 @@ export default function ConfidencyPosPage() {
   const [isModakaStockInModalOpen, setIsModakaStockInModalOpen] = useState(false);
   const [isSpecialBulkModalOpen, setIsSpecialBulkModalOpen] = useState(false);
   const [activeShift, setActiveShift] = useState<CashierShiftDto | null>(null);
+  const [isLoadingShift, setIsLoadingShift] = useState<boolean>(true);
+  const [pendingShiftHandover, setPendingShiftHandover] = useState<boolean>(false);
   const [resumableTodayShift, setResumableTodayShift] = useState<any | null>(null);
   const [isResumingShift, setIsResumingShift] = useState(false);
   const [isCashierModalOpen, setIsCashierModalOpen] = useState(false);
@@ -397,10 +401,17 @@ export default function ConfidencyPosPage() {
 
   // Active Cashier Shift Lifecycle
   const refreshActiveShift = useCallback(async () => {
-    if (!selectedBranchId) return;
+    if (!selectedBranchId) {
+      setIsLoadingShift(false);
+      return;
+    }
     const currentCashierId = activeCashier?.id || user?.id;
-    if (!currentCashierId) return;
+    if (!currentCashierId) {
+      setIsLoadingShift(false);
+      return;
+    }
 
+    setIsLoadingShift(true);
     try {
       const res = await shiftsApi.getOrCreateActiveShift(
         selectedBranchId,
@@ -422,6 +433,8 @@ export default function ConfidencyPosPage() {
       }
     } catch (err) {
       console.warn('[POS] refreshActiveShift error:', err);
+    } finally {
+      setIsLoadingShift(false);
     }
   }, [selectedBranchId, activeCashier?.id, user?.id, cashierName, isOwner]);
 
@@ -438,6 +451,7 @@ export default function ConfidencyPosPage() {
       if (res.success && res.data) {
         setActiveShift(res.data);
         setResumableTodayShift(null);
+        setIsLoadingShift(false);
         setScanFeedback('Shift resumed. Terminal ready.');
         setTimeout(() => setScanFeedback(null), 3000);
       } else {
@@ -465,6 +479,7 @@ export default function ConfidencyPosPage() {
       if (res.success && res.data) {
         setActiveShift(res.data);
         setResumableTodayShift(null);
+        setIsLoadingShift(false);
       }
     } catch (err: any) {
       alert(err?.message || 'Failed to start new shift');
@@ -477,31 +492,51 @@ export default function ConfidencyPosPage() {
     refreshActiveShift();
   }, [refreshActiveShift]);
 
-  // Listen for sidebar shortcut / query parameter (?action=shift-handover)
+  // Track shift handover intent from query param (?action=shift-handover)
   useEffect(() => {
-    const checkAction = () => {
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('action') === 'shift-handover') {
-          if (!isOwner) {
-            setIsEndShiftModalOpen(true);
-          }
-        }
-      }
-    };
-    checkAction();
-    window.addEventListener('popstate', checkAction);
+    if (actionParam === 'shift-handover') {
+      setPendingShiftHandover(true);
+    }
+  }, [actionParam]);
+
+  // Track shift handover intent from custom event (sidebar click within page)
+  useEffect(() => {
     const handleCustomOpen = () => {
-      if (!isOwner) {
-        setIsEndShiftModalOpen(true);
-      }
+      setPendingShiftHandover(true);
     };
     window.addEventListener('open-shift-handover', handleCustomOpen);
     return () => {
-      window.removeEventListener('popstate', checkAction);
       window.removeEventListener('open-shift-handover', handleCustomOpen);
     };
-  }, [isOwner]);
+  }, []);
+
+  // Handle pending shift handover intent once shift loading finishes
+  useEffect(() => {
+    if (!pendingShiftHandover || isLoadingShift) return;
+
+    // Reset pending intent
+    setPendingShiftHandover(false);
+
+    // If activeShift exists for the selected branch
+    if (activeShift && activeShift.branchId === selectedBranchId) {
+      setIsEndShiftModalOpen(true);
+      if (typeof window !== 'undefined' && window.location.search.includes('action=shift-handover')) {
+        router.replace('/dashboard/pos/');
+      }
+    } else {
+      // No active shift for this branch
+      if (typeof window !== 'undefined' && window.location.search.includes('action=shift-handover')) {
+        router.replace('/dashboard/pos/');
+      }
+      if (isOwner) {
+        // Owner with no active shift at this branch -> redirect cleanly to modaka
+        router.replace('/dashboard/finance/modaka/');
+      } else {
+        setScanFeedback('No active cashier shift is open for this branch. Please start a shift first.');
+        setTimeout(() => setScanFeedback(null), 4000);
+      }
+    }
+  }, [pendingShiftHandover, isLoadingShift, activeShift, selectedBranchId, isOwner, router]);
 
   // Instant 0ms Hydration via IndexedDB (< 15ms) + Decoupled Flat Background Sync
   const initCatalog = useCallback(async () => {
@@ -3975,5 +4010,22 @@ export default function ConfidencyPosPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ConfidencyPosPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#070C18] text-slate-100 flex items-center justify-center">
+          <div className="flex items-center gap-3 text-slate-400 text-xs font-bold uppercase tracking-widest">
+            <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+            Loading POS Terminal...
+          </div>
+        </div>
+      }
+    >
+      <ConfidencyPosPageContent />
+    </Suspense>
   );
 }

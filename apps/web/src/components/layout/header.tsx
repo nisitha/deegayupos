@@ -425,7 +425,7 @@ export function Header() {
                     </Link>
                   ) : (
                     <Link
-                      href="/dashboard/pos?action=shift-handover"
+                      href="/dashboard/pos/?action=shift-handover"
                       prefetch={false}
                       onClick={() => setProfileDropdownOpen(false)}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"

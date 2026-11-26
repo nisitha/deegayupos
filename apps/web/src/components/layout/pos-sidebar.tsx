@@ -68,7 +68,7 @@ const MENU_SECTIONS: SidebarMenuSection[] = [
       { name: 'Stock Transfers', href: '/dashboard/transfers', icon: ArrowLeftRight },
       { name: 'Suppliers (94)', href: '/dashboard/suppliers', icon: Truck },
       { name: 'Purchases & GRN', href: '/dashboard/purchases', icon: ClipboardCheck },
-      { name: 'Special Stock & Shift Off', href: '/dashboard/pos?action=shift-handover', icon: FileSpreadsheet, badge: 'Shift' },
+      { name: 'Special Sales & Stock', href: '/dashboard/finance/modaka/', icon: FileSpreadsheet, badge: 'A-F' },
       { name: 'Pricing Engine', href: '/dashboard/pricing', icon: Tag },
       { name: 'Customers', href: '/dashboard/customers', icon: Users },
     ],
@@ -216,7 +216,7 @@ export function PosSidebar() {
             : []),
           {
             name: 'Special Stock & Shift Off',
-            href: '/dashboard/pos?action=shift-handover',
+            href: '/dashboard/pos/?action=shift-handover',
             icon: FileSpreadsheet,
             badge: 'Shift',
           },
@@ -234,11 +234,12 @@ export function PosSidebar() {
   const isItemActive = useCallback(
     (href: string) => {
       if (!href || href === '#') return false;
-      const cleanHref = href.split('?')[0];
+      const cleanHref = (href.split('?')[0] || '').replace(/\/+$/, '');
+      const normPath = pathname.replace(/\/+$/, '');
 
       // Exact match for the dashboard root
       if (cleanHref === '/dashboard') {
-        return pathname === '/dashboard';
+        return normPath === '/dashboard';
       }
       // If href is a query action shortcut like shift-handover, don't override base POS tab
       if (href.includes('?')) {
@@ -247,20 +248,20 @@ export function PosSidebar() {
       // Transfers route alias matching
       if (
         (cleanHref === '/dashboard/transfers' || cleanHref === '/dashboard/inventory/transfers') &&
-        (pathname === '/dashboard/transfers' || pathname === '/dashboard/inventory/transfers' || pathname.startsWith('/dashboard/transfers/') || pathname.startsWith('/dashboard/inventory/transfers/'))
+        (normPath === '/dashboard/transfers' || normPath === '/dashboard/inventory/transfers' || normPath.startsWith('/dashboard/transfers/') || normPath.startsWith('/dashboard/inventory/transfers/'))
       ) {
         return true;
       }
       // Exact match
-      if (pathname === cleanHref) {
+      if (normPath === cleanHref) {
         return true;
       }
       // If another menu item matches pathname exactly, don't greedily match parent
-      if (allVisibleHrefs.includes(pathname)) {
+      if (allVisibleHrefs.some((h) => (h.split('?')[0] || '').replace(/\/+$/, '') === normPath)) {
         return false;
       }
       // Exact match or sub-route match with strict trailing slash boundary
-      return pathname.startsWith(`${cleanHref}/`);
+      return normPath.startsWith(`${cleanHref}/`);
     },
     [pathname, allVisibleHrefs],
   );
