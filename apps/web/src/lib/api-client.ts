@@ -3444,6 +3444,45 @@ export interface ShiftModakaEntryDto {
   totalAmount: number; // F = D * appliedRate
 }
 
+export interface DailySpecialBalanceMatrixItem {
+  productId: string;
+  rank: number;
+  sku: string;
+  name: string;
+  rate: number;
+  giriulla: number;
+  dambadeniya: number;
+  alawwa: number;
+  totalUnits: number;
+  totalValue: number;
+}
+
+export interface BranchMatrixMeta {
+  branchId: string;
+  branchName: string;
+  branchCode: string;
+  shiftId?: string | null;
+  shiftStatus?: 'open' | 'closed' | 'none';
+  cashierName?: string | null;
+  subtitle: string;
+  isCarriedForward: boolean;
+  totalUnits: number;
+  totalValue: number;
+}
+
+export interface DailySpecialBalanceMatrixResponse {
+  targetDate: string;
+  cutoffTimestamp: string;
+  items: DailySpecialBalanceMatrixItem[];
+  branches: {
+    giriulla: BranchMatrixMeta;
+    dambadeniya: BranchMatrixMeta;
+    alawwa: BranchMatrixMeta;
+  };
+  grandTotalUnits: number;
+  grandTotalValue: number;
+}
+
 /**
  * Canonical 1–7 Special Stock / Modaka Item Order Definition
  * 1. #1 — SKU-1805 — Kameshwari Rasayanaya Rawana 300 (Rate: 300)
@@ -5870,6 +5909,339 @@ export const shiftsApi = {
         success: false,
         data: false,
         error: { code: 'FLOAT_SET_ERROR', message: err.message, statusCode: 500 },
+      };
+    }
+  },
+
+  getDailySpecialBalanceMatrix: async (
+    targetDate: string
+  ): Promise<ApiResponse<DailySpecialBalanceMatrixResponse>> => {
+    try {
+      if (!targetDate) {
+        targetDate = getSriLankaDateStr();
+      }
+
+      // Cutoff timestamp: 11:00 PM (23:00) Asia/Colombo on targetDate
+      const cutoffIso = new Date(`${targetDate}T23:00:00+05:30`).toISOString();
+
+      // 1. Fetch branches and filter to the 3 operating branches
+      const { data: branchRows, error: bErr } = await supabase
+        .from('branches')
+        .select('id, name, code');
+
+      if (bErr || !branchRows) {
+        throw new Error(bErr?.message || 'Failed to fetch branches');
+      }
+
+      const branchGiriulla = branchRows.find(
+        (b) => b.name?.toLowerCase().includes('giriulla') || b.code?.toUpperCase() === 'BR-GIR'
+      );
+      const branchDambadeniya = branchRows.find(
+        (b) => b.name?.toLowerCase().includes('dambadeniya') || b.code?.toUpperCase() === 'BR-DAB'
+      );
+      const branchAlawwa = branchRows.find(
+        (b) => b.name?.toLowerCase().includes('alawwa') || b.code?.toUpperCase() === 'BR-ALW'
+      );
+
+      const operatingBranches = [
+        { key: 'giriulla' as const, branch: branchGiriulla, name: 'Giriulla', code: 'BR-GIR' },
+        { key: 'dambadeniya' as const, branch: branchDambadeniya, name: 'Dambadeniya', code: 'BR-DAB' },
+        { key: 'alawwa' as const, branch: branchAlawwa, name: 'Alawwa', code: 'BR-ALW' },
+      ];
+
+      // 2. Fetch canonical Special Stock configs / products
+      const configsRes = await shiftsApi.getModakaConfigs();
+      const canonicalConfigs = sortSpecialStockItems(configsRes.data || []);
+
+      // Helpers
+      const formatTime12h = (dateStr: string) => {
+        try {
+          return new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Colombo',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          }).format(new Date(dateStr));
+        } catch {
+          return '';
+        }
+      };
+
+      const formatShortDate = (dateStr: string) => {
+        try {
+          return new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Colombo',
+            month: 'short',
+            day: 'numeric',
+          }).format(new Date(dateStr));
+        } catch {
+          return '';
+        }
+      };
+
+      const colomboDateStr = (dateStr: string) => {
+        try {
+          return new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Colombo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date(dateStr));
+        } catch {
+          return '';
+        }
+      };
+
+      // 3. For each branch, find the latest shift on targetDate on or before cutoff, or fallback to prior closed shift
+      type SelectedShiftInfo = {
+        shift: any;
+        isCarriedForward: boolean;
+        subtitle: string;
+      };
+
+      const branchShiftMap = new Map<'giriulla' | 'dambadeniya' | 'alawwa', SelectedShiftInfo>();
+      const allSelectedShiftIds: string[] = [];
+
+      for (const op of operatingBranches) {
+        if (!op.branch?.id) {
+          branchShiftMap.set(op.key, {
+            shift: null,
+            isCarriedForward: false,
+            subtitle: 'No branch record',
+          });
+          continue;
+        }
+
+        const bId = op.branch.id;
+
+        // Query shifts started on or before cutoff
+        const { data: shifts } = await supabase
+          .from('cashier_shifts')
+          .select('id, shift_date, shift_number, started_at, ended_at, status, cashier_id')
+          .eq('branch_id', bId)
+          .lte('started_at', cutoffIso)
+          .order('started_at', { ascending: false })
+          .limit(15);
+
+        // Filter shifts that were active or closed on targetDate
+        const onDateShifts = (shifts || []).filter((s: any) => {
+          const sDate = s.shift_date ? colomboDateStr(s.shift_date) : '';
+          const stDate = s.started_at ? colomboDateStr(s.started_at) : '';
+          const enDate = s.ended_at ? colomboDateStr(s.ended_at) : '';
+          return (
+            sDate === targetDate ||
+            stDate === targetDate ||
+            enDate === targetDate ||
+            (s.status === 'open' && s.started_at <= cutoffIso)
+          );
+        });
+
+        let chosen: any = null;
+        let isCarriedForward = false;
+
+        if (onDateShifts.length > 0) {
+          // If an open shift exists on targetDate, that is the shift active at 11:00 PM cutoff!
+          const openShift = onDateShifts.find((s: any) => s.status === 'open');
+          chosen = openShift || onDateShifts[0];
+        } else {
+          // Carry-Forward Fallback: Fetch most recent closed shift prior to cutoff
+          const { data: priorClosed } = await supabase
+            .from('cashier_shifts')
+            .select('id, shift_date, shift_number, started_at, ended_at, status, cashier_id')
+            .eq('branch_id', bId)
+            .eq('status', 'closed')
+            .lte('ended_at', cutoffIso)
+            .order('ended_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (priorClosed) {
+            chosen = priorClosed;
+            isCarriedForward = true;
+          }
+        }
+
+        if (chosen?.id) {
+          allSelectedShiftIds.push(chosen.id);
+        }
+
+        branchShiftMap.set(op.key, {
+          shift: chosen,
+          isCarriedForward,
+          subtitle: '',
+        });
+      }
+
+      // 4. Fetch cashier user names for the chosen shifts
+      const cashierIds = Array.from(
+        new Set(
+          Array.from(branchShiftMap.values())
+            .map((v) => v.shift?.cashier_id)
+            .filter(Boolean)
+        )
+      );
+
+      const cashierNameMap = new Map<string, string>();
+      if (cashierIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .in('id', cashierIds);
+
+        (users || []).forEach((u: any) => cashierNameMap.set(u.id, u.full_name || u.email || 'Cashier'));
+      }
+
+      // Build subtitles
+      for (const op of operatingBranches) {
+        const info = branchShiftMap.get(op.key)!;
+        if (!info.shift) {
+          info.subtitle = 'No Recorded Shift';
+          continue;
+        }
+
+        const cName = cashierNameMap.get(info.shift.cashier_id) || 'Cashier';
+        if (info.isCarriedForward) {
+          const carriedDate = info.shift.ended_at
+            ? formatShortDate(info.shift.ended_at)
+            : info.shift.shift_date
+            ? formatShortDate(info.shift.shift_date)
+            : '';
+          info.subtitle = carriedDate ? `Carried Forward (${carriedDate})` : 'Carried Forward';
+        } else if (info.shift.status === 'open') {
+          info.subtitle = `${cName} • Active / Open`;
+        } else if (info.shift.ended_at) {
+          info.subtitle = `${cName} • Closed ${formatTime12h(info.shift.ended_at)}`;
+        } else {
+          info.subtitle = `${cName} • Closed`;
+        }
+      }
+
+      // 5. Fetch shift_modaka_entries for all selected shifts
+      const entriesByShiftAndProduct = new Map<string, { opening: number; inQty: number; sold: number; closing: number }>();
+      if (allSelectedShiftIds.length > 0) {
+        const { data: entries } = await supabase
+          .from('shift_modaka_entries')
+          .select('shift_id, product_id, opening_qty, in_qty, sold_qty, closing_qty')
+          .in('shift_id', allSelectedShiftIds);
+
+        (entries || []).forEach((e: any) => {
+          entriesByShiftAndProduct.set(`${e.shift_id}:${e.product_id}`, {
+            opening: Number(e.opening_qty || 0),
+            inQty: Number(e.in_qty || 0),
+            sold: Number(e.sold_qty || 0),
+            closing: Number(e.closing_qty || 0),
+          });
+        });
+      }
+
+      // 6. Build matrix rows for the 7 canonical configs
+      const items: DailySpecialBalanceMatrixItem[] = canonicalConfigs.map((cfg, idx) => {
+        const rank = idx + 1;
+        const rate = Number(cfg.customRate || 250);
+
+        const getBal = (key: 'giriulla' | 'dambadeniya' | 'alawwa') => {
+          const info = branchShiftMap.get(key);
+          if (!info?.shift?.id) return 0;
+          const entry = entriesByShiftAndProduct.get(`${info.shift.id}:${cfg.productId}`);
+          if (!entry) return 0;
+          if (info.shift.status === 'closed') {
+            return entry.closing;
+          }
+          return Math.max(0, entry.opening + entry.inQty - entry.sold);
+        };
+
+        const giriullaBal = getBal('giriulla');
+        const dambadeniyaBal = getBal('dambadeniya');
+        const alawwaBal = getBal('alawwa');
+        const rowTotal = giriullaBal + dambadeniyaBal + alawwaBal;
+
+        return {
+          productId: cfg.productId,
+          rank,
+          sku: cfg.productSku,
+          name: cfg.productName,
+          rate,
+          giriulla: giriullaBal,
+          dambadeniya: dambadeniyaBal,
+          alawwa: alawwaBal,
+          totalUnits: rowTotal,
+          totalValue: rowTotal * rate,
+        };
+      });
+
+      // 7. Calculate branch totals
+      const calcBranchTotals = (key: 'giriulla' | 'dambadeniya' | 'alawwa') => {
+        let units = 0;
+        let value = 0;
+        items.forEach((it) => {
+          const qty = it[key];
+          units += qty;
+          value += qty * it.rate;
+        });
+        return { units, value };
+      };
+
+      const gTotals = calcBranchTotals('giriulla');
+      const dTotals = calcBranchTotals('dambadeniya');
+      const aTotals = calcBranchTotals('alawwa');
+
+      const grandTotalUnits = items.reduce((sum, it) => sum + it.totalUnits, 0);
+      const grandTotalValue = items.reduce((sum, it) => sum + it.totalValue, 0);
+
+      const branchMeta = (
+        key: 'giriulla' | 'dambadeniya' | 'alawwa',
+        name: string,
+        code: string,
+        totals: { units: number; value: number }
+      ): BranchMatrixMeta => {
+        const info = branchShiftMap.get(key);
+        const cashierName = info?.shift?.cashier_id ? cashierNameMap.get(info.shift.cashier_id) || null : null;
+        return {
+          branchId: operatingBranches.find((b) => b.key === key)?.branch?.id || '',
+          branchName: name,
+          branchCode: code,
+          shiftId: info?.shift?.id || null,
+          shiftStatus: info?.shift ? (info.shift.status as 'open' | 'closed') : 'none',
+          cashierName,
+          subtitle: info?.subtitle || 'No Record',
+          isCarriedForward: Boolean(info?.isCarriedForward),
+          totalUnits: totals.units,
+          totalValue: totals.value,
+        };
+      };
+
+      return {
+        success: true,
+        data: {
+          targetDate,
+          cutoffTimestamp: cutoffIso,
+          items,
+          branches: {
+            giriulla: branchMeta('giriulla', 'Giriulla', 'BR-GIR', gTotals),
+            dambadeniya: branchMeta('dambadeniya', 'Dambadeniya', 'BR-DAB', dTotals),
+            alawwa: branchMeta('alawwa', 'Alawwa', 'BR-ALW', aTotals),
+          },
+          grandTotalUnits,
+          grandTotalValue,
+        },
+      };
+    } catch (err: any) {
+      console.error('[shiftsApi] getDailySpecialBalanceMatrix fatal:', err);
+      return {
+        success: false,
+        data: {
+          targetDate,
+          cutoffTimestamp: `${targetDate}T23:00:00+05:30`,
+          items: [],
+          branches: {
+            giriulla: { branchId: '', branchName: 'Giriulla', branchCode: 'BR-GIR', subtitle: 'Error', isCarriedForward: false, totalUnits: 0, totalValue: 0 },
+            dambadeniya: { branchId: '', branchName: 'Dambadeniya', branchCode: 'BR-DAB', subtitle: 'Error', isCarriedForward: false, totalUnits: 0, totalValue: 0 },
+            alawwa: { branchId: '', branchName: 'Alawwa', branchCode: 'BR-ALW', subtitle: 'Error', isCarriedForward: false, totalUnits: 0, totalValue: 0 },
+          },
+          grandTotalUnits: 0,
+          grandTotalValue: 0,
+        },
+        error: { code: 'MATRIX_ERROR', message: err.message, statusCode: 500 },
       };
     }
   },

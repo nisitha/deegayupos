@@ -21,6 +21,7 @@ import {
   X,
   Loader2,
   Clock,
+  Copy,
 } from 'lucide-react';
 import { useTenantBranch } from '../../../../context/tenant-branch-context';
 import {
@@ -30,6 +31,7 @@ import {
   CashierShiftDto,
   ModakaItemConfigDto,
   sortSpecialStockItems,
+  DailySpecialBalanceMatrixResponse,
 } from '../../../../lib/api-client';
 import { useRealtimePosSync } from '../../../../hooks/use-realtime-pos-sync';
 import {
@@ -140,6 +142,32 @@ export default function ModakaLedgerPage() {
   const [isSavingConfigs, setIsSavingConfigs] = useState<boolean>(false);
   const [configSuccessMsg, setConfigSuccessMsg] = useState<string | null>(null);
 
+  // 11:00 PM Special Balance Matrix state (Owner View)
+  const [matrixDate, setMatrixDate] = useState<string>(getTodaySriLanka());
+  const [matrixSort, setMatrixSort] = useState<'canonical' | 'stock_desc' | 'stock_asc' | 'name_asc'>('canonical');
+  const [matrixData, setMatrixData] = useState<DailySpecialBalanceMatrixResponse | null>(null);
+  const [isMatrixLoading, setIsMatrixLoading] = useState<boolean>(true);
+  const [copiedReport, setCopiedReport] = useState<boolean>(false);
+
+  // Load 11:00 PM matrix data
+  const loadMatrixData = useCallback(async (date: string, isBackground = false) => {
+    if (!isBackground) setIsMatrixLoading(true);
+    try {
+      const res = await shiftsApi.getDailySpecialBalanceMatrix(date);
+      if (res.success && res.data) {
+        setMatrixData(res.data);
+      }
+    } catch (err) {
+      console.error('[ModakaLedgerPage] loadMatrixData error:', err);
+    } finally {
+      if (!isBackground) setIsMatrixLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMatrixData(matrixDate, false);
+  }, [matrixDate, loadMatrixData]);
+
   // Load shifts & configs
   const loadData = useCallback(
     async (isBackground = false) => {
@@ -196,7 +224,10 @@ export default function ModakaLedgerPage() {
   }, [loadData]);
 
   // Wire Real-time sync for live bill & shift events silently in the background
-  useRealtimePosSync((isBg) => loadData(isBg ?? true));
+  useRealtimePosSync((isBg) => {
+    loadData(isBg ?? true);
+    loadMatrixData(matrixDate, true);
+  });
 
   // Load catalog products for config modal
   useEffect(() => {
@@ -219,7 +250,7 @@ export default function ModakaLedgerPage() {
     }
   }, [isConfigModalOpen, catalogProducts.length]);
 
-  // Quick date shifts
+  // Quick date shifts for Ledger
   const shiftDateBy = (days: number) => {
     const curr = new Date(selectedDate);
     curr.setDate(curr.getDate() + days);
@@ -227,6 +258,78 @@ export default function ModakaLedgerPage() {
     const mm = String(curr.getMonth() + 1).padStart(2, '0');
     const dd = String(curr.getDate()).padStart(2, '0');
     setSelectedDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  // Quick date shifts for 11:00 PM Matrix
+  const shiftMatrixDateBy = (days: number) => {
+    const curr = new Date(matrixDate);
+    curr.setDate(curr.getDate() + days);
+    const yyyy = curr.getFullYear();
+    const mm = String(curr.getMonth() + 1).padStart(2, '0');
+    const dd = String(curr.getDate()).padStart(2, '0');
+    setMatrixDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const getYesterdaySriLanka = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  };
+
+  // Matrix sorting logic
+  const sortedMatrixItems = useMemo(() => {
+    if (!matrixData?.items) return [];
+    const list = [...matrixData.items];
+    switch (matrixSort) {
+      case 'stock_desc':
+        return list.sort((a, b) => b.totalUnits - a.totalUnits);
+      case 'stock_asc':
+        return list.sort((a, b) => a.totalUnits - b.totalUnits);
+      case 'name_asc':
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case 'canonical':
+      default:
+        return list.sort((a, b) => a.rank - b.rank);
+    }
+  }, [matrixData?.items, matrixSort]);
+
+  // 1-Tap Copy Summary Handler
+  const handleCopyMatrixReport = () => {
+    if (!matrixData) return;
+    const b = matrixData.branches;
+    const text = [
+      `*Deegayu Weda Madhura — 11:00 PM Special Stock Balance*`,
+      `Date: ${matrixData.targetDate} (Cutoff: 11:00 PM)`,
+      ``,
+      `Branch Summary:`,
+      `• Giriulla: ${b.giriulla.subtitle} — ${b.giriulla.totalUnits.toLocaleString()} units (LKR ${b.giriulla.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })})`,
+      `• Dambadeniya: ${b.dambadeniya.subtitle} — ${b.dambadeniya.totalUnits.toLocaleString()} units (LKR ${b.dambadeniya.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })})`,
+      `• Alawwa: ${b.alawwa.subtitle} — ${b.alawwa.totalUnits.toLocaleString()} units (LKR ${b.alawwa.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })})`,
+      ``,
+      `----------------------------------------------------`,
+      `# | Special Item | Giriulla | Dambadeniya | Alawwa | All 3 Total`,
+      `----------------------------------------------------`,
+      ...sortedMatrixItems.map(
+        (it) =>
+          `#${it.rank} ${it.name} (${it.sku}): GIR: ${it.giriulla} | DAM: ${it.dambadeniya} | ALW: ${it.alawwa} | Total: ${it.totalUnits} units (LKR ${it.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+      ),
+      `----------------------------------------------------`,
+      `*ALL 3 TOTAL REMAINING STOCK:* ${matrixData.grandTotalUnits.toLocaleString()} units`,
+      `*TOTAL RETAIL VALUE:* LKR ${matrixData.grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      ``,
+      `Report generated on ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' })}`,
+    ].join('\n');
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 2500);
+    }
   };
 
   // Open config modal with strict canonical 1-7 sort order
@@ -691,6 +794,343 @@ export default function ModakaLedgerPage() {
           </div>
         </MotionStaggerItem>
       </MotionStaggerGrid>
+
+      {/* 11:00 PM SPECIAL BALANCE CONSOLIDATED 3-BRANCH MATRIX CARD (OWNER VIEW) */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden break-inside-avoid print:border-slate-300">
+        {/* Card Header & Controls Bar */}
+        <div className="px-6 py-4.5 bg-gradient-to-r from-slate-950 via-purple-950 to-indigo-950 text-white flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/30 shrink-0">
+              <Clock className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
+                  11:00 PM Special Balance
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                  Consolidated 3-Branch Matrix
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Cutoff: 11:00 PM
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                End-of-day remaining stock across Giriulla, Dambadeniya & Alawwa for{' '}
+                <strong className="text-white font-mono">{matrixDate}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Controls: Date Picker, Quick Toggles, Sorting, and 1-Tap Copy */}
+          <div className="flex items-center gap-2 flex-wrap print:hidden">
+            {/* Quick Date Toggles: Today / Yesterday */}
+            <div className="inline-flex rounded-xl bg-white/10 p-0.5 border border-white/15">
+              <button
+                type="button"
+                onClick={() => setMatrixDate(getTodaySriLanka())}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  matrixDate === getTodaySriLanka()
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatrixDate(getYesterdaySriLanka())}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  matrixDate === getYesterdaySriLanka()
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Yesterday
+              </button>
+            </div>
+
+            {/* Date Navigator */}
+            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/15">
+              <button
+                type="button"
+                onClick={() => shiftMatrixDateBy(-1)}
+                className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Previous Day"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <input
+                type="date"
+                value={matrixDate}
+                onChange={(e) => setMatrixDate(e.target.value)}
+                className="px-2 py-0.5 text-xs font-bold font-mono bg-transparent text-white border-none focus:outline-none cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => shiftMatrixDateBy(1)}
+                className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Next Day"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sorting Dropdown */}
+            <div className="relative">
+              <select
+                value={matrixSort}
+                onChange={(e) => setMatrixSort(e.target.value as any)}
+                className="px-3 py-1.5 text-xs font-bold bg-white/10 border border-white/20 rounded-xl text-slate-200 focus:outline-none focus:bg-slate-900 cursor-pointer"
+              >
+                <option value="canonical" className="bg-slate-900 text-white">Canonical Order (1 → 7)</option>
+                <option value="stock_desc" className="bg-slate-900 text-white">Highest Total Stock (High → Low)</option>
+                <option value="stock_asc" className="bg-slate-900 text-white">Lowest Total Stock (Low → High)</option>
+                <option value="name_asc" className="bg-slate-900 text-white">Item Name (A → Z)</option>
+              </select>
+            </div>
+
+            {/* 1-Tap Copy Summary Button */}
+            <button
+              type="button"
+              onClick={handleCopyMatrixReport}
+              disabled={!matrixData || sortedMatrixItems.length === 0}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer shadow-xs ${
+                copiedReport
+                  ? 'bg-emerald-600 text-white border-emerald-500'
+                  : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
+              }`}
+              title="Copy 11:00 PM plain text summary to clipboard"
+            >
+              {copiedReport ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-white" />
+                  <span>Copied Report!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-purple-300" />
+                  <span>Copy 11:00 PM Report</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Matrix Table Body */}
+        {isMatrixLoading ? (
+          <div className="py-12 text-center space-y-2">
+            <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto" />
+            <p className="text-xs font-bold text-slate-600">Calculating 11:00 PM balances across Giriulla, Dambadeniya & Alawwa...</p>
+          </div>
+        ) : !matrixData || sortedMatrixItems.length === 0 ? (
+          <div className="py-10 text-center text-slate-500 text-xs">
+            No Special Stock configurations found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-[#0F172A] text-white uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                <tr>
+                  {/* Column 1: # */}
+                  <th className="py-3 px-3 text-center w-10">#</th>
+
+                  {/* Column 2: Special Item */}
+                  <th className="py-3 px-4 min-w-[220px]">
+                    <div>Special Item (Canonical 1–7)</div>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">Catalog Variety & Standard Rate</div>
+                  </th>
+
+                  {/* Column 3: Giriulla */}
+                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-x border-slate-800">
+                    <div className="font-extrabold text-white text-xs">Giriulla</div>
+                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
+                      {matrixData.branches.giriulla.subtitle}
+                    </div>
+                    {matrixData.branches.giriulla.isCarriedForward && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                        Carried Forward
+                      </span>
+                    )}
+                  </th>
+
+                  {/* Column 4: Dambadeniya */}
+                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-r border-slate-800">
+                    <div className="font-extrabold text-white text-xs">Dambadeniya</div>
+                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
+                      {matrixData.branches.dambadeniya.subtitle}
+                    </div>
+                    {matrixData.branches.dambadeniya.isCarriedForward && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                        Carried Forward
+                      </span>
+                    )}
+                  </th>
+
+                  {/* Column 5: Alawwa */}
+                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-r border-slate-800">
+                    <div className="font-extrabold text-white text-xs">Alawwa</div>
+                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
+                      {matrixData.branches.alawwa.subtitle}
+                    </div>
+                    {matrixData.branches.alawwa.isCarriedForward && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                        Carried Forward
+                      </span>
+                    )}
+                  </th>
+
+                  {/* Column 6: All 3 Total */}
+                  <th className="py-3 px-4 text-center w-40 bg-gradient-to-r from-purple-950 to-indigo-950 text-white border-l border-purple-800">
+                    <div className="font-extrabold text-xs text-amber-300">All 3 Total</div>
+                    <div className="text-[10px] font-normal text-purple-200 mt-0.5">
+                      Combined Balance
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-sans">
+                {sortedMatrixItems.map((item) => (
+                  <tr key={item.productId} className="hover:bg-slate-50/80 transition-colors">
+                    {/* # */}
+                    <td className="py-2.5 px-3 text-center font-bold text-slate-400 font-mono">
+                      #{item.rank}
+                    </td>
+
+                    {/* Special Item */}
+                    <td className="py-2.5 px-4">
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                        <span>{item.name}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-50 text-purple-700 border border-purple-200">
+                          {item.sku}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Standard Selling Rate: LKR {item.rate}
+                      </span>
+                    </td>
+
+                    {/* Giriulla */}
+                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-x border-slate-100">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                          item.giriulla > 50
+                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                            : item.giriulla > 0
+                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                            : 'bg-rose-50 text-rose-900 ring-rose-200'
+                        }`}
+                      >
+                        {item.giriulla}
+                      </span>
+                    </td>
+
+                    {/* Dambadeniya */}
+                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-r border-slate-100">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                          item.dambadeniya > 50
+                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                            : item.dambadeniya > 0
+                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                            : 'bg-rose-50 text-rose-900 ring-rose-200'
+                        }`}
+                      >
+                        {item.dambadeniya}
+                      </span>
+                    </td>
+
+                    {/* Alawwa */}
+                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-r border-slate-100">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                          item.alawwa > 50
+                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                            : item.alawwa > 0
+                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                            : 'bg-rose-50 text-rose-900 ring-rose-200'
+                        }`}
+                      >
+                        {item.alawwa}
+                      </span>
+                    </td>
+
+                    {/* All 3 Total */}
+                    <td className="py-2.5 px-4 text-center bg-purple-50/60 border-l border-purple-100">
+                      <div className="inline-flex items-center justify-center min-w-[4rem] px-3 py-1 rounded-xl bg-purple-600 text-white font-mono font-black text-sm shadow-xs tabular-nums">
+                        {item.totalUnits}
+                      </div>
+                      <div className="text-[10px] text-purple-900 font-mono font-bold mt-0.5">
+                        LKR {item.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              {/* Bottom Accounting Summary Row with Double-Underline Styling */}
+              <tfoot className="border-t-2 border-b-4 border-double border-slate-400 bg-slate-100 text-slate-900">
+                {/* 1. Total Units Row */}
+                <tr>
+                  <td colSpan={2} className="py-3 px-4 font-black uppercase text-xs tracking-wider text-slate-900">
+                    <div className="flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-purple-600" />
+                      <span>Total Remaining Units (11:00 PM)</span>
+                    </div>
+                  </td>
+                  {/* Giriulla Total Units */}
+                  <td className="py-3 px-4 text-center border-x border-slate-300">
+                    <span className="font-mono font-black text-base text-slate-900">
+                      {matrixData.branches.giriulla.totalUnits.toLocaleString()} units
+                    </span>
+                  </td>
+                  {/* Dambadeniya Total Units */}
+                  <td className="py-3 px-4 text-center border-r border-slate-300">
+                    <span className="font-mono font-black text-base text-slate-900">
+                      {matrixData.branches.dambadeniya.totalUnits.toLocaleString()} units
+                    </span>
+                  </td>
+                  {/* Alawwa Total Units */}
+                  <td className="py-3 px-4 text-center border-r border-slate-300">
+                    <span className="font-mono font-black text-base text-slate-900">
+                      {matrixData.branches.alawwa.totalUnits.toLocaleString()} units
+                    </span>
+                  </td>
+                  {/* All 3 Total Combined Units */}
+                  <td className="py-3 px-4 text-center bg-purple-200/80 border-l border-purple-300">
+                    <span className="inline-flex items-center justify-center bg-purple-700 text-white font-mono font-black text-base px-3.5 py-1 rounded-xl shadow-xs">
+                      {matrixData.grandTotalUnits.toLocaleString()} units
+                    </span>
+                  </td>
+                </tr>
+
+                {/* 2. Total Retail Stock Value Row */}
+                <tr className="bg-slate-50 border-t border-slate-200 text-[11px]">
+                  <td colSpan={2} className="py-2 px-4 font-bold text-slate-600 uppercase tracking-wide">
+                    Total Retail Stock Value (LKR)
+                  </td>
+                  {/* Giriulla Value */}
+                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-x border-slate-200">
+                    LKR {matrixData.branches.giriulla.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                  {/* Dambadeniya Value */}
+                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
+                    LKR {matrixData.branches.dambadeniya.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                  {/* Alawwa Value */}
+                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
+                    LKR {matrixData.branches.alawwa.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                  {/* All 3 Total Combined Value */}
+                  <td className="py-2 px-4 text-center font-mono font-black text-purple-950 bg-purple-100/70 border-l border-purple-200">
+                    LKR {matrixData.grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Printable Header (Visible only when printing) */}
       <div className="hidden print:block text-center border-b pb-4 mb-4">
