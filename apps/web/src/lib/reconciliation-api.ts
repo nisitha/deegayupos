@@ -382,6 +382,22 @@ export const reconciliationApi = {
         previousClosingF = Number(prevRec.closing_cash_f);
       }
 
+      // Fallback: Check most recently closed cashier_shift at this branch across date boundaries
+      if (previousClosingF === null && !isAllBranches) {
+        const { data: prevClosed } = await supabase
+          .from('cashier_shifts')
+          .select('closing_float, closing_drawer_float, counted_remaining_drawer_cash')
+          .eq('branch_id', branchId)
+          .eq('status', 'closed')
+          .order('ended_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prevClosed) {
+          previousClosingF = Number(prevClosed.closing_float ?? prevClosed.counted_remaining_drawer_cash ?? prevClosed.closing_drawer_float ?? 0);
+        }
+      }
+
       // 5. Query live & historical sales for that date + branch (using sold_at index)
       let salesQuery = supabase
         .from('sales')
@@ -491,7 +507,27 @@ export const reconciliationApi = {
         console.warn('[ReconciliationApi] cashier_shifts error:', shiftErr.message);
       }
 
-      const shifts: ShiftHandoverSummary[] = (shiftRows || []).map((sh: any) => {
+      // If viewing single date (e.g. today), also include any currently active/open shift at the branch
+      const combinedShiftRows = [...(shiftRows || [])];
+      if (!isRange) {
+        let openShiftQuery = supabase
+          .from('cashier_shifts')
+          .select('*')
+          .eq('status', 'open');
+        if (!isAllBranches) {
+          openShiftQuery = openShiftQuery.eq('branch_id', branchId);
+        }
+        const { data: openRows } = await openShiftQuery;
+        if (openRows && openRows.length > 0) {
+          openRows.forEach((or: any) => {
+            if (!combinedShiftRows.some((existing: any) => existing.id === or.id)) {
+              combinedShiftRows.push(or);
+            }
+          });
+        }
+      }
+
+      const shifts: ShiftHandoverSummary[] = combinedShiftRows.map((sh: any) => {
         let posCash = Number(sh.pos_cash_sales) || 0;
         let posBills = Number(sh.pos_total_bills) || 0;
         let posGross = Number(sh.pos_gross_sales) || 0;

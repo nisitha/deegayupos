@@ -64,6 +64,46 @@ type TabView =
   | 'worksheet'
   | 'bank_accounts';
 
+function cleanHandoverRemarks(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  let text = String(notes).trim();
+  if (text.startsWith('{')) {
+    const firstNewline = text.indexOf('\n');
+    if (firstNewline !== -1) {
+      const firstLine = text.slice(0, firstNewline).trim();
+      try {
+        JSON.parse(firstLine);
+        text = text.slice(firstNewline + 1).trim();
+      } catch {
+        let braceDepth = 0;
+        let jsonEnd = -1;
+        for (let i = 0; i < text.length; i++) {
+          if (text[i] === '{') braceDepth++;
+          else if (text[i] === '}') {
+            braceDepth--;
+            if (braceDepth === 0) {
+              jsonEnd = i;
+              break;
+            }
+          }
+        }
+        if (jsonEnd !== -1) {
+          text = text.slice(jsonEnd + 1).trim();
+        }
+      }
+    } else {
+      try {
+        const parsed = JSON.parse(text);
+        text = parsed.remarks || parsed.cashier_remarks || '';
+      } catch {
+        text = '';
+      }
+    }
+  }
+  text = text.replace(/\[PENDING_OPENING_COUNT\]/g, '').trim();
+  return text || null;
+}
+
 export default function CashReconciliationPage() {
   const { business, branches, allowedBranches, selectedBranchId, setSelectedBranchId, user, activeCashier, isOwner } = useTenantBranch();
 
@@ -482,14 +522,18 @@ export default function CashReconciliationPage() {
         : shifts.filter((s) => s.branch_id === activeBranchFilter);
 
     // 1. Total Cash Inflow: Opening Float + POS Cash Sales + Special Stock Sales
-    const totalOpeningFloat = filteredShifts.reduce((sum, s) => sum + (s.opening_float || 0), 0);
-    const totalPosCash = filteredShifts.reduce((sum, s) => sum + (s.pos_cash_sales || 0), 0);
-    const totalSpecialSales = filteredShifts.reduce((sum, s) => sum + (s.modaka_total_amount || 0), 0);
+    let totalOpeningFloat = filteredShifts.reduce((sum, s) => sum + (s.opening_float || 0), 0);
+    let totalPosCash = filteredShifts.reduce((sum, s) => sum + (s.pos_cash_sales || 0), 0);
+    let totalSpecialSales = filteredShifts.reduce((sum, s) => sum + (s.modaka_total_amount || 0), 0);
 
-    const totalCashInflow =
-      filteredShifts.length > 0
-        ? totalOpeningFloat + totalPosCash + totalSpecialSales
-        : (worksheetData.previousClosingF || 0) + worksheetData.systemCashSales + worksheetData.modakaSalesTotal;
+    // If zero shifts recorded, fallback to worksheet totals consistently across all breakdown terms
+    if (filteredShifts.length === 0) {
+      totalOpeningFloat = worksheetData.previousClosingF || 0;
+      totalPosCash = worksheetData.systemCashSales || 0;
+      totalSpecialSales = worksheetData.modakaSalesTotal || 0;
+    }
+
+    const totalCashInflow = totalOpeningFloat + totalPosCash + totalSpecialSales;
 
     // 2. Banked & Paid Out: Bank Deposits + Goods Purchased Paid Out + Other Expenses
     const totalBanked = filteredShifts.reduce((sum, s) => sum + (s.banked_amount || 0), 0);
@@ -1996,11 +2040,32 @@ export default function CashReconciliationPage() {
 
           {/* 2. Detailed Per-Shift Tally Cards (Shift 1, Shift 2) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <Scale className="w-4 h-4 text-purple-400" />
-                <span>Shift Tally Worksheets ({shiftTallyKPIs.filteredShifts.length})</span>
-              </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-purple-400" />
+                  <span>Shift Tally Worksheets ({shiftTallyKPIs.filteredShifts.length})</span>
+                </h4>
+                {(() => {
+                  const activeCount = shiftTallyKPIs.filteredShifts.filter((s) => s.status === 'open').length;
+                  const closedCount = shiftTallyKPIs.filteredShifts.filter((s) => s.status === 'closed').length;
+                  return (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {activeCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          {activeCount} Active Shift{activeCount === 1 ? '' : 's'}
+                        </span>
+                      )}
+                      {closedCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                          {closedCount} Closed Shift{closedCount === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
               <span className="text-xs text-slate-500">
                 Detailed cash ledger verification per operating shift
               </span>
@@ -2099,12 +2164,19 @@ export default function CashReconciliationPage() {
                               }
                             })()
                           )}
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border ${
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase border flex items-center gap-1.5 ${
                             sh.status === 'closed'
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
                           }`}>
-                            {sh.status === 'closed' ? 'Closed & Verified' : 'Open / In-Progress'}
+                            {sh.status === 'closed' ? (
+                              <span>Closed & Verified</span>
+                            ) : (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                                <span>ACTIVE / OPEN SHIFT</span>
+                              </>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -2117,34 +2189,34 @@ export default function CashReconciliationPage() {
                             <span>Cash Inflows</span>
                             <span className="text-purple-400 font-mono">Drawer Receipts</span>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400">Opening Float:</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-slate-400 shrink-0">Opening Float:</span>
                               {sh.previous_closing_float !== null && sh.previous_closing_float !== undefined && (
-                                <span className="text-[10px] text-slate-500 font-mono">
+                                <span className="text-[10px] text-slate-500 font-mono truncate hidden sm:inline">
                                   (vs {sh.previous_shift_label || 'prev'}: LKR {Number(sh.previous_closing_float).toLocaleString('en-LK', { minimumFractionDigits: 2 })})
                                 </span>
                               )}
                             </div>
-                            <span className="font-mono font-bold text-slate-200">
+                            <span className="font-mono font-bold text-slate-200 whitespace-nowrap shrink-0 text-right">
                               LKR {(sh.opening_float || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-slate-400">POS Cash Sales:</span>
-                            <span className="font-mono font-bold text-slate-200">
+                            <span className="font-mono font-bold text-slate-200 whitespace-nowrap shrink-0 text-right">
                               LKR {(sh.pos_cash_sales || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-slate-400">Special Stock Sales:</span>
-                            <span className="font-mono font-bold text-purple-300">
+                            <span className="font-mono font-bold text-purple-300 whitespace-nowrap shrink-0 text-right">
                               LKR {(sh.modaka_total_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 font-bold">
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80 font-bold">
                             <span className="text-slate-200 uppercase text-[11px]">Total Cash Inflow:</span>
-                            <span className="font-mono text-sm text-indigo-400">
+                            <span className="font-mono text-sm text-indigo-400 whitespace-nowrap shrink-0 text-right">
                               LKR {shiftInflow.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -2156,33 +2228,33 @@ export default function CashReconciliationPage() {
                             <span>Outflows & Remaining Drawer</span>
                             <span className="text-amber-400 font-mono">Disbursements & Float</span>
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-slate-400">Goods Purchased Paid Out:</span>
-                            <span className="font-mono font-bold text-rose-300">
+                            <span className="font-mono font-bold text-rose-300 whitespace-nowrap shrink-0 text-right">
                               - LKR {(sh.goods_purchased_paid || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-slate-400">Other Expenses:</span>
-                            <span className="font-mono font-bold text-rose-300">
+                            <span className="font-mono font-bold text-rose-300 whitespace-nowrap shrink-0 text-right">
                               - LKR {(sh.other_expenses || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-slate-400">Banked Amount:</span>
-                            <span className="font-mono font-bold text-indigo-300">
+                            <span className="font-mono font-bold text-indigo-300 whitespace-nowrap shrink-0 text-right">
                               - LKR {(sh.banked_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
-                            <span className="text-slate-400">System Expected Remaining Drawer:</span>
-                            <span className="font-mono font-bold text-amber-300">
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/50">
+                            <span className="text-slate-400 truncate">System Expected Remaining Drawer:</span>
+                            <span className="font-mono font-bold text-amber-300 whitespace-nowrap shrink-0 text-right">
                               LKR {expectedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-300 font-semibold">Cashier Declared Remaining Drawer (Carried Forward):</span>
-                            <span className="font-mono font-bold text-emerald-400">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-300 font-semibold truncate">Declared Remaining Drawer (Float Carry):</span>
+                            <span className="font-mono font-bold text-emerald-400 whitespace-nowrap shrink-0 text-right">
                               LKR {countedDrawer.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -2201,9 +2273,9 @@ export default function CashReconciliationPage() {
                               </button>
                               {isExpanded && (
                                 <div className="mt-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between gap-2">
                                     <span>Bank Deposit Denominations</span>
-                                    <span className="text-indigo-400 font-mono">Banked: LKR {(sh.banked_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
+                                    <span className="text-indigo-400 font-mono whitespace-nowrap shrink-0 text-right">Banked: LKR {(sh.banked_amount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</span>
                                   </div>
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-mono text-[10px]">
                                     {denomEntries.map(([denom, count]) => (
@@ -2218,9 +2290,9 @@ export default function CashReconciliationPage() {
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 font-bold">
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80 font-bold">
                             <span className="text-slate-200 uppercase text-[11px]">Total Accounted:</span>
-                            <span className="font-mono text-sm text-amber-400">
+                            <span className="font-mono text-sm text-amber-400 whitespace-nowrap shrink-0 text-right">
                               LKR {shiftAccounted.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -2258,7 +2330,7 @@ export default function CashReconciliationPage() {
                           )}
                         </div>
 
-                        <span className={`font-mono text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ${
+                        <span className={`font-mono text-xs font-black px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap text-right ${
                           Math.abs(variance) < 0.01
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : variance < 0
@@ -2271,14 +2343,7 @@ export default function CashReconciliationPage() {
 
                       {/* Handover Remarks */}
                       {sh.handover_notes && (() => {
-                        const raw = String(sh.handover_notes).trim();
-                        let displayNote = raw;
-                        if (raw.startsWith('{')) {
-                          try {
-                            const parsed = JSON.parse(raw);
-                            displayNote = parsed.remarks || parsed.cashier_remarks || '';
-                          } catch { }
-                        }
+                        const displayNote = cleanHandoverRemarks(sh.handover_notes);
                         if (!displayNote) return null;
                         return (
                           <div className="text-xs text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 italic">

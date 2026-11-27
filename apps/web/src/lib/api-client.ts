@@ -4108,7 +4108,8 @@ export const shiftsApi = {
         .select('id, shift_number, closing_float, closing_drawer_float, counted_remaining_drawer_cash')
         .eq('branch_id', branchId)
         .eq('status', 'closed')
-        .order('ended_at', { ascending: false })
+        .order('ended_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -4674,7 +4675,8 @@ export const shiftsApi = {
           .select('shift_number, closing_float, closing_drawer_float, counted_remaining_drawer_cash')
           .eq('branch_id', targetBranchId)
           .eq('status', 'closed')
-          .order('ended_at', { ascending: false })
+          .order('ended_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
@@ -4700,10 +4702,15 @@ export const shiftsApi = {
         denomination_breakdown: denominationBreakdown || null,
       });
 
+      const totalAvailable = Math.round(
+        (countedFloat + Number(shiftRow.pos_cash_sales || 0) + Number(shiftRow.modaka_total_amount || 0)) * 100
+      ) / 100;
+
       let updQuery = supabase
         .from('cashier_shifts')
         .update({
           opening_float: countedFloat,
+          total_cash_available: totalAvailable,
           notes: notesPayload,
           handover_notes: notesPayload,
           updated_at: new Date().toISOString(),

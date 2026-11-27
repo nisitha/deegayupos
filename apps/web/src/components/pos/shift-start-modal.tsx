@@ -13,6 +13,7 @@ import {
   Calculator,
 } from 'lucide-react';
 import { shiftsApi, type CashierShiftDto } from '../../lib/api-client';
+import { supabase } from '../../lib/supabase';
 
 interface ShiftStartModalProps {
   isOpen: boolean;
@@ -50,13 +51,42 @@ export function ShiftStartModal({
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input when modal opens
+  // Focus input when modal opens and ensure cross-date closing_float carry-forward prefill
   useEffect(() => {
     if (!isOpen) {
       return undefined;
     }
+    let isCancelled = false;
     const prefillFloat = activeShift?.openingFloat ? Number(activeShift.openingFloat) : 0;
-    setCountedCashInput(prefillFloat > 0 ? prefillFloat.toString() : '');
+    if (prefillFloat > 0) {
+      setCountedCashInput(prefillFloat.toString());
+    } else if (activeShift?.branchId) {
+      // Cross-date carry-forward: fetch the branch's most recently closed shift ordered by ended_at DESC NULLS LAST, created_at DESC LIMIT 1
+      (async () => {
+        try {
+          const { data: prev } = await supabase
+            .from('cashier_shifts')
+            .select('closing_float, closing_drawer_float, counted_remaining_drawer_cash')
+            .eq('branch_id', activeShift.branchId)
+            .eq('status', 'closed')
+            .order('ended_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!isCancelled && prev) {
+            const carry = Number(
+              prev.closing_float ?? prev.counted_remaining_drawer_cash ?? prev.closing_drawer_float ?? 0
+            );
+            if (carry > 0) {
+              setCountedCashInput(carry.toString());
+            }
+          }
+        } catch { }
+      })();
+    } else {
+      setCountedCashInput('');
+    }
     setDenomCounts({});
     setShowDenomCounter(false);
     setErrorMsg(null);
@@ -65,9 +95,10 @@ export function ShiftStartModal({
       inputRef.current?.select();
     }, 150);
     return () => {
+      isCancelled = true;
       clearTimeout(timer);
     };
-  }, [isOpen, activeShift?.id, activeShift?.openingFloat]);
+  }, [isOpen, activeShift?.id, activeShift?.branchId, activeShift?.openingFloat]);
 
   const denomSum = useMemo(() => {
     return SRI_LANKA_DENOMINATIONS.reduce((acc, d) => {
