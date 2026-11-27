@@ -601,7 +601,7 @@ export const productsApi = {
     try {
       const { data: sbProds } = await supabase
         .from('products_pos_view')
-        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
+        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, stock_source_product_id, stock_conversion_factor, created_at, updated_at')
         .limit(100);
 
       if (sbProds && sbProds.length > 0) {
@@ -618,6 +618,8 @@ export const productsApi = {
           imageUrl: p.image_url || null,
           isActive: p.is_active ?? true,
           stock: 100,
+          stockSourceProductId: p.stock_source_product_id || null,
+          stockConversionFactor: Number(p.stock_conversion_factor || 1),
           createdAt: p.created_at || new Date().toISOString(),
           updatedAt: p.updated_at || new Date().toISOString(),
         }));
@@ -639,7 +641,7 @@ export const productsApi = {
     try {
       const { data: p } = await supabase
         .from('products_pos_view')
-        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, created_at, updated_at')
+        .select('id, name, sku, barcode, cost_price, retail_price, category_id, image_url, is_active, stock_source_product_id, stock_conversion_factor, created_at, updated_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -658,6 +660,8 @@ export const productsApi = {
             categoryId: p.category_id,
             imageUrl: p.image_url || null,
             isActive: p.is_active ?? true,
+            stockSourceProductId: p.stock_source_product_id || null,
+            stockConversionFactor: Number(p.stock_conversion_factor || 1),
             stock: 100,
             createdAt: p.created_at || new Date().toISOString(),
             updatedAt: p.updated_at || new Date().toISOString(),
@@ -737,6 +741,8 @@ export const productsApi = {
           category_id: data.categoryId || null,
           image_url: data.imageUrl || null,
           is_active: true,
+          stock_source_product_id: (data as any).stockSourceProductId || null,
+          stock_conversion_factor: (data as any).stockConversionFactor ?? 1,
         })
         .select()
         .maybeSingle();
@@ -750,16 +756,25 @@ export const productsApi = {
   },
   update: async (id: string, data: UpdateProductPayload): Promise<ApiResponse<ProductDto>> => {
     try {
+      const updatePayload: Record<string, any> = {
+        name: data.name,
+        retail_price: data.retailPrice,
+        cost_price: data.costPrice ?? (data as any).purchasePrice,
+        category_id: data.categoryId,
+        image_url: data.imageUrl,
+        is_active: data.isActive,
+      };
+
+      if ((data as any).stockSourceProductId !== undefined) {
+        updatePayload.stock_source_product_id = (data as any).stockSourceProductId || null;
+      }
+      if ((data as any).stockConversionFactor !== undefined) {
+        updatePayload.stock_conversion_factor = Number((data as any).stockConversionFactor) || 1;
+      }
+
       await supabase
         .from('products')
-        .update({
-          name: data.name,
-          retail_price: data.retailPrice,
-          cost_price: data.costPrice ?? (data as any).purchasePrice,
-          category_id: data.categoryId,
-          image_url: data.imageUrl,
-          is_active: data.isActive,
-        })
+        .update(updatePayload)
         .eq('id', id);
     } catch { }
 
@@ -1307,12 +1322,32 @@ export const posApi = {
       if (item.productId && isValidUuid(item.productId)) {
         try {
           const isBulk = (item as any).isSpecialBulk || String(item.productName || '').includes('(25-Pack Bulk)') || String(item.productName || '').includes('25-Pack');
-          const qtyToDeduct = Number((item as any).totalUnits || (isBulk ? Number(item.quantity || 1) * 25 : (item.quantity || 1)));
+          let targetProductId = item.productId;
+          let qtyToDeduct = Number((item as any).totalUnits || (isBulk ? Number(item.quantity || 1) * 25 : (item.quantity || 1)));
+          let stockNote: string | null = null;
+
+          // Check if sold product is linked to a master bulk herb (e.g. Kalan 01 -> 1g bulk stock, 1 Kalan = 5g)
+          try {
+            const { data: prodInfo } = await supabase
+              .from('products')
+              .select('id, name, stock_source_product_id, stock_conversion_factor')
+              .eq('id', item.productId)
+              .maybeSingle();
+
+            if (prodInfo?.stock_source_product_id) {
+              const factor = Number(prodInfo.stock_conversion_factor) || 5;
+              targetProductId = prodInfo.stock_source_product_id;
+              qtyToDeduct = Number(item.quantity || 1) * factor;
+              stockNote = `-${qtyToDeduct}g via ${item.quantity || 1} ${prodInfo.name} sale (${factor}g/Kalan)`;
+            }
+          } catch (linkErr) {
+            console.warn('[posApi.checkout] Product stock link check error:', linkErr);
+          }
 
           const { data: stockRow, error: sErr } = await supabase
             .from('stock_levels')
             .select('id, quantity_on_hand')
-            .eq('product_id', item.productId)
+            .eq('product_id', targetProductId)
             .eq('warehouse_id', targetWarehouseId)
             .maybeSingle();
 
@@ -1333,11 +1368,31 @@ export const posApi = {
               .insert({
                 tenant_id: tenantId,
                 warehouse_id: targetWarehouseId,
-                product_id: item.productId,
+                product_id: targetProductId,
                 quantity_on_hand: 0,
                 quantity_reserved: 0,
                 updated_at: new Date().toISOString(),
               });
+          }
+
+          // Record stock movement if linked bulk item
+          if (stockNote) {
+            try {
+              await supabase
+                .from('stock_movements')
+                .insert({
+                  tenant_id: tenantId,
+                  warehouse_id: targetWarehouseId,
+                  product_id: targetProductId,
+                  type: 'SALE',
+                  quantity: -qtyToDeduct,
+                  reference: `Sale #${saleId?.slice(0, 8)}`,
+                  notes: stockNote,
+                  created_at: new Date().toISOString(),
+                });
+            } catch (smErr) {
+              console.warn('[posApi.checkout] Stock movement log warning:', smErr);
+            }
           }
 
           // If item is Special Stock (25-Pack bulk item), sync active shift's shift_modaka_entries
@@ -1522,10 +1577,29 @@ export const posApi = {
             for (const item of items) {
               if (item.product_id && isValidUuid(item.product_id)) {
                 try {
+                  let targetProductId = item.product_id;
+                  let qtyToRestore = Number(item.quantity || 1);
+
+                  try {
+                    const { data: prodInfo } = await supabase
+                      .from('products')
+                      .select('id, stock_source_product_id, stock_conversion_factor')
+                      .eq('id', item.product_id)
+                      .maybeSingle();
+
+                    if (prodInfo?.stock_source_product_id) {
+                      const factor = Number(prodInfo.stock_conversion_factor) || 5;
+                      targetProductId = prodInfo.stock_source_product_id;
+                      qtyToRestore = Number(item.quantity || 1) * factor;
+                    }
+                  } catch (linkErr) {
+                    console.warn('[voidSale] Product stock link lookup error:', linkErr);
+                  }
+
                   const { data: stockRow } = await supabase
                     .from('stock_levels')
                     .select('id, quantity_on_hand')
-                    .eq('product_id', item.product_id)
+                    .eq('product_id', targetProductId)
                     .eq('warehouse_id', targetWarehouseId)
                     .maybeSingle();
 
@@ -1534,7 +1608,7 @@ export const posApi = {
                     await supabase
                       .from('stock_levels')
                       .update({
-                        quantity_on_hand: currentQty + Number(item.quantity || 1),
+                        quantity_on_hand: currentQty + qtyToRestore,
                         updated_at: new Date().toISOString(),
                       })
                       .eq('id', stockRow.id);
@@ -1544,8 +1618,8 @@ export const posApi = {
                       .insert({
                         tenant_id: DEEGAYU_TENANT_ID,
                         warehouse_id: targetWarehouseId,
-                        product_id: item.product_id,
-                        quantity_on_hand: Number(item.quantity || 1),
+                        product_id: targetProductId,
+                        quantity_on_hand: qtyToRestore,
                         quantity_reserved: 0,
                         updated_at: new Date().toISOString(),
                       });

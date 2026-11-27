@@ -96,6 +96,9 @@ interface RetailProductItem {
   unit: string;
   imageUrl?: string;
   alertQuantity?: number | null;
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number;
+  linkedBulkGrams?: number | null;
 }
 
 interface CartItem {
@@ -114,6 +117,9 @@ interface CartItem {
   departmentId?: string;
   selectedUnit?: string;
   displayQuantity?: number;
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number;
+  linkedBulkGrams?: number | null;
 }
 
 const CART_ITEM_THEMES = [
@@ -653,7 +659,7 @@ function ConfidencyPosPageContent() {
         const to = from + chunkSize - 1;
         const { data: chunk, error: chunkErr } = await supabase
           .from('products')
-          .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id')
+          .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, stock_source_product_id, stock_conversion_factor')
           .eq('is_active', true)
           .order('name', { ascending: true })
           .range(from, to);
@@ -683,7 +689,18 @@ function ConfidencyPosPageContent() {
       if (allProducts.length > 0) {
         const freshProducts: RetailProductItem[] = allProducts.map((p: any) => {
           const cat = p.category_id ? categoryMap.get(p.category_id) : null;
-          const stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 0;
+          const sourceProductId = p.stock_source_product_id;
+          const conversionFactor = Number(p.stock_conversion_factor) || 5;
+
+          let stockQty = stockMap.has(p.id) ? stockMap.get(p.id)! : 0;
+          let linkedBulkGrams: number | null = null;
+
+          // If linked to master bulk herb (e.g. 1g stock), calculate available Kalan units
+          if (sourceProductId) {
+            const sourceGramQty = stockMap.has(sourceProductId) ? stockMap.get(sourceProductId)! : 0;
+            linkedBulkGrams = sourceGramQty;
+            stockQty = Math.floor(sourceGramQty / conversionFactor);
+          }
 
           return {
             id: p.id,
@@ -702,6 +719,9 @@ function ConfidencyPosPageContent() {
             unit: 'units',
             imageUrl: p.image_url || undefined,
             alertQuantity: p.alert_quantity ?? null,
+            stockSourceProductId: sourceProductId || null,
+            stockConversionFactor: conversionFactor,
+            linkedBulkGrams,
           };
         });
 
@@ -925,6 +945,9 @@ function ConfidencyPosPageContent() {
           unit: product.unit,
           imageUrl: product.imageUrl,
           departmentId: product.departmentId,
+          stockSourceProductId: product.stockSourceProductId,
+          stockConversionFactor: product.stockConversionFactor,
+          linkedBulkGrams: product.linkedBulkGrams,
         },
       ];
     });
@@ -1085,6 +1108,9 @@ function ConfidencyPosPageContent() {
             unit: p.unit,
             imageUrl: p.imageUrl,
             departmentId: (p as any).departmentId,
+            stockSourceProductId: (p as any).stockSourceProductId,
+            stockConversionFactor: (p as any).stockConversionFactor,
+            linkedBulkGrams: (p as any).linkedBulkGrams,
           },
         ];
       });
@@ -2310,6 +2336,14 @@ function ConfidencyPosPageContent() {
                                   `In Stock: ${item.stockOnHand}`
                                 )}
                               </span>
+                              {item.linkedBulkGrams !== null && item.linkedBulkGrams !== undefined && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs font-mono">
+                                    Linked: {item.linkedBulkGrams.toLocaleString()}g bulk ({item.stockConversionFactor || 5}g/Kalan)
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2539,28 +2573,35 @@ function ConfidencyPosPageContent() {
                         </h4>
 
                         {/* High-Contrast Branch Stock Badge */}
-                        <div className="mt-1.5 flex items-center">
-                          {product.stockOnHand <= 0 ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-mono shadow-2xs">
-                                Out of Stock (0)
+                        <div className="mt-1.5 flex flex-col items-start gap-1">
+                          <div className="flex items-center">
+                            {product.stockOnHand <= 0 ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-mono shadow-2xs">
+                                  Out of Stock (0)
+                                </span>
+                                <a
+                                  href={`/dashboard/transfers?search=${encodeURIComponent(product.name)}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-0.5"
+                                  title="Check stock at other branches and request transfer"
+                                >
+                                  Check Other Branches &rarr;
+                                </a>
+                              </div>
+                            ) : product.stockOnHand <= 5 ? (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-mono shadow-2xs">
+                                Low Stock: {product.stockOnHand}
                               </span>
-                              <a
-                                href={`/dashboard/transfers?search=${encodeURIComponent(product.name)}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-0.5"
-                                title="Check stock at other branches and request transfer"
-                              >
-                                Check Other Branches &rarr;
-                              </a>
-                            </div>
-                          ) : product.stockOnHand <= 5 ? (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-mono shadow-2xs">
-                              Low Stock: {product.stockOnHand}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shadow-2xs">
-                              Stock: {product.stockOnHand.toLocaleString()}
+                            ) : (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono shadow-2xs">
+                                Stock: {product.stockOnHand.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          {product.linkedBulkGrams !== null && product.linkedBulkGrams !== undefined && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs font-mono">
+                              Linked: {product.linkedBulkGrams.toLocaleString()}g bulk ({product.stockConversionFactor || 5}g/Kalan)
                             </span>
                           )}
                         </div>

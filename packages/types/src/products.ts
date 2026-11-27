@@ -114,6 +114,8 @@ export interface ProductDto {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number | null;
   category?: CategoryDto | null;
   brand?: BrandDto | null;
   unit?: UnitDto | null;
@@ -137,6 +139,8 @@ export interface CreateProductPayload {
   alertQuantity?: number;
   isTrackStock?: boolean;
   isActive?: boolean;
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number | null;
   variants?: CreateProductVariantPayload[];
 }
 
@@ -157,6 +161,8 @@ export interface UpdateProductPayload {
   alertQuantity?: number;
   isTrackStock?: boolean;
   isActive?: boolean;
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number | null;
   variants?: CreateProductVariantPayload[];
 }
 

@@ -26,6 +26,7 @@ import {
   UploadCloud,
   Loader2,
   Image as ImageIcon,
+  Link2,
 } from 'lucide-react';
 import type {
   BrandDto,
@@ -74,6 +75,13 @@ export interface ManagedProductItem {
   alertQuantity?: number;
   isTrackStock?: boolean;
   variants?: unknown[];
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number | null;
+}
+
+interface ProductFormState extends CreateProductPayload {
+  stockSourceProductId?: string | null;
+  stockConversionFactor?: number | null;
 }
 
 export default function ProductsPage() {
@@ -84,6 +92,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [brands, setBrands] = useState<BrandDto[]>([]);
   const [units, setUnits] = useState<UnitDto[]>([]);
+  const [masterSourceCandidates, setMasterSourceCandidates] = useState<{ id: string; name: string; sku: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters & Pagination
@@ -113,7 +122,7 @@ export default function ProductsPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   // Form State for Product Create / Edit
-  const [formData, setFormData] = useState<CreateProductPayload>({
+  const [formData, setFormData] = useState<ProductFormState>({
     name: '',
     sku: '',
     barcode: '',
@@ -130,6 +139,8 @@ export default function ProductsPage() {
     isTrackStock: true,
     isActive: true,
     variants: [],
+    stockSourceProductId: '',
+    stockConversionFactor: 1,
   });
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -166,13 +177,14 @@ export default function ProductsPage() {
     }
   };
 
-  // Load Categories, Brands, Units
+  // Load Categories, Brands, Units, and Master Product Candidates
   const loadTaxonomy = useCallback(async () => {
     try {
-      const [catsRes, brandsRes, unitsRes] = await Promise.all([
+      const [catsRes, brandsRes, unitsRes, masterProdsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name', { ascending: true }),
         supabase.from('brands').select('*').order('name', { ascending: true }),
         supabase.from('units').select('*').order('name', { ascending: true }),
+        supabase.from('products').select('id, name, sku').order('name', { ascending: true }),
       ]);
       if (catsRes.data && catsRes.data.length > 0) {
         setCategories(
@@ -213,6 +225,15 @@ export default function ProductsPage() {
           }))
         );
       }
+      if (masterProdsRes.data) {
+        setMasterSourceCandidates(
+          masterProdsRes.data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku || '',
+          }))
+        );
+      }
     } catch (err) {
       console.warn('Catalog taxonomy background load note:', err);
     }
@@ -244,7 +265,7 @@ export default function ProductsPage() {
       // 2. Query flat products table directly (no fragile PostgREST joins)
       let query = supabase
         .from('products')
-        .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, created_at, updated_at', { count: 'exact' });
+        .select('id, name, sku, barcode, cost_price, retail_price, wholesale_price, image_url, alert_quantity, is_active, category_id, stock_source_product_id, stock_conversion_factor, created_at, updated_at', { count: 'exact' });
 
       if (search.trim()) {
         query = query.ilike('name', `%${search.trim()}%`);
@@ -304,6 +325,8 @@ export default function ProductsPage() {
             stock: stockQty,
             stockOnHand: stockQty,
             isActive: p.is_active ?? true,
+            stockSourceProductId: p.stock_source_product_id || null,
+            stockConversionFactor: Number(p.stock_conversion_factor || 1),
           };
         });
 
@@ -382,6 +405,8 @@ export default function ProductsPage() {
       isTrackStock: true,
       isActive: true,
       variants: [],
+      stockSourceProductId: '',
+      stockConversionFactor: 1,
     });
     setActiveTab('general');
     setFormError(null);
@@ -408,6 +433,8 @@ export default function ProductsPage() {
       alertQuantity: p.alertQuantity || 5,
       isTrackStock: p.isTrackStock !== undefined ? p.isTrackStock : true,
       isActive: p.isActive !== undefined ? p.isActive : true,
+      stockSourceProductId: p.stockSourceProductId || (p as any).stock_source_product_id || '',
+      stockConversionFactor: p.stockConversionFactor ?? (p as any).stock_conversion_factor ?? 1,
       variants: ((p.variants as unknown[]) || []).map((v) => {
         const item = v as { id?: string; name?: string; sku?: string; barcode?: string; costPrice?: number; retailPrice?: number; attributes?: Record<string, string> };
         return {
@@ -454,7 +481,9 @@ export default function ProductsPage() {
         categoryId: formData.categoryId || null,
         brandId: formData.brandId || null,
         unitId: formData.unitId || null,
-      };
+        stockSourceProductId: formData.stockSourceProductId || null,
+        stockConversionFactor: Number(formData.stockConversionFactor) || 1,
+      } as any;
 
       if (editingProduct) {
         await productsApi.update(editingProduct.id, payload);
@@ -767,7 +796,14 @@ export default function ProductsPage() {
                             <div className="text-sm font-semibold text-slate-900 leading-snug truncate max-w-[260px]" title={p.name}>
                               {p.name}
                             </div>
-                            <div className="font-mono text-xs text-slate-500 mt-0.5">{p.sku}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-xs text-slate-500">{p.sku}</span>
+                              {p.stockSourceProductId && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                  Linked ({p.stockConversionFactor || 5}g/unit)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1397,6 +1433,72 @@ export default function ProductsPage() {
                       <label htmlFor="isActive" className="text-xs font-medium text-slate-700 cursor-pointer">
                         Active for Checkout
                       </label>
+                    </div>
+                  </div>
+
+                  {/* Bulk Master Stock Link (Unit Conversion Engine) */}
+                  <div className="mt-4 p-4 rounded-xl bg-purple-50/60 border border-purple-200/80 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-purple-600" />
+                      <span className="text-xs font-bold text-purple-900">
+                        Master Bulk Stock Source & Unit Conversion (e.g. Kalan to Gram)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-purple-700 leading-relaxed">
+                      Link this product to draw physical stock from a bulk master SKU (e.g. 1 Kalan item draws 5 grams from master 1g stock). POS displays converted available units and decrements grams automatically upon checkout while keeping this item&apos;s custom price.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Master Stock Source Product
+                        </label>
+                        <select
+                          value={formData.stockSourceProductId || ''}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              stockSourceProductId: e.target.value || null,
+                              stockConversionFactor: e.target.value ? (formData.stockConversionFactor || 5) : 1,
+                            })
+                          }
+                          className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                        >
+                          <option value="">None (Independent Stock Item)</option>
+                          {masterSourceCandidates
+                            .filter((p) => !editingProduct || p.id !== editingProduct.id)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.sku || 'No SKU'})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Conversion Factor (Bulk grams per 1 unit sold)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.001"
+                          disabled={!formData.stockSourceProductId}
+                          value={formData.stockConversionFactor ?? 5}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              stockConversionFactor: parseFloat(e.target.value) || 1,
+                            })
+                          }
+                          placeholder="e.g. 5 (for 1 Kalan = 5 Grams)"
+                          className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-purple-500 disabled:opacity-50 transition-colors"
+                        />
+                        <span className="text-[10px] text-purple-600 mt-1 block">
+                          {formData.stockSourceProductId
+                            ? `Each unit sold will deduct ${formData.stockConversionFactor || 5} grams from bulk master stock.`
+                            : 'Select a Master Source Product to configure unit conversion.'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
