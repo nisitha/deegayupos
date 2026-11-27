@@ -24,6 +24,7 @@ export async function performAppLogout(router?: { replace?: (url: string) => voi
         'pixelcraft_cashier_name',
         'pixelcraft_pin_session',
         'pixelcraft_active_shift',
+        'pixelcraft_approved_cross_branch_id',
       ];
       keysToRemove.forEach((key) => {
         try {

@@ -367,8 +367,20 @@ export function TenantBranchProvider({ children }: { children: React.ReactNode }
 
   const allowedBranches: BusinessProfileBranch[] = React.useMemo(() => {
     if (isOwner) return branches;
-    if (assignedBranchIds.length === 0) return branches;
-    return branches.filter((b) => assignedBranchIds.includes(b.id));
+
+    // Check if staff has an approved cross-branch override for this session
+    let approvedCrossBranchId: string | null = null;
+    if (typeof window !== 'undefined') {
+      try {
+        approvedCrossBranchId = localStorage.getItem('pixelcraft_approved_cross_branch_id');
+      } catch {}
+    }
+
+    if (assignedBranchIds.length === 0 && !approvedCrossBranchId) return branches;
+
+    return branches.filter(
+      (b) => assignedBranchIds.includes(b.id) || (approvedCrossBranchId && b.id === approvedCrossBranchId)
+    );
   }, [isOwner, branches, assignedBranchIds]);
 
   // Guard selectedBranchId against out-of-scope branch selection for staff

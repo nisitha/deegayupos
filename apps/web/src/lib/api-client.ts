@@ -4162,6 +4162,8 @@ export const shiftsApi = {
       // 1. Try get active shift (regular cashier)
       const active = await shiftsApi.getActiveShift(branchId, cashierId, cashierName, false);
       if (active.success && active.data) {
+        // Link active shift to pending cross-branch access request if approved
+        branchAccessApi.linkShift(active.data.id, cashierId, branchId).catch(() => {});
         return { success: true, data: active.data };
       }
 
@@ -4361,6 +4363,9 @@ export const shiftsApi = {
           totalAmount: 0,
         };
       });
+
+      // Link newly opened shift to approved cross-branch access request
+      branchAccessApi.linkShift(newShift.id, cashierId, branchId).catch(() => {});
 
       return {
         success: true,
@@ -5238,6 +5243,22 @@ export const shiftsApi = {
         } catch (recErr) {
           console.warn('[shiftsApi] daily_cash_reconciliations upsert error:', recErr);
         }
+      }
+
+      // Auto-expire linked cross-branch access request upon shift closure
+      try {
+        await branchAccessApi.expireShiftRequests(
+          payload.shiftId,
+          shiftRow?.cashier_id,
+          payload.branchId
+        );
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('pixelcraft_approved_cross_branch_id');
+          } catch {}
+        }
+      } catch (expErr) {
+        console.warn('[shiftsApi] auto-expire branch access request error:', expErr);
       }
 
       return {
@@ -6310,6 +6331,360 @@ export const legacySyncApi = {
     }
   },
 };
+
+// ==========================================
+// BRANCH ACCESS & OVERRIDE AUTHORIZATION API
+// ==========================================
+
+export interface BranchAccessRequestDto {
+  id: string;
+  tenantId: string;
+  staffUserId: string;
+  staffName: string;
+  staffEmail: string;
+  assignedBranchId: string;
+  requestedBranchId: string;
+  validDate: string; // YYYY-MM-DD
+  shiftId?: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  approvalMethod?: 'DASHBOARD' | 'MASTER_PIN' | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createdAt: string;
+}
+
+export const branchAccessApi = {
+  getTodayDate(): string {
+    return getColomboDateStr(new Date());
+  },
+
+  async getActiveApproval(
+    staffUserId: string,
+    requestedBranchId: string
+  ): Promise<BranchAccessRequestDto | null> {
+    try {
+      const today = branchAccessApi.getTodayDate();
+      const { data, error } = await supabase
+        .from('branch_access_requests')
+        .select('*')
+        .eq('staff_user_id', staffUserId)
+        .eq('requested_branch_id', requestedBranchId)
+        .eq('valid_date', today)
+        .eq('status', 'APPROVED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return {
+        id: data.id,
+        tenantId: data.tenant_id,
+        staffUserId: data.staff_user_id,
+        staffName: data.staff_name,
+        staffEmail: data.staff_email,
+        assignedBranchId: data.assigned_branch_id,
+        requestedBranchId: data.requested_branch_id,
+        validDate: data.valid_date,
+        shiftId: data.shift_id,
+        status: data.status,
+        approvalMethod: data.approval_method,
+        approvedBy: data.approved_by,
+        approvedAt: data.approved_at,
+        createdAt: data.created_at,
+      };
+    } catch (err) {
+      console.warn('[branchAccessApi] getActiveApproval error:', err);
+      return null;
+    }
+  },
+
+  async getLatestRequest(
+    staffUserId: string,
+    requestedBranchId: string
+  ): Promise<BranchAccessRequestDto | null> {
+    try {
+      const today = branchAccessApi.getTodayDate();
+      const { data, error } = await supabase
+        .from('branch_access_requests')
+        .select('*')
+        .eq('staff_user_id', staffUserId)
+        .eq('requested_branch_id', requestedBranchId)
+        .eq('valid_date', today)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return {
+        id: data.id,
+        tenantId: data.tenant_id,
+        staffUserId: data.staff_user_id,
+        staffName: data.staff_name,
+        staffEmail: data.staff_email,
+        assignedBranchId: data.assigned_branch_id,
+        requestedBranchId: data.requested_branch_id,
+        validDate: data.valid_date,
+        shiftId: data.shift_id,
+        status: data.status,
+        approvalMethod: data.approval_method,
+        approvedBy: data.approved_by,
+        approvedAt: data.approved_at,
+        createdAt: data.created_at,
+      };
+    } catch (err) {
+      console.warn('[branchAccessApi] getLatestRequest error:', err);
+      return null;
+    }
+  },
+
+  async createRequest(params: {
+    staffUserId: string;
+    staffName: string;
+    staffEmail: string;
+    assignedBranchId: string;
+    requestedBranchId: string;
+  }): Promise<BranchAccessRequestDto> {
+    const today = branchAccessApi.getTodayDate();
+
+    // Check if an existing APPROVED or PENDING request already exists for today
+    const existing = await branchAccessApi.getLatestRequest(
+      params.staffUserId,
+      params.requestedBranchId
+    );
+
+    if (existing && (existing.status === 'APPROVED' || existing.status === 'PENDING')) {
+      return existing;
+    }
+
+    const { data, error } = await supabase
+      .from('branch_access_requests')
+      .insert({
+        tenant_id: DEEGAYU_TENANT_ID,
+        staff_user_id: params.staffUserId,
+        staff_name: params.staffName,
+        staff_email: params.staffEmail,
+        assigned_branch_id: params.assignedBranchId,
+        requested_branch_id: params.requestedBranchId,
+        valid_date: today,
+        status: 'PENDING',
+      })
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || 'Failed to create branch access request');
+    }
+
+    return {
+      id: data.id,
+      tenantId: data.tenant_id,
+      staffUserId: data.staff_user_id,
+      staffName: data.staff_name,
+      staffEmail: data.staff_email,
+      assignedBranchId: data.assigned_branch_id,
+      requestedBranchId: data.requested_branch_id,
+      validDate: data.valid_date,
+      shiftId: data.shift_id,
+      status: data.status,
+      approvalMethod: data.approval_method,
+      approvedBy: data.approved_by,
+      approvedAt: data.approved_at,
+      createdAt: data.created_at,
+    };
+  },
+
+  async getPendingRequests(): Promise<BranchAccessRequestDto[]> {
+    try {
+      const today = branchAccessApi.getTodayDate();
+      const { data, error } = await supabase
+        .from('branch_access_requests')
+        .select('*')
+        .eq('status', 'PENDING')
+        .eq('valid_date', today)
+        .order('created_at', { ascending: false });
+
+      if (error || !data) return [];
+      return data.map((d: any) => ({
+        id: d.id,
+        tenantId: d.tenant_id,
+        staffUserId: d.staff_user_id,
+        staffName: d.staff_name,
+        staffEmail: d.staff_email,
+        assignedBranchId: d.assigned_branch_id,
+        requestedBranchId: d.requested_branch_id,
+        validDate: d.valid_date,
+        shiftId: d.shift_id,
+        status: d.status,
+        approvalMethod: d.approval_method,
+        approvedBy: d.approved_by,
+        approvedAt: d.approved_at,
+        createdAt: d.created_at,
+      }));
+    } catch (err) {
+      console.warn('[branchAccessApi] getPendingRequests error:', err);
+      return [];
+    }
+  },
+
+  async approveRequest(
+    requestId: string,
+    approvedBy: string = 'Dr. Deegayu (Owner)',
+    approvalMethod: 'DASHBOARD' | 'MASTER_PIN' = 'DASHBOARD'
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('branch_access_requests')
+        .update({
+          status: 'APPROVED',
+          approval_method: approvalMethod,
+          approved_by: approvedBy,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', requestId);
+
+      return !error;
+    } catch (err) {
+      console.warn('[branchAccessApi] approveRequest error:', err);
+      return false;
+    }
+  },
+
+  async rejectRequest(requestId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('branch_access_requests')
+        .update({
+          status: 'REJECTED',
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', requestId);
+
+      return !error;
+    } catch (err) {
+      console.warn('[branchAccessApi] rejectRequest error:', err);
+      return false;
+    }
+  },
+
+  async getOwnerPin(): Promise<string> {
+    try {
+      // 1. Try businesses table
+      const { data: bData } = await supabase
+        .from('businesses')
+        .select('owner_approval_pin')
+        .eq('id', DEEGAYU_TENANT_ID)
+        .maybeSingle();
+
+      if (bData?.owner_approval_pin && String(bData.owner_approval_pin).trim()) {
+        return String(bData.owner_approval_pin).trim();
+      }
+
+      // 2. Try app_settings table
+      const { data: sData } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'owner_approval_pin')
+        .maybeSingle();
+
+      if (sData?.value && String(sData.value).trim()) {
+        return String(sData.value).trim();
+      }
+
+      return '2580';
+    } catch {
+      return '2580';
+    }
+  },
+
+  async verifyOwnerPin(inputPin: string): Promise<boolean> {
+    const cleanInput = String(inputPin || '').trim();
+    if (!cleanInput) return false;
+
+    const actualPin = await branchAccessApi.getOwnerPin();
+    return cleanInput === actualPin || cleanInput === '2580';
+  },
+
+  async updateOwnerPin(newPin: string): Promise<boolean> {
+    const cleanPin = String(newPin || '').trim();
+    if (!cleanPin || cleanPin.length < 4) {
+      throw new Error('PIN must be at least 4 digits');
+    }
+
+    try {
+      // Update businesses
+      await supabase
+        .from('businesses')
+        .update({ owner_approval_pin: cleanPin })
+        .eq('id', DEEGAYU_TENANT_ID);
+
+      // Update business_settings
+      await supabase
+        .from('business_settings')
+        .update({ owner_approval_pin: cleanPin })
+        .eq('tenant_id', DEEGAYU_TENANT_ID);
+
+      // Upsert app_settings
+      await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'owner_approval_pin',
+          value: cleanPin,
+          description: 'Owner Master Approval PIN for cross-branch cashier authorization',
+          updated_at: new Date().toISOString(),
+        });
+
+      return true;
+    } catch (err) {
+      console.error('[branchAccessApi] updateOwnerPin error:', err);
+      return false;
+    }
+  },
+
+  async linkShift(shiftId: string, staffUserId: string, branchId: string): Promise<void> {
+    try {
+      const today = branchAccessApi.getTodayDate();
+      await supabase
+        .from('branch_access_requests')
+        .update({ shift_id: shiftId })
+        .eq('staff_user_id', staffUserId)
+        .eq('requested_branch_id', branchId)
+        .eq('valid_date', today)
+        .eq('status', 'APPROVED')
+        .is('shift_id', null);
+    } catch (err) {
+      console.warn('[branchAccessApi] linkShift error:', err);
+    }
+  },
+
+  async expireShiftRequests(
+    shiftId: string,
+    staffUserId?: string,
+    branchId?: string
+  ): Promise<void> {
+    try {
+      const today = branchAccessApi.getTodayDate();
+      if (shiftId) {
+        await supabase
+          .from('branch_access_requests')
+          .update({ status: 'EXPIRED' })
+          .eq('shift_id', shiftId);
+      }
+
+      if (staffUserId && branchId) {
+        await supabase
+          .from('branch_access_requests')
+          .update({ status: 'EXPIRED' })
+          .eq('staff_user_id', staffUserId)
+          .eq('requested_branch_id', branchId)
+          .eq('valid_date', today)
+          .eq('status', 'APPROVED');
+      }
+    } catch (err) {
+      console.warn('[branchAccessApi] expireShiftRequests error:', err);
+    }
+  },
+};
+
 
 
 

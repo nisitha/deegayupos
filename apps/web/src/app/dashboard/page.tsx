@@ -29,6 +29,8 @@ import {
   Flame,
   ShieldAlert,
   Search,
+  KeyRound,
+  Check,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -46,7 +48,7 @@ import {
 } from 'recharts';
 import type { DashboardActivityItem } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi, legacySyncApi, procurementApi, getColomboDateStr, type LegacySyncConfigDto } from '../../lib/api-client';
+import { dashboardApi, legacySyncApi, procurementApi, getColomboDateStr, branchAccessApi, type LegacySyncConfigDto, type BranchAccessRequestDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
 import { useRealtimePosSync } from '../../hooks/use-realtime-pos-sync';
 import { supabase } from '../../lib/supabase';
@@ -924,6 +926,125 @@ export default function DashboardPage() {
   const [syncConfig, setSyncConfig] = useState<LegacySyncConfigDto | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
+
+  // Cross-Branch Cashier Access Requests & Master PIN State
+  const [pendingBranchRequests, setPendingBranchRequests] = useState<BranchAccessRequestDto[]>([]);
+  const [isApprovingRequestId, setIsApprovingRequestId] = useState<string | null>(null);
+  const [isRejectingRequestId, setIsRejectingRequestId] = useState<string | null>(null);
+  const [branchRequestToast, setBranchRequestToast] = useState<string | null>(null);
+
+  // Master PIN Manager Modal State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [ownerPinCurrent, setOwnerPinCurrent] = useState('2580');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [pinUpdateLoading, setPinUpdateLoading] = useState(false);
+  const [pinUpdateMessage, setPinUpdateMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchBranchAccessRequests = useCallback(async () => {
+    try {
+      const requests = await branchAccessApi.getPendingRequests();
+      setPendingBranchRequests(requests);
+    } catch (e) {
+      console.warn('[Dashboard] fetchBranchAccessRequests error:', e);
+    }
+  }, []);
+
+  const fetchCurrentOwnerPin = useCallback(async () => {
+    try {
+      const pin = await branchAccessApi.getOwnerPin();
+      setOwnerPinCurrent(pin);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchBranchAccessRequests();
+    fetchCurrentOwnerPin();
+
+    // Supabase Realtime subscription on branch_access_requests
+    const channel = supabase
+      .channel('owner-branch-access-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'branch_access_requests' },
+        () => {
+          fetchBranchAccessRequests();
+        }
+      )
+      .subscribe();
+
+    // High-reliability 5-second polling fallback
+    const interval = setInterval(() => {
+      fetchBranchAccessRequests();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchBranchAccessRequests, fetchCurrentOwnerPin]);
+
+  const handleApproveBranchAccess = async (reqId: string, staffName: string, requestedBranchId: string) => {
+    setIsApprovingRequestId(reqId);
+    try {
+      const success = await branchAccessApi.approveRequest(reqId, 'Dr. Deegayu (Owner)', 'DASHBOARD');
+      if (success) {
+        setPendingBranchRequests((prev) => prev.filter((r) => r.id !== reqId));
+        const branchName = BRANCH_MAP[requestedBranchId] || 'Branch';
+        setBranchRequestToast(`Access APPROVED for ${staffName} to operate at ${branchName}.`);
+        setTimeout(() => setBranchRequestToast(null), 4000);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to approve request');
+    } finally {
+      setIsApprovingRequestId(null);
+    }
+  };
+
+  const handleRejectBranchAccess = async (reqId: string, staffName: string) => {
+    setIsRejectingRequestId(reqId);
+    try {
+      const success = await branchAccessApi.rejectRequest(reqId);
+      if (success) {
+        setPendingBranchRequests((prev) => prev.filter((r) => r.id !== reqId));
+        setBranchRequestToast(`Access DECLINED for ${staffName}.`);
+        setTimeout(() => setBranchRequestToast(null), 4000);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to decline request');
+    } finally {
+      setIsRejectingRequestId(null);
+    }
+  };
+
+  const handleUpdateOwnerPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = newPinInput.trim();
+    if (!cleanPin || cleanPin.length < 4) {
+      setPinUpdateMessage({ text: 'PIN must be at least 4 digits', type: 'error' });
+      return;
+    }
+
+    setPinUpdateLoading(true);
+    setPinUpdateMessage(null);
+    try {
+      const ok = await branchAccessApi.updateOwnerPin(cleanPin);
+      if (ok) {
+        setOwnerPinCurrent(cleanPin);
+        setNewPinInput('');
+        setPinUpdateMessage({ text: 'Owner Master PIN updated successfully!', type: 'success' });
+        setTimeout(() => {
+          setIsPinModalOpen(false);
+          setPinUpdateMessage(null);
+        }, 1500);
+      } else {
+        setPinUpdateMessage({ text: 'Failed to update PIN in database.', type: 'error' });
+      }
+    } catch (err: any) {
+      setPinUpdateMessage({ text: err?.message || 'Failed to update PIN.', type: 'error' });
+    } finally {
+      setPinUpdateLoading(false);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -2098,6 +2219,18 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-2.5">
             <button
+              onClick={() => {
+                setIsPinModalOpen(true);
+                fetchCurrentOwnerPin();
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-300 text-xs font-semibold text-amber-900 hover:bg-amber-100 shadow-2xs transition-colors cursor-pointer"
+              title="Manage Owner Master PIN for cross-branch cashier access authorization"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-700" />
+              <span>Override PIN: <strong className="font-mono text-amber-950 font-bold">{ownerPinCurrent || '2580'}</strong></span>
+            </button>
+
+            <button
               onClick={() => fetchExecutiveData({ forceRefresh: true, silent: false })}
               disabled={loading || isNavigatingRange}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
@@ -2118,6 +2251,113 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* TOAST NOTIFICATION FOR BRANCH REQUEST ACTIONS */}
+        {branchRequestToast && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center justify-between shadow-sm animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{branchRequestToast}</span>
+            </div>
+            <button onClick={() => setBranchRequestToast(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* LIVE PENDING CROSS-BRANCH ACCESS REQUESTS ALERT */}
+        {pendingBranchRequests.length > 0 && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-400/80 text-amber-950 shadow-md animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-amber-300/60">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-amber-500/20 text-amber-800 shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 animate-bounce" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Cashier Cross-Branch Access Request
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                      {pendingBranchRequests.length} Pending
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    A staff member is requesting authorization to open a register shift at an unassigned shop today.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPinModalOpen(true);
+                  fetchCurrentOwnerPin();
+                }}
+                className="self-start sm:self-auto text-xs font-bold text-amber-900 hover:text-amber-950 underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Master PIN ({ownerPinCurrent})</span>
+              </button>
+            </div>
+
+            <div className="mt-3.5 divide-y divide-amber-200/80">
+              {pendingBranchRequests.map((req) => {
+                const assignedName = BRANCH_MAP[req.assignedBranchId] || 'Alawwa';
+                const requestedName = BRANCH_MAP[req.requestedBranchId] || 'Requested Shop';
+                const isApproving = isApprovingRequestId === req.id;
+                const isRejecting = isRejectingRequestId === req.id;
+
+                return (
+                  <div key={req.id} className="pt-3 pb-2 first:pt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs text-slate-900">{req.staffName}</span>
+                        <span className="text-[11px] text-slate-500 font-mono">({req.staffEmail})</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-white/80 border border-amber-300 text-amber-900">
+                          Today: {req.validDate}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-700 flex items-center gap-2 flex-wrap">
+                        <span>Permanent: <strong className="font-semibold text-slate-800">{assignedName}</strong></span>
+                        <span className="text-slate-400">&rarr;</span>
+                        <span>Requesting Terminal at: <strong className="font-bold text-indigo-700">{requestedName}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <button
+                        type="button"
+                        disabled={isApproving || isRejecting}
+                        onClick={() => handleApproveBranchAccess(req.id, req.staffName, req.requestedBranchId)}
+                        className="py-1.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        {isApproving ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>Approve Access</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isApproving || isRejecting}
+                        onClick={() => handleRejectBranchAccess(req.id, req.staffName)}
+                        className="py-1.5 px-3 rounded-xl bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 disabled:opacity-50 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        {isRejecting ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-600" />
+                        ) : (
+                          <X className="w-3.5 h-3.5 text-rose-600" />
+                        )}
+                        <span>Decline</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Date Filter Pills Row */}
         <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -4040,6 +4280,101 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* OWNER MASTER PIN OVERRIDE MODAL */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-amber-100 text-amber-800">
+                  <KeyRound className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Branch Override Master PIN</h3>
+                  <p className="text-[11px] text-slate-500">Cross-branch terminal authorization code</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPinModalOpen(false);
+                  setPinUpdateMessage(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Current Master PIN:</span>
+                  <span className="font-mono font-bold text-base text-slate-900 tracking-wider bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                    {ownerPinCurrent || '2580'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Cashiers can unlock cross-branch shifts instantly by entering this PIN at the login gate if Dr. Deegayu authorizes them via phone.
+                </p>
+              </div>
+
+              {pinUpdateMessage && (
+                <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+                  pinUpdateMessage.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}>
+                  <span>{pinUpdateMessage.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleUpdateOwnerPin} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Set New Master PIN (4 to 8 digits)
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={8}
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value)}
+                    placeholder="Enter new 4-8 digit PIN"
+                    className="w-full px-3.5 py-2.5 text-center text-base font-bold tracking-widest bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-mono"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPinModalOpen(false);
+                      setPinUpdateMessage(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={pinUpdateLoading || !newPinInput.trim()}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {pinUpdateLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <span>Update Master PIN</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </MotionPageShell>
   );
 }
