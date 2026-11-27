@@ -61,6 +61,31 @@ export const BRANCH_CODES: Record<string, string> = {
 export const DEFAULT_TENANT_ID = '0fef1423-5d89-4147-8af8-17c7e641c88a';
 export const DEFAULT_OWNER_ID = '96b2747b-9d22-4266-94ce-b035fadef498';
 
+/**
+ * Normalizes spelling variants across product names and search queries.
+ * Normalizes common catalog variants such as "bandage" <-> "bandege".
+ */
+export function normalizeCatalogSearch(term: string): string {
+  return (term || '')
+    .toLowerCase()
+    .trim()
+    .replace(/band[ae]ge/gi, 'bandage');
+}
+
+export function matchesCatalogSearch(text: string, query: string): boolean {
+  if (!query) return true;
+  const normText = normalizeCatalogSearch(text);
+  const normQ = normalizeCatalogSearch(query);
+
+  if (normText.includes(normQ)) return true;
+
+  const tokens = normQ.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    return tokens.every((token) => normText.includes(token));
+  }
+  return false;
+}
+
 // ============================================================================
 // DATA TYPES
 // ============================================================================
@@ -257,12 +282,25 @@ export const transfersApi = {
       const damWh = BRANCH_ID_TO_WAREHOUSE['fa68e4a0-a515-44c8-a082-5b5590366658'];
       const girWh = BRANCH_ID_TO_WAREHOUSE['197693d6-4247-48df-b614-6fcde9e34f7d'];
 
+      const normQ = normalizeCatalogSearch(q);
+      const qTokens = normQ.split(/\s+/).filter(Boolean);
+
       const allProducts = (prodRes.data || []).filter((p: any) => {
-        if (!q) return true;
-        const name = (p.name || '').toLowerCase();
-        const sku = (p.sku || '').toLowerCase();
-        const barcode = (p.barcode || '').toLowerCase();
-        return name.includes(q) || sku.includes(q) || barcode.includes(q);
+        if (!normQ) return true;
+        const normName = normalizeCatalogSearch(p.name || '');
+        const normSku = normalizeCatalogSearch(p.sku || '');
+        const normBarcode = (p.barcode || '').toLowerCase().trim();
+
+        if (normName.includes(normQ) || normSku.includes(normQ) || normBarcode.includes(normQ)) {
+          return true;
+        }
+
+        if (qTokens.length > 1) {
+          const combined = `${normName} ${normSku} ${normBarcode}`;
+          return qTokens.every((token) => combined.includes(token));
+        }
+
+        return false;
       });
 
       return allProducts.map((p: any) => {
@@ -951,15 +989,16 @@ async function executeDeductionFromSource(
     if (qty <= 0) continue;
 
     // 1. Deduct from stock_levels
-    const { data: sourceStockRow } = await supabase
+    const { data: sourceStockRows } = await supabase
       .from('stock_levels')
       .select('id, quantity_on_hand')
       .eq('warehouse_id', sourceWarehouseId)
       .eq('product_id', item.product_id)
-      .maybeSingle();
+      .order('updated_at', { ascending: false });
 
-    if (sourceStockRow?.id) {
-      const currentSourceQty = Number(sourceStockRow.quantity_on_hand || 0);
+    const primaryRow = sourceStockRows && sourceStockRows.length > 0 ? sourceStockRows[0] : null;
+    if (primaryRow) {
+      const currentSourceQty = Number(primaryRow.quantity_on_hand || 0);
       const newSourceQty = Math.max(0, currentSourceQty - qty);
 
       await supabase
@@ -969,7 +1008,18 @@ async function executeDeductionFromSource(
           branch_id: fromBranchId || null,
           updated_at: nowIso,
         })
-        .eq('id', sourceStockRow.id);
+        .eq('id', primaryRow.id);
+    } else {
+      await supabase.from('stock_levels').insert({
+        tenant_id: DEFAULT_TENANT_ID,
+        warehouse_id: sourceWarehouseId,
+        branch_id: fromBranchId || null,
+        product_id: item.product_id,
+        quantity_on_hand: 0,
+        quantity_reserved: 0,
+        reorder_point: 5,
+        updated_at: nowIso,
+      });
     }
 
     // 2. If special item and sending branch has active shift, sync shift_modaka_entries
@@ -1020,15 +1070,16 @@ async function executeAdditionToTarget(
     if (qty <= 0) continue;
 
     // 1. Add to stock_levels
-    const { data: targetStockRow } = await supabase
+    const { data: targetStockRows } = await supabase
       .from('stock_levels')
       .select('id, quantity_on_hand')
       .eq('warehouse_id', targetWarehouseId)
       .eq('product_id', item.product_id)
-      .maybeSingle();
+      .order('updated_at', { ascending: false });
 
-    if (targetStockRow?.id) {
-      const currentTargetQty = Number(targetStockRow.quantity_on_hand || 0);
+    const primaryRow = targetStockRows && targetStockRows.length > 0 ? targetStockRows[0] : null;
+    if (primaryRow) {
+      const currentTargetQty = Number(primaryRow.quantity_on_hand || 0);
       const newTargetQty = currentTargetQty + qty;
 
       await supabase
@@ -1038,7 +1089,7 @@ async function executeAdditionToTarget(
           branch_id: toBranchId || null,
           updated_at: nowIso,
         })
-        .eq('id', targetStockRow.id);
+        .eq('id', primaryRow.id);
     } else {
       await supabase.from('stock_levels').insert({
         tenant_id: DEFAULT_TENANT_ID,

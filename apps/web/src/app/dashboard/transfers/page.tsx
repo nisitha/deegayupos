@@ -26,6 +26,7 @@ import { useTenantBranch } from '../../../context/tenant-branch-context';
 import {
   transfersApi,
   ACTIVE_BRANCHES,
+  matchesCatalogSearch,
   type StockTransfer,
   type CrossBranchProductItem,
   type CreateTransferItemPayload,
@@ -210,25 +211,20 @@ export default function StockTransfersPage() {
     return ACTIVE_BRANCHES.find((b) => b.id === targetBranchId)?.name || 'My Branch';
   }, [targetBranchId]);
 
-  // Add Item to Transfer Request List
+  // Add Item to Transfer Request List (Supports Physical Stock Override when Source System Stock is 0 u)
   const handleAddItemToRequest = (item: CrossBranchProductItem, selectedFromBranchId?: string) => {
     const fromId = selectedFromBranchId || sourceBranchId;
     if (fromId !== sourceBranchId) {
       setSourceBranchId(fromId);
     }
 
-    const availableAtSource = (item.availability as any)[fromId] || 0;
-    if (availableAtSource <= 0) {
-      alert(`${item.name} is currently out of stock at ${ACTIVE_BRANCHES.find((b) => b.id === fromId)?.name || 'selected branch'} (Available: 0).`);
-      return;
-    }
+    const availableAtSource = Number((item.availability as any)[fromId] || 0);
 
     setRequestedItems((prev) => {
       const existing = prev.find((it) => it.product_id === item.id);
       if (existing) {
-        const nextQty = Math.min(availableAtSource, existing.quantity + 1);
         return prev.map((it) =>
-          it.product_id === item.id ? { ...it, quantity: nextQty } : it
+          it.product_id === item.id ? { ...it, quantity: it.quantity + 1 } : it
         );
       }
       return [
@@ -246,11 +242,10 @@ export default function StockTransfersPage() {
     });
   };
 
-  // Update item quantity in request builder
-  const handleRequestQuantityChange = (productId: string, valStr: string, maxStock: number) => {
+  // Update item quantity in request builder (allows physical stock override)
+  const handleRequestQuantityChange = (productId: string, valStr: string) => {
     const val = parseInt(valStr, 10);
-    let validQty = isNaN(val) || val <= 0 ? 1 : val;
-    if (validQty > maxStock) validQty = maxStock;
+    const validQty = isNaN(val) || val <= 0 ? 1 : val;
 
     setRequestedItems((prev) =>
       prev.map((it) => (it.product_id === productId ? { ...it, quantity: validQty } : it))
@@ -445,7 +440,12 @@ export default function StockTransfersPage() {
           t.to_branch_name.toLowerCase().includes(q) ||
           t.requested_by_name.toLowerCase().includes(q) ||
           (t.notes && t.notes.toLowerCase().includes(q)) ||
-          t.items.some((it) => it.product_name.toLowerCase().includes(q) || (it.sku && it.sku.toLowerCase().includes(q)))
+          t.items.some(
+            (it) =>
+              it.product_name.toLowerCase().includes(q) ||
+              (it.sku && it.sku.toLowerCase().includes(q)) ||
+              matchesCatalogSearch(it.product_name, q)
+          )
       );
     }
 
@@ -1080,28 +1080,43 @@ export default function StockTransfersPage() {
                           {/* 3-Branch Matrix Badges */}
                           <div className="flex items-center gap-2 flex-wrap">
                             {/* Alawwa */}
-                            <div className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 min-w-[76px]">
+                            <button
+                              type="button"
+                              onClick={() => handleAddItemToRequest(item, '00f4cdcb-7d1c-4026-b57a-6e66c33b0c54')}
+                              title="Click to request from Alawwa"
+                              className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 min-w-[76px] transition-colors cursor-pointer"
+                            >
                               <span className="text-[9px] font-bold text-slate-500 uppercase block">Alawwa</span>
                               <span className={`text-xs font-mono font-bold ${alawwaStock > 0 ? 'text-blue-700' : 'text-slate-400'}`}>
                                 {alawwaStock} u
                               </span>
-                            </div>
+                            </button>
 
                             {/* Dambadeniya */}
-                            <div className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 min-w-[76px]">
+                            <button
+                              type="button"
+                              onClick={() => handleAddItemToRequest(item, 'fa68e4a0-a515-44c8-a082-5b5590366658')}
+                              title="Click to request from Dambadeniya"
+                              className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 min-w-[76px] transition-colors cursor-pointer"
+                            >
                               <span className="text-[9px] font-bold text-slate-500 uppercase block">Dambadeniya</span>
                               <span className={`text-xs font-mono font-bold ${damStock > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
                                 {damStock} u
                               </span>
-                            </div>
+                            </button>
 
                             {/* Giriulla */}
-                            <div className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 min-w-[76px]">
+                            <button
+                              type="button"
+                              onClick={() => handleAddItemToRequest(item, '197693d6-4247-48df-b614-6fcde9e34f7d')}
+                              title="Click to request from Giriulla"
+                              className="text-center p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 min-w-[76px] transition-colors cursor-pointer"
+                            >
                               <span className="text-[9px] font-bold text-slate-500 uppercase block">Giriulla</span>
                               <span className={`text-xs font-mono font-bold ${girStock > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
                                 {girStock} u
                               </span>
-                            </div>
+                            </button>
 
                             {/* 1-Click Request Action Button */}
                             <button
@@ -1133,51 +1148,65 @@ export default function StockTransfersPage() {
 
                 <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden shadow-2xs">
                   {requestedItems.length > 0 ? (
-                    requestedItems.map((item) => (
-                      <div key={item.product_id} className="p-3.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
-                              {item.product_name}
-                            </span>
-                            {item.is_special_stock && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
-                                Special Item
+                    requestedItems.map((item) => {
+                      const isOverride = item.sourceStock <= 0 || item.quantity > item.sourceStock;
+                      return (
+                        <div key={item.product_id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                {item.product_name}
                               </span>
-                            )}
-                          </div>
-                          <span className="font-mono text-[11px] text-slate-500 block mt-0.5">
-                            SKU: {item.sku || 'N/A'} • Available at {sourceBranchName}: <strong className="text-emerald-700 font-bold">{item.sourceStock} units</strong>
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-500">Qty:</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={item.sourceStock}
-                              step={1}
-                              value={item.quantity}
-                              onChange={(e) =>
-                                handleRequestQuantityChange(item.product_id, e.target.value, item.sourceStock)
-                              }
-                              className="w-16 h-8 text-center font-mono font-bold text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-blue-600"
-                            />
-                            <span className="text-xs text-slate-400 font-mono">/ {item.sourceStock}</span>
+                              {item.is_special_stock && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                  Special Item
+                                </span>
+                              )}
+                              {isOverride && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                                  <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>System stock: {item.sourceStock} u (Physical stock override)</span>
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-[11px] text-slate-500 block mt-0.5">
+                              SKU: {item.sku || 'N/A'} • Available at {sourceBranchName}:{' '}
+                              <strong className={item.sourceStock > 0 ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold'}>
+                                {item.sourceStock} units
+                              </strong>
+                            </span>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRequestedItem(item.product_id)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-500">Qty:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleRequestQuantityChange(item.product_id, e.target.value)
+                                }
+                                className="w-16 h-8 text-center font-mono font-bold text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-blue-600"
+                              />
+                              <span className="text-xs text-slate-400 font-mono">
+                                / {item.sourceStock > 0 ? `${item.sourceStock} u` : '0 u'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRequestedItem(item.product_id)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="p-8 text-center text-slate-400 text-xs">
                       Search and click &ldquo;Add to Request&rdquo; above to add products to your transfer list.
@@ -1292,10 +1321,19 @@ export default function StockTransfersPage() {
                 <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden">
                   {dispatchingTransfer.items.map((it) => {
                     const currentApproved = approvedQuantities[it.id] ?? it.quantity_requested;
+                    const isOverride = it.source_stock_on_hand <= 0 || currentApproved > it.source_stock_on_hand;
                     return (
                       <div key={it.id} className="p-3 flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <span className="font-bold text-slate-900 block truncate">{it.product_name}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 block truncate">{it.product_name}</span>
+                            {isOverride && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                                <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                                <span>System stock: {it.source_stock_on_hand} u (Physical stock override)</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] text-slate-400 font-mono">
                             SKU: {it.sku || 'N/A'} • Available: {it.source_stock_on_hand} units
                           </span>
@@ -1306,7 +1344,6 @@ export default function StockTransfersPage() {
                           <input
                             type="number"
                             min={1}
-                            max={it.source_stock_on_hand}
                             step={1}
                             value={currentApproved}
                             onChange={(e) => {
