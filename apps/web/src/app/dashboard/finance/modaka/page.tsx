@@ -798,7 +798,7 @@ export default function ModakaLedgerPage() {
       {/* 11:00 PM SPECIAL BALANCE CONSOLIDATED 3-BRANCH MATRIX CARD (OWNER VIEW) */}
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden break-inside-avoid print:border-slate-300">
         {/* Card Header & Controls Bar */}
-        <div className="px-6 py-4.5 bg-gradient-to-r from-slate-950 via-purple-950 to-indigo-950 text-white flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div className="p-4 sm:px-6 sm:py-4.5 bg-gradient-to-r from-slate-950 via-purple-950 to-indigo-950 text-white flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/30 shrink-0">
               <Clock className="w-5 h-5 text-amber-300" />
@@ -823,13 +823,13 @@ export default function ModakaLedgerPage() {
           </div>
 
           {/* Controls: Date Picker, Quick Toggles, Sorting, and 1-Tap Copy */}
-          <div className="flex items-center gap-2 flex-wrap print:hidden">
+          <div className="flex flex-wrap items-center gap-2 print:hidden w-full lg:w-auto">
             {/* Quick Date Toggles: Today / Yesterday */}
-            <div className="inline-flex rounded-xl bg-white/10 p-0.5 border border-white/15">
+            <div className="inline-flex rounded-xl bg-white/10 p-0.5 border border-white/15 min-h-[38px] items-center">
               <button
                 type="button"
                 onClick={() => setMatrixDate(getTodaySriLanka())}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                   matrixDate === getTodaySriLanka()
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'text-slate-200 hover:text-white hover:bg-white/10'
@@ -840,7 +840,7 @@ export default function ModakaLedgerPage() {
               <button
                 type="button"
                 onClick={() => setMatrixDate(getYesterdaySriLanka())}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer min-h-[32px] ${
                   matrixDate === getYesterdaySriLanka()
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'text-slate-200 hover:text-white hover:bg-white/10'
@@ -851,11 +851,11 @@ export default function ModakaLedgerPage() {
             </div>
 
             {/* Date Navigator */}
-            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/15">
+            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/15 min-h-[38px]">
               <button
                 type="button"
                 onClick={() => shiftMatrixDateBy(-1)}
-                className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
                 title="Previous Day"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -864,12 +864,12 @@ export default function ModakaLedgerPage() {
                 type="date"
                 value={matrixDate}
                 onChange={(e) => setMatrixDate(e.target.value)}
-                className="px-2 py-0.5 text-xs font-bold font-mono bg-transparent text-white border-none focus:outline-none cursor-pointer"
+                className="px-2 py-1 text-xs font-bold font-mono bg-transparent text-white border-none focus:outline-none cursor-pointer"
               />
               <button
                 type="button"
                 onClick={() => shiftMatrixDateBy(1)}
-                className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
                 title="Next Day"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -877,11 +877,11 @@ export default function ModakaLedgerPage() {
             </div>
 
             {/* Sorting Dropdown */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <select
                 value={matrixSort}
                 onChange={(e) => setMatrixSort(e.target.value as any)}
-                className="px-3 py-1.5 text-xs font-bold bg-white/10 border border-white/20 rounded-xl text-slate-200 focus:outline-none focus:bg-slate-900 cursor-pointer"
+                className="w-full sm:w-auto px-3 py-2 text-xs font-bold bg-white/10 border border-white/20 rounded-xl text-slate-200 focus:outline-none focus:bg-slate-900 cursor-pointer min-h-[38px]"
               >
                 <option value="canonical" className="bg-slate-900 text-white">Canonical Order (1 → 7)</option>
                 <option value="stock_desc" className="bg-slate-900 text-white">Highest Total Stock (High → Low)</option>
@@ -895,7 +895,7 @@ export default function ModakaLedgerPage() {
               type="button"
               onClick={handleCopyMatrixReport}
               disabled={!matrixData || sortedMatrixItems.length === 0}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer shadow-xs ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer shadow-xs min-h-[38px] ${
                 copiedReport
                   ? 'bg-emerald-600 text-white border-emerald-500'
                   : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
@@ -928,207 +928,401 @@ export default function ModakaLedgerPage() {
             No Special Stock configurations found.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-[#0F172A] text-white uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
-                <tr>
-                  {/* Column 1: # */}
-                  <th className="py-3 px-3 text-center w-10">#</th>
+          <>
+            {/* ============================================================== */}
+            {/* 1. MOBILE CARD-MATRIX VIEW (block md:hidden) — ZERO HORIZONTAL SCROLLING */}
+            {/* ============================================================== */}
+            <div className="block md:hidden">
+              {/* Branch Status Strip (Top of Mobile List) */}
+              <div className="p-3 bg-slate-900 border-b border-slate-800 grid grid-cols-3 gap-2 text-center">
+                {/* Giriulla */}
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] font-black uppercase text-purple-300 block tracking-wider">Giriulla</span>
+                  <span className="text-[11px] font-medium text-slate-200 block truncate mt-0.5" title={matrixData.branches.giriulla.subtitle}>
+                    {matrixData.branches.giriulla.subtitle}
+                  </span>
+                  {matrixData.branches.giriulla.isCarriedForward && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                      Carried Forward
+                    </span>
+                  )}
+                </div>
 
-                  {/* Column 2: Special Item */}
-                  <th className="py-3 px-4 min-w-[220px]">
-                    <div>Special Item (Canonical 1–7)</div>
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">Catalog Variety & Standard Rate</div>
-                  </th>
+                {/* Dambadeniya */}
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] font-black uppercase text-purple-300 block tracking-wider">Dambadeniya</span>
+                  <span className="text-[11px] font-medium text-slate-200 block truncate mt-0.5" title={matrixData.branches.dambadeniya.subtitle}>
+                    {matrixData.branches.dambadeniya.subtitle}
+                  </span>
+                  {matrixData.branches.dambadeniya.isCarriedForward && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                      Carried Forward
+                    </span>
+                  )}
+                </div>
 
-                  {/* Column 3: Giriulla */}
-                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-x border-slate-800">
-                    <div className="font-extrabold text-white text-xs">Giriulla</div>
-                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
-                      {matrixData.branches.giriulla.subtitle}
-                    </div>
-                    {matrixData.branches.giriulla.isCarriedForward && (
-                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                        Carried Forward
-                      </span>
-                    )}
-                  </th>
+                {/* Alawwa */}
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] font-black uppercase text-purple-300 block tracking-wider">Alawwa</span>
+                  <span className="text-[11px] font-medium text-slate-200 block truncate mt-0.5" title={matrixData.branches.alawwa.subtitle}>
+                    {matrixData.branches.alawwa.subtitle}
+                  </span>
+                  {matrixData.branches.alawwa.isCarriedForward && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                      Carried Forward
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                  {/* Column 4: Dambadeniya */}
-                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-r border-slate-800">
-                    <div className="font-extrabold text-white text-xs">Dambadeniya</div>
-                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
-                      {matrixData.branches.dambadeniya.subtitle}
-                    </div>
-                    {matrixData.branches.dambadeniya.isCarriedForward && (
-                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                        Carried Forward
-                      </span>
-                    )}
-                  </th>
-
-                  {/* Column 5: Alawwa */}
-                  <th className="py-3 px-4 text-center w-36 bg-slate-900 border-r border-slate-800">
-                    <div className="font-extrabold text-white text-xs">Alawwa</div>
-                    <div className="text-[10px] font-normal text-purple-300 truncate max-w-[140px] mx-auto mt-0.5">
-                      {matrixData.branches.alawwa.subtitle}
-                    </div>
-                    {matrixData.branches.alawwa.isCarriedForward && (
-                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                        Carried Forward
-                      </span>
-                    )}
-                  </th>
-
-                  {/* Column 6: All 3 Total */}
-                  <th className="py-3 px-4 text-center w-40 bg-gradient-to-r from-purple-950 to-indigo-950 text-white border-l border-purple-800">
-                    <div className="font-extrabold text-xs text-amber-300">All 3 Total</div>
-                    <div className="text-[10px] font-normal text-purple-200 mt-0.5">
-                      Combined Balance
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-sans">
+              {/* 7 Item Cards (#1 to #7) */}
+              <div className="p-3 space-y-3">
                 {sortedMatrixItems.map((item) => (
-                  <tr key={item.productId} className="hover:bg-slate-50/80 transition-colors">
-                    {/* # */}
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-400 font-mono">
-                      #{item.rank}
-                    </td>
+                  <div key={item.productId} className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/90 shadow-2xs">
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-900 text-white font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          #{item.rank}
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900 tracking-tight leading-snug">
+                            {item.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                              {item.sku}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              Rate: LKR {item.rate}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                    {/* Special Item */}
-                    <td className="py-2.5 px-4">
-                      <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                        <span>{item.name}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-50 text-purple-700 border border-purple-200">
-                          {item.sku}
+                      {/* Total Units & Value Pill */}
+                      <div className="text-right shrink-0">
+                        <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-xl bg-purple-600 text-white font-mono font-black text-xs shadow-xs">
+                          {item.totalUnits} units
+                        </span>
+                        <span className="block text-[10px] font-mono font-bold text-purple-900 mt-0.5">
+                          LKR {item.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Standard Selling Rate: LKR {item.rate}
-                      </span>
-                    </td>
+                    </div>
 
-                    {/* Giriulla */}
-                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-x border-slate-100">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
-                          item.giriulla > 50
-                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
-                            : item.giriulla > 0
-                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
-                            : 'bg-rose-50 text-rose-900 ring-rose-200'
-                        }`}
-                      >
-                        {item.giriulla}
-                      </span>
-                    </td>
+                    {/* 3-Column Branch Grid */}
+                    <div className="grid grid-cols-3 gap-2 mt-2.5">
+                      {/* 1. Giriulla */}
+                      <div className={`p-2 rounded-xl text-center border ${
+                        item.giriulla > 0
+                          ? 'bg-white border-slate-200 shadow-2xs'
+                          : 'bg-rose-50/70 border-rose-200'
+                      }`}>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Giriulla</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          item.giriulla > 0 ? 'text-slate-900' : 'text-rose-600'
+                        }`}>
+                          {item.giriulla}
+                        </span>
+                      </div>
 
-                    {/* Dambadeniya */}
-                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-r border-slate-100">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
-                          item.dambadeniya > 50
-                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
-                            : item.dambadeniya > 0
-                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
-                            : 'bg-rose-50 text-rose-900 ring-rose-200'
+                      {/* 2. Dambadeniya */}
+                      <div className={`p-2 rounded-xl text-center border ${
+                        item.dambadeniya > 0
+                          ? 'bg-white border-slate-200 shadow-2xs'
+                          : 'bg-rose-50/70 border-rose-200'
+                      }`}>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Dambadeniya</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          item.dambadeniya > 0 ? 'text-slate-900' : 'text-rose-600'
+                        }`}>
+                          {item.dambadeniya}
+                        </span>
+                      </div>
+
+                      {/* 3. Alawwa */}
+                      <div className={`p-2 rounded-xl text-center border ${
+                        item.alawwa > 0
+                          ? 'bg-white border-slate-200 shadow-2xs'
+                          : 'bg-rose-50/70 border-rose-200'
+                      }`}>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Alawwa</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          item.alawwa > 0 ? 'text-slate-900' : 'text-rose-600'
+                        }`}>
+                          {item.alawwa}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mobile Bottom Grand Totals Card */}
+              <div className="p-3.5 bg-slate-100 border-t-2 border-slate-300 space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs font-black uppercase text-slate-900 tracking-wide">
+                    11:00 PM Grand Totals
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {/* Giriulla */}
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Giriulla</span>
+                    <span className="text-sm font-black font-mono text-slate-900 block mt-0.5">
+                      {matrixData.branches.giriulla.totalUnits.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500 block truncate">
+                      LKR {matrixData.branches.giriulla.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+
+                  {/* Dambadeniya */}
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Dambadeniya</span>
+                    <span className="text-sm font-black font-mono text-slate-900 block mt-0.5">
+                      {matrixData.branches.dambadeniya.totalUnits.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500 block truncate">
+                      LKR {matrixData.branches.dambadeniya.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+
+                  {/* Alawwa */}
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Alawwa</span>
+                    <span className="text-sm font-black font-mono text-slate-900 block mt-0.5">
+                      {matrixData.branches.alawwa.totalUnits.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500 block truncate">
+                      LKR {matrixData.branches.alawwa.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Full-Width Purple Combined Banner Row */}
+                <div className="p-2.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between gap-2 shadow-xs">
+                  <span className="text-xs font-bold text-purple-100">All 3 Branches Combined</span>
+                  <div className="text-right">
+                    <span className="text-sm font-black font-mono text-white block">
+                      {matrixData.grandTotalUnits.toLocaleString()} units
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-amber-300 block">
+                      LKR {matrixData.grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ============================================================== */}
+            {/* 2. BALANCED DESKTOP TABLE LAYOUT (hidden md:block) */}
+            {/* ============================================================== */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-xs text-left table-fixed">
+                <thead className="bg-[#0F172A] text-white uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                  <tr>
+                    {/* Column 1: # */}
+                    <th className="py-3 px-3 text-center w-14">#</th>
+
+                    {/* Column 2: Special Item */}
+                    <th className="py-3 px-4 w-[34%] max-w-[340px]">
+                      <div>Special Item (Canonical 1–7)</div>
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">Catalog Variety & Standard Rate</div>
+                    </th>
+
+                    {/* Column 3: Giriulla */}
+                    <th className="py-3 px-3 text-center w-[16%] bg-slate-900 border-x border-slate-800">
+                      <div className="font-extrabold text-white text-xs">Giriulla</div>
+                      <div className="text-[10px] font-normal text-purple-300 truncate max-w-[130px] mx-auto mt-0.5">
+                        {matrixData.branches.giriulla.subtitle}
+                      </div>
+                      {matrixData.branches.giriulla.isCarriedForward && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                          Carried Forward
+                        </span>
+                      )}
+                    </th>
+
+                    {/* Column 4: Dambadeniya */}
+                    <th className="py-3 px-3 text-center w-[16%] bg-slate-900 border-r border-slate-800">
+                      <div className="font-extrabold text-white text-xs">Dambadeniya</div>
+                      <div className="text-[10px] font-normal text-purple-300 truncate max-w-[130px] mx-auto mt-0.5">
+                        {matrixData.branches.dambadeniya.subtitle}
+                      </div>
+                      {matrixData.branches.dambadeniya.isCarriedForward && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                          Carried Forward
+                        </span>
+                      )}
+                    </th>
+
+                    {/* Column 5: Alawwa */}
+                    <th className="py-3 px-3 text-center w-[16%] bg-slate-900 border-r border-slate-800">
+                      <div className="font-extrabold text-white text-xs">Alawwa</div>
+                      <div className="text-[10px] font-normal text-purple-300 truncate max-w-[130px] mx-auto mt-0.5">
+                        {matrixData.branches.alawwa.subtitle}
+                      </div>
+                      {matrixData.branches.alawwa.isCarriedForward && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                          Carried Forward
+                        </span>
+                      )}
+                    </th>
+
+                    {/* Column 6: All 3 Total */}
+                    <th className="py-3 px-3 text-center w-[18%] bg-gradient-to-r from-purple-950 to-indigo-950 text-white border-l border-purple-800">
+                      <div className="font-extrabold text-xs text-amber-300">All 3 Total</div>
+                      <div className="text-[10px] font-normal text-purple-200 mt-0.5">
+                        Combined Balance
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-sans">
+                  {sortedMatrixItems.map((item) => (
+                    <tr key={item.productId} className="hover:bg-slate-50/80 transition-colors">
+                      {/* # */}
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-400 font-mono">
+                        #{item.rank}
+                      </td>
+
+                      {/* Special Item */}
+                      <td className="py-2.5 px-4 truncate">
+                        <div className="font-bold text-slate-900 text-xs flex items-center gap-2 truncate">
+                          <span className="truncate">{item.name}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                            {item.sku}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                          Standard Selling Rate: LKR {item.rate}
+                        </span>
+                      </td>
+
+                      {/* Giriulla */}
+                      <td className="py-2.5 px-3 text-center bg-slate-50/40 border-x border-slate-100">
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                            item.giriulla > 50
+                              ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                              : item.giriulla > 0
+                              ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                              : 'bg-rose-50 text-rose-900 ring-rose-200'
+                          }`}
+                        >
+                          {item.giriulla}
+                        </span>
+                      </td>
+
+                      {/* Dambadeniya */}
+                      <td className="py-2.5 px-3 text-center bg-slate-50/40 border-r border-slate-100">
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                            item.dambadeniya > 50
+                              ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                              : item.dambadeniya > 0
+                              ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                              : 'bg-rose-50 text-rose-900 ring-rose-200'
                         }`}
                       >
                         {item.dambadeniya}
                       </span>
                     </td>
 
-                    {/* Alawwa */}
-                    <td className="py-2.5 px-4 text-center bg-slate-50/40 border-r border-slate-100">
-                      <span
-                        className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
-                          item.alawwa > 50
-                            ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
-                            : item.alawwa > 0
-                            ? 'bg-amber-50 text-amber-950 ring-amber-300'
-                            : 'bg-rose-50 text-rose-900 ring-rose-200'
-                        }`}
-                      >
-                        {item.alawwa}
+                      {/* Alawwa */}
+                      <td className="py-2.5 px-3 text-center bg-slate-50/40 border-r border-slate-100">
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[3.5rem] px-2.5 py-1 rounded-lg text-sm font-black tabular-nums font-mono shadow-2xs ring-1 ${
+                            item.alawwa > 50
+                              ? 'bg-emerald-50 text-emerald-950 ring-emerald-300'
+                              : item.alawwa > 0
+                              ? 'bg-amber-50 text-amber-950 ring-amber-300'
+                              : 'bg-rose-50 text-rose-900 ring-rose-200'
+                          }`}
+                        >
+                          {item.alawwa}
+                        </span>
+                      </td>
+
+                      {/* All 3 Total */}
+                      <td className="py-2.5 px-3 text-center bg-purple-50/60 border-l border-purple-100">
+                        <div className="inline-flex items-center justify-center min-w-[4rem] px-3 py-1 rounded-xl bg-purple-600 text-white font-mono font-black text-sm shadow-xs tabular-nums">
+                          {item.totalUnits}
+                        </div>
+                        <div className="text-[10px] text-purple-900 font-mono font-bold mt-0.5">
+                          LKR {item.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+
+                {/* Bottom Accounting Summary Row with Double-Underline Styling */}
+                <tfoot className="border-t-2 border-b-4 border-double border-slate-400 bg-slate-100 text-slate-900">
+                  {/* 1. Total Units Row */}
+                  <tr>
+                    <td colSpan={2} className="py-3 px-4 font-black uppercase text-xs tracking-wider text-slate-900 truncate">
+                      <div className="flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-purple-600 shrink-0" />
+                        <span>Total Remaining Units (11:00 PM)</span>
+                      </div>
+                    </td>
+                    {/* Giriulla Total Units */}
+                    <td className="py-3 px-3 text-center border-x border-slate-300">
+                      <span className="font-mono font-black text-sm text-slate-900">
+                        {matrixData.branches.giriulla.totalUnits.toLocaleString()} units
                       </span>
                     </td>
-
-                    {/* All 3 Total */}
-                    <td className="py-2.5 px-4 text-center bg-purple-50/60 border-l border-purple-100">
-                      <div className="inline-flex items-center justify-center min-w-[4rem] px-3 py-1 rounded-xl bg-purple-600 text-white font-mono font-black text-sm shadow-xs tabular-nums">
-                        {item.totalUnits}
-                      </div>
-                      <div className="text-[10px] text-purple-900 font-mono font-bold mt-0.5">
-                        LKR {item.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </div>
+                    {/* Dambadeniya Total Units */}
+                    <td className="py-3 px-3 text-center border-r border-slate-300">
+                      <span className="font-mono font-black text-sm text-slate-900">
+                        {matrixData.branches.dambadeniya.totalUnits.toLocaleString()} units
+                      </span>
+                    </td>
+                    {/* Alawwa Total Units */}
+                    <td className="py-3 px-3 text-center border-r border-slate-300">
+                      <span className="font-mono font-black text-sm text-slate-900">
+                        {matrixData.branches.alawwa.totalUnits.toLocaleString()} units
+                      </span>
+                    </td>
+                    {/* All 3 Total Combined Units */}
+                    <td className="py-3 px-3 text-center bg-purple-200/80 border-l border-purple-300">
+                      <span className="inline-flex items-center justify-center bg-purple-700 text-white font-mono font-black text-sm px-3 py-1 rounded-xl shadow-xs">
+                        {matrixData.grandTotalUnits.toLocaleString()} units
+                      </span>
                     </td>
                   </tr>
-                ))}
-              </tbody>
 
-              {/* Bottom Accounting Summary Row with Double-Underline Styling */}
-              <tfoot className="border-t-2 border-b-4 border-double border-slate-400 bg-slate-100 text-slate-900">
-                {/* 1. Total Units Row */}
-                <tr>
-                  <td colSpan={2} className="py-3 px-4 font-black uppercase text-xs tracking-wider text-slate-900">
-                    <div className="flex items-center gap-1.5">
-                      <Coins className="w-4 h-4 text-purple-600" />
-                      <span>Total Remaining Units (11:00 PM)</span>
-                    </div>
-                  </td>
-                  {/* Giriulla Total Units */}
-                  <td className="py-3 px-4 text-center border-x border-slate-300">
-                    <span className="font-mono font-black text-base text-slate-900">
-                      {matrixData.branches.giriulla.totalUnits.toLocaleString()} units
-                    </span>
-                  </td>
-                  {/* Dambadeniya Total Units */}
-                  <td className="py-3 px-4 text-center border-r border-slate-300">
-                    <span className="font-mono font-black text-base text-slate-900">
-                      {matrixData.branches.dambadeniya.totalUnits.toLocaleString()} units
-                    </span>
-                  </td>
-                  {/* Alawwa Total Units */}
-                  <td className="py-3 px-4 text-center border-r border-slate-300">
-                    <span className="font-mono font-black text-base text-slate-900">
-                      {matrixData.branches.alawwa.totalUnits.toLocaleString()} units
-                    </span>
-                  </td>
-                  {/* All 3 Total Combined Units */}
-                  <td className="py-3 px-4 text-center bg-purple-200/80 border-l border-purple-300">
-                    <span className="inline-flex items-center justify-center bg-purple-700 text-white font-mono font-black text-base px-3.5 py-1 rounded-xl shadow-xs">
-                      {matrixData.grandTotalUnits.toLocaleString()} units
-                    </span>
-                  </td>
-                </tr>
-
-                {/* 2. Total Retail Stock Value Row */}
-                <tr className="bg-slate-50 border-t border-slate-200 text-[11px]">
-                  <td colSpan={2} className="py-2 px-4 font-bold text-slate-600 uppercase tracking-wide">
-                    Total Retail Stock Value (LKR)
-                  </td>
-                  {/* Giriulla Value */}
-                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-x border-slate-200">
-                    LKR {matrixData.branches.giriulla.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </td>
-                  {/* Dambadeniya Value */}
-                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
-                    LKR {matrixData.branches.dambadeniya.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </td>
-                  {/* Alawwa Value */}
-                  <td className="py-2 px-4 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
-                    LKR {matrixData.branches.alawwa.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </td>
-                  {/* All 3 Total Combined Value */}
-                  <td className="py-2 px-4 text-center font-mono font-black text-purple-950 bg-purple-100/70 border-l border-purple-200">
-                    LKR {matrixData.grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                  {/* 2. Total Retail Stock Value Row */}
+                  <tr className="bg-slate-50 border-t border-slate-200 text-[11px]">
+                    <td colSpan={2} className="py-2 px-4 font-bold text-slate-600 uppercase tracking-wide truncate">
+                      Total Retail Stock Value (LKR)
+                    </td>
+                    {/* Giriulla Value */}
+                    <td className="py-2 px-3 text-center font-mono font-bold text-slate-700 border-x border-slate-200">
+                      LKR {matrixData.branches.giriulla.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    {/* Dambadeniya Value */}
+                    <td className="py-2 px-3 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
+                      LKR {matrixData.branches.dambadeniya.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    {/* Alawwa Value */}
+                    <td className="py-2 px-3 text-center font-mono font-bold text-slate-700 border-r border-slate-200">
+                      LKR {matrixData.branches.alawwa.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    {/* All 3 Total Combined Value */}
+                    <td className="py-2 px-3 text-center font-mono font-black text-purple-950 bg-purple-100/70 border-l border-purple-200">
+                      LKR {matrixData.grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
