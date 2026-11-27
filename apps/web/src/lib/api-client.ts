@@ -3856,6 +3856,240 @@ export const shiftsApi = {
     return false;
   },
 
+  /**
+   * Returns true if current Asia/Colombo wall-clock time is >= 22:00 (10:00 PM).
+   */
+  isColomboPastAutoCloseTime: (): boolean => {
+    try {
+      const hourStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Colombo',
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date());
+      const hour = parseInt(hourStr, 10);
+      return !isNaN(hour) && hour >= 22;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Daily 10:00 PM Auto-End Shift Engine:
+   * Invokes DB RPC `auto_close_overdue_shifts()` (with safe client-side fallback if RPC unavailable)
+   * to close any open shift where shift_date < today (Asia/Colombo) or (shift_date === today && time >= 22:00).
+   */
+  runAutoCloseOverdueShifts: async (force = false): Promise<{ closedCount: number }> => {
+    const now = Date.now();
+    const g = globalThis as any;
+    if (!force && g.__pixelcraftAutoClosePromise) {
+      return g.__pixelcraftAutoClosePromise;
+    }
+    if (!force && g.__pixelcraftLastAutoCloseAt && now - g.__pixelcraftLastAutoCloseAt < 15000) {
+      return { closedCount: 0 };
+    }
+
+    const runner = async (): Promise<{ closedCount: number }> => {
+      try {
+        g.__pixelcraftLastAutoCloseAt = Date.now();
+
+        // 1. Primary path: PostgreSQL SECURITY DEFINER RPC
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('auto_close_overdue_shifts');
+        if (!rpcErr && rpcData && typeof rpcData === 'object') {
+          return { closedCount: Number((rpcData as any).closed_count || 0) };
+        }
+
+        // 2. Fallback client-side sweep if RPC is unavailable
+        const todayColombo = getColomboDateStr(new Date());
+        const isPast10Pm = shiftsApi.isColomboPastAutoCloseTime();
+
+        const { data: openShifts, error: openErr } = await supabase
+          .from('cashier_shifts')
+          .select('*')
+          .eq('status', 'open');
+
+        if (openErr || !openShifts || openShifts.length === 0) {
+          return { closedCount: 0 };
+        }
+
+        const overdueShifts = openShifts.filter((s: any) => {
+          const sDate = String(s.shift_date || '').slice(0, 10);
+          if (!sDate) return false;
+          if (sDate < todayColombo) return true;
+          if (sDate === todayColombo && isPast10Pm) return true;
+          return false;
+        });
+
+        if (overdueShifts.length === 0) {
+          return { closedCount: 0 };
+        }
+
+        let closedCount = 0;
+        const autoNote = '[AUTO-CLOSED AT 10:00 PM] Shift not manually ended before 10:00 PM. Expected drawer balance carried forward to next shift.';
+
+        for (const shift of overdueShifts) {
+          const shiftDateStr = String(shift.shift_date || todayColombo).slice(0, 10);
+          const endedAtIso = new Date(`${shiftDateStr}T22:00:00+05:30`).toISOString();
+
+          // Live POS sales linked to this shift
+          const { data: shiftSales } = await supabase
+            .from('sales')
+            .select('id, status, total_amount, paid_amount, sale_payments(payment_method, amount)')
+            .eq('shift_id', shift.id)
+            .is('deleted_at', null);
+
+          let posBills = 0;
+          let posVoided = 0;
+          let posCash = 0;
+          let posCard = 0;
+          let posQr = 0;
+          let posCredit = 0;
+          let posGross = 0;
+
+          (shiftSales || []).forEach((s: any) => {
+            if (String(s.status || '').toUpperCase() === 'VOIDED') {
+              posVoided += 1;
+              return;
+            }
+            const grandTotal = Math.round(Number(s.total_amount ?? s.paid_amount ?? 0) * 100) / 100;
+            posGross += grandTotal;
+            const payments = Array.isArray(s.sale_payments) ? s.sale_payments : [];
+            let billCash = 0;
+            if (payments.length === 0) {
+              billCash = grandTotal;
+            } else {
+              let cashSum = 0;
+              payments.forEach((p: any) => {
+                const pm = String(p.payment_method || '').toUpperCase();
+                const amt = Number(p.amount || 0);
+                if (pm === 'CASH') cashSum += amt;
+                else if (pm === 'CARD') posCard += amt;
+                else if (pm === 'QR_PAYMENT' || pm === 'LANKA_QR') posQr += amt;
+                else if (pm === 'STORE_CREDIT' || pm === 'CUSTOMER_CREDIT') posCredit += amt;
+                else cashSum += amt;
+              });
+              billCash = Math.min(Math.round(cashSum * 100) / 100, grandTotal);
+            }
+            posCash += billCash;
+            if (billCash > 0) posBills += 1;
+          });
+
+          // Finalize shift_modaka_entries & sync branch stock_levels
+          const { data: modakaEntries } = await supabase
+            .from('shift_modaka_entries')
+            .select('*')
+            .eq('shift_id', shift.id);
+
+          const { data: wh } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('branch_id', shift.branch_id)
+            .limit(1)
+            .maybeSingle();
+
+          let modakaSoldQty = 0;
+          let modakaAmt = 0;
+
+          for (const e of modakaEntries || []) {
+            const openQ = Number(e.opening_qty || 0);
+            const inQ = Number(e.in_qty || 0);
+            const soldQ = Number(e.sold_qty || 0);
+            const availQ = openQ + inQ;
+            const closeQ = Math.max(0, availQ - soldQ);
+            const rate = Number(e.applied_rate || 0);
+            const amt = soldQ * rate;
+            modakaSoldQty += soldQ;
+            modakaAmt += amt;
+
+            await supabase
+              .from('shift_modaka_entries')
+              .update({
+                total_available_qty: availQ,
+                closing_qty: closeQ,
+                total_amount: amt,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', e.id);
+
+            if (wh?.id) {
+              await supabase
+                .from('stock_levels')
+                .update({
+                  quantity_on_hand: closeQ,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('warehouse_id', wh.id)
+                .eq('product_id', e.product_id);
+            }
+          }
+
+          const openingFloat = Number(shift.opening_float || 0);
+          const totalCashAvail = Math.round((openingFloat + posCash + modakaAmt) * 100) / 100;
+          const expectedCash = Math.max(
+            0,
+            Math.round((totalCashAvail - Number(shift.goods_purchased_paid || 0) - Number(shift.other_expenses || 0)) * 100) / 100
+          );
+          const bankedAmt = Number(shift.banked_amount || 0);
+          const closingFloat = Math.max(0, Math.round((expectedCash - bankedAmt) * 100) / 100);
+          const existingNotes = String(shift.handover_notes || '').trim();
+          const newNotes = !existingNotes
+            ? autoNote
+            : existingNotes.includes('[AUTO-CLOSED AT 10:00 PM]')
+            ? existingNotes
+            : `${existingNotes}\n${autoNote}`;
+
+          const { error: updErr } = await supabase
+            .from('cashier_shifts')
+            .update({
+              status: 'closed',
+              ended_at: endedAtIso,
+              pos_total_bills: posBills,
+              pos_voided_bills: posVoided,
+              pos_cash_sales: posCash,
+              pos_card_sales: posCard,
+              pos_qr_sales: posQr,
+              pos_credit_sales: posCredit,
+              pos_gross_sales: posGross,
+              declared_shift_sale: posCash,
+              modaka_total_sold_qty: modakaSoldQty,
+              modaka_total_amount: modakaAmt,
+              total_cash_available: totalCashAvail,
+              expected_cash_before_bank: expectedCash,
+              banked_amount: bankedAmt,
+              closing_float: closingFloat,
+              closing_drawer_float: closingFloat,
+              expected_remaining_drawer_cash: closingFloat,
+              counted_remaining_drawer_cash: closingFloat,
+              counted_drawer_cash: expectedCash,
+              cash_variance: 0,
+              tally_status: 'balanced',
+              handover_notes: newNotes,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', shift.id)
+            .eq('status', 'open');
+
+          if (!updErr) {
+            closedCount += 1;
+            try {
+              await branchAccessApi.expireShiftRequests(shift.id, shift.cashier_id, shift.branch_id);
+            } catch {}
+          }
+        }
+
+        return { closedCount };
+      } catch (err) {
+        console.warn('[shiftsApi] runAutoCloseOverdueShifts warning:', err);
+        return { closedCount: 0 };
+      } finally {
+        g.__pixelcraftAutoClosePromise = null;
+      }
+    };
+
+    const p = runner();
+    g.__pixelcraftAutoClosePromise = p;
+    return p;
+  },
+
   getActiveShift: async (
     branchId: string,
     cashierId?: string,
@@ -3866,6 +4100,9 @@ export const shiftsApi = {
       if (!branchId || branchId === 'all' || branchId === 'ALL' || !isValidUuid(branchId)) {
         return { success: false, data: null };
       }
+
+      // Sweep overdue shifts (yesterday's unclosed shifts or past 10:00 PM Asia/Colombo) first
+      await shiftsApi.runAutoCloseOverdueShifts();
 
       // Query active open shift for branch (shared across PIN switches in the branch)
       const { data: openShift, error: findErr } = await supabase
@@ -4209,6 +4446,9 @@ export const shiftsApi = {
           error: { code: 'INVALID_BRANCH', message: 'Specific branch ID is required', statusCode: 400 },
         };
       }
+
+      // Sweep any overdue shifts (yesterday's unclosed shifts or past 10:00 PM Asia/Colombo) before opening/resuming
+      await shiftsApi.runAutoCloseOverdueShifts();
 
       // Check if current user is Owner by ID, email, role, or flag
       const isOwnerAccount = isOwner || shiftsApi.isOwnerUser({ id: cashierId, fullName: cashierName });

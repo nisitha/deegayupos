@@ -223,6 +223,27 @@ export default function ModakaLedgerPage() {
     loadData(false);
   }, [loadData]);
 
+  // Daily 10:00 PM Auto-End Shift Sweep on load and every 60s when Asia/Colombo >= 22:00
+  useEffect(() => {
+    shiftsApi.runAutoCloseOverdueShifts().then((res) => {
+      if (res.closedCount > 0) {
+        loadData(true);
+        loadMatrixData(matrixDate, true);
+      }
+    });
+    const autoCloseInterval = setInterval(() => {
+      if (shiftsApi.isColomboPastAutoCloseTime()) {
+        shiftsApi.runAutoCloseOverdueShifts(true).then((res) => {
+          if (res.closedCount > 0) {
+            loadData(true);
+            loadMatrixData(matrixDate, true);
+          }
+        });
+      }
+    }, 60000);
+    return () => clearInterval(autoCloseInterval);
+  }, [loadData, loadMatrixData, matrixDate]);
+
   // Wire Real-time sync for live bill & shift events silently in the background
   useRealtimePosSync((isBg) => {
     loadData(isBg ?? true);
@@ -1386,7 +1407,7 @@ export default function ModakaLedgerPage() {
                       {shift.cashierName ? `Cashier: ${shift.cashierName}` : 'Cashier Shift'}
                     </span>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-black tracking-tight text-white">
                           {shift.cashierName ? `Shift Handover: ${shift.cashierName}` : 'Cashier Shift Handover'}
                         </h3>
@@ -1399,6 +1420,11 @@ export default function ModakaLedgerPage() {
                         >
                           {shift.status === 'closed' ? 'Closed & Reconciled' : 'In Progress (Open)'}
                         </span>
+                        {shift.status === 'closed' && (shift.handoverNotes || '').includes('[AUTO-CLOSED AT 10:00 PM]') && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                            AUTO-CLOSED • 10:00 PM
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-300">
                         {shift.branchName} • Cashier:{' '}

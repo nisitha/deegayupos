@@ -48,7 +48,7 @@ import {
 } from 'recharts';
 import type { DashboardActivityItem } from '@pixelcraft/types';
 import { useTenantBranch } from '../../context/tenant-branch-context';
-import { dashboardApi, legacySyncApi, procurementApi, getColomboDateStr, branchAccessApi, type LegacySyncConfigDto, type BranchAccessRequestDto } from '../../lib/api-client';
+import { dashboardApi, legacySyncApi, procurementApi, getColomboDateStr, branchAccessApi, shiftsApi, type LegacySyncConfigDto, type BranchAccessRequestDto } from '../../lib/api-client';
 import { StaffPersonalWorkspace } from './staff-portal';
 import { useRealtimePosSync } from '../../hooks/use-realtime-pos-sync';
 import { supabase } from '../../lib/supabase';
@@ -1232,6 +1232,25 @@ export default function DashboardPage() {
   }, []);
 
   useRealtimePosSync(triggerSilentRefresh);
+
+  // Daily 10:00 PM Auto-End Shift Sweep on load and every 60s when Asia/Colombo >= 22:00
+  useEffect(() => {
+    shiftsApi.runAutoCloseOverdueShifts().then((res) => {
+      if (res.closedCount > 0 && isOwner) {
+        fetchExecutiveDataRef.current({ forceRefresh: true, silent: true });
+      }
+    });
+    const autoCloseInterval = setInterval(() => {
+      if (shiftsApi.isColomboPastAutoCloseTime()) {
+        shiftsApi.runAutoCloseOverdueShifts(true).then((res) => {
+          if (res.closedCount > 0 && isOwner) {
+            fetchExecutiveDataRef.current({ forceRefresh: true, silent: true });
+          }
+        });
+      }
+    }, 60000);
+    return () => clearInterval(autoCloseInterval);
+  }, [isOwner]);
 
   useEffect(() => {
     return () => {

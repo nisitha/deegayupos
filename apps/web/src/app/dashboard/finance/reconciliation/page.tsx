@@ -1312,6 +1312,25 @@ export default function CashReconciliationPage() {
     loadAllData(false);
   }, [loadAllData]);
 
+  // Daily 10:00 PM Auto-End Shift Sweep on load and every 60s when Asia/Colombo >= 22:00
+  useEffect(() => {
+    shiftsApi.runAutoCloseOverdueShifts().then((res) => {
+      if (res.closedCount > 0) {
+        loadAllData(true);
+      }
+    });
+    const autoCloseInterval = setInterval(() => {
+      if (shiftsApi.isColomboPastAutoCloseTime()) {
+        shiftsApi.runAutoCloseOverdueShifts(true).then((res) => {
+          if (res.closedCount > 0) {
+            loadAllData(true);
+          }
+        });
+      }
+    }, 60000);
+    return () => clearInterval(autoCloseInterval);
+  }, [loadAllData]);
+
   // Wire Real-time sync for live bill & shift events silently in the background
   useRealtimePosSync((isBg) => loadAllData(isBg ?? true));
 
@@ -2178,6 +2197,11 @@ export default function CashReconciliationPage() {
                               </>
                             )}
                           </span>
+                          {sh.status === 'closed' && (sh.handover_notes || '').includes('[AUTO-CLOSED AT 10:00 PM]') && (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-400/40">
+                              AUTO-CLOSED • 10:00 PM
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -3780,14 +3804,21 @@ export default function CashReconciliationPage() {
                   const shiftVar = s.cash_variance || 0;
                   return (
                     <div key={s.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-indigo-400" />
                           <span className="font-bold text-xs text-slate-200">{s.cashier_name}</span>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {formatShiftLabel(s.shift_number, s.cashier_name)}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            {formatShiftLabel(s.shift_number, s.cashier_name)}
+                          </span>
+                          {s.status === 'closed' && (s.handover_notes || '').includes('[AUTO-CLOSED AT 10:00 PM]') && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                              AUTO-CLOSED • 10:00 PM
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-slate-500" />
